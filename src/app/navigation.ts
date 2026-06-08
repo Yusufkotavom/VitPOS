@@ -30,6 +30,7 @@ export const sidebarNavigation: NavigationItem[] = [
   { to: '/', label: appLabels.dashboard, icon: Home },
   { to: '/pos', label: appLabels.pos, icon: ShoppingCart },
   { to: '/products', label: appLabels.products, icon: Package },
+  { to: '/products/categories', label: 'Kategori Produk', icon: Package },
   { to: '/customers', label: appLabels.customers, icon: Users },
   { to: '/sales-orders', label: appLabels.salesOrders, icon: ClipboardList },
   { to: '/payments', label: appLabels.payments, icon: CreditCard },

@@ -7,6 +7,7 @@ import { LoadingState } from '@/shared/components/feedback/loading-state'
 const DashboardPage = lazy(() => import('@/features/dashboard/pages/dashboard-page').then(pick('DashboardPage')))
 const PosPage = lazy(() => import('@/features/pos/pages/pos-page').then(pick('PosPage')))
 const ProductsPage = lazy(() => import('@/features/products/pages/products-page').then(pick('ProductsPage')))
+const CategoriesPage = lazy(() => import('@/features/products/pages/categories-page').then(pick('CategoriesPage')))
 const CustomersPage = lazy(() => import('@/features/customers/pages/customers-page').then(pick('CustomersPage')))
 const SalesOrdersPage = lazy(() => import('@/features/sales-orders/pages/sales-orders-page').then(pick('SalesOrdersPage')))
 const PaymentsPage = lazy(() => import('@/features/payments/pages/payments-page').then(pick('PaymentsPage')))
@@ -48,6 +49,7 @@ export const router = createBrowserRouter([
       { index: true, element: routeElement(DashboardPage) },
       { path: 'pos', element: routeElement(PosPage) },
       { path: 'products', element: routeElement(ProductsPage) },
+      { path: 'products/categories', element: routeElement(CategoriesPage) },
       { path: 'customers', element: routeElement(CustomersPage) },
       { path: 'sales-orders', element: routeElement(SalesOrdersPage) },
       { path: 'payments', element: routeElement(PaymentsPage) },
