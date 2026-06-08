@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { formatRupiahFromNumber, formatUnits, parseDigits } from '@/features/catalog/lib/formatters'
+import { parseDigits } from '@/features/catalog/lib/formatters'
 import type { LocalProduct } from '@/services/local-db/schema'
 
 export const productStatusOptions = ['Aktif', 'Draft', 'Arsip'] as const
@@ -26,15 +26,23 @@ export const productInitialValues: ProductFormValues = {
   status: 'Aktif',
 }
 
-export function mapProductFormToRecord(values: ProductFormValues, id: string): LocalProduct {
+export function mapProductFormToRecord(values: ProductFormValues, id: string, base?: LocalProduct): LocalProduct {
+  const isService = values.type === 'Jasa'
+  const parsedPrice = parseDigits(values.price)
+  const parsedStock = isService ? 0 : parseDigits(values.stock)
+  const now = new Date().toISOString()
+
   return {
     id,
     name: values.name.trim(),
     category: values.category.trim(),
     type: values.type,
-    price: formatRupiahFromNumber(parseDigits(values.price)),
-    stock: values.type === 'Jasa' ? '-' : formatUnits(parseDigits(values.stock), 'pcs'),
+    price: parsedPrice,
+    stock: parsedStock,
     status: values.status,
+    syncStatus: 'pending',
+    version: (base?.version ?? 0) + 1,
+    updatedAt: now,
   }
 }
 
@@ -43,8 +51,8 @@ export function mapProductRecordToFormValues(product: LocalProduct): ProductForm
     name: product.name,
     category: product.category,
     type: product.type,
-    price: String(parseDigits(product.price)),
-    stock: String(parseDigits(product.stock)),
+    price: String(product.price),
+    stock: String(product.stock),
     status: product.status === 'Aktif' || product.status === 'Draft' || product.status === 'Arsip' ? product.status : 'Aktif',
   }
 }
