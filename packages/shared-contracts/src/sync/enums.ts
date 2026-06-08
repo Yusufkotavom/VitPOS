@@ -1,4 +1,4 @@
-export type SyncEntityType = 'product' | 'customer' | 'sale' | 'payment' | 'stock_movement' | 'cash'
+export type SyncEntityType = 'product' | 'customer' | 'sale' | 'payment' | 'stock_movement' | 'cash' | 'setting' | 'shift' | 'product_category'
 export type SyncMutationType = 'create' | 'update' | 'delete'
 export type LocalOutboxStatus = 'queued' | 'syncing' | 'synced' | 'failed' | 'conflict'
 export type ServerSyncStatus = 'pending' | 'synced' | 'failed' | 'conflict'
