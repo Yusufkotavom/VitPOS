@@ -20,18 +20,26 @@ function createTable<T extends { id: string }>() {
   }
 }
 
+function sampleProduct(overrides: Partial<LocalProduct> = {}): LocalProduct {
+  return {
+    id: 'product-1',
+    name: 'Kopi Susu',
+    category: 'Minuman',
+    type: 'Produk Fisik',
+    price: 18000,
+    stock: 24,
+    status: 'Aktif',
+    syncStatus: 'pending',
+    version: 1,
+    updatedAt: '2026-06-08T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
 describe('createRepository', () => {
   it('lists rows from the table', async () => {
     const table = createTable<LocalProduct>()
-    const product: LocalProduct = {
-      id: 'product-1',
-      name: 'Kopi Susu',
-      category: 'Minuman',
-      type: 'Produk Fisik',
-      price: 'Rp 18.000',
-      stock: '24 pcs',
-      status: 'Aktif',
-    }
+    const product = sampleProduct()
     table.rows.set(product.id, product)
 
     const repository = createRepository({ table, outboxTable: createTable<OutboxItem>(), entityType: 'product' })
@@ -39,18 +47,10 @@ describe('createRepository', () => {
     await expect(repository.list()).resolves.toEqual([product])
   })
 
-  it('upserts row and queues matching outbox item', async () => {
+  it('upserts row and queues create outbox item when row does not exist', async () => {
     const table = createTable<LocalProduct>()
     const outboxTable = createTable<OutboxItem>()
-    const product: LocalProduct = {
-      id: 'product-1',
-      name: 'Kopi Susu',
-      category: 'Minuman',
-      type: 'Produk Fisik',
-      price: 'Rp 18.000',
-      stock: '24 pcs',
-      status: 'Aktif',
-    }
+    const product = sampleProduct()
 
     const repository = createRepository({ table, outboxTable, entityType: 'product' })
     await repository.upsert(product)
@@ -71,40 +71,24 @@ describe('createRepository', () => {
   it('updates row and queues update when row already exists', async () => {
     const table = createTable<LocalProduct>()
     const outboxTable = createTable<OutboxItem>()
-    const product: LocalProduct = {
-      id: 'product-1',
-      name: 'Kopi Susu',
-      category: 'Minuman',
-      type: 'Produk Fisik',
-      price: 'Rp 18.000',
-      stock: '24 pcs',
-      status: 'Aktif',
-    }
+    const product = sampleProduct()
     table.rows.set(product.id, product)
 
     const repository = createRepository({ table, outboxTable, entityType: 'product' })
-    await repository.upsert({ ...product, stock: '18 pcs' })
+    await repository.upsert({ ...product, stock: 18 })
 
     expect(Array.from(outboxTable.rows.values())[0]).toMatchObject({
       entityType: 'product',
       entityId: product.id,
       mutationType: 'update',
-      payload: { ...product, stock: '18 pcs' },
+      payload: { ...product, stock: 18 },
     })
   })
 
   it('deletes row and queues delete with previous payload', async () => {
     const table = createTable<LocalProduct>()
     const outboxTable = createTable<OutboxItem>()
-    const product: LocalProduct = {
-      id: 'product-1',
-      name: 'Kopi Susu',
-      category: 'Minuman',
-      type: 'Produk Fisik',
-      price: 'Rp 18.000',
-      stock: '24 pcs',
-      status: 'Aktif',
-    }
+    const product = sampleProduct()
     table.rows.set(product.id, product)
 
     const repository = createRepository({ table, outboxTable, entityType: 'product' })

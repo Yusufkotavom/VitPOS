@@ -1,11 +1,43 @@
+import type {
+  ConflictResolution,
+  ConflictStatus,
+  LocalOutboxStatus as OutboxStatus,
+  SyncEntityType,
+  SyncMutationType,
+  SyncMutationRecord as OutboxItem,
+} from '@kotacom/shared-contracts/sync'
+
+export type SyncStatus = 'pending' | 'synced' | 'failed' | 'conflict'
+export type ProductStatus = 'Aktif' | 'Draft' | 'Arsip'
+export type ProductType = 'Produk Fisik' | 'Jasa'
+export type SalesOrderStatus = 'Draft' | 'Lunas' | 'Sebagian' | 'Belum Bayar' | 'Batal'
+export type PaymentStatus = 'Berhasil' | 'Pending' | 'Gagal' | 'Refund'
+export type PosPaymentMethodCode = 'tunai' | 'qris' | 'kartu' | 'transfer' | 'e-wallet' | 'piutang'
+export type StockMovementType = 'sale' | 'purchase' | 'return' | 'adjustment' | 'transfer_in' | 'transfer_out' | 'damage_lost'
+
 export type LocalProduct = {
   id: string
   name: string
   category: string
-  type: 'Produk Fisik' | 'Jasa'
-  price: string
-  stock: string
-  status: string
+  type: ProductType
+  price: number
+  stock: number
+  sku?: string
+  barcode?: string
+  status: ProductStatus
+  syncStatus: SyncStatus
+  version: number
+  updatedAt: string
+}
+
+export type LocalProductCategory = {
+  id: string
+  name: string
+  description?: string
+  status: 'Aktif' | 'Arsip'
+  syncStatus: SyncStatus
+  version: number
+  updatedAt: string
 }
 
 export type LocalCustomer = {
@@ -13,37 +45,77 @@ export type LocalCustomer = {
   name: string
   phone: string
   city: string
-  receivable: string
-  orders: string
+  receivable: number
+  orders: number
   status: string
+  syncStatus: SyncStatus
+  version: number
+  updatedAt: string
+}
+
+export type LocalSalesOrderItem = {
+  id: string
+  salesOrderId: string
+  productId: string
+  name: string
+  qty: number
+  unitPrice: number
+  subtotal: number
 }
 
 export type LocalSalesOrder = {
   id: string
   code: string
-  customer: string
+  customerId?: string
+  customerName: string
   date: string
-  total: string
-  paid: string
-  status: string
+  subtotal: number
+  discountTotal: number
+  taxTotal: number
+  grandTotal: number
+  paidTotal: number
+  status: SalesOrderStatus
+  items: LocalSalesOrderItem[]
+  syncStatus: SyncStatus
+  version: number
+  updatedAt: string
 }
 
 export type LocalPayment = {
   id: string
   ref: string
+  salesOrderId?: string
   source: string
-  method: string
-  amount: string
+  method: PosPaymentMethodCode
+  amount: number
   date: string
-  status: string
+  status: PaymentStatus
+  syncStatus: SyncStatus
+  version: number
+  updatedAt: string
+}
+
+export type LocalStockMovement = {
+  id: string
+  productId: string
+  productName: string
+  warehouseId?: string
+  warehouseName: string
+  type: StockMovementType
+  qty: number
+  referenceType?: string
+  referenceId?: string
+  notes?: string
+  syncStatus: SyncStatus
+  updatedAt: string
 }
 
 export type LocalInventory = {
   id: string
   product: string
   warehouse: string
-  stockSystem: string
-  stockSafe: string
+  stockSystem: number
+  stockSafe: number
   movement: string
   status: string
 }
@@ -54,20 +126,41 @@ export type LocalCash = {
   date: string
   account: string
   category: string
-  income: string
-  expense: string
+  income: number
+  expense: number
   status: string
+}
+
+export type LocalSetting = {
+  id: string
+  area: string
+  setting: string
+  value: string
+  updatedAt: string
+  status: string
+}
+
+export type LocalShift = {
+  id: string
+  cashierName: string
+  startTime: string
+  endTime?: string
+  startCash: number
+  expectedCash?: number
+  actualCash?: number
+  difference?: number
+  status: 'open' | 'closed'
 }
 
 export type SyncConflict = {
   id: string
-  entityType: 'product' | 'customer' | 'sale' | 'payment' | 'stock_movement' | 'cash'
+  entityType: SyncEntityType
   entityId: string
   localValue: unknown
   cloudValue: unknown
   reason: 'version_mismatch' | 'deleted_remotely' | 'field_conflict'
   status: 'open' | 'resolved'
-  resolution?: 'use_local' | 'use_cloud' | 'manual_merge'
+  resolution?: ConflictResolution
   createdAt: string
   resolvedAt?: string
 }
@@ -79,13 +172,7 @@ export type SyncRun = {
   status: 'running' | 'success' | 'failed'
   processed: number
   failed: number
+  pulled?: number
 }
 
-export type {
-  ConflictResolution,
-  ConflictStatus,
-  LocalOutboxStatus as OutboxStatus,
-  SyncEntityType,
-  SyncMutationType,
-  SyncMutationRecord as OutboxItem,
-} from '@kotacom/shared-contracts/sync'
+export type { ConflictResolution, ConflictStatus, OutboxItem, OutboxStatus, SyncEntityType, SyncMutationType }

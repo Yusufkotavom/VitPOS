@@ -5,7 +5,11 @@ import type {
   LocalInventory,
   LocalPayment,
   LocalProduct,
+  LocalProductCategory,
   LocalSalesOrder,
+  LocalSetting,
+  LocalShift,
+  LocalStockMovement,
   OutboxItem,
   SyncEntityType,
   SyncMutationType,
@@ -79,5 +83,9 @@ export const productRepository = createRepository<LocalProduct>({ table: localDb
 export const customerRepository = createRepository<LocalCustomer>({ table: localDb.customers, outboxTable: localDb.outbox, entityType: 'customer' })
 export const salesOrderRepository = createRepository<LocalSalesOrder>({ table: localDb.salesOrders, outboxTable: localDb.outbox, entityType: 'sale' })
 export const paymentRepository = createRepository<LocalPayment>({ table: localDb.payments, outboxTable: localDb.outbox, entityType: 'payment' })
-export const inventoryRepository = createRepository<LocalInventory>({ table: localDb.inventory, outboxTable: localDb.outbox, entityType: 'stock_movement' })
+export const stockMovementRepository = createRepository<LocalStockMovement>({ table: localDb.stockMovements, outboxTable: localDb.outbox, entityType: 'stock_movement' })
 export const cashRepository = createRepository<LocalCash>({ table: localDb.cash, outboxTable: localDb.outbox, entityType: 'cash' })
+export const inventoryRepository = createRepository<LocalInventory>({ table: localDb.inventory, outboxTable: localDb.outbox, entityType: 'stock_movement' })
+export const settingRepository = createRepository<LocalSetting>({ table: localDb.settings, outboxTable: localDb.outbox, entityType: 'setting' })
+export const shiftRepository = createRepository<LocalShift>({ table: localDb.shifts, outboxTable: localDb.outbox, entityType: 'shift' })
+export const productCategoryRepository = createRepository<LocalProductCategory>({ table: localDb.productCategories, outboxTable: localDb.outbox, entityType: 'product_category' })
