@@ -3,8 +3,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { createProductId } from '@/features/catalog/lib/entity-id'
 import { ProductForm } from '@/features/products/components/product-form'
 import { mapProductFormToRecord, mapProductRecordToFormValues, type ProductFormValues } from '@/features/products/schemas/product-form-schema'
@@ -18,7 +17,7 @@ export function ProductCrudActions({ product }: { product?: LocalProduct }) {
 
   async function handleSubmit(values: ProductFormValues) {
     const id = product?.id ?? createProductId()
-    await productRepository.upsert(mapProductFormToRecord(values, id))
+    await productRepository.upsert(mapProductFormToRecord(values, id, product))
     toast.success(isEdit ? 'Produk diperbarui' : 'Produk ditambahkan')
     setFormOpen(false)
   }
@@ -32,18 +31,20 @@ export function ProductCrudActions({ product }: { product?: LocalProduct }) {
 
   return (
     <div className="flex flex-wrap gap-2">
-      <Sheet open={formOpen} onOpenChange={setFormOpen}>
-        <SheetTrigger asChild>
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogTrigger asChild>
           {product ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />Ubah</Button> : <Button><PlusIcon data-icon="inline-start" />Tambah Produk</Button>}
-        </SheetTrigger>
-        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
-          <SheetHeader>
-            <SheetTitle>{isEdit ? 'Ubah produk' : 'Tambah produk'}</SheetTitle>
-            <SheetDescription>Simpan data lokal dulu. Outbox sinkron terisi otomatis.</SheetDescription>
-          </SheetHeader>
-          <ProductForm defaultValues={product ? mapProductRecordToFormValues(product) : undefined} submitLabel={isEdit ? 'Simpan perubahan' : 'Simpan produk'} onCancel={() => setFormOpen(false)} onSubmit={handleSubmit} />
-        </SheetContent>
-      </Sheet>
+        </DialogTrigger>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{isEdit ? 'Ubah produk' : 'Tambah produk'}</DialogTitle>
+            <DialogDescription>Simpan data lokal dulu. Outbox sinkron terisi otomatis.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <ProductForm defaultValues={product ? mapProductRecordToFormValues(product) : undefined} submitLabel={isEdit ? 'Simpan perubahan' : 'Simpan produk'} onCancel={() => setFormOpen(false)} onSubmit={handleSubmit} />
+          </div>
+        </DialogContent>
+      </Dialog>
       {product ? (
         <>
           <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />Hapus</Button>

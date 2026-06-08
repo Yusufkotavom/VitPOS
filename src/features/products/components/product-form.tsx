@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,7 +18,7 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
   }, [defaultValues, form])
 
   const errors = form.formState.errors
-  const type = form.watch('type')
+  const type = useWatch({ control: form.control, name: 'type' })
 
   return (
     <form className="flex flex-col gap-4 p-4" onSubmit={form.handleSubmit(onSubmit)}>

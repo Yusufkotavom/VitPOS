@@ -1,22 +1,9 @@
-type ProductRow = {
-  id: string
-  name: string
-  category: string
-  type: string
-  price: string
-  stock: string
-  status: string
-}
+import type { LocalProduct } from '@/services/local-db/schema'
 
-function parseStock(stock: string) {
-  const match = stock.match(/\d+/)
-  return match ? Number(match[0]) : 0
-}
-
-export function ProductStatusSummary({ products }: { products: ProductRow[] }) {
+export function ProductStatusSummary({ products }: { products: LocalProduct[] }) {
   const activeCount = products.filter((product) => product.status === 'Aktif').length
   const serviceCount = products.filter((product) => product.type === 'Jasa').length
-  const lowStockCount = products.filter((product) => product.type !== 'Jasa' && parseStock(product.stock) <= 10).length
+  const lowStockCount = products.filter((product) => product.type !== 'Jasa' && product.stock <= 10).length
 
   return (
     <section className="grid gap-3 md:grid-cols-3">
