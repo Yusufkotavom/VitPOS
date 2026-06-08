@@ -49,6 +49,7 @@ src/
 
 1. Copy `.env.example` ke `.env.local`
 2. Isi `DATABASE_URL`
+3. Set `VITE_API_BASE_URL` saat web harus bicara ke API terpisah
 
 ```bash
 cp .env.example .env.local
@@ -72,15 +73,31 @@ Script database:
 
 ## Development
 
+Web app:
+
 ```bash
 npm install
 npm run dev
 ```
 
+Backend API:
+
+```bash
+npm run api:dev
+```
+
 ## Verification
+
+Web:
 
 ```bash
 npm run check
+```
+
+API:
+
+```bash
+npm run api:check
 ```
 
 `npm run check` menjalankan:
@@ -89,6 +106,12 @@ npm run check
 - typecheck
 - test
 - build
+
+`npm run api:check` menjalankan:
+
+- API test
+- API typecheck
+- API build
 
 ## Catatan penting
 

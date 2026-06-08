@@ -16,7 +16,9 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@kotacom/shared-contracts": ["./packages/shared-contracts/src/index.ts"],
+      "@kotacom/shared-contracts/sync": ["./packages/shared-contracts/src/sync/index.ts"]
     },
     "ignoreDeprecations": "6.0",
 
@@ -26,5 +28,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src", "packages/shared-contracts/src"]
 }

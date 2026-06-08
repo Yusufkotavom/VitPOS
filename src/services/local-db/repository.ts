@@ -80,4 +80,4 @@ export const customerRepository = createRepository<LocalCustomer>({ table: local
 export const salesOrderRepository = createRepository<LocalSalesOrder>({ table: localDb.salesOrders, outboxTable: localDb.outbox, entityType: 'sale' })
 export const paymentRepository = createRepository<LocalPayment>({ table: localDb.payments, outboxTable: localDb.outbox, entityType: 'payment' })
 export const inventoryRepository = createRepository<LocalInventory>({ table: localDb.inventory, outboxTable: localDb.outbox, entityType: 'stock_movement' })
-export const cashRepository = createRepository<LocalCash>({ table: localDb.cash, outboxTable: localDb.outbox, entityType: 'payment' })
+export const cashRepository = createRepository<LocalCash>({ table: localDb.cash, outboxTable: localDb.outbox, entityType: 'cash' })

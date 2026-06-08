@@ -1,0 +1,7 @@
+export type SyncEntityType = 'product' | 'customer' | 'sale' | 'payment' | 'stock_movement' | 'cash'
+export type SyncMutationType = 'create' | 'update' | 'delete'
+export type LocalOutboxStatus = 'queued' | 'syncing' | 'synced' | 'failed' | 'conflict'
+export type ServerSyncStatus = 'pending' | 'synced' | 'failed' | 'conflict'
+export type ApiSyncItemStatus = 'pending' | 'processing' | 'applied' | 'conflict' | 'rejected'
+export type ConflictStatus = 'open' | 'resolved'
+export type ConflictResolution = 'use_local' | 'use_cloud' | 'manual_merge'

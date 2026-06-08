@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
-import { reportRows } from '@/features/reports/mocks/reports.mock'
 import { ReportsSummaryCards } from '@/features/reports/components/reports-summary-cards'
+import { useReportRows } from '@/features/reports/hooks/use-report-rows'
 import { DataTable } from '@/shared/components/data-table/data-table'
 import { ContentCard } from '@/shared/components/display/content-card'
 import { StatusBadge } from '@/shared/components/display/status-badge'
@@ -13,9 +13,11 @@ function tone(status: string) {
 }
 
 export function ReportsPage() {
+  const { data: reportRows = [] } = useReportRows()
+
   return (
     <PageShell title="Laporan" description="Keuangan, laba rugi, arus kas, persediaan, penjualan, piutang, dan hutang." actions={<Button>Export PDF</Button>}>
-      <ReportsSummaryCards />
+      <ReportsSummaryCards reports={reportRows} />
       <ContentCard title="Dashboard Laporan" description="Summary cards dan daftar laporan siap export.">
         <DataTable
           data={reportRows}

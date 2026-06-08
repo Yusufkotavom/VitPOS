@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildSyncPushResponse, toApiSyncItemStatus } from './contracts'
+import { buildSyncPushResponse, localOutboxStatusToApiItemStatus } from './contracts'
 
 describe('api sync contracts', () => {
   it('maps local queue statuses to api item statuses', () => {
-    expect(toApiSyncItemStatus('queued')).toBe('pending')
-    expect(toApiSyncItemStatus('syncing')).toBe('processing')
-    expect(toApiSyncItemStatus('synced')).toBe('applied')
-    expect(toApiSyncItemStatus('failed')).toBe('rejected')
+    expect(localOutboxStatusToApiItemStatus('queued')).toBe('pending')
+    expect(localOutboxStatusToApiItemStatus('syncing')).toBe('processing')
+    expect(localOutboxStatusToApiItemStatus('synced')).toBe('applied')
+    expect(localOutboxStatusToApiItemStatus('failed')).toBe('rejected')
+    expect(localOutboxStatusToApiItemStatus('conflict')).toBe('conflict')
   })
 
   it('builds push response summary from item results', () => {

@@ -5,18 +5,20 @@ import { type SyncHealthStatus, type SyncSummary } from '@/features/sync/types/s
 type SyncStore = SyncSummary & {
   setOnline: (isOnline: boolean) => void
   setStatus: (status: SyncHealthStatus) => void
+  setCounts: (counts: Pick<SyncSummary, 'pendingCount' | 'failedCount' | 'conflictCount'>) => void
   markSynced: () => void
 }
 
 export const useSyncStore = create<SyncStore>((set) => ({
   isOnline: true,
   status: 'pending',
-  pendingCount: 7,
+  pendingCount: 0,
   failedCount: 0,
   conflictCount: 0,
-  lastSyncAt: '2026-06-08T08:30:00.000Z',
+  lastSyncAt: null,
   setOnline: (isOnline) => set({ isOnline, status: isOnline ? 'pending' : 'offline' }),
   setStatus: (status) => set({ status }),
+  setCounts: (counts) => set(counts),
   markSynced: () =>
     set({
       status: 'synced',

@@ -7,7 +7,13 @@
     "skipLibCheck": true,
     "types": ["node"],
     "rootDir": "../..",
-    "outDir": "dist"
+    "outDir": "dist",
+    "baseUrl": "../..",
+    "paths": {
+      "@kotacom/shared-contracts": ["packages/shared-contracts/src/index.ts"],
+      "@kotacom/shared-contracts/sync": ["packages/shared-contracts/src/sync/index.ts"]
+    },
+    "ignoreDeprecations": "6.0"
   },
-  "include": ["src", "../../src/db/schema/**/*.ts"]
+  "include": ["src", "../../src/db/schema/**/*.ts", "../../packages/shared-contracts/src/**/*.ts"]
 }

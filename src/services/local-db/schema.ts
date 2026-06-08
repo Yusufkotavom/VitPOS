@@ -1,9 +1,3 @@
-export type SyncEntityType = 'product' | 'customer' | 'sale' | 'payment' | 'stock_movement'
-export type SyncMutationType = 'create' | 'update' | 'delete'
-export type OutboxStatus = 'queued' | 'syncing' | 'synced' | 'failed'
-export type ConflictStatus = 'open' | 'resolved'
-export type ConflictResolution = 'use_local' | 'use_cloud' | 'manual_merge'
-
 export type LocalProduct = {
   id: string
   name: string
@@ -65,29 +59,15 @@ export type LocalCash = {
   status: string
 }
 
-export type OutboxItem = {
-  id: string
-  entityType: SyncEntityType
-  entityId: string
-  mutationType: SyncMutationType
-  payload: unknown
-  status: OutboxStatus
-  attempts: number
-  errorMessage?: string
-  createdAt: string
-  updatedAt: string
-  syncedAt?: string
-}
-
 export type SyncConflict = {
   id: string
-  entityType: SyncEntityType
+  entityType: 'product' | 'customer' | 'sale' | 'payment' | 'stock_movement' | 'cash'
   entityId: string
   localValue: unknown
   cloudValue: unknown
   reason: 'version_mismatch' | 'deleted_remotely' | 'field_conflict'
-  status: ConflictStatus
-  resolution?: ConflictResolution
+  status: 'open' | 'resolved'
+  resolution?: 'use_local' | 'use_cloud' | 'manual_merge'
   createdAt: string
   resolvedAt?: string
 }
@@ -100,3 +80,12 @@ export type SyncRun = {
   processed: number
   failed: number
 }
+
+export type {
+  ConflictResolution,
+  ConflictStatus,
+  LocalOutboxStatus as OutboxStatus,
+  SyncEntityType,
+  SyncMutationType,
+  SyncMutationRecord as OutboxItem,
+} from '@kotacom/shared-contracts/sync'

@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+
 import { Button } from '@/components/ui/button'
 import { useSyncConflicts } from '@/features/sync/hooks/use-sync-conflicts'
 import { useSyncQueue } from '@/features/sync/hooks/use-sync-queue'
@@ -21,6 +23,10 @@ export function SyncPage() {
   const { items: outbox, pendingCount, failedCount } = useSyncQueue()
   const { conflicts, openCount } = useSyncConflicts()
 
+  useEffect(() => {
+    sync.setCounts({ pendingCount, failedCount, conflictCount: openCount })
+  }, [failedCount, openCount, pendingCount, sync])
+
   async function addMockQueue() {
     await enqueueOutboxItem({
       entityType: 'sale',
@@ -32,7 +38,14 @@ export function SyncPage() {
 
   async function syncNow() {
     sync.setStatus('syncing')
-    await runMockSync()
+    const result = await runMockSync()
+
+    if (result.failed > 0) {
+      sync.setStatus(openCount > 0 ? 'conflict' : 'failed')
+      return
+    }
+
+    sync.markSynced()
   }
 
   return (
