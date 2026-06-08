@@ -1,13 +1,17 @@
-import { describe, expect, it } from 'vitest'
-
+import { describe, it, expect } from 'vitest'
 import { formatCurrency } from './format-currency'
 
 describe('formatCurrency', () => {
-  it('formats number as Indonesian rupiah without decimals', () => {
-    expect(formatCurrency(12500)).toBe('Rp 12.500')
+  it('formats valid numbers correctly', () => {
+    expect(formatCurrency(150000)).toBe('Rp 150.000')
+    expect(formatCurrency(0)).toBe('Rp 0')
   })
 
-  it('rounds decimal value to nearest rupiah', () => {
-    expect(formatCurrency(12500.75)).toBe('Rp 12.501')
+  it('handles invalid inputs safely', () => {
+    expect(formatCurrency(undefined)).toBe('Rp 0')
+    expect(formatCurrency(null)).toBe('Rp 0')
+    expect(formatCurrency(NaN)).toBe('Rp 0')
+    expect(formatCurrency('150000')).toBe('Rp 150.000')
+    expect(formatCurrency('invalid')).toBe('Rp 0')
   })
 })

@@ -100,6 +100,18 @@ API:
 npm run api:check
 ```
 
+Android shell:
+
+```bash
+npm run mobile:check
+```
+
+Desktop shell:
+
+```bash
+npm run desktop:check
+```
+
 `npm run check` menjalankan:
 
 - lint
@@ -112,6 +124,23 @@ npm run api:check
 - API test
 - API typecheck
 - API build
+
+`npm run mobile:check` memvalidasi konfigurasi Capacitor dan memastikan build web tersedia untuk shell Android.
+
+`npm run desktop:check` memvalidasi scaffold Tauri tanpa perlu Rust toolchain lokal.
+
+## Agent reporting
+
+Setiap agent selesai harus update:
+
+- `docs/agent-changelog.md`
+
+Isi minimal:
+
+- status done / partial / failed
+- file yang disentuh
+- verifikasi yang dijalankan
+- gap yang masih tersisa
 
 ## Catatan penting
 

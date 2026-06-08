@@ -71,4 +71,23 @@ describe('sync contract validation', () => {
     }
   })
 
+  it('accepts supplier, purchase, return, and service_order as valid entityTypes', () => {
+    const types = ['supplier', 'purchase', 'return', 'service_order']
+    for (const type of types) {
+      const result = parseSyncPushBody({
+        tenantId: '11111111-1111-4111-8111-111111111111',
+        deviceId: 'kasir-1',
+        mutations: [
+          {
+            entityId: '33333333-3333-4333-8333-333333333333',
+            entityType: type,
+            mutationType: 'create',
+            payload: {},
+          },
+        ],
+      })
+      expect(result.ok).toBe(true)
+    }
+  })
+
 })

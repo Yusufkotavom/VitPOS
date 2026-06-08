@@ -1,7 +1,10 @@
-export function formatCurrency(value: number) {
+export function formatCurrency(value: unknown) {
+  const numValue = typeof value === 'string' ? Number.parseFloat(value) : value
+  const safeValue = typeof numValue === 'number' && Number.isFinite(numValue) ? numValue : 0
+
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
     maximumFractionDigits: 0,
-  }).format(value).replace(/\u00a0/g, ' ')
+  }).format(safeValue).replace(/\u00a0/g, ' ')
 }
