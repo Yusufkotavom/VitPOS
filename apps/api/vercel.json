@@ -1,9 +1,5 @@
 {
-  "functions": {
-    "src/index.ts": {
-      "runtime": "@vercel/node"
-    }
-  },
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "routes": [
     {
       "src": "/(.*)",
