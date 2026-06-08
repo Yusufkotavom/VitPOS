@@ -9,9 +9,12 @@ type PosStore = {
   paymentMethod: PosPaymentMethod
   discount: number
   paidAmount: number
+  customerId: string | null
+  customerName: string | null
   setSearchQuery: (value: string) => void
   setSelectedCategory: (value: string) => void
   addItem: (product: PosProduct) => void
+  updateItem: (productId: string, updates: Partial<PosCartItem>) => void
   increaseQty: (productId: string) => void
   decreaseQty: (productId: string) => void
   removeItem: (productId: string) => void
@@ -19,6 +22,7 @@ type PosStore = {
   setPaymentMethod: (value: PosPaymentMethod) => void
   setPaidAmount: (value: number) => void
   setDiscount: (value: number) => void
+  setCustomer: (id: string | null, name: string | null) => void
 }
 
 export const usePosStore = create<PosStore>((set) => ({
@@ -28,6 +32,8 @@ export const usePosStore = create<PosStore>((set) => ({
   paymentMethod: 'tunai',
   discount: 0,
   paidAmount: 0,
+  customerId: null,
+  customerName: null,
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setSelectedCategory: (selectedCategory) => set({ selectedCategory }),
   addItem: (product) =>
@@ -56,6 +62,17 @@ export const usePosStore = create<PosStore>((set) => ({
         ],
       }
     }),
+  updateItem: (productId, updates) =>
+    set((state) => ({
+      cartItems: state.cartItems.map((item) => {
+        if (item.productId === productId) {
+          const price = updates.price ?? item.price
+          const qty = updates.qty ?? item.qty
+          return { ...item, ...updates, price, qty, subtotal: price * qty }
+        }
+        return item
+      }),
+    })),
   increaseQty: (productId) =>
     set((state) => ({
       cartItems: state.cartItems.map((item) =>
@@ -71,10 +88,11 @@ export const usePosStore = create<PosStore>((set) => ({
         .filter((item) => item.qty > 0),
     })),
   removeItem: (productId) => set((state) => ({ cartItems: state.cartItems.filter((item) => item.productId !== productId) })),
-  clearCart: () => set({ cartItems: [], discount: 0, paidAmount: 0, paymentMethod: 'tunai' }),
+  clearCart: () => set({ cartItems: [], discount: 0, paidAmount: 0, paymentMethod: 'tunai', customerId: null, customerName: null }),
   setPaymentMethod: (paymentMethod) => set({ paymentMethod }),
   setPaidAmount: (paidAmount) => set({ paidAmount }),
   setDiscount: (discount) => set({ discount }),
+  setCustomer: (id, name) => set({ customerId: id, customerName: name }),
 }))
 
 export function selectPosTotals(state: PosStore) {
@@ -85,3 +103,4 @@ export function selectPosTotals(state: PosStore) {
 
   return { subtotal, total, change, itemCount }
 }
+

@@ -35,12 +35,8 @@ function isPaidStatus(total: number, paid: number): LocalSalesOrder['status'] {
   return 'Belum Bayar'
 }
 
-function isCashLike(method: PosPaymentMethod): boolean {
-  return method === 'tunai' || method === 'qris' || method === 'kartu' || method === 'transfer' || method === 'e-wallet'
-}
-
 export const posTransactionService = {
-  async saveDraft(cartItems: CartItem[], totals: PosTotals, discountTotal: number = 0) {
+  async saveDraft(cartItems: CartItem[], totals: PosTotals, discountTotal: number = 0, customerName?: string | null) {
     if (cartItems.length === 0) return
 
     const draftId = crypto.randomUUID()
@@ -59,7 +55,7 @@ export const posTransactionService = {
     const draftOrder: LocalSalesOrder = {
       id: draftId,
       code: `DRF-${Date.now()}`,
-      customerName: 'Draft',
+      customerName: customerName || 'Draft',
       date: todayLabel(),
       subtotal: totals.subtotal,
       discountTotal: discountTotal,
@@ -92,7 +88,7 @@ export const posTransactionService = {
     })
   },
 
-  async checkout(cartItems: CartItem[], totals: PosTotals, paymentMethod: PosPaymentMethod, paidAmount: number, discountTotal: number = 0) {
+  async checkout(cartItems: CartItem[], totals: PosTotals, paymentMethod: PosPaymentMethod, paidAmount: number, discountTotal: number = 0, customerName?: string | null) {
     if (cartItems.length === 0) return
 
     const nowIso = new Date().toISOString()
@@ -109,12 +105,12 @@ export const posTransactionService = {
       subtotal: cartItem.subtotal,
     }))
 
-    const actualPaid = isCashLike(paymentMethod) ? totals.total : paidAmount
+    const actualPaid = Math.max(paidAmount, 0)
 
     const salesOrder: LocalSalesOrder = {
       id: salesOrderId,
       code: orderCode(),
-      customerName: 'Umum',
+      customerName: customerName || 'Umum',
       date: todayLabel(),
       subtotal: totals.subtotal,
       discountTotal: discountTotal,
@@ -218,5 +214,7 @@ export const posTransactionService = {
         await localDb.outbox.put(outboxItem)
       }
     })
+
+    return { salesOrderId, paymentId, code: salesOrder.code }
   }
 }

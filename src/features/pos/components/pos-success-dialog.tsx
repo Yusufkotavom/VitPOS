@@ -1,8 +1,9 @@
-import { Printer, MessageCircle, Plus } from 'lucide-react'
+import { Printer, MessageCircle, Plus, FileText } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/format-currency'
 import { type PosOrderSummary } from '@/features/pos/types/pos-order.types'
+import { Link } from 'react-router-dom'
 
 export type PosSuccessDialogProps = {
   open: boolean
@@ -23,6 +24,11 @@ export function PosSuccessDialog({
 }: PosSuccessDialogProps) {
   if (!order) return null
 
+  // Kita asumsikan id di order adalah order.id asli dari DB atau transaction service.
+  // Wait, di transaction service, id yang dikembalikan adalah orderCode untuk referensi tampilan.
+  // Tapi route /sales-orders/:id butuh UUID nya, bukan code.
+  // Kita sesuaikan: `id` harusnya `salesOrderId` yang di generate.
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton={false} className="max-w-md">
@@ -36,7 +42,7 @@ export function PosSuccessDialog({
         <div className="my-6 space-y-4 rounded-xl border bg-muted/30 p-4">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">ID Pesanan</span>
-            <span className="font-mono font-medium">{order.id}</span>
+            <span className="font-mono font-medium">{order.code}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Metode Bayar</span>
@@ -65,10 +71,18 @@ export function PosSuccessDialog({
               WhatsApp
             </Button>
           </div>
-          <Button variant="default" onClick={onNewSale} className="w-full mt-2" size="lg">
-            <Plus data-icon="inline-start" />
-            Penjualan Baru
-          </Button>
+          <div className="grid grid-cols-2 gap-2 w-full mt-2">
+            <Button variant="secondary" asChild className="w-full">
+              <Link to={`/sales-orders/${order.id}`}>
+                <FileText data-icon="inline-start" className="mr-2" />
+                Buka Detail
+              </Link>
+            </Button>
+            <Button variant="default" onClick={onNewSale} className="w-full">
+              <Plus data-icon="inline-start" />
+              Penjualan Baru
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

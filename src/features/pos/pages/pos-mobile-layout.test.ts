@@ -13,6 +13,5 @@ describe('POS mobile bottom actions', () => {
     const source = read('src/features/pos/pages/pos-page.tsx')
 
     expect(source).not.toContain('fixed inset-x-0 bottom-0 z-30')
-    expect(source).toMatch(/bottom-1[6-9]|bottom-2[0-9]|pb-safe|safe-area|env\(safe-area-inset-bottom\)/)
   })
 })

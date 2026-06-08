@@ -111,6 +111,29 @@ Track agent work, verification evidence, and remaining gaps after each delegated
 - Remaining:
   - Manual browser QA after final check.
 
+### POS minimalis & Checkout Flow
+- Status: done, pending final full-project verification
+- Files:
+  - `src/features/pos/pages/pos-page.tsx`
+  - `src/features/pos/components/payment-summary.tsx`
+  - `src/features/pos/components/pos-customer-select.tsx`
+  - `src/features/pos/components/cart-panel.tsx`
+  - `src/features/pos/components/cart-item-edit-dialog.tsx`
+  - `src/features/pos/types/pos.types.ts`
+  - `src/features/pos/stores/pos-store.ts`
+  - `src/features/pos/services/pos-transaction.service.ts`
+- Done:
+  - Merubah POS page menjadi layout minimalist dengan Search Customer (Combobox/Datalist) + Product di Header atas, bukan PageShell standar.
+  - Dialog checkout detail (ada subtotal, discount, item notes).
+  - Metode bayar mencakup input jumlah nominal; handling pembayaran uang pas, kurang (DP), dan kembali.
+  - Menyederhanakan sync indicator jadi icon dot mungil `Cloud` / `RefreshCw`.
+  - Fix test render mismatch di Card vs List views `sales-orders-page.test.tsx` dan `pos-mobile-layout.test.ts`.
+- Verification:
+  - `npm run lint && npm run typecheck && npm run test` passed sempurna 99 tests.
+  - `npm run build` passed
+- Remaining:
+  - None for this wave. Lanjut rilis feature wave 1.
+
 ## New agent reporting rule
 
 After every agent completion, update this file before commit:

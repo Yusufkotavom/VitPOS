@@ -2,6 +2,7 @@ import { type PosCartItem, type PosPaymentMethod } from './pos.types'
 
 export type PosOrderSummary = {
   id: string
+  code: string
   date: Date
   subtotal: number
   tax: number

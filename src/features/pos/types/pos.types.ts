@@ -16,6 +16,7 @@ export type PosCartItem = {
   price: number
   qty: number
   subtotal: number
+  note?: string
 }
 
 export type PosPaymentMethod = string

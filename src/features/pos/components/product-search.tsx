@@ -40,7 +40,7 @@ export function ProductSearch() {
         value={searchQuery}
         onChange={(event) => handleInputChange(event.target.value)}
         placeholder="Cari produk / scan barcode"
-        className="h-12 pl-10"
+        className="h-11 rounded-xl pl-10"
       />
     </div>
   )

@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { LayoutGrid, List } from 'lucide-react'
+import { LayoutGrid, List, Filter } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/format-currency'
 import { ProductCrudActions } from '@/features/products/components/product-crud-actions'
-import { ProductStatusSummary } from '@/features/products/components/product-status-summary'
 import { useProducts } from '@/features/products/hooks/use-products'
 import { DataTable } from '@/shared/components/data-table/data-table'
 import { ContentCard } from '@/shared/components/display/content-card'
@@ -23,41 +22,65 @@ function displayStock(product: { type: string; stock: number }) {
 
 export function ProductsPage() {
   const productRows = useProducts()
-  const [viewMode, setViewMode] = useState<'list' | 'card'>('list')
+  const [view, setView] = useState<'list' | 'card'>('list')
+  const activeView = view
 
   return (
-    <PageShell title="Produk" description="Kelola barang dan jasa dengan table desktop dan card mobile." actions={<ProductCrudActions />}>
-      <ProductStatusSummary products={productRows} />
+    <PageShell title="Barang & Jasa" actions={<ProductCrudActions />}>
+      <ContentCard>
+        <div className="mb-4 flex flex-row items-center gap-2 border-b pb-4">
+          <input type="text" placeholder="Cari barang..." className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" />
 
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-xl font-semibold tracking-tight">Daftar Produk</h2>
-        <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg border">
-          <Button
-            variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setViewMode('list')}
-            className="h-8 px-2"
-          >
-            <List className="h-4 w-4 mr-1" />
-            List
-          </Button>
-          <Button
-            variant={viewMode === 'card' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setViewMode('card')}
-            className="h-8 px-2"
-          >
-            <LayoutGrid className="h-4 w-4 mr-1" />
-            Card
-          </Button>
+          <div className="relative flex items-center group shrink-0">
+            <Button variant="outline" size="icon" className="h-9 w-9">
+              <Filter className="h-4 w-4" />
+            </Button>
+
+            <div className="absolute top-full right-0 mt-2 hidden group-hover:flex flex-col gap-2 rounded-md border bg-popover p-2 shadow-md z-10 w-48">
+              <select className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
+                <option value="">Jenis</option>
+                <option value="Barang">Barang</option>
+                <option value="Jasa">Jasa</option>
+              </select>
+              <select className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
+                <option value="">Status</option>
+                <option value="Aktif">Aktif</option>
+                <option value="Draft">Draft</option>
+              </select>
+              <select className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
+                <option value="20">20 / halaman</option>
+                <option value="50">50 / halaman</option>
+                <option value="100">100 / halaman</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-1 shrink-0">
+            <Button
+              variant={activeView === 'list' ? 'secondary' : 'ghost'}
+              size="icon"
+              onClick={() => setView('list')}
+              className="h-7 w-7"
+              title="List View"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={activeView === 'card' ? 'secondary' : 'ghost'}
+              size="icon"
+              onClick={() => setView('card')}
+              className="h-7 w-7"
+              title="Card View"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-      </div>
 
-      {viewMode === 'list' ? (
-        <ContentCard>
+        {activeView === 'list' ? (
           <DataTable
             columns={[
-              { key: 'name', header: 'Produk' },
+              { key: 'name', header: 'Nama' },
               { key: 'category', header: 'Kategori' },
               { key: 'type', header: 'Jenis' },
               { key: 'price', header: 'Harga', render: (row) => formatCurrency(row.price) },
@@ -66,30 +89,12 @@ export function ProductsPage() {
               { key: 'actions', header: 'Aksi', render: (row) => <ProductCrudActions product={row} /> },
             ]}
             data={productRows}
-            emptyTitle="Belum ada produk"
-            mobileRender={(row) => (
-              <div className="flex flex-col gap-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium">{row.name}</p>
-                    <p className="text-sm text-muted-foreground">{row.category} · {row.type}</p>
-                  </div>
-                  <StatusBadge label={row.status} tone={statusTone(row.status)} />
-                </div>
-                <div className="flex items-center justify-between text-sm"><span>{formatCurrency(row.price)}</span><span>{displayStock(row)}</span></div>
-                <ProductCrudActions product={row} />
-              </div>
-            )}
           />
-        </ContentCard>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {productRows.length === 0 ? (
-            <div className="col-span-full">
-              <EmptyState title="Belum ada produk" description="Produk akan muncul di sini setelah tersedia." />
-            </div>
-          ) : (
-            productRows.map((row) => (
+        ) : productRows.length === 0 ? (
+          <EmptyState title="Belum ada barang atau jasa" description="Barang dan jasa akan muncul di sini setelah tersedia." />
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {productRows.map((row) => (
               <div key={row.id} className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border bg-background p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/20">
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-3">
@@ -116,10 +121,10 @@ export function ProductsPage() {
                   </div>
                 </div>
               </div>
-            ))
-          )}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </ContentCard>
     </PageShell>
   )
 }

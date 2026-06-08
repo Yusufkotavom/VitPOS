@@ -87,7 +87,7 @@ export function mapSalesOrderRecordToFormValues(order: LocalSalesOrder): SalesOr
     discountTotal: String(order.discountTotal),
     taxTotal: String(order.taxTotal),
     status: order.status,
-    items: order.items.length > 0
+    items: (order.items?.length ?? 0) > 0
       ? order.items.map((item) => ({ name: item.name, qty: String(item.qty), unitPrice: String(item.unitPrice) }))
       : [{ name: '', qty: '1', unitPrice: '0' }],
   }
