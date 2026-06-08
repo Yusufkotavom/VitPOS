@@ -1,14 +1,14 @@
 import { and, desc, eq, gte } from 'drizzle-orm'
 import { Hono } from 'hono'
 
-import { db } from '../../lib/db'
+import { db } from '../../lib/db.js'
 import {
   buildSyncPushResponse,
   serverSyncStatusToApiItemStatus,
   parseSyncPullQuery,
   parseSyncPushBody,
   type SyncPushItemResult,
-} from '../../lib/contracts'
+} from '../../lib/contracts.js'
 import { outboxLogs } from '../../../../../src/db/schema'
 
 export const syncRoutes = new Hono()

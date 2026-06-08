@@ -1,10 +1,10 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 
-import { authRoutes } from './features/auth/routes'
-import { healthRoutes } from './features/health/routes'
-import { reportRoutes } from './features/reports/routes'
-import { syncRoutes } from './features/sync/routes'
+import { authRoutes } from './features/auth/routes.js'
+import { healthRoutes } from './features/health/routes.js'
+import { reportRoutes } from './features/reports/routes.js'
+import { syncRoutes } from './features/sync/routes.js'
 
 export function createApp() {
   const app = new Hono()

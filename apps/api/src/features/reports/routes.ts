@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 
-import { db } from '../../lib/db'
-import { getInventoryMovementSummary, getPaymentSummary, getSalesSummary } from './service'
+import { db } from '../../lib/db.js'
+import { getInventoryMovementSummary, getPaymentSummary, getSalesSummary } from './service.js'
 
 export const reportRoutes = new Hono()
 
