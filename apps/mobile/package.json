@@ -1,0 +1,21 @@
+{
+  "name": "@vitpos/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "description": "VitPOS Mobile - Capacitor Android shell wrapping root web build",
+  "type": "module",
+  "scripts": {
+    "check": "npm run check:config && npm run check:web-build",
+    "check:config": "node -e \"const fs = require('fs'); if (!fs.existsSync('./capacitor.config.ts')) process.exit(1); const content = fs.readFileSync('./capacitor.config.ts', 'utf8'); if (!content.includes('appId: \\'com.kotacom.vitpos\\'')) process.exit(1); console.log('✓ Config valid')\"",
+    "check:web-build": "node -e \"const fs = require('fs'); const path = require('path'); const distPath = path.resolve('../../dist/index.html'); if (!fs.existsSync(distPath)) { console.error('✗ Web build missing. Run: npm run build (from root)'); process.exit(1); } console.log('✓ Web build exists')\"",
+    "sync": "cap sync",
+    "open:android": "cap open android",
+    "build:android": "npm run check && cap sync && cap copy android",
+    "prebuild": "echo 'Run npm run build from project root first'"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/core": "^8.4.0"
+  }
+}

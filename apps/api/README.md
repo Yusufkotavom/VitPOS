@@ -24,10 +24,13 @@ npm run build
 - `GET /health`
 - `GET /api/v1/health`
 - `GET /api/v1/auth/me`
+- `GET /api/v1/auth/tenants`
 - `POST /api/v1/auth/login`
 - `GET /api/v1/sync/pull`
 - `POST /api/v1/sync/push`
 - `GET /api/v1/reports/sales/summary`
+- `GET /api/v1/reports/payments/summary`
+- `GET /api/v1/reports/inventory/movements`
 
 ## Env
 

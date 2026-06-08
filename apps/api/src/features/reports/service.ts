@@ -1,7 +1,7 @@
 import { and, count, eq, gte, lte, sum } from 'drizzle-orm'
 
-import type { AppDb } from '../../lib/db'
-import { payments, salesOrders, stockMovements } from '../../../../../src/db/schema'
+import type { AppDb } from '../../lib/db.js'
+import { payments, salesOrders, stockMovements } from '../../../../../src/db/schema/index.js'
 
 export async function getSalesSummary(db: AppDb, input: { tenantId: string; branchId?: string; from?: string; to?: string }) {
   const filters = [eq(salesOrders.tenantId, input.tenantId)]

@@ -11,6 +11,8 @@ export function createApp() {
 
   app.use('*', cors())
 
+  app.get('/', (c) => c.json({ message: 'VitPOS API is running!' }))
+
   app.route('/health', healthRoutes)
   app.route('/api/v1/health', healthRoutes)
   app.route('/api/v1/auth', authRoutes)

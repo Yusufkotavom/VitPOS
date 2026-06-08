@@ -1,0 +1,15 @@
+{
+  "name": "@vitpos/desktop",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "check": "node -e \"const fs=require('fs'); const required=['src-tauri/Cargo.toml','src-tauri/tauri.conf.json','src-tauri/src/main.rs']; for (const file of required) { if (!fs.existsSync(file)) { console.error('Missing '+file); process.exit(1); } } const conf=fs.readFileSync('src-tauri/tauri.conf.json','utf8'); if (!conf.includes('com.kotacom.vitpos')) { console.error('Missing desktop identifier'); process.exit(1); } console.log('✓ Desktop scaffold valid')\""
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.2"
+  }
+}

@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 
 import { db, type AppDb } from '../../lib/db.js'
-import { tenantMembers, tenants, users } from '../../../../../src/db/schema'
+import { tenantMembers, tenants, users } from '../../../../../src/db/schema/index.js'
 
 export const authRoutes = new Hono()
 

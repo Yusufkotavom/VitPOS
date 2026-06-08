@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 
-import * as schema from '../../../../src/db/schema'
+import * as schema from '../../../../src/db/schema/index.js'
 import { getApiDatabaseUrl } from './env.js'
 
 let dbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null
