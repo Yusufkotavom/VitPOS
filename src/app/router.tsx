@@ -2,6 +2,7 @@ import { lazy, Suspense, type ComponentType } from 'react'
 import { createBrowserRouter } from 'react-router-dom'
 
 import { AppLayout } from '@/shared/components/layout/app-layout'
+import { AuthGuard } from '@/features/auth/components/auth-guard'
 import { LoadingState } from '@/shared/components/feedback/loading-state'
 
 const DashboardPage = lazy(() => import('@/features/dashboard/pages/dashboard-page').then(pick('DashboardPage')))
@@ -10,6 +11,7 @@ const ProductsPage = lazy(() => import('@/features/products/pages/products-page'
 const CategoriesPage = lazy(() => import('@/features/products/pages/categories-page').then(pick('CategoriesPage')))
 const CustomersPage = lazy(() => import('@/features/customers/pages/customers-page').then(pick('CustomersPage')))
 const SalesOrdersPage = lazy(() => import('@/features/sales-orders/pages/sales-orders-page').then(pick('SalesOrdersPage')))
+const SalesOrderDetailPage = lazy(() => import('@/features/sales-orders/pages/sales-order-detail-page').then(pick('SalesOrderDetailPage')))
 const PaymentsPage = lazy(() => import('@/features/payments/pages/payments-page').then(pick('PaymentsPage')))
 const InventoryPage = lazy(() => import('@/features/inventory/pages/inventory-page').then(pick('InventoryPage')))
 const CashPage = lazy(() => import('@/features/cash/pages/cash-page').then(pick('CashPage')))
@@ -18,6 +20,7 @@ const SettingsPage = lazy(() => import('@/features/settings/pages/settings-page'
 const SyncPage = lazy(() => import('@/features/sync/pages/sync-page').then(pick('SyncPage')))
 const ShiftPage = lazy(() => import('@/features/shift/pages/shift-page').then(pick('ShiftPage')))
 const ServiceOrdersPage = lazy(() => import('@/features/service-orders/pages/service-orders-page').then(pick('ServiceOrdersPage')))
+const ServiceOrderDetailPage = lazy(() => import('@/features/service-orders/pages/service-order-detail-page').then(pick('ServiceOrderDetailPage')))
 const PurchasesPage = lazy(() => import('@/features/purchases/pages/purchases-page').then(pick('PurchasesPage')))
 const SuppliersPage = lazy(() => import('@/features/suppliers/pages/suppliers-page').then(pick('SuppliersPage')))
 const ReturnsPage = lazy(() => import('@/features/returns/pages/returns-page').then(pick('ReturnsPage')))
@@ -44,7 +47,11 @@ export const router = createBrowserRouter([
   { path: '/onboarding', element: routeElement(OnboardingPage) },
   {
     path: '/',
-    element: <AppLayout />,
+    element: (
+      <AuthGuard>
+        <AppLayout />
+      </AuthGuard>
+    ),
     children: [
       { index: true, element: routeElement(DashboardPage) },
       { path: 'pos', element: routeElement(PosPage) },
@@ -52,11 +59,13 @@ export const router = createBrowserRouter([
       { path: 'products/categories', element: routeElement(CategoriesPage) },
       { path: 'customers', element: routeElement(CustomersPage) },
       { path: 'sales-orders', element: routeElement(SalesOrdersPage) },
+      { path: 'sales-orders/:id', element: routeElement(SalesOrderDetailPage) },
       { path: 'payments', element: routeElement(PaymentsPage) },
       { path: 'inventory', element: routeElement(InventoryPage) },
       { path: 'cash', element: routeElement(CashPage) },
       { path: 'reports', element: routeElement(ReportsPage) },
       { path: 'service-orders', element: routeElement(ServiceOrdersPage) },
+      { path: 'service-orders/:id', element: routeElement(ServiceOrderDetailPage) },
       { path: 'purchases', element: routeElement(PurchasesPage) },
       { path: 'suppliers', element: routeElement(SuppliersPage) },
       { path: 'returns', element: routeElement(ReturnsPage) },

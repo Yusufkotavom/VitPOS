@@ -1,4 +1,4 @@
-import type { FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Building2, CheckCircle2, ShieldCheck } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -13,12 +13,44 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { localDb } from '@/services/local-db/client'
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const { setAuth } = useAuthStore()
+  const [error, setError] = useState<string | null>(null)
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    setError(null)
+
+    const formData = new FormData(event.currentTarget)
+    const email = formData.get('email')?.toString().trim().toLowerCase()
+    
+    if (!email) return
+
+    let user = await localDb.users.where('email').equals(email).first()
+
+    if (!user && email === 'owner@usaha.co.id') {
+      const mockUser = {
+        id: crypto.randomUUID(),
+        name: 'Owner',
+        email: 'owner@usaha.co.id',
+        passwordHash: 'mock-hash',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+      await localDb.users.add(mockUser)
+      user = mockUser
+    }
+
+    if (!user) {
+      setError('Email tidak terdaftar atau kata sandi salah')
+      return
+    }
+
+    setAuth(user)
     navigate('/tenants')
   }
 
@@ -83,6 +115,7 @@ export function LoginPage() {
                   Setup awal
                 </Link>
               </div>
+              {error ? <p className="text-sm font-medium text-destructive">{error}</p> : null}
             </form>
           </CardContent>
           <CardFooter className="flex flex-col items-stretch gap-3">

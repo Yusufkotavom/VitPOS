@@ -1,5 +1,6 @@
+import { useState, type FormEvent } from 'react'
 import { CheckCircle2, ChevronRight, PackagePlus, Store } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 import { onboardingSteps } from '@/features/auth/mocks/auth.mock'
 import { Button } from '@/components/ui/button'
@@ -12,11 +13,94 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { localDb } from '@/services/local-db/client'
 
 export function OnboardingPage() {
+  const navigate = useNavigate()
+  const { currentUser, setAuth, setActiveTenant } = useAuthStore()
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError(null)
+
+    const formData = new FormData(event.currentTarget)
+    
+    const ownerName = formData.get('ownerName')?.toString().trim()
+    const ownerEmail = formData.get('ownerEmail')?.toString().trim().toLowerCase()
+    const ownerPass = formData.get('ownerPassword')?.toString().trim()
+
+    if (!currentUser && (!ownerName || !ownerEmail || !ownerPass)) {
+      setError('Data owner wajib diisi lengkap')
+      return
+    }
+
+    const name = formData.get('businessName')?.toString().trim()
+    const type = formData.get('businessType')?.toString().trim() || 'Retail'
+    const phone = formData.get('businessPhone')?.toString().trim() || ''
+
+    if (!name) {
+      setError('Nama usaha wajib diisi')
+      return
+    }
+
+    const now = new Date().toISOString()
+    let userId = currentUser?.id
+
+    if (!currentUser) {
+      const existingUser = await localDb.users.where('email').equals(ownerEmail!).first()
+      if (existingUser) {
+        setError('Email sudah terdaftar. Silakan login dulu.')
+        return
+      }
+
+      userId = crypto.randomUUID()
+      const newUser = {
+        id: userId,
+        name: ownerName!,
+        email: ownerEmail!,
+        passwordHash: ownerPass!,
+        createdAt: now,
+        updatedAt: now,
+      }
+      await localDb.users.add(newUser)
+      setAuth(newUser)
+    }
+
+    const tenantId = crypto.randomUUID()
+
+    const newTenant = {
+      id: tenantId,
+      name,
+      type,
+      phone,
+      planCode: 'trial',
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    const newMember = {
+      id: crypto.randomUUID(),
+      tenantId,
+      userId: userId!,
+      role: 'owner',
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    await localDb.tenants.add(newTenant)
+    await localDb.tenantMembers.add(newMember)
+
+    setActiveTenant(newTenant, 'owner')
+    navigate('/')
+  }
+
   return (
     <main className="min-h-screen bg-muted/30 px-4 py-8">
-      <div className="mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[320px_1fr]">
+      <form onSubmit={handleSubmit} className="mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[320px_1fr]">
         <Card>
           <CardHeader>
             <CardTitle>Progress Setup</CardTitle>
@@ -55,25 +139,41 @@ export function OnboardingPage() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="flex flex-col gap-2 md:col-span-2">
+                {!currentUser ? (
+                  <>
+                    <div className="flex flex-col gap-2 md:col-span-2">
+                      <label htmlFor="owner-name" className="text-sm font-medium">Nama owner</label>
+                      <Input id="owner-name" name="ownerName" placeholder="Nama lengkap" required />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label htmlFor="owner-email" className="text-sm font-medium">Email owner</label>
+                      <Input id="owner-email" name="ownerEmail" type="email" placeholder="owner@usaha.co.id" required />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label htmlFor="owner-password" className="text-sm font-medium">Kata sandi owner</label>
+                      <Input id="owner-password" name="ownerPassword" type="password" placeholder="Minimal 8 karakter" required />
+                    </div>
+                  </>
+                ) : null}
+                <div className="flex flex-col gap-2 md:col-span-2 mt-2 border-t pt-4">
                   <label htmlFor="business-name" className="text-sm font-medium">Nama usaha</label>
-                  <Input id="business-name" placeholder="Contoh: Toko Sumber Rejeki" />
+                  <Input id="business-name" name="businessName" placeholder="Contoh: Toko Sumber Rejeki" required />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label htmlFor="business-type" className="text-sm font-medium">Jenis usaha</label>
-                  <Input id="business-type" placeholder="Retail, F&B, Service" />
+                  <Input id="business-type" name="businessType" placeholder="Retail, F&B, Service" />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label htmlFor="business-phone" className="text-sm font-medium">Nomor WhatsApp</label>
-                  <Input id="business-phone" placeholder="08xxxxxxxxxx" />
+                  <Input id="business-phone" name="businessPhone" placeholder="08xxxxxxxxxx" />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label htmlFor="first-branch" className="text-sm font-medium">Cabang pertama</label>
-                  <Input id="first-branch" placeholder="Cabang Utama" />
+                  <Input id="first-branch" name="firstBranch" placeholder="Cabang Utama" />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label htmlFor="first-warehouse" className="text-sm font-medium">Gudang pertama</label>
-                  <Input id="first-warehouse" placeholder="Gudang Pusat" />
+                  <Input id="first-warehouse" name="firstWarehouse" placeholder="Gudang Pusat" />
                 </div>
               </div>
             </CardContent>
@@ -95,28 +195,27 @@ export function OnboardingPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="flex flex-col gap-2 text-sm font-medium">
                   Metode pembayaran utama
-                  <Input placeholder="Tunai, QRIS, transfer" />
+                  <Input name="paymentMethods" placeholder="Tunai, QRIS, transfer" />
                 </label>
                 <label className="flex flex-col gap-2 text-sm font-medium">
                   Sumber import produk
-                  <Input placeholder="CSV, Excel, input manual" />
+                  <Input name="productImportSource" placeholder="CSV, Excel, input manual" />
                 </label>
               </div>
+              {error ? <p className="mt-3 text-sm font-medium text-destructive">{error}</p> : null}
             </CardContent>
             <CardFooter className="sticky bottom-0 flex flex-col items-stretch gap-3 bg-background sm:flex-row sm:justify-between">
               <Button variant="outline" asChild>
                 <Link to="/login">Kembali ke login</Link>
               </Button>
-              <Button asChild>
-                <Link to="/tenants">
-                  Simpan dan lanjut
-                  <ChevronRight data-icon="inline-end" />
-                </Link>
+              <Button type="submit">
+                Simpan dan lanjut
+                <ChevronRight data-icon="inline-end" />
               </Button>
             </CardFooter>
           </Card>
         </div>
-      </div>
+      </form>
     </main>
   )
 }

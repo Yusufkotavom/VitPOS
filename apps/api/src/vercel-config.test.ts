@@ -8,10 +8,17 @@ describe('api vercel config', () => {
 
     expect(config.default).toEqual({
       $schema: 'https://openapi.vercel.sh/vercel.json',
+      framework: null,
+      builds: [
+        {
+          src: 'api/index.js',
+          use: '@vercel/node',
+        },
+      ],
       routes: [
         {
           src: '/(.*)',
-          dest: '/src/index.ts',
+          dest: '/api/index.js',
         },
       ],
     })

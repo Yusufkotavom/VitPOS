@@ -7,12 +7,43 @@ import type {
   SyncMutationRecord as OutboxItem,
 } from '@kotacom/shared-contracts/sync'
 
+export type LocalUser = {
+  id: string
+  name: string
+  email: string
+  passwordHash: string
+  avatarUrl?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type LocalTenant = {
+  id: string
+  name: string
+  type: string
+  phone: string
+  planCode: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type LocalTenantMember = {
+  id: string
+  tenantId: string
+  userId: string
+  role: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 export type SyncStatus = 'pending' | 'synced' | 'failed' | 'conflict'
 export type ProductStatus = 'Aktif' | 'Draft' | 'Arsip'
 export type ProductType = 'Produk Fisik' | 'Jasa'
 export type SalesOrderStatus = 'Draft' | 'Lunas' | 'Sebagian' | 'Belum Bayar' | 'Batal'
 export type PaymentStatus = 'Berhasil' | 'Pending' | 'Gagal' | 'Refund'
-export type PosPaymentMethodCode = 'tunai' | 'qris' | 'kartu' | 'transfer' | 'e-wallet' | 'piutang'
+export type PosPaymentMethodCode = string
 export type StockMovementType = 'sale' | 'purchase' | 'return' | 'adjustment' | 'transfer_in' | 'transfer_out' | 'damage_lost'
 
 export type LocalProduct = {
@@ -24,6 +55,7 @@ export type LocalProduct = {
   stock: number
   sku?: string
   barcode?: string
+  imageUrl?: string
   status: ProductStatus
   syncStatus: SyncStatus
   version: number
@@ -231,6 +263,17 @@ export type LocalServiceOrder = {
   status: ServiceOrderStatus
   syncStatus: SyncStatus
   version: number
+  updatedAt: string
+}
+
+export type LocalPaymentMethod = {
+  id: string
+  name: string
+  provider: string
+  type: string
+  accountNumber?: string
+  accountName?: string
+  status: 'Aktif' | 'Tidak Aktif'
   updatedAt: string
 }
 

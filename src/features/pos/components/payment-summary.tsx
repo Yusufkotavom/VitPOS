@@ -2,29 +2,47 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/format-currency'
 import { selectPosTotals, usePosStore } from '@/features/pos/stores/pos-store'
-import { type PosPaymentMethod } from '@/features/pos/types/pos.types'
 import { posTransactionService } from '@/features/pos/services/pos-transaction.service'
 import { toast } from 'sonner'
+import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
+import { useState } from 'react'
+import { PosSuccessDialog } from '@/features/pos/components/pos-success-dialog'
+import { buildWhatsAppLink } from '@/lib/whatsapp'
+import { printPage } from '@/lib/print'
+import { type PosOrderSummary } from '@/features/pos/types/pos-order.types'
 
-const paymentMethods: { code: PosPaymentMethod; label: string }[] = [
-  { code: 'tunai', label: 'Tunai' },
-  { code: 'qris', label: 'QRIS' },
-  { code: 'kartu', label: 'Kartu' },
-  { code: 'transfer', label: 'Transfer' },
-  { code: 'e-wallet', label: 'E-wallet' },
-  { code: 'piutang', label: 'Piutang' },
+const defaultMethods = [
+  { id: 'tunai', name: 'Tunai' },
+  { id: 'qris', name: 'QRIS' },
+  { id: 'transfer', name: 'Transfer' },
 ]
 
 export function PaymentSummary() {
   const store = usePosStore()
   const totals = selectPosTotals(store)
+  const dbMethods = usePaymentMethods()
+  const activeMethods = dbMethods && dbMethods.length > 0 ? dbMethods.filter(m => m.status === 'Aktif') : defaultMethods
+  
+  const [successOrder, setSuccessOrder] = useState<PosOrderSummary | null>(null)
 
   async function handleCheckout() {
     if (store.cartItems.length === 0) return
 
     try {
       await posTransactionService.checkout(store.cartItems, totals, store.paymentMethod, store.paidAmount, store.discount)
-      toast.success('Pembayaran berhasil dicatat dan masuk antrean sinkron')
+      setSuccessOrder({
+        id: `POS-${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
+        date: new Date(),
+        subtotal: totals.subtotal,
+        tax: 0,
+        discount: store.discount,
+        total: totals.total,
+        paymentMethod: store.paymentMethod,
+        amountPaid: store.paymentMethod === 'tunai' ? store.paidAmount : totals.total,
+        change: totals.change,
+        items: store.cartItems,
+        cashierName: 'Kasir',
+      })
       store.clearCart()
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Gagal mencatat pembayaran'
@@ -32,8 +50,23 @@ export function PaymentSummary() {
     }
   }
 
+  function handleWhatsApp() {
+    if (!successOrder) return
+    const text = `Nota Pesanan ${successOrder.id}\nTotal: ${formatCurrency(successOrder.total)}\nMetode: ${successOrder.paymentMethod}\nTerima kasih!`
+    window.open(buildWhatsAppLink('0800000000', text), '_blank')
+  }
+
   return (
     <div className="flex flex-col gap-4">
+      <PosSuccessDialog 
+        open={successOrder !== null} 
+        onOpenChange={(open) => !open && setSuccessOrder(null)}
+        order={successOrder}
+        onPrint={printPage}
+        onWhatsApp={handleWhatsApp}
+        onNewSale={() => setSuccessOrder(null)}
+      />
+
       <div className="space-y-2 rounded-2xl border p-4 text-sm">
         <div className="flex justify-between">
           <span className="text-muted-foreground">Subtotal</span>
@@ -50,13 +83,13 @@ export function PaymentSummary() {
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        {paymentMethods.map((method) => (
+        {activeMethods.map((method) => (
           <Button
-            key={method.code}
-            variant={store.paymentMethod === method.code ? 'default' : 'outline'}
-            onClick={() => store.setPaymentMethod(method.code)}
+            key={method.id}
+            variant={store.paymentMethod === method.name.toLowerCase() ? 'default' : 'outline'}
+            onClick={() => store.setPaymentMethod(method.name.toLowerCase())}
           >
-            {method.label}
+            {method.name}
           </Button>
         ))}
       </div>

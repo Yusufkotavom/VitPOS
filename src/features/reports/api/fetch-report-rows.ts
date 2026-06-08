@@ -38,8 +38,10 @@ type InventoryMovementResponse = {
   }>
 }
 
-export async function fetchReportRows() {
+export async function fetchReportRows(params?: { from?: string; to?: string }) {
   const query = buildTenantQuery(buildBaimTenantQuery())
+  if (params?.from) query.set('from', params.from)
+  if (params?.to) query.set('to', params.to)
 
   const [sales, payments, inventory] = await Promise.all([
     apiGet<ReportSummaryResponse>('/reports/sales/summary', query),

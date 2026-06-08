@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { formatCurrency } from '@/lib/format-currency'
 import { ServiceOrderCrudActions } from '@/features/service-orders/components/service-order-crud-actions'
 import { useServiceOrders } from '@/features/service-orders/hooks/use-service-orders'
@@ -23,7 +24,7 @@ export function ServiceOrdersPage() {
           data={serviceRows}
           emptyTitle="Belum ada service order"
           columns={[
-            { key: 'code', header: 'No Service' },
+            { key: 'code', header: 'No Service', render: (row) => <Link to={`/service-orders/${row.id}`} className="font-medium text-primary hover:underline">{row.code}</Link> },
             { key: 'customerName', header: 'Pelanggan' },
             { key: 'description', header: 'Pekerjaan' },
             { key: 'date', header: 'Tanggal' },
@@ -35,7 +36,9 @@ export function ServiceOrdersPage() {
             <div className="flex flex-col gap-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-medium">{row.code}</p>
+                  <p className="font-medium text-primary hover:underline">
+                    <Link to={`/service-orders/${row.id}`}>{row.code}</Link>
+                  </p>
                   <p className="text-sm text-muted-foreground">{row.customerName} · {row.date}</p>
                 </div>
                 <StatusBadge label={row.status} tone={tone(row.status)} />

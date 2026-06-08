@@ -1,5 +1,6 @@
 import { formatCurrency } from '@/lib/format-currency'
 import { usePosStore } from '@/features/pos/stores/pos-store'
+import { matchesProductSearch } from '@/features/pos/lib/product-search'
 import { useProducts } from '@/features/products/hooks/use-products'
 import { EmptyState } from '@/shared/components/feedback/empty-state'
 
@@ -9,15 +10,11 @@ export function ProductGrid() {
   const addItem = usePosStore((state) => state.addItem)
   const localProducts = useProducts()
 
-  const normalizedSearch = searchQuery.trim().toLowerCase()
   const products = localProducts.filter((product) => {
     const matchesCategory = selectedCategory === 'Semua' || product.category === selectedCategory
-    const matchesSearch =
-      normalizedSearch.length === 0 ||
-      product.name.toLowerCase().includes(normalizedSearch)
     const isActive = product.status === 'Aktif'
 
-    return isActive && matchesCategory && matchesSearch
+    return isActive && matchesCategory && matchesProductSearch(product, searchQuery)
   })
 
   if (products.length === 0) {
@@ -44,9 +41,14 @@ export function ProductGrid() {
                 isFavorite: false,
               })
             }
-            className="rounded-2xl border bg-background p-4 text-left shadow-sm transition hover:border-primary hover:bg-muted/40 active:scale-[0.99]"
+            className="rounded-2xl border bg-background text-left shadow-sm transition hover:border-primary hover:bg-muted/40 active:scale-[0.99] flex flex-col overflow-hidden"
           >
-            <div className="flex min-h-32 flex-col justify-between gap-3">
+            {product.imageUrl ? (
+              <div className="w-full h-32 bg-muted">
+                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+              </div>
+            ) : null}
+            <div className="flex min-h-[110px] w-full flex-col justify-between gap-3 p-4">
               <div className="space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <p className="font-medium leading-tight">{product.name}</p>

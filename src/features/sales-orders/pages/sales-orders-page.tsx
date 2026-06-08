@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { LayoutGrid, List } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -35,7 +36,9 @@ function SalesOrderCard({ row }: { row: ReturnType<typeof useSalesOrders>[number
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Invoice</p>
-            <h3 className="text-lg font-semibold leading-none">{row.code}</h3>
+            <h3 className="text-lg font-semibold leading-none text-primary hover:underline">
+              <Link to={`/sales-orders/${row.id}`}>{row.code}</Link>
+            </h3>
             <p className="text-sm text-muted-foreground">{row.customerName}</p>
           </div>
           <StatusBadge label={row.status} tone={tone(row.status)} />
@@ -112,9 +115,9 @@ export function SalesOrdersPage() {
         {activeView === 'list' ? (
           <DataTable
             data={orderRows}
-            columns={[
-              { key: 'code', header: 'Invoice' },
-              { key: 'customerName', header: 'Pelanggan' },
+              columns={[
+                { key: 'code', header: 'Invoice', render: (row) => <Link to={`/sales-orders/${row.id}`} className="font-medium text-primary hover:underline">{row.code}</Link> },
+                { key: 'customerName', header: 'Pelanggan' },
               { key: 'date', header: 'Tanggal' },
               { key: 'grandTotal', header: 'Total', render: (row) => formatCurrency(row.grandTotal) },
               { key: 'paidTotal', header: 'Dibayar', render: (row) => formatCurrency(row.paidTotal) },
@@ -124,8 +127,10 @@ export function SalesOrdersPage() {
             mobileRender={(row) => (
               <div className="space-y-2">
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium">{row.code}</p>
+                  <div className="space-y-1">
+                    <p className="font-medium text-primary hover:underline cursor-pointer">
+                      <Link to={`/sales-orders/${row.id}`}>{row.code}</Link>
+                    </p>
                     <p className="text-sm text-muted-foreground">{row.customerName} · {row.date}</p>
                   </div>
                   <StatusBadge label={row.status} tone={tone(row.status)} />

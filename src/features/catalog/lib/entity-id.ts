@@ -5,3 +5,8 @@ export function createProductId() {
 export function createCustomerId() {
   return crypto.randomUUID()
 }
+
+export function createEntityId(prefix: string) {
+  return `${prefix}-${crypto.randomUUID()}`
+}
+

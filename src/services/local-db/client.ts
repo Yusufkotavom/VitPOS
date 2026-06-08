@@ -15,15 +15,22 @@ import type {
   LocalSalesOrderItem,
   LocalServiceOrder,
   LocalSetting,
+  LocalPaymentMethod,
   LocalShift,
   LocalStockMovement,
   LocalSupplier,
+  LocalTenant,
+  LocalTenantMember,
+  LocalUser,
   OutboxItem,
   SyncConflict,
   SyncRun,
 } from '@/services/local-db/schema'
 
 export class VitposLocalDb extends Dexie {
+  users!: EntityTable<LocalUser, 'id'>
+  tenants!: EntityTable<LocalTenant, 'id'>
+  tenantMembers!: EntityTable<LocalTenantMember, 'id'>
   products!: EntityTable<LocalProduct, 'id'>
   productCategories!: EntityTable<LocalProductCategory, 'id'>
   customers!: EntityTable<LocalCustomer, 'id'>
@@ -34,6 +41,7 @@ export class VitposLocalDb extends Dexie {
   inventory!: EntityTable<LocalInventory, 'id'>
   cash!: EntityTable<LocalCash, 'id'>
   settings!: EntityTable<LocalSetting, 'id'>
+  paymentMethods!: EntityTable<LocalPaymentMethod, 'id'>
   shifts!: EntityTable<LocalShift, 'id'>
   suppliers!: EntityTable<LocalSupplier, 'id'>
   purchases!: EntityTable<LocalPurchase, 'id'>
@@ -96,6 +104,7 @@ export class VitposLocalDb extends Dexie {
       inventory: 'id, product, warehouse, status',
       cash: 'id, ref, date, account, category, status',
       settings: 'id, area, setting, status',
+      paymentMethods: 'id, name, provider, type, status, updatedAt',
       shifts: 'id, cashierName, startTime, status',
       outbox: 'id, entityType, entityId, mutationType, status, createdAt, updatedAt, syncedAt',
       syncConflicts: 'id, entityType, entityId, status, createdAt, resolvedAt',
@@ -112,6 +121,7 @@ export class VitposLocalDb extends Dexie {
       inventory: 'id, product, warehouse, status',
       cash: 'id, ref, date, account, category, status',
       settings: 'id, area, setting, status',
+      paymentMethods: 'id, name, provider, type, status, updatedAt',
       shifts: 'id, cashierName, startTime, status',
       outbox: 'id, entityType, entityId, mutationType, status, createdAt, updatedAt, syncedAt',
       syncConflicts: 'id, entityType, entityId, status, createdAt, resolvedAt',
@@ -128,6 +138,7 @@ export class VitposLocalDb extends Dexie {
       inventory: 'id, product, warehouse, status',
       cash: 'id, ref, date, account, category, status',
       settings: 'id, area, setting, status',
+      paymentMethods: 'id, name, provider, type, status, updatedAt',
       shifts: 'id, cashierName, startTime, status',
       outbox: 'id, entityType, entityId, mutationType, status, createdAt, updatedAt, syncedAt',
       syncConflicts: 'id, entityType, entityId, status, createdAt, resolvedAt',
@@ -144,6 +155,33 @@ export class VitposLocalDb extends Dexie {
       inventory: 'id, product, warehouse, status',
       cash: 'id, ref, date, account, category, status',
       settings: 'id, area, setting, status',
+      paymentMethods: 'id, name, provider, type, status, updatedAt',
+      shifts: 'id, cashierName, startTime, status',
+      suppliers: 'id, name, phone, city, status, syncStatus, updatedAt',
+      purchases: 'id, code, supplierName, date, status, syncStatus, updatedAt',
+      purchaseItems: 'id, purchaseId, productId',
+      returns: 'id, code, type, referenceCode, date, status, syncStatus, updatedAt',
+      returnItems: 'id, returnId, productId',
+      serviceOrders: 'id, code, customerName, date, status, syncStatus, updatedAt',
+      outbox: 'id, entityType, entityId, mutationType, status, createdAt, updatedAt, syncedAt',
+      syncConflicts: 'id, entityType, entityId, status, createdAt, resolvedAt',
+      syncRuns: 'id, status, startedAt, finishedAt',
+    })
+    this.version(9).stores({
+      users: 'id, email',
+      tenants: 'id',
+      tenantMembers: 'id, [userId+tenantId], userId',
+      products: 'id, name, category, type, status, syncStatus, updatedAt',
+      productCategories: 'id, name, status, syncStatus, updatedAt',
+      customers: 'id, name, phone, city, status, syncStatus, updatedAt',
+      salesOrders: 'id, code, customerName, date, status, syncStatus, updatedAt',
+      salesOrderItems: 'id, salesOrderId, productId',
+      payments: 'id, ref, source, method, date, status, syncStatus, updatedAt, salesOrderId',
+      stockMovements: 'id, productId, type, referenceId, syncStatus, updatedAt',
+      inventory: 'id, product, warehouse, status',
+      cash: 'id, ref, date, account, category, status',
+      settings: 'id, area, setting, status',
+      paymentMethods: 'id, name, provider, type, status, updatedAt',
       shifts: 'id, cashierName, startTime, status',
       suppliers: 'id, name, phone, city, status, syncStatus, updatedAt',
       purchases: 'id, code, supplierName, date, status, syncStatus, updatedAt',

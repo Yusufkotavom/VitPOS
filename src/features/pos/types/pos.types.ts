@@ -18,4 +18,4 @@ export type PosCartItem = {
   subtotal: number
 }
 
-export type PosPaymentMethod = 'tunai' | 'qris' | 'kartu' | 'transfer' | 'e-wallet' | 'piutang'
+export type PosPaymentMethod = string
