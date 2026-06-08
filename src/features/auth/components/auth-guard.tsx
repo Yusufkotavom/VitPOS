@@ -8,12 +8,12 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   const location = useLocation()
 
   if (!currentUser) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  const isTenantRoute = location.pathname === '/tenants' || location.pathname === '/onboarding'
+  const isSetupRoute = location.pathname === '/tenants' || location.pathname === '/onboarding'
 
-  if (!activeTenant && !isTenantRoute) {
+  if (!activeTenant && !isSetupRoute) {
     return <Navigate to="/tenants" replace />
   }
 
