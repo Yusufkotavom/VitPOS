@@ -1,12 +1,19 @@
-import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
-import { useState } from 'react'
+import { PencilIcon, PlusIcon, Trash2Icon, Settings2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { Controller, useForm, useWatch } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { CashForm } from '@/features/cash/components/cash-form'
-import { mapCashFormToRecord, mapCashRecordToFormValues, type CashFormValues } from '@/features/cash/schemas/cash-form-schema'
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Field, FieldGroup } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import { cashFormSchema, cashInitialValues, cashAccountOptions, cashTypeOptions, cashStatusOptions, type CashFormValues } from '@/features/cash/schemas/cash-form-schema'
+import { mapCashFormToRecord, mapCashRecordToFormValues } from '@/features/cash/schemas/cash-form-schema'
+import { useCashCategories } from '@/features/cash/hooks/use-cash-categories'
 import { cashRepository } from '@/services/local-db/repository'
 import type { LocalCash } from '@/services/local-db/schema'
 
@@ -14,6 +21,20 @@ export function CashCrudActions({ cash }: { cash?: LocalCash }) {
   const [formOpen, setFormOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const isEdit = Boolean(cash)
+  const categories = useCashCategories()
+  const activeCategories = categories.filter(c => c.status === 'Aktif')
+
+  const form = useForm<CashFormValues>({
+    resolver: zodResolver(cashFormSchema),
+    defaultValues: cash ? mapCashRecordToFormValues(cash) : cashInitialValues,
+  })
+
+  useEffect(() => {
+    form.reset(cash ? mapCashRecordToFormValues(cash) : cashInitialValues)
+  }, [cash, form])
+
+  const type = useWatch({ control: form.control, name: 'type' })
+  const filteredCategories = activeCategories.filter(c => c.type === type)
 
   async function handleSubmit(values: CashFormValues) {
     const id = cash?.id ?? crypto.randomUUID()
@@ -29,27 +50,144 @@ export function CashCrudActions({ cash }: { cash?: LocalCash }) {
     setDeleteOpen(false)
   }
 
+  const errors = form.formState.errors
+
   return (
     <div className="flex flex-wrap gap-2">
-      <Sheet open={formOpen} onOpenChange={setFormOpen}>
-        <SheetTrigger asChild>
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogTrigger asChild>
           {cash
             ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />Ubah</Button>
             : <Button><PlusIcon data-icon="inline-start" />Tambah Transaksi</Button>}
-        </SheetTrigger>
-        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
-          <SheetHeader>
-            <SheetTitle>{isEdit ? 'Ubah transaksi kas' : 'Tambah transaksi kas'}</SheetTitle>
-            <SheetDescription>Catat pemasukan atau pengeluaran. Outbox sinkron otomatis.</SheetDescription>
-          </SheetHeader>
-          <CashForm
-            defaultValues={cash ? mapCashRecordToFormValues(cash) : undefined}
-            submitLabel={isEdit ? 'Simpan perubahan' : 'Simpan transaksi'}
-            onCancel={() => setFormOpen(false)}
-            onSubmit={handleSubmit}
-          />
-        </SheetContent>
-      </Sheet>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-sm">
+          <form onSubmit={form.handleSubmit(handleSubmit)}>
+            <DialogHeader>
+              <DialogTitle>{isEdit ? 'Ubah transaksi kas' : 'Tambah transaksi kas'}</DialogTitle>
+              <DialogDescription>Catat pemasukan atau pengeluaran. Outbox sinkron otomatis.</DialogDescription>
+            </DialogHeader>
+            <FieldGroup>
+              <Field data-invalid={!!errors.ref}>
+                <Label htmlFor="ref">No. Referensi</Label>
+                <Input id="ref" {...form.register('ref')} aria-invalid={!!errors.ref} placeholder="KAS-004" />
+              </Field>
+              <Field data-invalid={!!errors.date}>
+                <Label htmlFor="date">Tanggal</Label>
+                <Input id="date" {...form.register('date')} aria-invalid={!!errors.date} placeholder="8 Juni 2026" />
+              </Field>
+              <Field>
+                <Label htmlFor="account">Akun Kas</Label>
+                <Controller
+                  name="account"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <SelectTrigger id="account">
+                        <SelectValue placeholder="Pilih akun" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {cashAccountOptions.map(opt => (
+                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </Field>
+              <Field>
+                <Label htmlFor="type">Jenis</Label>
+                <Controller
+                  name="type"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <SelectTrigger id="type">
+                        <SelectValue placeholder="Pilih jenis" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {cashTypeOptions.map(opt => (
+                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </Field>
+              <Field data-invalid={!!errors.category}>
+                <Label htmlFor="category">Kategori</Label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Controller
+                      name="category"
+                      control={form.control}
+                      render={({ field }) => (
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <SelectTrigger id="category">
+                            <SelectValue placeholder="Pilih kategori" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {filteredCategories.length === 0 ? (
+                                <SelectItem value="_none" disabled>Tidak ada kategori</SelectItem>
+                              ) : (
+                                filteredCategories.map(cat => (
+                                  <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                                ))
+                              )}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                  </div>
+                  <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" asChild>
+                    <Link to="/cash/categories" title="Kelola kategori">
+                      <Settings2 className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                </div>
+              </Field>
+              <Field data-invalid={!!errors.amount}>
+                <Label htmlFor="amount">{type === 'Pemasukan' ? 'Nominal masuk' : 'Nominal keluar'}</Label>
+                <Input id="amount" inputMode="numeric" {...form.register('amount')} aria-invalid={!!errors.amount} placeholder="0" />
+              </Field>
+              <Field>
+                <Label htmlFor="status">Status</Label>
+                <Controller
+                  name="status"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <SelectTrigger id="status">
+                        <SelectValue placeholder="Pilih status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {cashStatusOptions.map(opt => (
+                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </Field>
+            </FieldGroup>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="outline" type="button">Batal</Button>
+              </DialogClose>
+              <Button type="submit" disabled={form.formState.isSubmitting}>
+                {isEdit ? 'Simpan' : 'Tambah'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       {cash ? (
         <>
           <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />Hapus</Button>

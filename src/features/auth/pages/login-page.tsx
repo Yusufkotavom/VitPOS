@@ -110,9 +110,9 @@ export function LoginPage() {
                 <Input id="password" name="password" type="password" placeholder="Masukkan kata sandi" autoComplete="current-password" />
               </label>
               <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="text-muted-foreground">Belum punya usaha?</span>
-                <Link className="font-medium text-primary hover:underline" to="/onboarding">
-                  Setup awal
+                <span className="text-muted-foreground">Belum punya akun?</span>
+                <Link className="font-medium text-primary hover:underline" to="/register">
+                  Daftar di sini
                 </Link>
               </div>
               {error ? <p className="text-sm font-medium text-destructive">{error}</p> : null}

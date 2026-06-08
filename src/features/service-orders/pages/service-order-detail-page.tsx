@@ -43,20 +43,8 @@ export function ServiceOrderDetailPage() {
     )
   }
 
-  if (!order) {
-    return (
-      <PageShell title="Tidak Ditemukan" description="Service Order tidak ditemukan">
-        <Button asChild variant="outline">
-          <Link to="/service-orders">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Kembali ke Daftar
-          </Link>
-        </Button>
-      </PageShell>
-    )
-  }
-
   function startEditing() {
+    if (!order) return
     setEditCustomer(order.customerName)
     setEditDesc(order.description)
     setEditCost(String(order.cost))
@@ -69,6 +57,7 @@ export function ServiceOrderDetailPage() {
   }
 
   async function saveEditing() {
+    if (!order) return
     await serviceOrderRepository.upsert({
       ...order,
       customerName: editCustomer.trim(),
@@ -84,9 +73,23 @@ export function ServiceOrderDetailPage() {
   }
 
   async function handleDelete() {
+    if (!order) return
     await serviceOrderRepository.remove(order.id)
     toast.success('Service order dihapus')
     setDeleteOpen(false)
+  }
+
+  if (!order) {
+    return (
+      <PageShell title="Tidak Ditemukan" description="Service Order tidak ditemukan">
+        <Button asChild variant="outline">
+          <Link to="/service-orders">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Kembali ke Daftar
+          </Link>
+        </Button>
+      </PageShell>
+    )
   }
 
   return (

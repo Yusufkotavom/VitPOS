@@ -65,13 +65,18 @@ function ServiceOrderCard({ row }: { row: ReturnType<typeof useServiceOrders>[nu
 export function ServiceOrdersPage() {
   const serviceRows = useServiceOrders()
   const [view, setView] = useState<'list' | 'card'>('list')
+  const [search, setSearch] = useState('')
   const activeView = view
+
+  const filtered = serviceRows.filter(row =>
+    !search || [row.code, row.customerName, row.description, row.date].some(f => f.toLowerCase().includes(search.toLowerCase()))
+  )
 
   return (
     <PageShell title="Service Order" description="Penerimaan, pengerjaan, biaya, dan status service." actions={<ServiceOrderCrudActions />}>
       <ContentCard title="Daftar Service Order" description="Tampilkan service order dalam bentuk table atau card.">
         <div className="mb-4 flex flex-row items-center gap-2 border-b pb-4">
-          <input type="text" placeholder="Cari service..." className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" />
+          <input type="text" placeholder="Cari service..." value={search} onChange={e => setSearch(e.target.value)} className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
 
           <div className="relative flex items-center group shrink-0">
             <Button variant="outline" size="icon" className="h-9 w-9">
@@ -119,23 +124,24 @@ export function ServiceOrdersPage() {
 
         {activeView === 'list' ? (
           <DataTable
-            data={serviceRows}
+            data={filtered}
             columns={[
-              { key: 'code', header: 'No Service', sortable: true, render: (row) => <Link to={`/service-orders/${row.id}`} className="font-medium text-primary hover:underline">{row.code}</Link> },
+              { key: 'code', header: 'Kode', sortable: true, render: (row) => <Link to={`/service-orders/${row.id}`} className="font-medium text-primary hover:underline">{row.code}</Link> },
               { key: 'customerName', header: 'Pelanggan', sortable: true },
-              { key: 'date', header: 'Tanggal', sortable: true },
               { key: 'description', header: 'Pekerjaan' },
+              { key: 'date', header: 'Tanggal', sortable: true },
               { key: 'cost', header: 'Biaya', sortable: true, render: (row) => formatCurrency(row.cost) },
               { key: 'status', header: 'Status', render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
+              { key: 'actions', header: 'Aksi', render: (row) => <ServiceOrderCrudActions order={row} /> },
             ]}
           />
-        ) : serviceRows.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="col-span-full">
             <p className="text-center text-muted-foreground py-12">Belum ada service order</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {serviceRows.map((row) => (
+            {filtered.map((row) => (
               <ServiceOrderCard key={row.id} row={row} />
             ))}
           </div>

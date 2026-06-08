@@ -1,6 +1,7 @@
 import { localDb } from '@/services/local-db/client'
 import type {
   LocalCash,
+  LocalCashCategory,
   LocalCustomer,
   LocalInventory,
   LocalPayment,
@@ -90,6 +91,7 @@ export const salesOrderRepository = createRepository<LocalSalesOrder>({ table: l
 export const paymentRepository = createRepository<LocalPayment>({ table: localDb.payments, outboxTable: localDb.outbox, entityType: 'payment' })
 export const stockMovementRepository = createRepository<LocalStockMovement>({ table: localDb.stockMovements, outboxTable: localDb.outbox, entityType: 'stock_movement' })
 export const cashRepository = createRepository<LocalCash>({ table: localDb.cash, outboxTable: localDb.outbox, entityType: 'cash' })
+export const cashCategoryRepository = createRepository<LocalCashCategory>({ table: localDb.cashCategories, outboxTable: localDb.outbox, entityType: 'cash_category' })
 export const inventoryRepository = createRepository<LocalInventory>({ table: localDb.inventory, outboxTable: localDb.outbox, entityType: 'stock_movement' })
 export const settingRepository = createRepository<LocalSetting>({ table: localDb.settings, outboxTable: localDb.outbox, entityType: 'setting' })
 export const shiftRepository = createRepository<LocalShift>({ table: localDb.shifts, outboxTable: localDb.outbox, entityType: 'shift' })

@@ -30,6 +30,7 @@ const SuppliersPage = lazy(() => import('@/features/suppliers/pages/suppliers-pa
 const ReturnsPage = lazy(() => import('@/features/returns/pages/returns-page').then(pick('ReturnsPage')))
 const PlatformAdminPage = lazy(() => import('@/features/platform-admin/pages/platform-admin-page').then(pick('PlatformAdminPage')))
 const LoginPage = lazy(() => import('@/features/auth/pages/login-page').then(pick('LoginPage')))
+const BillingPage = lazy(() => import('@/features/auth/pages/billing-page').then(pick('BillingPage')))
 const RegisterPage = lazy(() => import('@/features/auth/pages/register-page').then(pick('RegisterPage')))
 const TenantSelectorPage = lazy(() => import('@/features/auth/pages/tenant-selector-page').then(pick('TenantSelectorPage')))
 const OnboardingPage = lazy(() => import('@/features/auth/pages/onboarding-page').then(pick('OnboardingPage')))
@@ -49,8 +50,9 @@ function routeElement(Page: ComponentType) {
 export const router = createBrowserRouter([
   { path: '/login', element: routeElement(LoginPage) },
   { path: '/register', element: routeElement(RegisterPage) },
-  { path: '/tenants', element: routeElement(TenantSelectorPage) },
-  { path: '/onboarding', element: routeElement(OnboardingPage) },
+  { path: '/tenants', element: <AuthGuard>{routeElement(TenantSelectorPage)}</AuthGuard> },
+  { path: '/onboarding', element: <AuthGuard>{routeElement(OnboardingPage)}</AuthGuard> },
+  { path: '/billing', element: <AuthGuard>{routeElement(BillingPage)}</AuthGuard> },
   {
     path: '/',
     element: (

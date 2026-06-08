@@ -10,7 +10,7 @@ import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { localDb } from '@/services/local-db/client'
 
 describe('onboarding page data logic', () => {
-  it('creates new tenant and navigates to dashboard', async () => {
+  it('creates new tenant and navigates to dashboard after 5-step wizard', async () => {
     await localDb.tenants.clear()
     await localDb.tenantMembers.clear()
     useAuthStore.getState().logout()
@@ -25,14 +25,34 @@ describe('onboarding page data logic', () => {
       ),
     )
 
-    fireEvent.change(screen.getByLabelText('Nama usaha'), { target: { value: 'Toko Baru' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Simpan dan lanjut' }))
+    // Step 1: Info
+    expect(screen.getAllByText(/Informasi Perusahaan/)[1]).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/Nama Bisnis/), { target: { value: 'Toko Baru' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Lanjut' }))
+
+    // Step 2: Template
+    expect(screen.getAllByText(/Pilih Template Bisnis/)[1]).toBeInTheDocument()
+    fireEvent.click(screen.getByText(/^Retail$/i))
+    fireEvent.click(screen.getByRole('button', { name: 'Lanjut' }))
+
+    // Step 3: Product setup
+    expect(screen.getAllByText(/Setup Produk Awal/)[1]).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Lanjut' }))
+
+    // Step 4: Payment config
+    expect(screen.getAllByText(/Metode Pembayaran/)[1]).toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText(/QRIS/))
+    fireEvent.click(screen.getByRole('button', { name: 'Lanjut' }))
+
+    // Step 5: Subscription
+    expect(screen.getAllByText(/Pilih Paket Langganan/)[1]).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Selesai & Mulai Jualan' }))
 
     expect(await screen.findByText('Dashboard Route')).toBeInTheDocument()
 
     const state = useAuthStore.getState()
     expect(state.activeTenant?.name).toBe('Toko Baru')
-    expect(state.activeTenant?.role).toBe('owner')
+    expect(state.activeTenant?.type).toBe('retail')
     expect(await localDb.tenants.count()).toBe(1)
     expect(await localDb.tenantMembers.count()).toBe(1)
   })

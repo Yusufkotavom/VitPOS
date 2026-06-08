@@ -75,7 +75,12 @@ function SalesOrderCard({ row }: { row: ReturnType<typeof useSalesOrders>[number
 export function SalesOrdersPage() {
   const orderRows = useSalesOrders()
   const [view, setView] = useState<'list' | 'card'>('list')
+  const [search, setSearch] = useState('')
   const activeView = view
+
+  const filtered = orderRows.filter(row =>
+    !search || [row.code, row.customerName, row.date].some(f => f.toLowerCase().includes(search.toLowerCase()))
+  )
 
   return (
     <PageShell title="Pesanan Penjualan" description="Invoice, pembayaran, piutang, print, PDF, dan WhatsApp." actions={
@@ -85,7 +90,7 @@ export function SalesOrdersPage() {
     }>
       <ContentCard title="Daftar Invoice" description="Tampilkan invoice dalam bentuk table atau card.">
         <div className="mb-4 flex flex-row items-center gap-2 border-b pb-4">
-          <input type="text" placeholder="Search invoice..." className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" />
+          <input type="text" placeholder="Cari invoice..." value={search} onChange={e => setSearch(e.target.value)} className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
           
           <div className="relative flex items-center group shrink-0">
             <Button variant="outline" size="icon" className="h-9 w-9">
@@ -131,7 +136,7 @@ export function SalesOrdersPage() {
 
         {activeView === 'list' ? (
               <DataTable
-            data={orderRows}
+            data={filtered}
               columns={[
                 { key: 'code', header: 'Invoice', sortable: true, render: (row) => <Link to={`/sales-orders/${row.id}`} className="font-medium text-primary hover:underline">{row.code}</Link> },
                 { key: 'customerName', header: 'Pelanggan', sortable: true },
@@ -141,11 +146,11 @@ export function SalesOrdersPage() {
               { key: 'status', header: 'Status', render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
             ]}
           />
-        ) : orderRows.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <EmptyState title="Belum ada invoice" description="Invoice akan muncul di sini setelah tersedia." />
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {orderRows.map((row) => (
+            {filtered.map((row) => (
               <SalesOrderCard key={row.id} row={row} />
             ))}
           </div>

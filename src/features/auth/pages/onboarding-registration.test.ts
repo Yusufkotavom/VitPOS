@@ -25,11 +25,18 @@ describe('onboarding registration flow', () => {
       ),
     )
 
-    fireEvent.change(screen.getByLabelText('Nama usaha'), { target: { value: 'Toko Regis' } })
-    fireEvent.change(screen.getByLabelText('Nama owner'), { target: { value: 'Budi' } })
-    fireEvent.change(screen.getByLabelText('Email owner'), { target: { value: 'budi@toko.id' } })
-    fireEvent.change(screen.getByLabelText('Kata sandi owner'), { target: { value: 'password123' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Simpan dan lanjut' }))
+    expect(screen.getAllByText(/Informasi Perusahaan/)[1]).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/Nama owner/), { target: { value: 'Budi' } })
+    fireEvent.change(screen.getByLabelText(/Email owner/), { target: { value: 'budi@toko.id' } })
+    fireEvent.change(screen.getByLabelText(/Kata sandi owner/), { target: { value: 'password123' } })
+    fireEvent.change(screen.getByLabelText(/Nama Bisnis/), { target: { value: 'Toko Regis' } })
+    
+    // Quick skip through wizard for registration test
+    fireEvent.click(screen.getByRole('button', { name: 'Lanjut' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Lanjut' })) // temp
+    fireEvent.click(screen.getByRole('button', { name: 'Lanjut' })) // prod
+    fireEvent.click(screen.getByRole('button', { name: 'Lanjut' })) // pay
+    fireEvent.click(screen.getByRole('button', { name: 'Selesai & Mulai Jualan' })) // sub
 
     expect(await screen.findByText('Dashboard Route')).toBeInTheDocument()
     expect(useAuthStore.getState().currentUser?.email).toBe('budi@toko.id')

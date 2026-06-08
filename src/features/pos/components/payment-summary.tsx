@@ -4,9 +4,9 @@ import { Separator } from '@/components/ui/separator'
 import { formatCurrency } from '@/lib/format-currency'
 import { selectPosTotals, usePosStore } from '@/features/pos/stores/pos-store'
 import { posTransactionService } from '@/features/pos/services/pos-transaction.service'
-import { toast } from 'sonner'
 import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
-import { useState } from 'react'
+import { toast } from 'sonner'
+import { useEffect, useState } from 'react'
 import { PosSuccessDialog } from '@/features/pos/components/pos-success-dialog'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { printPage } from '@/lib/print'
@@ -23,15 +23,21 @@ export function PaymentSummary() {
   const store = usePosStore()
   const totals = selectPosTotals(store)
   const dbMethods = usePaymentMethods()
-  const activeMethods = dbMethods && dbMethods.length > 0 ? dbMethods.filter(m => m.status === 'Aktif') : defaultMethods
+  const activeMethods = dbMethods && dbMethods.length > 0 ? dbMethods.filter((m) => m.status === 'Aktif') : defaultMethods
   
   const [successOrder, setSuccessOrder] = useState<PosOrderSummary | null>(null)
+
+  const setPaidAmount = store.setPaidAmount
+  const initialTotal = totals.total
+  useEffect(() => {
+    setPaidAmount(initialTotal)
+  }, [setPaidAmount, initialTotal])
 
   async function handleCheckout() {
     if (store.cartItems.length === 0) return
 
     try {
-      const result = await posTransactionService.checkout(store.cartItems, totals, store.paymentMethod, store.paidAmount || totals.total, store.discount, store.customerName)
+      const result = await posTransactionService.checkout(store.cartItems, totals, store.paymentMethod, store.paidAmount, store.discount, store.customerName)
       if (!result) {
         throw new Error('Transaksi tidak menghasilkan data order')
       }
@@ -44,8 +50,8 @@ export function PaymentSummary() {
         discount: store.discount,
         total: totals.total,
         paymentMethod: store.paymentMethod,
-        amountPaid: store.paidAmount || totals.total,
-        change: Math.max((store.paidAmount || totals.total) - totals.total, 0),
+        amountPaid: store.paidAmount,
+        change: Math.max(store.paidAmount - totals.total, 0),
         items: store.cartItems,
         customerName: store.customerName ?? 'Umum',
         cashierName: 'Kasir',
@@ -121,7 +127,7 @@ export function PaymentSummary() {
       <div className="space-y-3 pt-2">
         <label className="text-sm font-medium">Metode Pembayaran</label>
         <div className="grid grid-cols-3 gap-2">
-          {activeMethods.map((method) => (
+          {activeMethods.map((method: { id: string; name: string }) => (
             <Button
               key={method.id}
               variant={store.paymentMethod === method.name.toLowerCase() ? 'default' : 'outline'}

@@ -8,7 +8,7 @@ export const customerStatusOptions = ['Aktif', 'Piutang', 'Nonaktif'] as const
 export const customerFormSchema = z.object({
   name: z.string().trim().min(1, 'Nama pelanggan wajib diisi'),
   phone: z.string().trim().min(6, 'Nomor WhatsApp wajib diisi'),
-  city: z.string().trim().min(1, 'Kota wajib diisi'),
+  city: z.string().trim().min(1, 'Alamat wajib diisi'),
   receivable: z.string().trim().min(1, 'Nominal piutang wajib diisi'),
   orders: z.string().trim().min(1, 'Total order wajib diisi'),
   status: z.enum(customerStatusOptions),

@@ -16,20 +16,26 @@ function statusTone(status: string) {
   return 'neutral'
 }
 
-function displayStock(product: { type: string; stock: number }) {
-  return product.type === 'Jasa' ? '-' : `${product.stock} pcs`
+function displayStock(product: { type: string; stock: number; manageStock?: boolean }) {
+  if (product.type === 'Jasa' || product.manageStock === false) return 'Unlimited'
+  return `${product.stock} pcs`
 }
 
 export function ProductsPage() {
   const productRows = useProducts()
   const [view, setView] = useState<'list' | 'card'>('list')
+  const [search, setSearch] = useState('')
   const activeView = view
 
+  const filtered = productRows.filter(row =>
+    !search || [row.name, row.category, row.type].some(f => f.toLowerCase().includes(search.toLowerCase()))
+  )
+
   return (
-    <PageShell title="Barang & Jasa" actions={<ProductCrudActions />}>
+    <PageShell title="Barang & Jasa" description="Kelola produk fisik, jasa, harga grosir, gambar, dan stok." actions={<ProductCrudActions />}>
       <ContentCard>
         <div className="mb-4 flex flex-row items-center gap-2 border-b pb-4">
-          <input type="text" placeholder="Cari barang..." className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" />
+          <input type="text" placeholder="Cari barang..." value={search} onChange={e => setSearch(e.target.value)} className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
 
           <div className="relative flex items-center group shrink-0">
             <Button variant="outline" size="icon" className="h-9 w-9">
@@ -83,18 +89,18 @@ export function ProductsPage() {
               { key: 'name', header: 'Nama' },
               { key: 'category', header: 'Kategori' },
               { key: 'type', header: 'Jenis' },
-              { key: 'price', header: 'Harga', render: (row) => formatCurrency(row.price) },
+              { key: 'price', header: 'Harga', render: (row) => row.wholesalePrice ? `${formatCurrency(row.price)} / Grosir ${formatCurrency(row.wholesalePrice)}` : formatCurrency(row.price) },
               { key: 'stock', header: 'Stok', render: (row) => displayStock(row) },
               { key: 'status', header: 'Status', render: (row) => <StatusBadge label={row.status} tone={statusTone(row.status)} /> },
               { key: 'actions', header: 'Aksi', render: (row) => <ProductCrudActions product={row} /> },
             ]}
-            data={productRows}
+            data={filtered}
           />
-        ) : productRows.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <EmptyState title="Belum ada barang atau jasa" description="Barang dan jasa akan muncul di sini setelah tersedia." />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {productRows.map((row) => (
+            {filtered.map((row) => (
               <div key={row.id} className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border bg-background p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/20">
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-3">

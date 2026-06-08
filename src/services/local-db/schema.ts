@@ -52,10 +52,13 @@ export type LocalProduct = {
   category: string
   type: ProductType
   price: number
+  wholesalePrice?: number
   stock: number
+  manageStock?: boolean
   sku?: string
   barcode?: string
   imageUrl?: string
+  icon?: string
   status: ProductStatus
   syncStatus: SyncStatus
   version: number
@@ -161,6 +164,16 @@ export type LocalCash = {
   income: number
   expense: number
   status: string
+}
+
+export type LocalCashCategory = {
+  id: string
+  name: string
+  type: 'Pemasukan' | 'Pengeluaran'
+  status: 'Aktif' | 'Nonaktif'
+  syncStatus: SyncStatus
+  version: number
+  updatedAt: string
 }
 
 export type LocalSetting = {

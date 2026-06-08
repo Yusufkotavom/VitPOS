@@ -34,7 +34,7 @@ export function PosPage() {
 
   return (
     <div className="flex h-[100dvh] flex-col bg-muted/20">
-      <header className="border-b bg-background px-4 py-4 shadow-sm z-10 sticky top-0">
+      <header className="border-b bg-background px-4 py-4 shadow-sm">
         <div className="mx-auto grid max-w-screen-2xl gap-3 md:grid-cols-2">
           <div className="rounded-2xl border bg-card p-3 shadow-sm">
             <p className="mb-2 text-xs font-medium text-muted-foreground">Pelanggan</p>
@@ -88,7 +88,7 @@ export function PosPage() {
       </main>
 
       {/* Footer Bawah: Keranjang (Mobile) */}
-      <div className="border-t bg-background p-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] xl:hidden z-20">
+      <div className="border-t bg-background p-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] xl:hidden z-20 sticky bottom-0">
         <div className="mx-auto flex items-center gap-3">
           <div className="flex-1">
             <p className="text-xs text-muted-foreground">{totals.itemCount} item</p>

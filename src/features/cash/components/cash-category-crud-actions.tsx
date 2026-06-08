@@ -10,36 +10,48 @@ import { Field, FieldGroup } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
-import { paymentFormSchema, paymentInitialValues, paymentMethodOptions, paymentStatusOptions, type PaymentFormValues } from '@/features/payments/schemas/payment-form-schema'
-import { mapPaymentFormToRecord, mapPaymentRecordToFormValues } from '@/features/payments/schemas/payment-form-schema'
-import { paymentRepository } from '@/services/local-db/repository'
-import type { LocalPayment } from '@/services/local-db/schema'
+import { cashCategoryFormSchema, cashCategoryInitialValues, cashCategoryTypeOptions, type CashCategoryFormValues } from '@/features/cash/schemas/cash-category-schema'
+import { cashCategoryRepository } from '@/services/local-db/repository'
+import type { LocalCashCategory } from '@/services/local-db/schema'
 
-export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
+export function CashCategoryCrudActions({ category }: { category?: LocalCashCategory }) {
   const [formOpen, setFormOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
-  const isEdit = Boolean(payment)
+  const isEdit = Boolean(category)
 
-  const form = useForm<PaymentFormValues>({
-    resolver: zodResolver(paymentFormSchema),
-    defaultValues: payment ? mapPaymentRecordToFormValues(payment) : paymentInitialValues,
+  const form = useForm<CashCategoryFormValues>({
+    resolver: zodResolver(cashCategoryFormSchema),
+    defaultValues: category
+      ? { name: category.name, type: category.type, status: category.status }
+      : cashCategoryInitialValues,
   })
 
   useEffect(() => {
-    form.reset(payment ? mapPaymentRecordToFormValues(payment) : paymentInitialValues)
-  }, [payment, form])
+    form.reset(category
+      ? { name: category.name, type: category.type, status: category.status }
+      : cashCategoryInitialValues)
+  }, [category, form])
 
-  async function handleSubmit(values: PaymentFormValues) {
-    const id = payment?.id ?? crypto.randomUUID()
-    await paymentRepository.upsert(mapPaymentFormToRecord(values, id, payment))
-    toast.success(isEdit ? 'Pembayaran diperbarui' : 'Pembayaran dicatat')
+  async function handleSubmit(values: CashCategoryFormValues) {
+    const id = category?.id ?? crypto.randomUUID()
+    const now = new Date().toISOString()
+    await cashCategoryRepository.upsert({
+      id,
+      name: values.name.trim(),
+      type: values.type,
+      status: values.status,
+      syncStatus: 'pending',
+      version: (category?.version ?? 0) + 1,
+      updatedAt: now,
+    })
+    toast.success(isEdit ? 'Kategori diperbarui' : 'Kategori ditambahkan')
     setFormOpen(false)
   }
 
   async function handleDelete() {
-    if (!payment) return
-    await paymentRepository.remove(payment.id)
-    toast.success('Pembayaran dihapus')
+    if (!category) return
+    await cashCategoryRepository.remove(category.id)
+    toast.success('Kategori dihapus')
     setDeleteOpen(false)
   }
 
@@ -49,38 +61,34 @@ export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
     <div className="flex flex-wrap gap-2">
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogTrigger asChild>
-          {payment
+          {category
             ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />Ubah</Button>
-            : <Button><PlusIcon data-icon="inline-start" />Record Payment</Button>}
+            : <Button size="sm"><PlusIcon data-icon="inline-start" />Tambah</Button>}
         </DialogTrigger>
         <DialogContent className="sm:max-w-sm">
           <form onSubmit={form.handleSubmit(handleSubmit)}>
             <DialogHeader>
-              <DialogTitle>{isEdit ? 'Ubah pembayaran' : 'Catat pembayaran'}</DialogTitle>
-              <DialogDescription>Pembayaran tersimpan lokal dulu, lalu masuk antrean sinkron.</DialogDescription>
+              <DialogTitle>{isEdit ? 'Ubah kategori' : 'Tambah kategori'}</DialogTitle>
+              <DialogDescription>Kategori untuk pemasukan atau pengeluaran kas.</DialogDescription>
             </DialogHeader>
             <FieldGroup>
-              <Field data-invalid={!!errors.ref}>
-                <Label htmlFor="ref">No. Referensi</Label>
-                <Input id="ref" {...form.register('ref')} aria-invalid={!!errors.ref} placeholder="PAY-20260608-001" />
-              </Field>
-              <Field data-invalid={!!errors.source}>
-                <Label htmlFor="source">Sumber</Label>
-                <Input id="source" {...form.register('source')} aria-invalid={!!errors.source} placeholder="Nama pelanggan / invoice" />
+              <Field data-invalid={!!errors.name}>
+                <Label htmlFor="name">Nama Kategori</Label>
+                <Input id="name" {...form.register('name')} aria-invalid={!!errors.name} placeholder="Penjualan" />
               </Field>
               <Field>
-                <Label htmlFor="method">Metode Bayar</Label>
+                <Label htmlFor="type">Tipe</Label>
                 <Controller
-                  name="method"
+                  name="type"
                   control={form.control}
                   render={({ field }) => (
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <SelectTrigger id="method">
-                        <SelectValue placeholder="Pilih metode" />
+                      <SelectTrigger id="type">
+                        <SelectValue placeholder="Pilih tipe" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          {paymentMethodOptions.map(opt => (
+                          {cashCategoryTypeOptions.map(opt => (
                             <SelectItem key={opt} value={opt}>{opt}</SelectItem>
                           ))}
                         </SelectGroup>
@@ -89,29 +97,20 @@ export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
                   )}
                 />
               </Field>
-              <Field data-invalid={!!errors.date}>
-                <Label htmlFor="date">Tanggal</Label>
-                <Input id="date" type="date" {...form.register('date')} aria-invalid={!!errors.date} />
-              </Field>
-              <Field data-invalid={!!errors.amount}>
-                <Label htmlFor="amount">Nominal</Label>
-                <Input id="amount" inputMode="numeric" {...form.register('amount')} aria-invalid={!!errors.amount} placeholder="0" />
-              </Field>
               <Field>
-                <Label htmlFor="status">Status</Label>
+                <Label htmlFor="category-status">Status</Label>
                 <Controller
                   name="status"
                   control={form.control}
                   render={({ field }) => (
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <SelectTrigger id="status">
+                      <SelectTrigger id="category-status">
                         <SelectValue placeholder="Pilih status" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          {paymentStatusOptions.map(opt => (
-                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                          ))}
+                          <SelectItem value="Aktif">Aktif</SelectItem>
+                          <SelectItem value="Nonaktif">Nonaktif</SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>
@@ -124,24 +123,24 @@ export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
                 <Button variant="outline" type="button">Batal</Button>
               </DialogClose>
               <Button type="submit" disabled={form.formState.isSubmitting}>
-                {isEdit ? 'Simpan' : 'Catat'}
+                {isEdit ? 'Simpan' : 'Tambah'}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
-      {payment ? (
+      {category ? (
         <>
           <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />Hapus</Button>
           <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Hapus pembayaran</DialogTitle>
-                <DialogDescription>Pembayaran {payment.ref} akan dihapus dari data lokal dan masuk antrean sinkron.</DialogDescription>
+                <DialogTitle>Hapus kategori</DialogTitle>
+                <DialogDescription>Kategori {category.name} akan dihapus dari data lokal dan masuk antrean sinkron.</DialogDescription>
               </DialogHeader>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setDeleteOpen(false)}>Batal</Button>
-                <Button variant="destructive" onClick={handleDelete}>Hapus pembayaran</Button>
+                <Button variant="destructive" onClick={handleDelete}>Hapus kategori</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

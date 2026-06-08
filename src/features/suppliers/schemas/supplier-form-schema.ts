@@ -8,7 +8,7 @@ export const supplierStatusOptions = ['Aktif', 'Hutang', 'Nonaktif'] as const
 export const supplierFormSchema = z.object({
   name: z.string().trim().min(1, 'Nama supplier wajib diisi'),
   phone: z.string().trim().min(6, 'Nomor telepon wajib diisi'),
-  city: z.string().trim().min(1, 'Kota wajib diisi'),
+  city: z.string().trim().min(1, 'Alamat wajib diisi'),
   payable: z.string().trim().min(1, 'Nominal hutang wajib diisi'),
   orders: z.string().trim().min(1, 'Total order wajib diisi'),
   status: z.enum(supplierStatusOptions),

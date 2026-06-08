@@ -78,7 +78,14 @@ export const sidebarNavigation: SidebarNavigationGroup[] = [
   {
     group: 'Keuangan & Laporan',
     items: [
-      { to: '/cash', label: appLabels.cashBank, icon: Wallet },
+      {
+        to: '/cash',
+        label: appLabels.cashBank,
+        icon: Wallet,
+        items: [
+          { to: '/cash/payment-methods', label: 'Metode Pembayaran', icon: CreditCard },
+        ],
+      },
       { to: '/reports', label: appLabels.reports, icon: BarChart3 },
     ],
   },
@@ -86,7 +93,14 @@ export const sidebarNavigation: SidebarNavigationGroup[] = [
     group: 'Sistem',
     items: [
       { to: '/sync', label: appLabels.offlineSync, icon: RefreshCw },
-      { to: '/settings', label: appLabels.companySetting, icon: Settings },
+      {
+        to: '/settings',
+        label: appLabels.companySetting,
+        icon: Settings,
+        items: [
+          { to: '/settings/profile', label: 'Profil Pengguna', icon: Users },
+        ],
+      },
       { to: '/platform-admin', label: 'Platform Admin', icon: Shield },
     ],
   },

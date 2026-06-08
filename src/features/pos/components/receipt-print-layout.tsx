@@ -1,8 +1,18 @@
+import { useLiveQuery } from 'dexie-react-hooks'
 import { formatCurrency } from '@/lib/format-currency'
+import { localDb } from '@/services/local-db/client'
 import { type PosOrderSummary } from '@/features/pos/types/pos-order.types'
 
 export function ReceiptPrintLayout({ order }: { order: PosOrderSummary | null }) {
+  const settings = useLiveQuery(() => localDb.settings.toArray(), []) ?? []
+
   if (!order) return null
+
+  const companyName = settings.find(s => s.id === 'company-name')?.value || 'KOTACOM POS'
+  const companyPhone = settings.find(s => s.id === 'company-phone')?.value || ''
+  const companyAddress = settings.find(s => s.id === 'company-address')?.value || ''
+  const receiptHeader = settings.find(s => s.id === 'receipt-header')?.value || ''
+  const receiptFooter = settings.find(s => s.id === 'receipt-footer')?.value || 'Terima kasih atas kunjungan Anda'
 
   // Format date natively for print layout
   const dateStr = new Intl.DateTimeFormat('id-ID', {
@@ -39,9 +49,10 @@ export function ReceiptPrintLayout({ order }: { order: PosOrderSummary | null })
 
       <div className="print-receipt-container p-2">
         <div className="text-center mb-4">
-          <h1 className="font-bold text-sm uppercase">KOTACOM POS</h1>
-          <p className="text-[10px]">Jl. Contoh Alamat No. 123</p>
-          <p className="text-[10px]">Telp: 08123456789</p>
+          <h1 className="font-bold text-sm uppercase">{companyName}</h1>
+          {companyAddress && <p className="text-[10px] whitespace-pre-wrap">{companyAddress}</p>}
+          {companyPhone && <p className="text-[10px]">Telp: {companyPhone}</p>}
+          {receiptHeader && <p className="text-[10px] italic border-t border-dashed mt-1 pt-1">{receiptHeader}</p>}
         </div>
 
         <div className="border-b border-dashed border-black pb-2 mb-2">
@@ -50,7 +61,7 @@ export function ReceiptPrintLayout({ order }: { order: PosOrderSummary | null })
             <span>Kasir: {order.cashierName}</span>
           </div>
           <div className="flex justify-between mt-1">
-            <span>ID: {order.id.slice(0, 8)}</span>
+            <span>ID: {order.code}</span>
             {order.customerName && <span>Pel: {order.customerName}</span>}
           </div>
         </div>
@@ -63,6 +74,7 @@ export function ReceiptPrintLayout({ order }: { order: PosOrderSummary | null })
                 <span>{item.qty} x {formatCurrency(item.price)}</span>
                 <span>{formatCurrency(item.subtotal)}</span>
               </div>
+              {item.note && <div className="text-[10px] text-gray-700 pl-2">*{item.note}</div>}
             </div>
           ))}
         </div>
@@ -86,21 +98,27 @@ export function ReceiptPrintLayout({ order }: { order: PosOrderSummary | null })
 
         <div className="border-t border-dashed border-black mt-2 pt-2 space-y-1">
           <div className="flex justify-between">
-            <span>Tunai/Bayar ({order.paymentMethod})</span>
+            <span>Bayar ({order.paymentMethod})</span>
             <span>{formatCurrency(order.amountPaid)}</span>
           </div>
-          <div className="flex justify-between font-semibold">
-            <span>Kembali</span>
-            <span>{formatCurrency(order.change)}</span>
-          </div>
+          {order.amountPaid < order.total ? (
+            <div className="flex justify-between text-red-600 font-semibold">
+              <span>Kurang (DP)</span>
+              <span>{formatCurrency(order.total - order.amountPaid)}</span>
+            </div>
+          ) : (
+            <div className="flex justify-between font-semibold">
+              <span>Kembali</span>
+              <span>{formatCurrency(order.change)}</span>
+            </div>
+          )}
         </div>
 
-        <div className="text-center mt-6">
-          <p>Terima Kasih</p>
-          <p className="text-[10px]">Barang yang sudah dibeli</p>
-          <p className="text-[10px]">tidak dapat ditukar/dikembalikan</p>
+        <div className="text-center mt-6 border-t border-dashed pt-2">
+          <p className="whitespace-pre-wrap">{receiptFooter}</p>
         </div>
       </div>
     </div>
   )
 }
+

@@ -9,7 +9,7 @@ export type SyncPushBody = SyncPushRequest
 
 export type SyncMutationInput = SyncPushBody['mutations'][number]
 
-const syncEntityTypes = new Set<SyncEntityType>(['product', 'customer', 'sale', 'payment', 'stock_movement', 'cash', 'setting', 'shift', 'product_category', 'supplier', 'purchase', 'return', 'service_order'])
+const syncEntityTypes = new Set<SyncEntityType>(['product', 'customer', 'sale', 'payment', 'stock_movement', 'cash', 'cash_category', 'setting', 'shift', 'product_category', 'supplier', 'purchase', 'return', 'service_order'])
 const syncMutationTypes = new Set<SyncMutationType>(['create', 'update', 'delete'])
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 

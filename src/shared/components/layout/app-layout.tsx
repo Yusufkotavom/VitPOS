@@ -1,5 +1,5 @@
 import { Building2 } from 'lucide-react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
 import { mobileNavigation } from '@/app/navigation'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
@@ -12,6 +12,8 @@ import { SyncStatusBadge } from '@/shared/components/sync/sync-status-badge'
 
 export function AppLayout() {
   const syncSummary = useSyncStore()
+  const location = useLocation()
+  const isPos = location.pathname === '/pos'
 
   return (
     <SidebarProvider>
@@ -50,24 +52,26 @@ export function AppLayout() {
             <Outlet />
           </main>
 
-          <nav className="fixed inset-x-0 bottom-0 z-20 grid h-16 grid-cols-5 border-t bg-background lg:hidden">
-            {mobileNavigation.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === '/'}
-                className={({ isActive }) =>
-                  cn(
-                    'flex flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted-foreground',
-                    isActive && 'text-primary',
-                  )
-                }
-              >
-                <item.icon />
-                <span>{item.label}</span>
-              </NavLink>
-            ))}
-          </nav>
+          {!isPos ? (
+            <nav className="fixed inset-x-0 bottom-0 z-20 grid h-16 grid-cols-5 border-t bg-background lg:hidden">
+              {mobileNavigation.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === '/'}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted-foreground',
+                      isActive && 'text-primary',
+                    )
+                  }
+                >
+                  <item.icon />
+                  <span>{item.label}</span>
+                </NavLink>
+              ))}
+            </nav>
+          ) : null}
         </div>
       </SidebarInset>
     </SidebarProvider>

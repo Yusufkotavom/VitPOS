@@ -36,7 +36,7 @@ export function SalesOrderDetailPage() {
   if (isLoading) {
     return (
       <PageShell title="Loading..." description="">
-        <div className="space-y-4">
+        <div className="space-y-4 p-4">
           <Skeleton className="h-8 w-1/3" />
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-64 w-full" />
@@ -45,20 +45,8 @@ export function SalesOrderDetailPage() {
     )
   }
 
-  if (!order) {
-    return (
-      <PageShell title="Tidak Ditemukan" description="Sales Order tidak ditemukan">
-        <Button asChild variant="outline">
-          <Link to="/sales-orders">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Kembali ke Daftar
-          </Link>
-        </Button>
-      </PageShell>
-    )
-  }
-
   function startEditing() {
+    if (!order) return
     setEditItems(order.items.map(i => ({ id: i.id, name: i.name, qty: String(i.qty), unitPrice: String(i.unitPrice) })))
     setEditing(true)
   }
@@ -68,6 +56,7 @@ export function SalesOrderDetailPage() {
   }
 
   async function saveEditing() {
+    if (!order) return
     const items = editItems.map(i => {
       const qty = Number(i.qty) || 0
       const unitPrice = Number(i.unitPrice) || 0
@@ -110,6 +99,7 @@ export function SalesOrderDetailPage() {
   }
 
   async function handleReceivePayment() {
+    if (!order) return
     const amount = Number(payAmount) || 0
     if (amount <= 0) return toast.error('Nominal pembayaran harus lebih dari 0')
 
@@ -130,9 +120,23 @@ export function SalesOrderDetailPage() {
   }
 
   async function handleDelete() {
+    if (!order) return
     await salesOrderRepository.remove(order.id)
     toast.success('Invoice dihapus')
     setDeleteOpen(false)
+  }
+
+  if (!order) {
+    return (
+      <PageShell title="Tidak Ditemukan" description="Sales Order tidak ditemukan">
+        <Button asChild variant="outline">
+          <Link to="/sales-orders">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Kembali ke Daftar
+          </Link>
+        </Button>
+      </PageShell>
+    )
   }
 
   const shortage = Math.max(0, order.grandTotal - order.paidTotal)

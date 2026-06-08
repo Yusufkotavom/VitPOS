@@ -58,12 +58,12 @@ describe('auth polish behavior', () => {
     expect(screen.getAllByText('Data sudah aman').length).toBeGreaterThan(0)
   })
 
-  it('onboarding exposes progress, accessible business field, and mobile action links', () => {
+  it('onboarding exposes wizard progress, accessible business field, and login action link', () => {
     render(createElement(MemoryRouter, null, createElement(OnboardingPage)))
 
     expect(screen.getByText('Progress Setup')).toBeInTheDocument()
-    expect(screen.getByLabelText('Nama usaha')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Simpan dan lanjut/i })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Kembali ke login/i })).toBeInTheDocument()
+    expect(screen.getByLabelText('Nama Bisnis')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Lanjut/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Ke Login/i })).toBeInTheDocument()
   })
 })
