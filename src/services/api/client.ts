@@ -19,13 +19,36 @@ export function buildTenantQuery(input: { tenantId: string; branchId?: string; f
   return params
 }
 
+async function readApiError(response: Response) {
+  const payload = await response.json().catch(() => null) as { message?: string } | null
+  return payload?.message ?? `API request failed: ${response.status}`
+}
+
 export async function apiGet<T>(path: string, query?: URLSearchParams) {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000'
+  const baseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3010'
   const url = buildApiUrl(baseUrl, path)
   const response = await fetch(query ? `${url}?${query.toString()}` : url)
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`)
+    throw new Error(await readApiError(response))
+  }
+
+  return response.json() as Promise<T>
+}
+
+export async function apiPost<T>(path: string, body: unknown) {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3010'
+  const url = buildApiUrl(baseUrl, path)
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response))
   }
 
   return response.json() as Promise<T>

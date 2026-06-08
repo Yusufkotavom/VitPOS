@@ -152,6 +152,88 @@ export type LocalShift = {
   status: 'open' | 'closed'
 }
 
+export type LocalSupplier = {
+  id: string
+  name: string
+  phone: string
+  city: string
+  payable: number
+  orders: number
+  status: string
+  syncStatus: SyncStatus
+  version: number
+  updatedAt: string
+}
+
+export type LocalPurchaseItem = {
+  id: string
+  purchaseId: string
+  productId: string
+  name: string
+  qty: number
+  unitPrice: number
+  subtotal: number
+}
+
+export type PurchaseStatus = 'Draft' | 'Dikirim' | 'Diterima' | 'Batal'
+
+export type LocalPurchase = {
+  id: string
+  code: string
+  supplierId?: string
+  supplierName: string
+  date: string
+  subtotal: number
+  grandTotal: number
+  status: PurchaseStatus
+  items: LocalPurchaseItem[]
+  syncStatus: SyncStatus
+  version: number
+  updatedAt: string
+}
+
+export type LocalReturnItem = {
+  id: string
+  returnId: string
+  productId: string
+  name: string
+  qty: number
+  unitPrice: number
+  subtotal: number
+}
+
+export type ReturnType = 'Penjualan' | 'Pembelian'
+export type ReturnStatus = 'Draft' | 'Diproses' | 'Selesai' | 'Batal'
+
+export type LocalReturn = {
+  id: string
+  code: string
+  type: ReturnType
+  referenceCode: string
+  date: string
+  total: number
+  status: ReturnStatus
+  items: LocalReturnItem[]
+  syncStatus: SyncStatus
+  version: number
+  updatedAt: string
+}
+
+export type ServiceOrderStatus = 'Diterima' | 'Dikerjakan' | 'Selesai' | 'Diambil' | 'Batal'
+
+export type LocalServiceOrder = {
+  id: string
+  code: string
+  customerName: string
+  description: string
+  date: string
+  cost: number
+  status: ServiceOrderStatus
+  syncStatus: SyncStatus
+  version: number
+  updatedAt: string
+}
+
 export type SyncConflict = {
   id: string
   entityType: SyncEntityType

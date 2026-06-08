@@ -1,4 +1,5 @@
-import { Button } from '@/components/ui/button'
+import { formatCurrency } from '@/lib/format-currency'
+import { InventoryAdjustmentActions, InventoryMovementHistory } from '@/features/inventory/components/inventory-adjustment-actions'
 import { useInventory } from '@/features/inventory/hooks/use-inventory'
 import { DataTable } from '@/shared/components/data-table/data-table'
 import { ContentCard } from '@/shared/components/display/content-card'
@@ -14,16 +15,33 @@ function tone(status: string) {
 export function InventoryPage() {
   const inventory = useInventory()
 
+  const totalItems = inventory.length
+  const lowStockCount = inventory.filter((row) => row.status === 'Stok Rendah' || row.status === 'Habis').length
+
   return (
-    <PageShell title="Stok & Gudang" description="Multi gudang, movement history, transfer, adjustment, dan stok kritis." actions={<Button>Adjustment Stok</Button>}>
+    <PageShell title="Stok & Gudang" description="Multi gudang, movement history, transfer, adjustment, dan stok kritis." actions={<InventoryAdjustmentActions />}>
+      <section className="grid gap-3 md:grid-cols-3">
+        <article className="rounded-2xl border bg-background p-4 shadow-sm">
+          <p className="text-xs text-muted-foreground">Total SKU tercatat</p>
+          <p className="mt-2 text-2xl font-semibold">{totalItems}</p>
+        </article>
+        <article className="rounded-2xl border bg-background p-4 shadow-sm">
+          <p className="text-xs text-muted-foreground">Stok kritis</p>
+          <p className="mt-2 text-2xl font-semibold text-rose-600">{lowStockCount}</p>
+        </article>
+        <article className="rounded-2xl border bg-background p-4 shadow-sm">
+          <p className="text-xs text-muted-foreground">Nilai stok</p>
+          <p className="mt-2 text-2xl font-semibold">{formatCurrency(inventory.reduce((sum, row) => sum + row.stockSystem * 1000, 0))}</p>
+        </article>
+      </section>
       <ContentCard title="Stok per Gudang" description="Gunakan movement history, bukan angka stok mati saja.">
         <DataTable
           data={inventory}
           columns={[
             { key: 'product', header: 'Produk' },
             { key: 'warehouse', header: 'Gudang' },
-            { key: 'stockSystem', header: 'Stok Sistem' },
-            { key: 'stockSafe', header: 'Stok Aman' },
+            { key: 'stockSystem', header: 'Stok Sistem', render: (row) => String(row.stockSystem) },
+            { key: 'stockSafe', header: 'Stok Aman', render: (row) => String(row.stockSafe) },
             { key: 'movement', header: 'Movement Terakhir' },
             { key: 'status', header: 'Status', render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
           ]}
@@ -37,6 +55,9 @@ export function InventoryPage() {
             </div>
           )}
         />
+      </ContentCard>
+      <ContentCard title="Riwayat Pergerakan Stok" description="50 pergerakan terakhir dari semua tipe (sale, purchase, adjustment, transfer).">
+        <InventoryMovementHistory />
       </ContentCard>
     </PageShell>
   )

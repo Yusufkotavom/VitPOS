@@ -13,6 +13,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
 } from '@/components/ui/sidebar'
 import { useSyncStore } from '@/features/sync/stores/sync-store'
@@ -28,41 +31,57 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg">
               <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <Building2 />
+                <Building2 aria-hidden="true" />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">KOTACOM</span>
                 <span className="truncate text-xs text-muted-foreground">Business Suite</span>
               </div>
-              <ChevronsUpDown className="ml-auto" />
+              <ChevronsUpDown aria-hidden="true" className="ml-auto" />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Operasional</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {sidebarNavigation.map((item) => (
-                <SidebarMenuItem key={item.to}>
-                  <SidebarMenuButton asChild tooltip={item.label}>
-                    <NavLink to={item.to} end={item.to === '/'}>
-                      <item.icon />
-                      <span>{item.label}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {sidebarNavigation.map((group) => (
+          <SidebarGroup key={group.group}>
+            <SidebarGroupLabel>{group.group}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => (
+                  <SidebarMenuItem key={item.to}>
+                    <SidebarMenuButton asChild tooltip={item.label}>
+                      <NavLink to={item.to} end={item.to === '/'}>
+                        <item.icon aria-hidden="true" />
+                        <span>{item.label}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                    {item.items?.length ? (
+                      <SidebarMenuSub>
+                        {item.items.map((child) => (
+                          <SidebarMenuSubItem key={child.to}>
+                            <SidebarMenuSubButton asChild>
+                              <NavLink to={child.to}>
+                                <child.icon aria-hidden="true" />
+                                <span>{child.label}</span>
+                              </NavLink>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    ) : null}
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton>
-              <Store />
+              <Store aria-hidden="true" />
               <span>Cabang Utama</span>
             </SidebarMenuButton>
           </SidebarMenuItem>

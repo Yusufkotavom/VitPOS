@@ -5,7 +5,7 @@ import { useSyncConflicts } from '@/features/sync/hooks/use-sync-conflicts'
 import { useSyncQueue } from '@/features/sync/hooks/use-sync-queue'
 import { useSyncStore } from '@/features/sync/stores/sync-store'
 import { enqueueOutboxItem } from '@/services/sync/outbox-service'
-import { runMockSync } from '@/services/sync/sync-engine'
+import { runSync } from '@/services/sync/sync-engine'
 import { ContentCard } from '@/shared/components/display/content-card'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { EmptyState } from '@/shared/components/feedback/empty-state'
@@ -19,13 +19,17 @@ function statusTone(status: string) {
 }
 
 export function SyncPage() {
-  const sync = useSyncStore()
+  const isOnline = useSyncStore((s) => s.isOnline)
+  const setOnline = useSyncStore((s) => s.setOnline)
+  const setStatus = useSyncStore((s) => s.setStatus)
+  const markSynced = useSyncStore((s) => s.markSynced)
+  const setCounts = useSyncStore((s) => s.setCounts)
   const { items: outbox, pendingCount, failedCount } = useSyncQueue()
   const { conflicts, openCount } = useSyncConflicts()
 
   useEffect(() => {
-    sync.setCounts({ pendingCount, failedCount, conflictCount: openCount })
-  }, [failedCount, openCount, pendingCount, sync])
+    setCounts({ pendingCount, failedCount, conflictCount: openCount })
+  }, [failedCount, openCount, pendingCount, setCounts])
 
   async function addMockQueue() {
     await enqueueOutboxItem({
@@ -37,15 +41,15 @@ export function SyncPage() {
   }
 
   async function syncNow() {
-    sync.setStatus('syncing')
-    const result = await runMockSync()
+    setStatus('syncing')
+    const result = await runSync()
 
     if (result.failed > 0) {
-      sync.setStatus(openCount > 0 ? 'conflict' : 'failed')
+      setStatus(openCount > 0 ? 'conflict' : 'failed')
       return
     }
 
-    sync.markSynced()
+    markSynced()
   }
 
   return (
@@ -54,8 +58,8 @@ export function SyncPage() {
       description="Pantau queue, failed sync, conflict, dan status keamanan data cloud."
       actions={
         <>
-          <Button variant="outline" onClick={() => sync.setOnline(!sync.isOnline)}>
-            {sync.isOnline ? 'Simulasi Offline' : 'Simulasi Online'}
+          <Button variant="outline" onClick={() => setOnline(!isOnline)}>
+            {isOnline ? 'Simulasi Offline' : 'Simulasi Online'}
           </Button>
           <Button variant="outline" onClick={addMockQueue}>Buat Data Contoh</Button>
           <Button onClick={syncNow}>Sinkronkan Sekarang</Button>
@@ -78,7 +82,7 @@ export function SyncPage() {
         <div className="rounded-2xl border bg-background p-5 shadow-sm">
           <p className="text-sm text-muted-foreground">Status</p>
           <div className="mt-3">
-            <StatusBadge label={sync.isOnline ? 'Online' : 'Offline Mode'} tone={sync.isOnline ? 'success' : 'warning'} />
+            <StatusBadge label={isOnline ? 'Online' : 'Offline Mode'} tone={isOnline ? 'success' : 'warning'} />
           </div>
         </div>
       </div>

@@ -1,6 +1,8 @@
-import { dashboardAlerts } from '@/features/dashboard/mocks/dashboard.mock'
+import { useDashboardStats } from '@/features/dashboard/hooks/use-dashboard-stats'
 
 export function DashboardAlertList() {
+  const { dashboardAlerts } = useDashboardStats()
+
   return (
     <div className="grid gap-4">
       {dashboardAlerts.map((alert) => {

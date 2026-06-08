@@ -1,6 +1,8 @@
-import { dashboardStats } from '@/features/dashboard/mocks/dashboard.mock'
+import { useDashboardStats } from '@/features/dashboard/hooks/use-dashboard-stats'
 
 export function DashboardKpiGrid() {
+  const { dashboardStats } = useDashboardStats()
+
   return (
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {dashboardStats.map((stat) => (

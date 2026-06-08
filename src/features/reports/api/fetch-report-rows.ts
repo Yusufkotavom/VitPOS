@@ -1,3 +1,4 @@
+import { buildBaimTenantQuery } from '@/lib/baim-runtime'
 import { apiGet, buildTenantQuery } from '@/services/api/client'
 
 export type ReportRow = {
@@ -38,7 +39,7 @@ type InventoryMovementResponse = {
 }
 
 export async function fetchReportRows() {
-  const query = buildTenantQuery({ tenantId: 'tenant-demo', branchId: 'branch-demo' })
+  const query = buildTenantQuery(buildBaimTenantQuery())
 
   const [sales, payments, inventory] = await Promise.all([
     apiGet<ReportSummaryResponse>('/reports/sales/summary', query),

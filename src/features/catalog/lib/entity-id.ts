@@ -1,7 +1,7 @@
 export function createProductId() {
-  return `product-${crypto.randomUUID()}`
+  return crypto.randomUUID()
 }
 
 export function createCustomerId() {
-  return `customer-${crypto.randomUUID()}`
+  return crypto.randomUUID()
 }

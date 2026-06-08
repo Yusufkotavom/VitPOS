@@ -7,11 +7,17 @@ import type {
   LocalPayment,
   LocalProduct,
   LocalProductCategory,
+  LocalPurchase,
+  LocalPurchaseItem,
+  LocalReturn,
+  LocalReturnItem,
   LocalSalesOrder,
   LocalSalesOrderItem,
+  LocalServiceOrder,
   LocalSetting,
   LocalShift,
   LocalStockMovement,
+  LocalSupplier,
   OutboxItem,
   SyncConflict,
   SyncRun,
@@ -29,6 +35,12 @@ export class VitposLocalDb extends Dexie {
   cash!: EntityTable<LocalCash, 'id'>
   settings!: EntityTable<LocalSetting, 'id'>
   shifts!: EntityTable<LocalShift, 'id'>
+  suppliers!: EntityTable<LocalSupplier, 'id'>
+  purchases!: EntityTable<LocalPurchase, 'id'>
+  purchaseItems!: EntityTable<LocalPurchaseItem, 'id'>
+  returns!: EntityTable<LocalReturn, 'id'>
+  returnItems!: EntityTable<LocalReturnItem, 'id'>
+  serviceOrders!: EntityTable<LocalServiceOrder, 'id'>
   outbox!: EntityTable<OutboxItem, 'id'>
   syncConflicts!: EntityTable<SyncConflict, 'id'>
   syncRuns!: EntityTable<SyncRun, 'id'>
@@ -117,6 +129,28 @@ export class VitposLocalDb extends Dexie {
       cash: 'id, ref, date, account, category, status',
       settings: 'id, area, setting, status',
       shifts: 'id, cashierName, startTime, status',
+      outbox: 'id, entityType, entityId, mutationType, status, createdAt, updatedAt, syncedAt',
+      syncConflicts: 'id, entityType, entityId, status, createdAt, resolvedAt',
+      syncRuns: 'id, status, startedAt, finishedAt',
+    })
+    this.version(8).stores({
+      products: 'id, name, category, type, status, syncStatus, updatedAt',
+      productCategories: 'id, name, status, syncStatus, updatedAt',
+      customers: 'id, name, phone, city, status, syncStatus, updatedAt',
+      salesOrders: 'id, code, customerName, date, status, syncStatus, updatedAt',
+      salesOrderItems: 'id, salesOrderId, productId',
+      payments: 'id, ref, source, method, date, status, syncStatus, updatedAt, salesOrderId',
+      stockMovements: 'id, productId, type, referenceId, syncStatus, updatedAt',
+      inventory: 'id, product, warehouse, status',
+      cash: 'id, ref, date, account, category, status',
+      settings: 'id, area, setting, status',
+      shifts: 'id, cashierName, startTime, status',
+      suppliers: 'id, name, phone, city, status, syncStatus, updatedAt',
+      purchases: 'id, code, supplierName, date, status, syncStatus, updatedAt',
+      purchaseItems: 'id, purchaseId, productId',
+      returns: 'id, code, type, referenceCode, date, status, syncStatus, updatedAt',
+      returnItems: 'id, returnId, productId',
+      serviceOrders: 'id, code, customerName, date, status, syncStatus, updatedAt',
       outbox: 'id, entityType, entityId, mutationType, status, createdAt, updatedAt, syncedAt',
       syncConflicts: 'id, entityType, entityId, status, createdAt, resolvedAt',
       syncRuns: 'id, status, startedAt, finishedAt',

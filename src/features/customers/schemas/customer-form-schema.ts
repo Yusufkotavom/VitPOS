@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { formatRupiahFromNumber, formatUnits, parseDigits } from '@/features/catalog/lib/formatters'
+import { parseDigits } from '@/features/catalog/lib/formatters'
 import type { LocalCustomer } from '@/services/local-db/schema'
 
 export const customerStatusOptions = ['Aktif', 'Piutang', 'Nonaktif'] as const
@@ -25,15 +25,18 @@ export const customerInitialValues: CustomerFormValues = {
   status: 'Aktif',
 }
 
-export function mapCustomerFormToRecord(values: CustomerFormValues, id: string): LocalCustomer {
+export function mapCustomerFormToRecord(values: CustomerFormValues, id: string, base?: LocalCustomer): LocalCustomer {
   return {
     id,
     name: values.name.trim(),
     phone: values.phone.trim(),
     city: values.city.trim(),
-    receivable: formatRupiahFromNumber(parseDigits(values.receivable)),
-    orders: formatUnits(parseDigits(values.orders), 'order'),
+    receivable: parseDigits(values.receivable),
+    orders: parseDigits(values.orders),
     status: values.status,
+    syncStatus: 'pending',
+    version: (base?.version ?? 0) + 1,
+    updatedAt: new Date().toISOString(),
   }
 }
 
@@ -42,8 +45,8 @@ export function mapCustomerRecordToFormValues(customer: LocalCustomer): Customer
     name: customer.name,
     phone: customer.phone,
     city: customer.city,
-    receivable: String(parseDigits(customer.receivable)),
-    orders: String(parseDigits(customer.orders)),
+    receivable: String(customer.receivable),
+    orders: String(customer.orders),
     status: customer.status === 'Aktif' || customer.status === 'Piutang' || customer.status === 'Nonaktif' ? customer.status : 'Aktif',
   }
 }

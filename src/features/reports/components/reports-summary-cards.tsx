@@ -1,4 +1,4 @@
-import type { ReportRow } from '@/features/reports/mocks/reports.mock'
+import type { ReportRow } from '@/features/reports/api/fetch-report-rows'
 
 export function ReportsSummaryCards({ reports }: { reports: ReportRow[] }) {
   const readyCount = reports.filter((report) => report.status === 'Siap Export').length

@@ -1,3 +1,4 @@
+import { formatCurrency } from '@/lib/format-currency'
 import { CustomerCrudActions } from '@/features/customers/components/customer-crud-actions'
 import { useCustomers } from '@/features/customers/hooks/use-customers'
 import { DataTable } from '@/shared/components/data-table/data-table'
@@ -24,8 +25,8 @@ export function CustomersPage() {
             { key: 'name', header: 'Pelanggan' },
             { key: 'phone', header: 'WhatsApp' },
             { key: 'city', header: 'Kota' },
-            { key: 'receivable', header: 'Piutang' },
-            { key: 'orders', header: 'Total Order' },
+            { key: 'receivable', header: 'Piutang', render: (row) => formatCurrency(row.receivable) },
+            { key: 'orders', header: 'Total Order', render: (row) => String(row.orders) },
             { key: 'status', header: 'Status', render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
             { key: 'actions', header: 'Aksi', render: (row) => <CustomerCrudActions customer={row} /> },
           ]}
@@ -38,7 +39,7 @@ export function CustomersPage() {
                 </div>
                 <StatusBadge label={row.status} tone={tone(row.status)} />
               </div>
-              <div className="flex items-center justify-between text-sm"><span>Piutang {row.receivable}</span><span>{row.orders}</span></div>
+              <div className="flex items-center justify-between text-sm"><span>Piutang {formatCurrency(row.receivable)}</span><span>{row.orders} order</span></div>
               <CustomerCrudActions customer={row} />
             </div>
           )}

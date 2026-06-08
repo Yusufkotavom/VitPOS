@@ -16,9 +16,23 @@ export const useSyncStore = create<SyncStore>((set) => ({
   failedCount: 0,
   conflictCount: 0,
   lastSyncAt: null,
-  setOnline: (isOnline) => set({ isOnline, status: isOnline ? 'pending' : 'offline' }),
-  setStatus: (status) => set({ status }),
-  setCounts: (counts) => set(counts),
+  setOnline: (isOnline) => set((state) => {
+    const nextStatus = isOnline ? 'pending' : 'offline'
+    if (state.isOnline === isOnline && state.status === nextStatus) return state
+    return { isOnline, status: nextStatus }
+  }),
+  setStatus: (status) => set((state) => (state.status === status ? state : { status })),
+  setCounts: (counts) => set((state) => {
+    if (
+      state.pendingCount === counts.pendingCount
+      && state.failedCount === counts.failedCount
+      && state.conflictCount === counts.conflictCount
+    ) {
+      return state
+    }
+
+    return counts
+  }),
   markSynced: () =>
     set({
       status: 'synced',

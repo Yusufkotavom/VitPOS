@@ -25,14 +25,19 @@ describe('customerFormSchema', () => {
       'customer-1',
     )
 
-    expect(result).toEqual({
-      id: 'customer-1',
-      name: 'Toko Maju',
-      phone: '08123456789',
-      city: 'Bandung',
-      receivable: 'Rp 120.000',
-      orders: '8 order',
-      status: 'Piutang',
-    })
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: 'customer-1',
+        name: 'Toko Maju',
+        phone: '08123456789',
+        city: 'Bandung',
+        receivable: 120000,
+        orders: 8,
+        status: 'Piutang',
+        syncStatus: 'pending',
+        version: 1,
+      })
+    )
+    expect(result.updatedAt).toBeTypeOf('string')
   })
 })

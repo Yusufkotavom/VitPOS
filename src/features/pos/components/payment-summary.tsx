@@ -3,6 +3,8 @@ import { Input } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/format-currency'
 import { selectPosTotals, usePosStore } from '@/features/pos/stores/pos-store'
 import { type PosPaymentMethod } from '@/features/pos/types/pos.types'
+import { posTransactionService } from '@/features/pos/services/pos-transaction.service'
+import { toast } from 'sonner'
 
 const paymentMethods: { code: PosPaymentMethod; label: string }[] = [
   { code: 'tunai', label: 'Tunai' },
@@ -16,6 +18,19 @@ const paymentMethods: { code: PosPaymentMethod; label: string }[] = [
 export function PaymentSummary() {
   const store = usePosStore()
   const totals = selectPosTotals(store)
+
+  async function handleCheckout() {
+    if (store.cartItems.length === 0) return
+
+    try {
+      await posTransactionService.checkout(store.cartItems, totals, store.paymentMethod, store.paidAmount, store.discount)
+      toast.success('Pembayaran berhasil dicatat dan masuk antrean sinkron')
+      store.clearCart()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Gagal mencatat pembayaran'
+      toast.error(message)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -61,7 +76,7 @@ export function PaymentSummary() {
         </div>
       ) : null}
 
-      <Button className="h-12 text-base" disabled={store.cartItems.length === 0} onClick={store.clearCart}>
+      <Button className="h-12 text-base" disabled={store.cartItems.length === 0} onClick={handleCheckout}>
         Selesaikan Pembayaran
       </Button>
     </div>

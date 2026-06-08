@@ -19,7 +19,7 @@ export function OnboardingPage() {
       <div className="mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[320px_1fr]">
         <Card>
           <CardHeader>
-            <CardTitle>Setup Usaha</CardTitle>
+            <CardTitle>Progress Setup</CardTitle>
             <CardDescription>Lengkapi data awal sebelum mulai jualan.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -36,7 +36,7 @@ export function OnboardingPage() {
           </CardContent>
           <CardFooter className="flex items-center gap-2 text-sm text-muted-foreground">
             <CheckCircle2 />
-            <span>Semua field masih mock UI.</span>
+            <span>Data awal siap disimpan sebagai profil usaha.</span>
           </CardFooter>
         </Card>
 
@@ -55,26 +55,26 @@ export function OnboardingPage() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="flex flex-col gap-2 text-sm font-medium md:col-span-2">
-                  Nama usaha
-                  <Input placeholder="Contoh: Toko Sumber Rejeki" />
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-medium">
-                  Jenis usaha
-                  <Input placeholder="Retail, F&B, Service" />
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-medium">
-                  Nomor WhatsApp
-                  <Input placeholder="08xxxxxxxxxx" />
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-medium">
-                  Cabang pertama
-                  <Input placeholder="Cabang Utama" />
-                </label>
-                <label className="flex flex-col gap-2 text-sm font-medium">
-                  Gudang pertama
-                  <Input placeholder="Gudang Pusat" />
-                </label>
+                <div className="flex flex-col gap-2 md:col-span-2">
+                  <label htmlFor="business-name" className="text-sm font-medium">Nama usaha</label>
+                  <Input id="business-name" placeholder="Contoh: Toko Sumber Rejeki" />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="business-type" className="text-sm font-medium">Jenis usaha</label>
+                  <Input id="business-type" placeholder="Retail, F&B, Service" />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="business-phone" className="text-sm font-medium">Nomor WhatsApp</label>
+                  <Input id="business-phone" placeholder="08xxxxxxxxxx" />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="first-branch" className="text-sm font-medium">Cabang pertama</label>
+                  <Input id="first-branch" placeholder="Cabang Utama" />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="first-warehouse" className="text-sm font-medium">Gudang pertama</label>
+                  <Input id="first-warehouse" placeholder="Gudang Pusat" />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -103,7 +103,7 @@ export function OnboardingPage() {
                 </label>
               </div>
             </CardContent>
-            <CardFooter className="flex flex-col items-stretch gap-3 sm:flex-row sm:justify-between">
+            <CardFooter className="sticky bottom-0 flex flex-col items-stretch gap-3 bg-background sm:flex-row sm:justify-between">
               <Button variant="outline" asChild>
                 <Link to="/login">Kembali ke login</Link>
               </Button>

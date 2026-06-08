@@ -1,6 +1,14 @@
 import { type ReactNode } from 'react'
 
 import { EmptyState } from '@/shared/components/feedback/empty-state'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
 type Column<T> = {
   key: keyof T | string
@@ -25,29 +33,29 @@ export function DataTable<T extends { id: string }>({
 
   return (
     <>
-      <div className="hidden overflow-hidden rounded-2xl border bg-background md:block">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
-            <tr>
+      <div className="hidden overflow-hidden rounded-md border bg-background md:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
               {columns.map((column) => (
-                <th key={String(column.key)} className="px-4 py-3 font-medium">
+                <TableHead key={String(column.key)}>
                   {column.header}
-                </th>
+                </TableHead>
               ))}
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {data.map((row) => (
-              <tr key={row.id} className="border-t">
+              <TableRow key={row.id}>
                 {columns.map((column) => (
-                  <td key={String(column.key)} className="px-4 py-3 align-middle">
+                  <TableCell key={String(column.key)}>
                     {column.render ? column.render(row) : String(row[column.key as keyof T] ?? '')}
-                  </td>
+                  </TableCell>
                 ))}
-              </tr>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
       <div className="grid gap-3 md:hidden">
         {data.map((row) => (

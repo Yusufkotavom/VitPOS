@@ -24,18 +24,18 @@ export function CartPanel() {
               <p className="font-medium">{item.name}</p>
               <p className="text-sm text-muted-foreground">{formatCurrency(item.price)}</p>
             </div>
-            <Button variant="ghost" size="icon-sm" onClick={() => removeItem(item.productId)}>
-              <Trash2 />
+            <Button aria-label={`Hapus ${item.name} dari keranjang`} variant="ghost" size="icon-sm" onClick={() => removeItem(item.productId)}>
+              <Trash2 aria-hidden="true" />
             </Button>
           </div>
           <div className="mt-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon-sm" onClick={() => decreaseQty(item.productId)}>
-                <Minus />
+              <Button aria-label={`Kurangi jumlah ${item.name}`} variant="outline" size="icon-sm" onClick={() => decreaseQty(item.productId)}>
+                <Minus aria-hidden="true" />
               </Button>
               <span className="min-w-8 text-center text-sm font-medium">{item.qty}</span>
-              <Button variant="outline" size="icon-sm" onClick={() => increaseQty(item.productId)}>
-                <Plus />
+              <Button aria-label={`Tambah jumlah ${item.name}`} variant="outline" size="icon-sm" onClick={() => increaseQty(item.productId)}>
+                <Plus aria-hidden="true" />
               </Button>
             </div>
             <p className="font-semibold">{formatCurrency(item.subtotal)}</p>

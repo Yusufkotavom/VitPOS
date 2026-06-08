@@ -1,6 +1,8 @@
-import { dashboardTransactions } from '@/features/dashboard/mocks/dashboard.mock'
+import { useDashboardStats } from '@/features/dashboard/hooks/use-dashboard-stats'
 
 export function RecentTransactions() {
+  const { dashboardTransactions } = useDashboardStats()
+
   return (
     <article className="rounded-2xl border bg-background p-5 shadow-sm">
       <h2 className="text-lg font-semibold">Transaksi Terbaru</h2>

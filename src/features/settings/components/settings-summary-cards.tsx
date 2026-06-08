@@ -1,6 +1,7 @@
-import { settingRows } from '@/features/settings/mocks/settings.mock'
+import { useSettings } from '@/features/settings/hooks/use-settings'
 
 export function SettingsSummaryCards() {
+  const settingRows = useSettings() || []
   const completeCount = settingRows.filter((setting) => setting.status === 'Lengkap').length
   const incompleteCount = settingRows.filter((setting) => setting.status !== 'Lengkap').length
 

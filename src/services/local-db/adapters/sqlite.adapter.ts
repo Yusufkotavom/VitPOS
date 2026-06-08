@@ -1,6 +1,12 @@
-import { type LocalDbAdapter } from '@/services/local-db/adapters'
+import { type LocalDbAdapter, type AdapterTable, type LocalDbAdapterMetadata } from '@/services/local-db/adapters'
 
-export const sqliteAdapter: LocalDbAdapter = {
-  name: 'sqlite',
-  platform: 'mobile',
+class SqliteAdapterStub implements LocalDbAdapter {
+  readonly metadata: LocalDbAdapterMetadata = { name: 'sqlite', platform: 'mobile' }
+
+  async init(): Promise<void> { throw new Error('SQLite adapter not yet implemented') }
+  async teardown(): Promise<void> { throw new Error('SQLite adapter not yet implemented') }
+  storageTable<T extends { id: string }>(): AdapterTable<T> { throw new Error('SQLite adapter not yet implemented') }
+  async runInTransaction<T>(): Promise<T> { throw new Error('SQLite adapter not yet implemented') }
 }
+
+export const sqliteAdapter = new SqliteAdapterStub()

@@ -12,11 +12,30 @@ import { formatCurrency } from '@/lib/format-currency'
 import { ContentCard } from '@/shared/components/display/content-card'
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { SyncStatusBadge } from '@/shared/components/sync/sync-status-badge'
+import { toast } from 'sonner'
+import { posTransactionService } from '@/features/pos/services/pos-transaction.service'
 
 export function PosPage() {
   const syncSummary = useSyncStore()
   const totals = selectPosTotals(usePosStore())
   const hasItems = totals.itemCount > 0
+
+  async function handleDraft() {
+    if (!hasItems) return
+    const state = usePosStore.getState()
+
+    try {
+      await posTransactionService.saveDraft(state.cartItems, totals, state.discount)
+      toast.success('Draft berhasil disimpan')
+      state.clearCart()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Gagal menyimpan draft')
+    }
+  }
+
+  function scrollToPayment() {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+  }
 
   return (
     <PageShell
@@ -25,14 +44,14 @@ export function PosPage() {
       actions={
         <>
           <SyncStatusBadge summary={syncSummary} />
-          <Button variant="outline" disabled={!hasItems}>Simpan Draft</Button>
-          <Button disabled={!hasItems}>Bayar {hasItems ? formatCurrency(totals.total) : ''}</Button>
+          <Button variant="outline" disabled={!hasItems} onClick={handleDraft}>Simpan Draft</Button>
+          <Button disabled={!hasItems} onClick={scrollToPayment}>Bayar {hasItems ? formatCurrency(totals.total) : ''}</Button>
         </>
       }
     >
       <PosSummaryStrip itemCount={totals.itemCount} subtotal={totals.subtotal} total={totals.total} />
       <HeldSaleBanner visible={hasItems && syncSummary.pendingCount > 0} />
-      <div className="grid gap-4 pb-24 xl:grid-cols-[minmax(0,1fr)_400px] xl:pb-0">
+      <div className="grid gap-4 pb-40 xl:grid-cols-[minmax(0,1fr)_400px] xl:pb-0">
         <ContentCard
           title="Katalog Produk"
           description="Cari cepat, pilih kategori, lalu tap produk untuk tambah ke keranjang."
@@ -59,13 +78,13 @@ export function PosPage() {
         </aside>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 p-3 shadow-lg backdrop-blur xl:hidden">
+      <div className="fixed inset-x-0 bottom-16 z-30 border-t bg-background/95 p-3 shadow-lg backdrop-blur xl:hidden">
         <div className="mx-auto flex max-w-screen-sm items-center gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-xs text-muted-foreground">Total bayar</p>
             <p className="truncate text-lg font-semibold">{formatCurrency(totals.total)}</p>
           </div>
-          <Button className="h-11 min-w-32" disabled={!hasItems}>Bayar</Button>
+          <Button className="h-11 min-w-32" disabled={!hasItems} onClick={scrollToPayment}>Bayar</Button>
         </div>
       </div>
     </PageShell>

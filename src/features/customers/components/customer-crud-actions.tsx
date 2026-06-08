@@ -18,7 +18,7 @@ export function CustomerCrudActions({ customer }: { customer?: LocalCustomer }) 
 
   async function handleSubmit(values: CustomerFormValues) {
     const id = customer?.id ?? createCustomerId()
-    await customerRepository.upsert(mapCustomerFormToRecord(values, id))
+    await customerRepository.upsert(mapCustomerFormToRecord(values, id, customer))
     toast.success(isEdit ? 'Pelanggan diperbarui' : 'Pelanggan ditambahkan')
     setFormOpen(false)
   }
