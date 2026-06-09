@@ -1,6 +1,6 @@
 {
   "name": "@vitpos/mobile",
-  "version": "0.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "VitPOS Mobile - Capacitor Android shell wrapping root web build",
   "type": "module",
