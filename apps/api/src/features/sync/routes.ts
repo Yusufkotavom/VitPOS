@@ -11,7 +11,23 @@ import {
   type SyncPushItemResult,
 } from '../../lib/contracts.js'
 import { applyMutation } from './apply.js'
-import { customers, outboxLogs, payments, products, salesOrders, stockMovements } from '../../../../../src/db/schema/index.js'
+import {
+  cash,
+  cashCategories,
+  customers,
+  outboxLogs,
+  payments,
+  productCategories,
+  products,
+  purchases,
+  returns,
+  salesOrders,
+  serviceOrders,
+  settings,
+  shifts,
+  stockMovements,
+  suppliers,
+} from '../../../../../src/db/schema/index.js'
 
 export const syncRoutes = new Hono()
 
@@ -63,6 +79,74 @@ syncRoutes.get('/pull', async (c) => {
   const customerRows = await db.query.customers.findMany({
     where: and(eq(customers.tenantId, parsed.value.tenantId), isNull(customers.deletedAt), customerSinceFilter),
     orderBy: [desc(customers.updatedAt)],
+    limit: 100,
+  })
+
+  const categoriesSinceFilter = parsed.value.since ? gte(productCategories.updatedAt, parsed.value.since) : undefined
+  const categoryRows = await db.query.productCategories.findMany({
+    where: and(eq(productCategories.tenantId, parsed.value.tenantId), isNull(productCategories.deletedAt), categoriesSinceFilter),
+    orderBy: [desc(productCategories.updatedAt)],
+    limit: 100,
+  })
+
+  const cashCategoriesSinceFilter = parsed.value.since ? gte(cashCategories.updatedAt, parsed.value.since) : undefined
+  const cashCategoryRows = await db.query.cashCategories.findMany({
+    where: and(eq(cashCategories.tenantId, parsed.value.tenantId), isNull(cashCategories.deletedAt), cashCategoriesSinceFilter),
+    orderBy: [desc(cashCategories.updatedAt)],
+    limit: 100,
+  })
+
+  const cashBranchFilter = parsed.value.branchId ? eq(cash.branchId, parsed.value.branchId) : undefined
+  const cashSinceFilter = parsed.value.since ? gte(cash.updatedAt, parsed.value.since) : undefined
+  const cashRows = await db.query.cash.findMany({
+    where: and(eq(cash.tenantId, parsed.value.tenantId), cashBranchFilter, cashSinceFilter),
+    orderBy: [desc(cash.updatedAt)],
+    limit: 100,
+  })
+
+  const settingsSinceFilter = parsed.value.since ? gte(settings.updatedAt, parsed.value.since) : undefined
+  const settingRows = await db.query.settings.findMany({
+    where: and(eq(settings.tenantId, parsed.value.tenantId), settingsSinceFilter),
+    orderBy: [desc(settings.updatedAt)],
+    limit: 100,
+  })
+
+  const shiftsBranchFilter = parsed.value.branchId ? eq(shifts.branchId, parsed.value.branchId) : undefined
+  const shiftsSinceFilter = parsed.value.since ? gte(shifts.updatedAt, parsed.value.since) : undefined
+  const shiftRows = await db.query.shifts.findMany({
+    where: and(eq(shifts.tenantId, parsed.value.tenantId), shiftsBranchFilter, shiftsSinceFilter),
+    orderBy: [desc(shifts.updatedAt)],
+    limit: 100,
+  })
+
+  const supplierSinceFilter = parsed.value.since ? gte(suppliers.updatedAt, parsed.value.since) : undefined
+  const supplierRows = await db.query.suppliers.findMany({
+    where: and(eq(suppliers.tenantId, parsed.value.tenantId), isNull(suppliers.deletedAt), supplierSinceFilter),
+    orderBy: [desc(suppliers.updatedAt)],
+    limit: 100,
+  })
+
+  const purchaseBranchFilter = parsed.value.branchId ? eq(purchases.branchId, parsed.value.branchId) : undefined
+  const purchaseSinceFilter = parsed.value.since ? gte(purchases.updatedAt, parsed.value.since) : undefined
+  const purchaseRows = await db.query.purchases.findMany({
+    where: and(eq(purchases.tenantId, parsed.value.tenantId), purchaseBranchFilter, purchaseSinceFilter),
+    orderBy: [desc(purchases.updatedAt)],
+    limit: 100,
+  })
+
+  const returnBranchFilter = parsed.value.branchId ? eq(returns.branchId, parsed.value.branchId) : undefined
+  const returnSinceFilter = parsed.value.since ? gte(returns.updatedAt, parsed.value.since) : undefined
+  const returnRows = await db.query.returns.findMany({
+    where: and(eq(returns.tenantId, parsed.value.tenantId), returnBranchFilter, returnSinceFilter),
+    orderBy: [desc(returns.updatedAt)],
+    limit: 100,
+  })
+
+  const serviceOrderBranchFilter = parsed.value.branchId ? eq(serviceOrders.branchId, parsed.value.branchId) : undefined
+  const serviceOrderSinceFilter = parsed.value.since ? gte(serviceOrders.updatedAt, parsed.value.since) : undefined
+  const serviceOrderRows = await db.query.serviceOrders.findMany({
+    where: and(eq(serviceOrders.tenantId, parsed.value.tenantId), serviceOrderBranchFilter, serviceOrderSinceFilter),
+    orderBy: [desc(serviceOrders.updatedAt)],
     limit: 100,
   })
 
@@ -162,6 +246,168 @@ syncRoutes.get('/pull', async (c) => {
         receivable: 0,
         orders: 0,
         status: row.isActive ? 'Aktif' : 'Nonaktif',
+        version: row.version,
+      },
+      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
+      serverSyncStatus: row.syncStatus,
+      updatedAt: row.updatedAt.toISOString(),
+    })),
+    ...categoryRows.map<SyncPullItem>((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: 'product_category',
+      mutationType: 'update',
+      payload: {
+        id: row.id,
+        name: row.name,
+        status: row.isActive ? 'Aktif' : 'Arsip',
+      },
+      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus ?? 'synced'),
+      serverSyncStatus: row.syncStatus ?? 'synced',
+      updatedAt: row.updatedAt.toISOString(),
+    })),
+    ...cashCategoryRows.map<SyncPullItem>((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: 'cash_category',
+      mutationType: 'update',
+      payload: {
+        id: row.id,
+        name: row.name,
+        type: row.type === 'income' ? 'Pemasukan' : 'Pengeluaran',
+        status: row.isActive ? 'Aktif' : 'Nonaktif',
+      },
+      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
+      serverSyncStatus: row.syncStatus,
+      updatedAt: row.updatedAt.toISOString(),
+    })),
+    ...cashRows.map<SyncPullItem>((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: 'cash',
+      mutationType: 'update',
+      payload: {
+        id: row.id,
+        ref: row.ref,
+        date: row.date.toISOString(),
+        account: '',
+        category: row.categoryId ?? '',
+        income: Number(row.income),
+        expense: Number(row.expense),
+        status: row.status,
+      },
+      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
+      serverSyncStatus: row.syncStatus,
+      updatedAt: row.updatedAt.toISOString(),
+    })),
+    ...settingRows.map<SyncPullItem>((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: 'setting',
+      mutationType: 'update',
+      payload: {
+        id: row.key,
+        key: row.key,
+        area: row.area,
+        value: row.value,
+        status: row.status,
+      },
+      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
+      serverSyncStatus: row.syncStatus,
+      updatedAt: row.updatedAt.toISOString(),
+    })),
+    ...shiftRows.map<SyncPullItem>((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: 'shift',
+      mutationType: 'update',
+      payload: {
+        id: row.id,
+        cashierName: row.cashierName,
+        startTime: row.startTime.toISOString(),
+        endTime: row.endTime?.toISOString() ?? null,
+        startCash: Number(row.startCash),
+        expectedCash: row.expectedCash ? Number(row.expectedCash) : undefined,
+        actualCash: row.actualCash ? Number(row.actualCash) : undefined,
+        difference: row.difference ? Number(row.difference) : undefined,
+        status: row.status,
+      },
+      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
+      serverSyncStatus: row.syncStatus,
+      updatedAt: row.updatedAt.toISOString(),
+    })),
+    ...supplierRows.map<SyncPullItem>((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: 'supplier',
+      mutationType: 'update',
+      payload: {
+        id: row.id,
+        name: row.name,
+        phone: row.phone ?? '',
+        city: row.city ?? '',
+        payable: Number(row.payable),
+        orders: row.orders,
+        status: row.isActive ? 'Aktif' : 'Nonaktif',
+        version: row.version,
+      },
+      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
+      serverSyncStatus: row.syncStatus,
+      updatedAt: row.updatedAt.toISOString(),
+    })),
+    ...purchaseRows.map<SyncPullItem>((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: 'purchase',
+      mutationType: 'update',
+      payload: {
+        id: row.id,
+        code: row.code,
+        supplierId: row.supplierId,
+        date: row.date.toISOString(),
+        subtotal: Number(row.subtotal),
+        grandTotal: Number(row.grandTotal),
+        status: row.status,
+        version: row.version,
+      },
+      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
+      serverSyncStatus: row.syncStatus,
+      updatedAt: row.updatedAt.toISOString(),
+    })),
+    ...returnRows.map<SyncPullItem>((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: 'return',
+      mutationType: 'update',
+      payload: {
+        id: row.id,
+        code: row.code,
+        type: row.type === 'sale' ? 'Penjualan' : 'Pembelian',
+        referenceCode: row.referenceCode,
+        date: row.date.toISOString(),
+        total: Number(row.total),
+        status: row.status,
+        version: row.version,
+      },
+      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
+      serverSyncStatus: row.syncStatus,
+      updatedAt: row.updatedAt.toISOString(),
+    })),
+    ...serviceOrderRows.map<SyncPullItem>((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: 'service_order',
+      mutationType: 'update',
+      payload: {
+        id: row.id,
+        code: row.code,
+        customerId: row.customerId,
+        customerName: row.customerName,
+        description: row.description,
+        date: row.date.toISOString(),
+        cost: Number(row.cost),
+        status: row.status,
+        version: row.version,
       },
       transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
       serverSyncStatus: row.syncStatus,

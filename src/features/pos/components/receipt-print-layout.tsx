@@ -1,10 +1,15 @@
 import { useLiveQuery } from 'dexie-react-hooks'
+import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { formatCurrency } from '@/lib/format-currency'
 import { localDb } from '@/services/local-db/client'
 import { type PosOrderSummary } from '@/features/pos/types/pos-order.types'
 
 export function ReceiptPrintLayout({ order }: { order: PosOrderSummary | null }) {
-  const settings = useLiveQuery(() => localDb.settings.toArray(), []) ?? []
+  const activeTenantId = useAuthStore((state) => state.activeTenant?.id)
+  const settings = useLiveQuery(
+    () => activeTenantId ? localDb.settings.where('tenantId').equals(activeTenantId).toArray() : [],
+    [activeTenantId],
+  ) ?? []
 
   if (!order) return null
 
@@ -121,4 +126,3 @@ export function ReceiptPrintLayout({ order }: { order: PosOrderSummary | null })
     </div>
   )
 }
-

@@ -23,7 +23,7 @@ export function PaymentsPage() {
   const [search, setSearch] = useState('')
 
   const filtered = payments.filter(row =>
-    !search || [row.ref, row.source, row.method].some(f => f.toLowerCase().includes(search.toLowerCase()))
+    !search || [row.ref, row.source, row.method, row.salesOrderId ?? ''].some(f => f.toLowerCase().includes(search.toLowerCase()))
   )
 
   return (
@@ -77,6 +77,7 @@ export function PaymentsPage() {
             data={filtered}
             columns={[
               { key: 'ref', header: 'Ref', sortable: true },
+              { key: 'salesOrderId', header: 'Invoice', render: (row) => row.salesOrderId ?? '-' },
               { key: 'source', header: 'Sumber', sortable: true },
               { key: 'method', header: 'Metode' },
               { key: 'amount', header: 'Nominal', sortable: true, render: (row) => formatCurrency(row.amount) },

@@ -1,12 +1,24 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 
 import type { AppDb } from '../../lib/db.js'
 import {
+  cash,
+  cashCategories,
+  customers,
   payments,
+  productCategories,
   products,
+  purchaseItems,
+  purchases,
+  returnItems,
+  returns,
   salesOrderItems,
   salesOrders,
+  serviceOrders,
+  settings,
+  shifts,
   stockMovements,
+  suppliers,
 } from '../../../../../src/db/schema/index.js'
 
 type ApplyContext = {
@@ -315,6 +327,582 @@ async function applyStockMovement(db: AppDb, ctx: ApplyContext, entityId: string
     })
 }
 
+type CustomerPayload = {
+  id?: string
+  name?: string
+  phone?: string
+  email?: string
+  city?: string | null
+  receivable?: number
+  orders?: number
+  status?: string
+  isActive?: boolean
+}
+
+type ProductCategoryPayload = {
+  id?: string
+  name?: string
+  description?: string
+  status?: string
+  isActive?: boolean
+}
+
+type CashCategoryPayload = {
+  id?: string
+  name?: string
+  type?: string
+  status?: string
+  isActive?: boolean
+}
+
+type CashPayload = {
+  id?: string
+  ref?: string
+  date?: string
+  account?: string
+  category?: string
+  categoryId?: string
+  income?: number
+  expense?: number
+  status?: string
+}
+
+type SettingPayload = {
+  id?: string
+  key?: string
+  area?: string
+  setting?: string
+  value?: string
+  status?: string
+}
+
+type ShiftPayload = {
+  id?: string
+  cashierName?: string
+  startTime?: string
+  endTime?: string
+  startCash?: number
+  expectedCash?: number
+  actualCash?: number
+  difference?: number
+  status?: string
+}
+
+type SupplierPayload = {
+  id?: string
+  name?: string
+  phone?: string
+  city?: string
+  payable?: number
+  orders?: number
+  status?: string
+  isActive?: boolean
+}
+
+type PurchasePayload = {
+  id?: string
+  code?: string
+  supplierId?: string
+  supplierName?: string
+  date?: string
+  subtotal?: number | string
+  grandTotal?: number | string
+  status?: string
+  items?: Array<{
+    id?: string
+    productId?: string
+    name?: string
+    qty?: number | string
+    unitPrice?: number | string
+    subtotal?: number | string
+  }>
+}
+
+type ReturnPayload = {
+  id?: string
+  code?: string
+  type?: string
+  referenceCode?: string
+  date?: string
+  total?: number | string
+  status?: string
+  items?: Array<{
+    id?: string
+    productId?: string
+    name?: string
+    qty?: number | string
+    unitPrice?: number | string
+    subtotal?: number | string
+  }>
+}
+
+type ServiceOrderPayload = {
+  id?: string
+  code?: string
+  customerId?: string
+  customerName?: string
+  description?: string
+  date?: string
+  cost?: number | string
+  status?: string
+}
+
+function mapClientCustomerStatus(value: unknown): boolean {
+  if (value === 'Nonaktif' || value === false) return false
+  return true
+}
+
+function mapClientCategoryStatus(value: unknown): boolean {
+  if (value === 'Arsip' || value === 'Nonaktif' || value === false) return false
+  return true
+}
+
+function mapClientCashCategoryType(value: unknown): 'income' | 'expense' {
+  if (value === 'Pemasukan' || value === 'income') return 'income'
+  return 'expense'
+}
+
+function mapClientShiftStatus(value: unknown): 'open' | 'closed' {
+  if (value === 'closed' || value === 'tutup') return 'closed'
+  return 'open'
+}
+
+function mapClientPurchaseStatus(value: unknown): 'draft' | 'shipped' | 'received' | 'cancelled' {
+  if (value === 'Draft' || value === 'draft') return 'draft'
+  if (value === 'Dikirim' || value === 'shipped') return 'shipped'
+  if (value === 'Diterima' || value === 'received') return 'received'
+  if (value === 'Batal' || value === 'cancelled') return 'cancelled'
+  return 'draft'
+}
+
+function mapClientReturnType(value: unknown): 'sale' | 'purchase' {
+  if (value === 'Pembelian' || value === 'purchase') return 'purchase'
+  return 'sale'
+}
+
+function mapClientReturnStatus(value: unknown): 'draft' | 'processing' | 'completed' | 'cancelled' {
+  if (value === 'Draft' || value === 'draft') return 'draft'
+  if (value === 'Diproses' || value === 'processing') return 'processing'
+  if (value === 'Selesai' || value === 'completed') return 'completed'
+  if (value === 'Batal' || value === 'cancelled') return 'cancelled'
+  return 'draft'
+}
+
+function mapClientServiceOrderStatus(value: unknown): 'received' | 'in_progress' | 'completed' | 'picked_up' | 'cancelled' {
+  if (value === 'Diterima' || value === 'received') return 'received'
+  if (value === 'Dikerjakan' || value === 'in_progress') return 'in_progress'
+  if (value === 'Selesai' || value === 'completed') return 'completed'
+  if (value === 'Diambil' || value === 'picked_up') return 'picked_up'
+  if (value === 'Batal' || value === 'cancelled') return 'cancelled'
+  return 'received'
+}
+
+async function applyCustomer(db: AppDb, ctx: ApplyContext, entityId: string, mutationType: string, payload: CustomerPayload) {
+  if (mutationType === 'delete') {
+    await db.update(customers).set({ deletedAt: new Date() }).where(eq(customers.id, entityId))
+    return
+  }
+
+  const now = new Date()
+  await db
+    .insert(customers)
+    .values({
+      id: entityId,
+      tenantId: ctx.tenantId,
+      branchId: toNullableUuid(ctx.branchId),
+      name: payload.name ?? '',
+      phone: payload.phone ?? null,
+      email: payload.email ?? null,
+      address: payload.city ?? null,
+      notes: null,
+      isActive: mapClientCustomerStatus(payload.status ?? payload.isActive),
+      syncStatus: 'synced',
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: customers.id,
+      set: {
+        name: payload.name ?? '',
+        phone: payload.phone ?? null,
+        email: payload.email ?? null,
+        address: payload.city ?? null,
+        isActive: mapClientCustomerStatus(payload.status ?? payload.isActive),
+        syncStatus: 'synced',
+        updatedAt: now,
+      },
+    })
+}
+
+async function applyProductCategory(db: AppDb, ctx: ApplyContext, entityId: string, mutationType: string, payload: ProductCategoryPayload) {
+  if (mutationType === 'delete') {
+    await db.update(productCategories).set({ deletedAt: new Date() }).where(eq(productCategories.id, entityId))
+    return
+  }
+
+  const now = new Date()
+  await db
+    .insert(productCategories)
+    .values({
+      id: entityId,
+      tenantId: ctx.tenantId,
+      name: payload.name ?? '',
+      isActive: mapClientCategoryStatus(payload.status ?? payload.isActive),
+      syncStatus: 'synced',
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: productCategories.id,
+      set: {
+        name: payload.name ?? '',
+        isActive: mapClientCategoryStatus(payload.status ?? payload.isActive),
+        syncStatus: 'synced',
+        updatedAt: now,
+      },
+    })
+}
+
+async function applyCashCategory(db: AppDb, ctx: ApplyContext, entityId: string, mutationType: string, payload: CashCategoryPayload) {
+  if (mutationType === 'delete') {
+    await db.update(cashCategories).set({ deletedAt: new Date() }).where(eq(cashCategories.id, entityId))
+    return
+  }
+
+  const now = new Date()
+  await db
+    .insert(cashCategories)
+    .values({
+      id: entityId,
+      tenantId: ctx.tenantId,
+      name: payload.name ?? '',
+      type: mapClientCashCategoryType(payload.type),
+      isActive: mapClientCategoryStatus(payload.status ?? payload.isActive),
+      syncStatus: 'synced',
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: cashCategories.id,
+      set: {
+        name: payload.name ?? '',
+        type: mapClientCashCategoryType(payload.type),
+        isActive: mapClientCategoryStatus(payload.status ?? payload.isActive),
+        syncStatus: 'synced',
+        updatedAt: now,
+      },
+    })
+}
+
+async function applyCash(db: AppDb, ctx: ApplyContext, entityId: string, mutationType: string, payload: CashPayload) {
+  if (mutationType === 'delete') {
+    await db.delete(cash).where(eq(cash.id, entityId))
+    return
+  }
+
+  const now = new Date()
+  await db
+    .insert(cash)
+    .values({
+      id: entityId,
+      tenantId: ctx.tenantId,
+      branchId: toNullableUuid(ctx.branchId),
+      ref: payload.ref ?? payload.id ?? entityId,
+      date: payload.date ? new Date(payload.date) : now,
+      categoryId: toNullableUuid(payload.categoryId ?? payload.category),
+      income: toNumeric(payload.income),
+      expense: toNumeric(payload.expense),
+      status: payload.status ?? 'posted',
+      syncStatus: 'synced',
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: cash.id,
+      set: {
+        income: toNumeric(payload.income),
+        expense: toNumeric(payload.expense),
+        status: payload.status ?? 'posted',
+        syncStatus: 'synced',
+        updatedAt: now,
+      },
+    })
+}
+
+async function applySetting(db: AppDb, ctx: ApplyContext, entityId: string, mutationType: string, payload: SettingPayload) {
+  if (mutationType === 'delete') {
+    await db.delete(settings).where(eq(settings.id, entityId))
+    return
+  }
+
+  const now = new Date()
+  const settingKey = payload.key ?? payload.setting ?? entityId
+  const area = payload.area ?? 'general'
+
+  const existing = await db.query.settings.findFirst({
+    where: and(eq(settings.tenantId, ctx.tenantId), eq(settings.key, settingKey)),
+  })
+
+  if (existing) {
+    await db
+      .update(settings)
+      .set({
+        value: payload.value ?? '',
+        area,
+        status: payload.status ?? 'active',
+        syncStatus: 'synced',
+        updatedAt: now,
+      })
+      .where(eq(settings.id, existing.id))
+  } else {
+    const uuid = /^[0-9a-f]{8}-/i.test(entityId) ? entityId : crypto.randomUUID()
+    await db.insert(settings).values({
+      id: uuid,
+      tenantId: ctx.tenantId,
+      key: settingKey,
+      area,
+      value: payload.value ?? '',
+      status: payload.status ?? 'active',
+      syncStatus: 'synced',
+      createdAt: now,
+      updatedAt: now,
+    })
+  }
+}
+
+async function applyShift(db: AppDb, ctx: ApplyContext, entityId: string, mutationType: string, payload: ShiftPayload) {
+  if (mutationType === 'delete') {
+    await db.delete(shifts).where(eq(shifts.id, entityId))
+    return
+  }
+
+  const now = new Date()
+  await db
+    .insert(shifts)
+    .values({
+      id: entityId,
+      tenantId: ctx.tenantId,
+      branchId: toNullableUuid(ctx.branchId),
+      cashierName: payload.cashierName ?? '',
+      startTime: payload.startTime ? new Date(payload.startTime) : now,
+      endTime: payload.endTime ? new Date(payload.endTime) : null,
+      startCash: toNumeric(payload.startCash),
+      expectedCash: payload.expectedCash !== undefined ? toNumeric(payload.expectedCash) : null,
+      actualCash: payload.actualCash !== undefined ? toNumeric(payload.actualCash) : null,
+      difference: payload.difference !== undefined ? toNumeric(payload.difference) : null,
+      status: mapClientShiftStatus(payload.status),
+      syncStatus: 'synced',
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: shifts.id,
+      set: {
+        endTime: payload.endTime ? new Date(payload.endTime) : null,
+        expectedCash: payload.expectedCash !== undefined ? toNumeric(payload.expectedCash) : undefined,
+        actualCash: payload.actualCash !== undefined ? toNumeric(payload.actualCash) : undefined,
+        difference: payload.difference !== undefined ? toNumeric(payload.difference) : undefined,
+        status: mapClientShiftStatus(payload.status),
+        syncStatus: 'synced',
+        updatedAt: now,
+      },
+    })
+}
+
+async function applySupplier(db: AppDb, ctx: ApplyContext, entityId: string, mutationType: string, payload: SupplierPayload) {
+  if (mutationType === 'delete') {
+    await db.update(suppliers).set({ deletedAt: new Date() }).where(eq(suppliers.id, entityId))
+    return
+  }
+
+  const now = new Date()
+  await db
+    .insert(suppliers)
+    .values({
+      id: entityId,
+      tenantId: ctx.tenantId,
+      name: payload.name ?? '',
+      phone: payload.phone ?? null,
+      city: payload.city ?? null,
+      payable: toNumeric(payload.payable),
+      orders: payload.orders ?? 0,
+      isActive: mapClientCustomerStatus(payload.status ?? payload.isActive),
+      syncStatus: 'synced',
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: suppliers.id,
+      set: {
+        name: payload.name ?? '',
+        phone: payload.phone ?? null,
+        city: payload.city ?? null,
+        payable: toNumeric(payload.payable),
+        orders: payload.orders ?? 0,
+        isActive: mapClientCustomerStatus(payload.status ?? payload.isActive),
+        syncStatus: 'synced',
+        updatedAt: now,
+      },
+    })
+}
+
+async function applyPurchase(db: AppDb, ctx: ApplyContext, entityId: string, mutationType: string, payload: PurchasePayload) {
+  if (mutationType === 'delete') {
+    await db.delete(purchaseItems).where(eq(purchaseItems.purchaseId, entityId))
+    await db.delete(purchases).where(eq(purchases.id, entityId))
+    return
+  }
+
+  const now = new Date()
+  await db
+    .insert(purchases)
+    .values({
+      id: entityId,
+      tenantId: ctx.tenantId,
+      branchId: toNullableUuid(ctx.branchId),
+      supplierId: toNullableUuid(payload.supplierId),
+      code: payload.code ?? entityId,
+      date: payload.date ? new Date(payload.date) : now,
+      subtotal: toNumeric(payload.subtotal),
+      grandTotal: toNumeric(payload.grandTotal),
+      status: mapClientPurchaseStatus(payload.status),
+      syncStatus: 'synced',
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: purchases.id,
+      set: {
+        subtotal: toNumeric(payload.subtotal),
+        grandTotal: toNumeric(payload.grandTotal),
+        status: mapClientPurchaseStatus(payload.status),
+        syncStatus: 'synced',
+        updatedAt: now,
+      },
+    })
+
+  if (Array.isArray(payload.items)) {
+    await db.delete(purchaseItems).where(eq(purchaseItems.purchaseId, entityId))
+
+    if (payload.items.length > 0) {
+      await db.insert(purchaseItems).values(
+        payload.items.map((item) => ({
+          id: item.id ?? crypto.randomUUID(),
+          tenantId: ctx.tenantId,
+          purchaseId: entityId,
+          productId: toNullableUuid(item.productId),
+          name: item.name ?? '',
+          qty: toNumeric(item.qty),
+          unitPrice: toNumeric(item.unitPrice),
+          subtotal: toNumeric(item.subtotal),
+          createdAt: now,
+          updatedAt: now,
+        })),
+      )
+    }
+  }
+}
+
+async function applyReturn(db: AppDb, ctx: ApplyContext, entityId: string, mutationType: string, payload: ReturnPayload) {
+  if (mutationType === 'delete') {
+    await db.delete(returnItems).where(eq(returnItems.returnId, entityId))
+    await db.delete(returns).where(eq(returns.id, entityId))
+    return
+  }
+
+  const now = new Date()
+  await db
+    .insert(returns)
+    .values({
+      id: entityId,
+      tenantId: ctx.tenantId,
+      branchId: toNullableUuid(ctx.branchId),
+      code: payload.code ?? entityId,
+      type: mapClientReturnType(payload.type),
+      referenceCode: payload.referenceCode ?? '',
+      date: payload.date ? new Date(payload.date) : now,
+      total: toNumeric(payload.total),
+      status: mapClientReturnStatus(payload.status),
+      syncStatus: 'synced',
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: returns.id,
+      set: {
+        total: toNumeric(payload.total),
+        status: mapClientReturnStatus(payload.status),
+        syncStatus: 'synced',
+        updatedAt: now,
+      },
+    })
+
+  if (Array.isArray(payload.items)) {
+    await db.delete(returnItems).where(eq(returnItems.returnId, entityId))
+
+    if (payload.items.length > 0) {
+      await db.insert(returnItems).values(
+        payload.items.map((item) => ({
+          id: item.id ?? crypto.randomUUID(),
+          tenantId: ctx.tenantId,
+          returnId: entityId,
+          productId: toNullableUuid(item.productId),
+          name: item.name ?? '',
+          qty: toNumeric(item.qty),
+          unitPrice: toNumeric(item.unitPrice),
+          subtotal: toNumeric(item.subtotal),
+          createdAt: now,
+          updatedAt: now,
+        })),
+      )
+    }
+  }
+}
+
+async function applyServiceOrder(db: AppDb, ctx: ApplyContext, entityId: string, mutationType: string, payload: ServiceOrderPayload) {
+  if (mutationType === 'delete') {
+    await db.delete(serviceOrders).where(eq(serviceOrders.id, entityId))
+    return
+  }
+
+  const now = new Date()
+  await db
+    .insert(serviceOrders)
+    .values({
+      id: entityId,
+      tenantId: ctx.tenantId,
+      branchId: toNullableUuid(ctx.branchId),
+      customerId: toNullableUuid(payload.customerId),
+      code: payload.code ?? entityId,
+      customerName: payload.customerName ?? '',
+      description: payload.description ?? null,
+      date: payload.date ? new Date(payload.date) : now,
+      cost: toNumeric(payload.cost),
+      status: mapClientServiceOrderStatus(payload.status),
+      syncStatus: 'synced',
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: serviceOrders.id,
+      set: {
+        customerName: payload.customerName ?? '',
+        description: payload.description ?? null,
+        cost: toNumeric(payload.cost),
+        status: mapClientServiceOrderStatus(payload.status),
+        syncStatus: 'synced',
+        updatedAt: now,
+      },
+    })
+}
+
 export async function applyMutation(
   db: AppDb,
   ctx: ApplyContext,
@@ -337,6 +925,46 @@ export async function applyMutation(
   }
   if (entityType === 'stock_movement') {
     await applyStockMovement(db, ctx, entityId, mutationType, (payload ?? {}) as StockMovementPayload)
+    return
+  }
+  if (entityType === 'customer') {
+    await applyCustomer(db, ctx, entityId, mutationType, (payload ?? {}) as CustomerPayload)
+    return
+  }
+  if (entityType === 'product_category') {
+    await applyProductCategory(db, ctx, entityId, mutationType, (payload ?? {}) as ProductCategoryPayload)
+    return
+  }
+  if (entityType === 'cash_category') {
+    await applyCashCategory(db, ctx, entityId, mutationType, (payload ?? {}) as CashCategoryPayload)
+    return
+  }
+  if (entityType === 'cash') {
+    await applyCash(db, ctx, entityId, mutationType, (payload ?? {}) as CashPayload)
+    return
+  }
+  if (entityType === 'setting') {
+    await applySetting(db, ctx, entityId, mutationType, (payload ?? {}) as SettingPayload)
+    return
+  }
+  if (entityType === 'shift') {
+    await applyShift(db, ctx, entityId, mutationType, (payload ?? {}) as ShiftPayload)
+    return
+  }
+  if (entityType === 'supplier') {
+    await applySupplier(db, ctx, entityId, mutationType, (payload ?? {}) as SupplierPayload)
+    return
+  }
+  if (entityType === 'purchase') {
+    await applyPurchase(db, ctx, entityId, mutationType, (payload ?? {}) as PurchasePayload)
+    return
+  }
+  if (entityType === 'return') {
+    await applyReturn(db, ctx, entityId, mutationType, (payload ?? {}) as ReturnPayload)
+    return
+  }
+  if (entityType === 'service_order') {
+    await applyServiceOrder(db, ctx, entityId, mutationType, (payload ?? {}) as ServiceOrderPayload)
     return
   }
 }

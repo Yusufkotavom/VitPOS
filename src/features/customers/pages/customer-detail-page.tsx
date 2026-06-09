@@ -14,6 +14,7 @@ import { formatCurrency } from '@/lib/format-currency'
 import { customerRepository } from '@/services/local-db/repository'
 import { localDb } from '@/services/local-db/client'
 import { customerStatusOptions } from '@/features/customers/schemas/customer-form-schema'
+import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { DataTable } from '@/shared/components/data-table/data-table'
@@ -36,6 +37,7 @@ type OrderRow = {
 
 export function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const activeTenantId = useAuthStore((state) => state.activeTenant?.id)
 
   const { data: customer, isLoading, refetch } = useQuery({
     queryKey: ['customer', id],
@@ -43,8 +45,14 @@ export function CustomerDetailPage() {
     enabled: !!id,
   })
 
-  const rawSales = useLiveQuery(() => localDb.salesOrders.toArray(), [])
-  const rawService = useLiveQuery(() => localDb.serviceOrders.toArray(), [])
+  const rawSales = useLiveQuery(
+    () => activeTenantId ? localDb.salesOrders.where('tenantId').equals(activeTenantId).toArray() : [],
+    [activeTenantId],
+  )
+  const rawService = useLiveQuery(
+    () => activeTenantId ? localDb.serviceOrders.where('tenantId').equals(activeTenantId).toArray() : [],
+    [activeTenantId],
+  )
 
   const allSalesOrders = useMemo(() => rawSales ?? [], [rawSales])
   const allServiceOrders = useMemo(() => rawService ?? [], [rawService])
@@ -70,7 +78,7 @@ export function CustomerDetailPage() {
         status: so.status,
       }))
     const serviceOrders: OrderRow[] = allServiceOrders
-      .filter(so => so.customerName === customer.name)
+      .filter(so => so.customerId === id || so.customerName === customer.name)
       .map(so => ({
         id: so.id,
         code: so.code,
@@ -238,28 +246,32 @@ export function CustomerDetailPage() {
 
           <div>
             <h3 className="text-sm font-medium text-muted-foreground mb-3">Riwayat Order</h3>
-            <DataTable
-              data={orders}
-              columns={[
-                { key: 'code', header: 'Kode', sortable: true, render: (row: OrderRow) => (
-                  <Link
-                    to={row.type === 'Penjualan' ? `/sales-orders/${row.id}` : `/service-orders/${row.id}`}
-                    className="font-medium text-primary hover:underline"
-                  >
-                    {row.code}
-                  </Link>
-                )},
-                { key: 'date', header: 'Tanggal', sortable: true, render: (row: OrderRow) => new Date(row.date).toLocaleDateString('id-ID') },
-                { key: 'type', header: 'Tipe', render: (row: OrderRow) => (
-                  <StatusBadge label={row.type} tone={row.type === 'Penjualan' ? 'info' : 'warning'} />
-                )},
-                { key: 'total', header: 'Total', sortable: true, render: (row: OrderRow) => formatCurrency(row.total) },
-                { key: 'status', header: 'Status', render: (row: OrderRow) => (
-                  <StatusBadge label={row.status} tone={tone(row.status)} />
-                )},
-              ]}
-              emptyTitle="Belum ada transaksi"
-            />
+            <div className="overflow-x-auto">
+              <div className="min-w-[600px]">
+                <DataTable
+                  data={orders}
+                  columns={[
+                    { key: 'code', header: 'Kode', sortable: true, render: (row: OrderRow) => (
+                      <Link
+                        to={row.type === 'Penjualan' ? `/sales-orders/${row.id}` : `/service-orders/${row.id}`}
+                        className="font-medium text-primary hover:underline"
+                      >
+                        {row.code}
+                      </Link>
+                    )},
+                    { key: 'date', header: 'Tanggal', sortable: true, render: (row: OrderRow) => new Date(row.date).toLocaleDateString('id-ID') },
+                    { key: 'type', header: 'Tipe', render: (row: OrderRow) => (
+                      <StatusBadge label={row.type} tone={row.type === 'Penjualan' ? 'info' : 'warning'} />
+                    )},
+                    { key: 'total', header: 'Total', sortable: true, render: (row: OrderRow) => formatCurrency(row.total) },
+                    { key: 'status', header: 'Status', render: (row: OrderRow) => (
+                      <StatusBadge label={row.status} tone={tone(row.status)} />
+                    )},
+                  ]}
+                  emptyTitle="Belum ada transaksi"
+                />
+              </div>
+            </div>
           </div>
         </div>
 

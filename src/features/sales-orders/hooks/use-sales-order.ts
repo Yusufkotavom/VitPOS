@@ -1,34 +1,34 @@
-import { useQuery } from '@tanstack/react-query';
-import { localDb } from '@/services/local-db/client';
+import { useQuery } from '@tanstack/react-query'
+
+import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
+import { localDb } from '@/services/local-db/client'
 
 export function useSalesOrder(id?: string) {
   return useQuery({
     queryKey: ['sales-orders', id],
     queryFn: async () => {
-      if (!id) return null;
-      // Get the order
-      const order = await localDb.salesOrders.get(id);
-      if (!order) return null;
-
-      // Ensure items is an array, parsing if necessary from stored data if it wasn't typed correctly
-      // In Dexie, objects might be stored directly, but it's good practice to ensure format.
-      const items = Array.isArray(order.items) ? order.items : [];
+      if (!id) return null
+      const tenantId = requireActiveTenantId()
+      const order = await localDb.salesOrders.get(id)
+      if (!order || order.tenantId !== tenantId) return null
+      const items = Array.isArray(order.items) ? order.items.filter((item) => item.tenantId === tenantId) : []
+      const payments = await localDb.payments.where('tenantId').equals(tenantId).toArray()
+      const paymentHistory = payments
+        .filter((payment) => payment.salesOrderId === order.id)
+        .map((payment) => ({
+          id: payment.id,
+          date: payment.date,
+          amount: payment.amount,
+          method: payment.method,
+          status: payment.status,
+        }))
 
       return {
         ...order,
         items,
-        // Mock payment history for UI detail view
-        payments: [
-          {
-            id: 'pay-1',
-            date: order.date,
-            amount: order.paidTotal,
-            method: 'tunai',
-            status: 'success',
-          }
-        ]
-      };
+        payments: paymentHistory,
+      }
     },
     enabled: !!id,
-  });
+  })
 }

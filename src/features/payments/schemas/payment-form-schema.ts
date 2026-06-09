@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { parseDigits } from '@/features/catalog/lib/formatters'
 import type { LocalPayment } from '@/services/local-db/schema'
 
@@ -8,6 +9,7 @@ export const paymentStatusOptions = ['Berhasil', 'Pending', 'Gagal', 'Refund'] a
 
 export const paymentFormSchema = z.object({
   ref: z.string().trim().min(1, 'Nomor referensi wajib diisi'),
+  salesOrderId: z.string().trim().optional(),
   source: z.string().trim().min(1, 'Sumber pembayaran wajib diisi'),
   method: z.enum(paymentMethodOptions),
   amount: z.string().trim().min(1, 'Nominal wajib diisi'),
@@ -19,6 +21,7 @@ export type PaymentFormValues = z.infer<typeof paymentFormSchema>
 
 export const paymentInitialValues: PaymentFormValues = {
   ref: '',
+  salesOrderId: '',
   source: '',
   method: 'tunai',
   amount: '0',
@@ -29,7 +32,9 @@ export const paymentInitialValues: PaymentFormValues = {
 export function mapPaymentFormToRecord(values: PaymentFormValues, id: string, base?: LocalPayment): LocalPayment {
   return {
     id,
+    tenantId: resolveTenantId(base?.tenantId),
     ref: values.ref.trim(),
+    salesOrderId: values.salesOrderId?.trim() || undefined,
     source: values.source.trim(),
     method: values.method,
     amount: parseDigits(values.amount),
@@ -44,6 +49,7 @@ export function mapPaymentFormToRecord(values: PaymentFormValues, id: string, ba
 export function mapPaymentRecordToFormValues(payment: LocalPayment): PaymentFormValues {
   return {
     ref: payment.ref,
+    salesOrderId: payment.salesOrderId ?? '',
     source: payment.source,
     method: payment.method as PaymentFormValues['method'],
     amount: String(payment.amount),

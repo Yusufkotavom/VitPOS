@@ -20,6 +20,7 @@ vi.mock('@/features/sales-orders/components/sales-order-crud-actions', () => ({
 const orderRows: LocalSalesOrder[] = [
   {
     id: 'so-1',
+    tenantId: 'tenant-1',
     code: 'INV-001',
     customerName: 'PT Maju',
     date: '2026-06-08',
@@ -66,4 +67,3 @@ describe('SalesOrdersPage', () => {
     expect(screen.queryByRole('columnheader', { name: 'Invoice' })).not.toBeInTheDocument()
   })
 })
-

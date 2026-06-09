@@ -1,4 +1,5 @@
 import { localDb } from '@/services/local-db/client'
+import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { type ConflictResolution, type SyncConflict } from '@/services/local-db/schema'
 
 function createId(prefix: string) {
@@ -8,6 +9,7 @@ function createId(prefix: string) {
 export async function createMockConflict(entityId: string) {
   const conflict: SyncConflict = {
     id: createId('conflict'),
+    tenantId: resolveTenantId(),
     entityType: 'product',
     entityId,
     localValue: { name: 'Produk Lokal', price: 25000 },

@@ -72,6 +72,7 @@ describe('productFormSchema', () => {
       'product-1',
       {
         id: 'product-1',
+        tenantId: 'tenant-1',
         name: 'Kopi Arabika',
         category: 'Minuman',
         type: 'Produk Fisik',

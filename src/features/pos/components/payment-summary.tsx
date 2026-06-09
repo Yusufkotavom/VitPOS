@@ -9,8 +9,11 @@ import { toast } from 'sonner'
 import { useEffect, useState } from 'react'
 import { PosSuccessDialog } from '@/features/pos/components/pos-success-dialog'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
-import { printPage } from '@/lib/print'
+import { localDb } from '@/services/local-db/client'
+import { messageTemplateService } from '@/services/message-template.service'
 import { type PosOrderSummary } from '@/features/pos/types/pos-order.types'
+import { usePdf } from '@/shared/components/pdf/use-pdf'
+import type { PdfData } from '@/shared/components/pdf/types'
 import { User } from 'lucide-react'
 
 const defaultMethods = [
@@ -19,13 +22,31 @@ const defaultMethods = [
   { id: 'transfer', name: 'Transfer' },
 ]
 
-export function PaymentSummary() {
+export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
   const store = usePosStore()
   const totals = selectPosTotals(store)
   const dbMethods = usePaymentMethods()
   const activeMethods = dbMethods && dbMethods.length > 0 ? dbMethods.filter((m) => m.status === 'Aktif') : defaultMethods
   
   const [successOrder, setSuccessOrder] = useState<PosOrderSummary | null>(null)
+  const { downloadPdf } = usePdf()
+
+  const receiptData: PdfData | null = successOrder ? {
+    type: 'receipt',
+    code: successOrder.code,
+    date: new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(successOrder.date),
+    cashierName: successOrder.cashierName || 'Kasir',
+    customer: { name: successOrder.customerName ?? 'Umum' },
+    items: successOrder.items.map(i => ({ name: i.name, qty: i.qty, price: i.price, subtotal: i.subtotal })),
+    summary: {
+      subtotal: successOrder.subtotal,
+      discount: successOrder.discount,
+      grandTotal: successOrder.total,
+      paidTotal: successOrder.amountPaid,
+      status: successOrder.amountPaid >= successOrder.total ? 'Lunas' : 'Sebagian',
+    },
+    paymentMethod: successOrder.paymentMethod,
+  } : null
 
   const setPaidAmount = store.setPaidAmount
   const initialTotal = totals.total
@@ -37,7 +58,7 @@ export function PaymentSummary() {
     if (store.cartItems.length === 0) return
 
     try {
-      const result = await posTransactionService.checkout(store.cartItems, totals, store.paymentMethod, store.paidAmount, store.discount, store.customerName)
+      const result = await posTransactionService.checkout(store.cartItems, totals, store.paymentMethod, store.paidAmount, store.discount, store.customerName, store.customerId)
       if (!result) {
         throw new Error('Transaksi tidak menghasilkan data order')
       }
@@ -53,6 +74,7 @@ export function PaymentSummary() {
         amountPaid: store.paidAmount,
         change: Math.max(store.paidAmount - totals.total, 0),
         items: store.cartItems,
+        customerId: store.customerId,
         customerName: store.customerName ?? 'Umum',
         cashierName: 'Kasir',
       })
@@ -63,21 +85,63 @@ export function PaymentSummary() {
     }
   }
 
-  function handleWhatsApp() {
+  async function handlePrint() {
+    if (!successOrder || !receiptData) return
+    await downloadPdf(receiptData, `struk-${successOrder.code}`)
+  }
+
+  async function handleWhatsApp() {
     if (!successOrder) return
-    const text = `Nota Pesanan ${successOrder.id}\nTotal: ${formatCurrency(successOrder.total)}\nMetode: ${successOrder.paymentMethod}\nTerima kasih!`
-    window.open(buildWhatsAppLink('0800000000', text), '_blank')
+    const customerId = successOrder.customerId
+    let phone = ''
+    if (customerId) {
+      const customer = await localDb.customers.get(customerId)
+      phone = customer?.phone ?? ''
+    }
+    if (!phone) {
+      toast.error('Nomor WhatsApp pelanggan tidak ditemukan')
+      return
+    }
+
+    const paid = formatCurrency(successOrder.amountPaid)
+    const total = formatCurrency(successOrder.total)
+    const change = formatCurrency(successOrder.change)
+    const items = successOrder.items
+      .map((item) => `${item.name} x${item.qty} = ${formatCurrency(item.subtotal)}`)
+      .join('\n')
+
+    const text = await messageTemplateService.render('invoice', {
+      code: successOrder.code,
+      date: successOrder.date.toLocaleDateString('id-ID'),
+      customer_name: successOrder.customerName ?? 'Umum',
+      items,
+      total,
+      paid,
+      change,
+      payment_method: successOrder.paymentMethod,
+      store_name: '',
+    })
+
+    window.open(buildWhatsAppLink(phone, text), '_blank')
   }
 
   return (
     <div className="flex flex-col gap-4">
       <PosSuccessDialog 
         open={successOrder !== null} 
-        onOpenChange={(open) => !open && setSuccessOrder(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSuccessOrder(null)
+            onComplete?.()
+          }
+        }}
         order={successOrder}
-        onPrint={printPage}
+        onPrint={handlePrint}
         onWhatsApp={handleWhatsApp}
-        onNewSale={() => setSuccessOrder(null)}
+        onNewSale={() => {
+          setSuccessOrder(null)
+          onComplete?.()
+        }}
       />
 
       <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
@@ -170,5 +234,4 @@ export function PaymentSummary() {
     </div>
   )
 }
-
 

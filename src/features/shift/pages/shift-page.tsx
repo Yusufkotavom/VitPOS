@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { formatCurrency } from '@/lib/format-currency'
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { useShifts } from '@/features/shift/hooks/use-shifts'
@@ -14,6 +15,7 @@ export function ShiftPage() {
   async function openShift() {
     await shiftRepository.upsert({
       id: crypto.randomUUID(),
+      tenantId: resolveTenantId(),
       cashierName: 'Kasir Aktif',
       startTime: new Date().toISOString(),
       startCash: 500000,

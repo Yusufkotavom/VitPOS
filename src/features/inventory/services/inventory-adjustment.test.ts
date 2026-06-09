@@ -9,6 +9,7 @@ vi.mock('@/services/local-db/client', () => ({
     transaction: vi.fn(),
     stockMovements: { put: vi.fn() },
     products: { get: vi.fn(), update: vi.fn() },
+    inventory: { put: vi.fn() },
     outbox: { put: vi.fn() }
   }
 }))
@@ -31,6 +32,7 @@ describe('inventoryAdjustmentService', () => {
 
     const product: LocalProduct = { 
       id: 'p1', 
+      tenantId: 'tenant-1',
       name: 'Product 1', 
       stock: 10, 
       version: 1,
@@ -47,6 +49,7 @@ describe('inventoryAdjustmentService', () => {
 
     expect(localDb.transaction).toHaveBeenCalled()
     expect(localDb.stockMovements.put).toHaveBeenCalled()
+    expect(localDb.inventory.put).toHaveBeenCalled()
     expect(productRepository.upsert).toHaveBeenCalledWith(expect.objectContaining({ stock: 15 }))
     expect(stockMovementRepository.upsert).toHaveBeenCalled()
   })

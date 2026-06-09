@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { createRepository } from '@/services/local-db/repository'
-import type { LocalProduct, OutboxItem } from '@/services/local-db/schema'
+import type { LocalProduct } from '@/services/local-db/schema'
 
-function createTable<T extends { id: string }>() {
+function createTable<T extends { id: string; tenantId: string }>() {
   const rows = new Map<string, T>()
 
   return {
@@ -17,12 +17,30 @@ function createTable<T extends { id: string }>() {
     delete: vi.fn(async (id: string) => {
       rows.delete(id)
     }),
+    where: vi.fn((key: string) => ({
+      equals: vi.fn((value: string) => ({
+        toArray: vi.fn(async () => Array.from(rows.values()).filter((row) => key in row && row[key as keyof T] === value)),
+      })),
+    })),
+  }
+}
+
+function createOutboxTable() {
+  const rows = new Map<string, { id: string; entityType: string; entityId: string; mutationType: string; payload: unknown; status: string; attempts: number; createdAt: string; updatedAt: string; tenantId?: string }>()
+
+  return {
+    rows,
+    put: vi.fn(async (row: { id: string; entityType: string; entityId: string; mutationType: string; payload: unknown; status: string; attempts: number; createdAt: string; updatedAt: string; tenantId?: string }) => {
+      rows.set(row.id, row)
+      return row.id
+    }),
   }
 }
 
 function sampleProduct(overrides: Partial<LocalProduct> = {}): LocalProduct {
   return {
     id: 'product-1',
+    tenantId: 'tenant-1',
     name: 'Kopi Susu',
     category: 'Minuman',
     type: 'Produk Fisik',
@@ -42,14 +60,14 @@ describe('createRepository', () => {
     const product = sampleProduct()
     table.rows.set(product.id, product)
 
-    const repository = createRepository({ table, outboxTable: createTable<OutboxItem>(), entityType: 'product' })
+    const repository = createRepository({ table, outboxTable: createOutboxTable(), entityType: 'product' })
 
-    await expect(repository.list()).resolves.toEqual([product])
+    await expect(repository.list('tenant-1')).resolves.toEqual([product])
   })
 
   it('upserts row and queues create outbox item when row does not exist', async () => {
     const table = createTable<LocalProduct>()
-    const outboxTable = createTable<OutboxItem>()
+    const outboxTable = createOutboxTable()
     const product = sampleProduct()
 
     const repository = createRepository({ table, outboxTable, entityType: 'product' })
@@ -70,7 +88,7 @@ describe('createRepository', () => {
 
   it('updates row and queues update when row already exists', async () => {
     const table = createTable<LocalProduct>()
-    const outboxTable = createTable<OutboxItem>()
+    const outboxTable = createOutboxTable()
     const product = sampleProduct()
     table.rows.set(product.id, product)
 
@@ -87,12 +105,12 @@ describe('createRepository', () => {
 
   it('deletes row and queues delete with previous payload', async () => {
     const table = createTable<LocalProduct>()
-    const outboxTable = createTable<OutboxItem>()
+    const outboxTable = createOutboxTable()
     const product = sampleProduct()
     table.rows.set(product.id, product)
 
     const repository = createRepository({ table, outboxTable, entityType: 'product' })
-    await repository.remove(product.id)
+    await repository.remove(product.id, 'tenant-1')
 
     expect(table.rows.has(product.id)).toBe(false)
     expect(Array.from(outboxTable.rows.values())[0]).toMatchObject({

@@ -11,6 +11,7 @@ type PosStore = {
   paidAmount: number
   customerId: string | null
   customerName: string | null
+  viewMode: 'grid' | 'list'
   setSearchQuery: (value: string) => void
   setSelectedCategory: (value: string) => void
   addItem: (product: PosProduct) => void
@@ -23,6 +24,7 @@ type PosStore = {
   setPaidAmount: (value: number) => void
   setDiscount: (value: number) => void
   setCustomer: (id: string | null, name: string | null) => void
+  setViewMode: (value: 'grid' | 'list') => void
 }
 
 export const usePosStore = create<PosStore>((set) => ({
@@ -34,6 +36,7 @@ export const usePosStore = create<PosStore>((set) => ({
   paidAmount: 0,
   customerId: null,
   customerName: null,
+  viewMode: 'grid',
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setSelectedCategory: (selectedCategory) => set({ selectedCategory }),
   addItem: (product) =>
@@ -93,6 +96,7 @@ export const usePosStore = create<PosStore>((set) => ({
   setPaidAmount: (paidAmount) => set({ paidAmount }),
   setDiscount: (discount) => set({ discount }),
   setCustomer: (id, name) => set({ customerId: id, customerName: name }),
+  setViewMode: (viewMode) => set({ viewMode }),
 }))
 
 export function selectPosTotals(state: PosStore) {

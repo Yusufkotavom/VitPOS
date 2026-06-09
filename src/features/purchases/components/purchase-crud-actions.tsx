@@ -3,10 +3,13 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { PurchaseForm } from '@/features/purchases/components/purchase-form'
+import { receivePurchaseOrder, syncSupplierPurchaseMetrics } from '@/features/purchases/services/purchase-receiving.service'
 import { mapPurchaseFormToRecord, mapPurchaseRecordToFormValues, type PurchaseFormValues } from '@/features/purchases/schemas/purchase-form-schema'
+import { localDb } from '@/services/local-db/client'
 import { purchaseRepository } from '@/services/local-db/repository'
 import type { LocalPurchase } from '@/services/local-db/schema'
 
@@ -17,16 +20,41 @@ export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) 
 
   async function handleSubmit(values: PurchaseFormValues) {
     const id = purchase?.id ?? crypto.randomUUID()
-    await purchaseRepository.upsert(mapPurchaseFormToRecord(values, id, purchase))
+    const tenantId = requireActiveTenantId()
+    const supplierName = values.supplierName.trim()
+    const supplier = supplierName
+      ? await localDb.suppliers.where('[tenantId+name]').equals([tenantId, supplierName]).first()
+      : undefined
+    const tenantProducts = await localDb.products.where('tenantId').equals(tenantId).toArray()
+    const mappedPurchase = mapPurchaseFormToRecord(values, id, purchase)
+    const nextPurchase = {
+      ...mappedPurchase,
+      supplierId: supplier?.id,
+      items: mappedPurchase.items.map((item) => ({
+        ...item,
+        productId: tenantProducts.find((product) => product.name.toLowerCase() === item.name.toLowerCase())?.id ?? item.productId,
+      })),
+    }
+    await purchaseRepository.upsert(nextPurchase)
+    await syncSupplierPurchaseMetrics(purchase?.supplierId)
+    await syncSupplierPurchaseMetrics(nextPurchase.supplierId)
     toast.success(isEdit ? 'PO diperbarui' : 'PO dibuat')
     setFormOpen(false)
   }
 
   async function handleDelete() {
     if (!purchase) return
+    const supplierId = purchase.supplierId
     await purchaseRepository.remove(purchase.id)
+    await syncSupplierPurchaseMetrics(supplierId)
     toast.success('PO dihapus')
     setDeleteOpen(false)
+  }
+
+  async function handleReceive() {
+    if (!purchase) return
+    await receivePurchaseOrder(purchase)
+    toast.success('Barang diterima dan stok diperbarui')
   }
 
   return (
@@ -45,6 +73,7 @@ export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) 
       </Sheet>
       {purchase ? (
         <>
+          {purchase.status !== 'Diterima' && purchase.status !== 'Batal' ? <Button size="sm" onClick={handleReceive}>Terima Barang</Button> : null}
           <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />Hapus</Button>
           <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
             <DialogContent>

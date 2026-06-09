@@ -3,10 +3,13 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { SalesOrderForm } from '@/features/sales-orders/components/sales-order-form'
+import { deleteSalesOrder, syncCustomerSalesMetrics } from '@/features/sales-orders/services/sales-order-finance.service'
 import { mapSalesOrderFormToRecord, mapSalesOrderRecordToFormValues, type SalesOrderFormValues } from '@/features/sales-orders/schemas/sales-order-form-schema'
+import { localDb } from '@/services/local-db/client'
 import { salesOrderRepository } from '@/services/local-db/repository'
 import type { LocalSalesOrder } from '@/services/local-db/schema'
 
@@ -17,14 +20,25 @@ export function SalesOrderCrudActions({ order }: { order?: LocalSalesOrder }) {
 
   async function handleSubmit(values: SalesOrderFormValues) {
     const id = order?.id ?? crypto.randomUUID()
-    await salesOrderRepository.upsert(mapSalesOrderFormToRecord(values, id, order))
+    const tenantId = requireActiveTenantId()
+    const customerName = values.customerName.trim()
+    const existingCustomer = customerName
+      ? await localDb.customers.where('[tenantId+name]').equals([tenantId, customerName]).first()
+      : undefined
+    const nextOrder = {
+      ...mapSalesOrderFormToRecord(values, id, order),
+      customerId: existingCustomer?.id,
+    }
+    await salesOrderRepository.upsert(nextOrder)
+    await syncCustomerSalesMetrics(order?.customerId)
+    await syncCustomerSalesMetrics(nextOrder.customerId)
     toast.success(isEdit ? 'Invoice diperbarui' : 'Invoice dibuat')
     setFormOpen(false)
   }
 
   async function handleDelete() {
     if (!order) return
-    await salesOrderRepository.remove(order.id)
+    await deleteSalesOrder(order.id)
     toast.success('Invoice dihapus')
     setDeleteOpen(false)
   }

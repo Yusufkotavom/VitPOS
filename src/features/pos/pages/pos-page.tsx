@@ -109,7 +109,7 @@ export function PosPage() {
             <DialogTitle>Pembayaran</DialogTitle>
           </DialogHeader>
           <div className="py-2">
-            <PaymentSummary />
+            <PaymentSummary onComplete={() => setIsPaymentOpen(false)} />
           </div>
         </DialogContent>
       </Dialog>

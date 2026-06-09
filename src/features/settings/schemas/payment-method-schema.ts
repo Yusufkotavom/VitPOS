@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import type { LocalPaymentMethod } from '@/services/local-db/schema'
 
 export const paymentMethodStatusOptions = ['Aktif', 'Tidak Aktif'] as const
@@ -27,6 +28,7 @@ export const paymentMethodInitialValues: PaymentMethodFormValues = {
 export function mapPaymentMethodFormToRecord(values: PaymentMethodFormValues, id: string): LocalPaymentMethod {
   return {
     id,
+    tenantId: resolveTenantId(),
     name: values.name.trim(),
     provider: values.provider.trim(),
     type: values.type.trim(),

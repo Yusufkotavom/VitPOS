@@ -1,4 +1,4 @@
-import { Building2, ChevronsUpDown, Store } from 'lucide-react'
+import { Building2, ChevronsUpDown, Store, ShoppingCart, Coffee, Monitor } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 
 import { sidebarNavigation } from '@/app/navigation'
@@ -19,10 +19,24 @@ import {
   SidebarRail,
 } from '@/components/ui/sidebar'
 import { useSyncStore } from '@/features/sync/stores/sync-store'
+import { useSettings } from '@/features/settings/hooks/use-settings'
 import { SyncStatusBadge } from '@/shared/components/sync/sync-status-badge'
+
+const ICONS: Record<string, React.ElementType> = {
+  Store,
+  ShoppingCart,
+  Coffee,
+  Monitor,
+}
 
 export function AppSidebar() {
   const syncSummary = useSyncStore()
+  const settings = useSettings()
+  
+  const companyName = settings?.find(s => s.id === 'company-name')?.value || 'KOTACOM'
+  const companyLogo = settings?.find(s => s.id === 'company-logo')?.value
+  const companyIconId = settings?.find(s => s.id === 'company-icon')?.value
+  const CompanyIcon = companyIconId && ICONS[companyIconId] ? ICONS[companyIconId] : Building2
 
   return (
     <Sidebar collapsible="icon" variant="inset">
@@ -30,11 +44,15 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <Building2 aria-hidden="true" />
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground overflow-hidden">
+                {companyLogo ? (
+                  <img src={companyLogo} alt={companyName} className="size-full object-cover" />
+                ) : (
+                  <CompanyIcon aria-hidden="true" className="size-5" />
+                )}
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">KOTACOM</span>
+                <span className="truncate font-semibold">{companyName}</span>
                 <span className="truncate text-xs text-muted-foreground">Business Suite</span>
               </div>
               <ChevronsUpDown aria-hidden="true" className="ml-auto" />

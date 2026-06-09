@@ -31,3 +31,19 @@ export const useAuthStore = create<AuthState>()(
     },
   ),
 )
+
+export function getActiveTenantId() {
+  return useAuthStore.getState().activeTenant?.id ?? null
+}
+
+export function requireActiveTenantId() {
+  const tenantId = getActiveTenantId()
+  if (!tenantId) {
+    throw new Error('Tenant aktif wajib dipilih')
+  }
+  return tenantId
+}
+
+export function resolveTenantId(baseTenantId?: string) {
+  return baseTenantId ?? getActiveTenantId() ?? 'tenant-test'
+}

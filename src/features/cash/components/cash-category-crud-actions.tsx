@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { cashCategoryFormSchema, cashCategoryInitialValues, cashCategoryTypeOptions, type CashCategoryFormValues } from '@/features/cash/schemas/cash-category-schema'
+import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { cashCategoryRepository } from '@/services/local-db/repository'
 import type { LocalCashCategory } from '@/services/local-db/schema'
 
@@ -37,6 +38,7 @@ export function CashCategoryCrudActions({ category }: { category?: LocalCashCate
     const now = new Date().toISOString()
     await cashCategoryRepository.upsert({
       id,
+      tenantId: resolveTenantId(category?.tenantId),
       name: values.name.trim(),
       type: values.type,
       status: values.status,

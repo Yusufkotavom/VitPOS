@@ -34,7 +34,7 @@ export function InventoryPage() {
           <p className="mt-2 text-2xl font-semibold">{formatCurrency(inventory.reduce((sum, row) => sum + row.stockSystem * 1000, 0))}</p>
         </article>
       </section>
-      <ContentCard title="Stok per Gudang" description="Gunakan movement history, bukan angka stok mati saja.">
+      <ContentCard title="Stok per Gudang" description="Pantau kuantitas stok barang di setiap gudang atau cabang secara aktual.">
         <DataTable
           data={inventory}
           columns={[

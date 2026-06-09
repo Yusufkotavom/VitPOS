@@ -12,6 +12,7 @@ export type PosOrderSummary = {
   amountPaid: number
   change: number
   items: PosCartItem[]
+  customerId?: string | null
   customerName?: string
   cashierName: string
 }

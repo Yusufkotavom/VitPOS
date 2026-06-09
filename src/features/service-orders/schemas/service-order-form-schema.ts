@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { parseDigits } from '@/features/catalog/lib/formatters'
 import type { LocalServiceOrder } from '@/services/local-db/schema'
 
@@ -28,6 +29,7 @@ export const serviceOrderInitialValues: ServiceOrderFormValues = {
 export function mapServiceOrderFormToRecord(values: ServiceOrderFormValues, id: string, base?: LocalServiceOrder): LocalServiceOrder {
   return {
     id,
+    tenantId: resolveTenantId(base?.tenantId),
     code: values.code.trim(),
     customerName: values.customerName.trim(),
     description: values.description.trim(),

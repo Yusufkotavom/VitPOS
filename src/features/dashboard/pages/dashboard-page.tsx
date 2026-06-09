@@ -5,6 +5,7 @@ import { DashboardKpiGrid } from '@/features/dashboard/components/dashboard-kpi-
 import { QuickActions } from '@/features/dashboard/components/quick-actions'
 import { RecentTransactions } from '@/features/dashboard/components/recent-transactions'
 import { RevenueExpensePanel } from '@/features/dashboard/components/revenue-expense-panel'
+import { DashboardCarousel } from '@/features/dashboard/components/dashboard-carousel'
 import { PageShell } from '@/shared/components/layout/page-shell'
 
 export function DashboardPage() {
@@ -19,17 +20,22 @@ export function DashboardPage() {
         </>
       }
     >
-      <DashboardKpiGrid />
+      <div className="flex flex-col gap-6">
+        <DashboardCarousel />
 
-      <section className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
-        <RevenueExpensePanel />
         <QuickActions />
-      </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
-        <RecentTransactions />
-        <DashboardAlertList />
-      </section>
+        <DashboardKpiGrid />
+
+        <section className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
+          <RevenueExpensePanel />
+          <DashboardAlertList />
+        </section>
+
+        <section className="grid gap-6">
+          <RecentTransactions />
+        </section>
+      </div>
     </PageShell>
   )
 }

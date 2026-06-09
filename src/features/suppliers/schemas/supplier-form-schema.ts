@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { parseDigits } from '@/features/catalog/lib/formatters'
 import type { LocalSupplier } from '@/services/local-db/schema'
 
@@ -28,6 +29,7 @@ export const supplierInitialValues: SupplierFormValues = {
 export function mapSupplierFormToRecord(values: SupplierFormValues, id: string, base?: LocalSupplier): LocalSupplier {
   return {
     id,
+    tenantId: resolveTenantId(base?.tenantId),
     name: values.name.trim(),
     phone: values.phone.trim(),
     city: values.city.trim(),

@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { LayoutGrid, List, Filter } from 'lucide-react'
+import { LayoutGrid, List, Filter, Image as ImageIcon, Package, Coffee, Shirt, MonitorSmartphone } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency } from '@/lib/format-currency'
 import { ProductCrudActions } from '@/features/products/components/product-crud-actions'
 import { useProducts } from '@/features/products/hooks/use-products'
@@ -9,6 +10,28 @@ import { ContentCard } from '@/shared/components/display/content-card'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { EmptyState } from '@/shared/components/feedback/empty-state'
+
+const iconMap: Record<string, React.ReactNode> = {
+  Package: <Package className="size-6 text-muted-foreground" />,
+  Coffee: <Coffee className="size-6 text-muted-foreground" />,
+  Shirt: <Shirt className="size-6 text-muted-foreground" />,
+  MonitorSmartphone: <MonitorSmartphone className="size-6 text-muted-foreground" />,
+}
+
+function ProductMedia({ imageUrl, iconName, className }: { imageUrl?: string; iconName?: string; className?: string }) {
+  if (imageUrl) {
+    return (
+      <div className={`bg-muted overflow-hidden shrink-0 ${className}`}>
+        <img src={imageUrl} alt="Product" className="w-full h-full object-cover" loading="lazy" />
+      </div>
+    )
+  }
+  return (
+    <div className={`bg-muted/30 flex items-center justify-center shrink-0 border border-muted-foreground/10 ${className}`}>
+      {iconName && iconMap[iconName] ? iconMap[iconName] : <ImageIcon className="size-6 text-muted-foreground" />}
+    </div>
+  )
+}
 
 function statusTone(status: string) {
   if (status === 'Aktif') return 'success'
@@ -25,11 +48,19 @@ export function ProductsPage() {
   const productRows = useProducts()
   const [view, setView] = useState<'list' | 'card'>('list')
   const [search, setSearch] = useState('')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [filterType, setFilterType] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
   const activeView = view
 
-  const filtered = productRows.filter(row =>
-    !search || [row.name, row.category, row.type].some(f => f.toLowerCase().includes(search.toLowerCase()))
-  )
+  const filtered = productRows.filter(row => {
+    if (search && ![row.name, row.category, row.type].some(f => f.toLowerCase().includes(search.toLowerCase()))) return false
+    if (filterType && row.type !== filterType) return false
+    if (filterStatus && row.status !== filterStatus) return false
+    return true
+  })
+
+  const hasActiveFilter = filterType || filterStatus
 
   return (
     <PageShell title="Barang & Jasa" description="Kelola produk fisik, jasa, harga grosir, gambar, dan stok." actions={<ProductCrudActions />}>
@@ -37,29 +68,54 @@ export function ProductsPage() {
         <div className="mb-4 flex flex-row items-center gap-2 border-b pb-4">
           <input type="text" placeholder="Cari barang..." value={search} onChange={e => setSearch(e.target.value)} className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
 
-          <div className="relative flex items-center group shrink-0">
-            <Button variant="outline" size="icon" className="h-9 w-9">
+          <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
+            <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setFilterOpen(true)}>
               <Filter className="h-4 w-4" />
+              {hasActiveFilter && <span className="absolute -top-1 -right-1 size-2 rounded-full bg-primary" />}
             </Button>
-
-            <div className="absolute top-full right-0 mt-2 hidden group-hover:flex flex-col gap-2 rounded-md border bg-popover p-2 shadow-md z-10 w-48">
-              <select className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
-                <option value="">Jenis</option>
-                <option value="Barang">Barang</option>
-                <option value="Jasa">Jasa</option>
-              </select>
-              <select className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
-                <option value="">Status</option>
-                <option value="Aktif">Aktif</option>
-                <option value="Draft">Draft</option>
-              </select>
-              <select className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
-                <option value="20">20 / halaman</option>
-                <option value="50">50 / halaman</option>
-                <option value="100">100 / halaman</option>
-              </select>
-            </div>
-          </div>
+            <DialogContent className="max-w-xs">
+              <DialogHeader>
+                <DialogTitle>Filter</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Jenis</label>
+                  <select
+                    value={filterType}
+                    onChange={e => setFilterType(e.target.value)}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="">Semua</option>
+                    <option value="Produk Fisik">Barang</option>
+                    <option value="Jasa">Jasa</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Status</label>
+                  <select
+                    value={filterStatus}
+                    onChange={e => setFilterStatus(e.target.value)}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="">Semua</option>
+                    <option value="Aktif">Aktif</option>
+                    <option value="Draft">Draft</option>
+                    <option value="Arsip">Arsip</option>
+                  </select>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  {hasActiveFilter && (
+                    <Button variant="outline" className="flex-1" onClick={() => { setFilterType(''); setFilterStatus('') }}>
+                      Reset
+                    </Button>
+                  )}
+                  <Button className="flex-1" onClick={() => setFilterOpen(false)}>
+                    Tutup
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-1 shrink-0">
             <Button
@@ -86,10 +142,12 @@ export function ProductsPage() {
         {activeView === 'list' ? (
           <DataTable
             columns={[
+              { key: 'image', header: '', render: (row) => <ProductMedia imageUrl={row.imageUrl} iconName={row.icon} className="size-10 rounded-md" /> },
               { key: 'name', header: 'Nama' },
               { key: 'category', header: 'Kategori' },
               { key: 'type', header: 'Jenis' },
-              { key: 'price', header: 'Harga', render: (row) => row.wholesalePrice ? `${formatCurrency(row.price)} / Grosir ${formatCurrency(row.wholesalePrice)}` : formatCurrency(row.price) },
+              { key: 'costPrice', header: 'HPP', render: (row) => formatCurrency(row.costPrice ?? 0) },
+              { key: 'price', header: 'Harga Jual', render: (row) => row.wholesalePrice ? `${formatCurrency(row.price)} / Grosir ${formatCurrency(row.wholesalePrice)}` : formatCurrency(row.price) },
               { key: 'stock', header: 'Stok', render: (row) => displayStock(row) },
               { key: 'status', header: 'Status', render: (row) => <StatusBadge label={row.status} tone={statusTone(row.status)} /> },
               { key: 'actions', header: 'Aksi', render: (row) => <ProductCrudActions product={row} /> },
@@ -101,29 +159,36 @@ export function ProductsPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {filtered.map((row) => (
-              <div key={row.id} className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border bg-background p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/20">
-                <div>
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <StatusBadge label={row.status} tone={statusTone(row.status)} />
-                    <span className="text-xs font-medium px-2 py-1 bg-muted rounded-md text-muted-foreground">{row.type}</span>
+              <div key={row.id} className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border bg-background shadow-sm transition-all hover:shadow-md hover:border-primary/20">
+                <ProductMedia imageUrl={row.imageUrl} iconName={row.icon} className="w-full h-32 border-b" />
+                <div className="p-5 flex flex-col justify-between flex-1">
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <StatusBadge label={row.status} tone={statusTone(row.status)} />
+                      <span className="text-xs font-medium px-2 py-1 bg-muted rounded-md text-muted-foreground">{row.type}</span>
+                    </div>
+                    <h3 className="font-semibold text-lg line-clamp-1">{row.name}</h3>
+                    <p className="text-sm text-muted-foreground mt-1 mb-4">{row.category}</p>
                   </div>
-                  <h3 className="font-semibold text-lg line-clamp-1">{row.name}</h3>
-                  <p className="text-sm text-muted-foreground mt-1 mb-4">{row.category}</p>
-                </div>
 
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="flex flex-col bg-muted/30 p-2 rounded-lg">
-                      <span className="text-muted-foreground text-xs mb-0.5">Harga Jual</span>
-                      <span className="font-medium">{formatCurrency(row.price)}</span>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="flex flex-col bg-muted/30 p-2 rounded-lg">
+                        <span className="text-muted-foreground text-xs mb-0.5">Modal / HPP</span>
+                        <span className="font-medium">{formatCurrency(row.costPrice ?? 0)}</span>
+                      </div>
+                      <div className="flex flex-col bg-muted/30 p-2 rounded-lg">
+                        <span className="text-muted-foreground text-xs mb-0.5">Harga Jual</span>
+                        <span className="font-medium">{formatCurrency(row.price)}</span>
+                      </div>
+                      <div className="flex flex-col bg-muted/30 p-2 rounded-lg col-span-2">
+                        <span className="text-muted-foreground text-xs mb-0.5">Sisa Stok</span>
+                        <span className="font-medium">{displayStock(row)}</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col bg-muted/30 p-2 rounded-lg">
-                      <span className="text-muted-foreground text-xs mb-0.5">Sisa Stok</span>
-                      <span className="font-medium">{displayStock(row)}</span>
+                    <div className="pt-2 border-t flex justify-end">
+                      <ProductCrudActions product={row} />
                     </div>
-                  </div>
-                  <div className="pt-2 border-t flex justify-end">
-                    <ProductCrudActions product={row} />
                   </div>
                 </div>
               </div>

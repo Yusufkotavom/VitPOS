@@ -1,4 +1,5 @@
 import { localDb } from '@/services/local-db/client'
+import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import type {
   LocalCash,
   LocalCashCategory,
@@ -21,18 +22,19 @@ import type {
   SyncMutationType,
 } from '@/services/local-db/schema'
 
-type RepositoryTable<T extends { id: string }> = {
+type RepositoryTable<T extends { id: string; tenantId: string }> = {
   toArray: () => Promise<T[]>
   get: (id: string) => Promise<T | undefined>
   put: (row: T) => Promise<unknown>
   delete: (id: string) => Promise<void>
+  where?: (key: string) => { equals: (val: string) => { toArray: () => Promise<T[]> } }
 }
 
 type OutboxTable = {
-  put: (row: OutboxItem) => Promise<unknown>
+  put: (row: OutboxItem & { tenantId?: string }) => Promise<unknown>
 }
 
-type RepositoryOptions<T extends { id: string }> = {
+type RepositoryOptions<T extends { id: string; tenantId: string }> = {
   table: RepositoryTable<T>
   outboxTable: OutboxTable
   entityType: SyncEntityType
@@ -42,10 +44,11 @@ function createId(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`
 }
 
-async function enqueueMutation<T extends { id: string }>(outboxTable: OutboxTable, entityType: SyncEntityType, mutationType: SyncMutationType, row: T) {
+async function enqueueMutation<T extends { id: string; tenantId: string }>(outboxTable: OutboxTable, entityType: SyncEntityType, mutationType: SyncMutationType, row: T) {
   const now = new Date().toISOString()
-  const item: OutboxItem = {
+  const item: OutboxItem & { tenantId?: string } = {
     id: createId('outbox'),
+    tenantId: row.tenantId,
     entityType,
     entityId: row.id,
     mutationType,
@@ -60,25 +63,31 @@ async function enqueueMutation<T extends { id: string }>(outboxTable: OutboxTabl
   return item
 }
 
-export function createRepository<T extends { id: string }>({ table, outboxTable, entityType }: RepositoryOptions<T>) {
+export function createRepository<T extends { id: string; tenantId: string }>({ table, outboxTable, entityType }: RepositoryOptions<T>) {
   return {
-    list() {
-      return table.toArray()
+    async list(tenantId: string = requireActiveTenantId()) {
+      if (table.where) {
+        return table.where('tenantId').equals(tenantId).toArray()
+      }
+      const rows = await table.toArray()
+      return rows.filter((row) => row.tenantId === tenantId)
     },
-    get(id: string) {
-      return table.get(id)
+    async get(id: string, tenantId: string = requireActiveTenantId()) {
+      const item = await table.get(id)
+      if (item && item.tenantId === tenantId) return item
+      return undefined
     },
     async upsert(row: T) {
+      if (!row.tenantId) throw new Error('tenantId is required for upsert')
       const existing = await table.get(row.id)
       await table.put(row)
       await enqueueMutation(outboxTable, entityType, existing ? 'update' : 'create', row)
       return row
     },
-    async remove(id: string) {
-      const existing = await table.get(id)
-      await table.delete(id)
-
+    async remove(id: string, tenantId: string = requireActiveTenantId()) {
+      const existing = await this.get(id, tenantId)
       if (existing) {
+        await table.delete(id)
         await enqueueMutation(outboxTable, entityType, 'delete', existing)
       }
     },
@@ -101,4 +110,3 @@ export const purchaseRepository = createRepository<LocalPurchase>({ table: local
 export const returnRepository = createRepository<LocalReturn>({ table: localDb.returns, outboxTable: localDb.outbox, entityType: 'return' })
 export const serviceOrderRepository = createRepository<LocalServiceOrder>({ table: localDb.serviceOrders, outboxTable: localDb.outbox, entityType: 'service_order' })
 export const paymentMethodRepository = createRepository<LocalPaymentMethod>({ table: localDb.paymentMethods, outboxTable: localDb.outbox, entityType: 'setting' })
-

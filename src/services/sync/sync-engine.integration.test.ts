@@ -4,6 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { config } from 'dotenv'
 
 import { createApp } from '../../../apps/api/src/app'
+import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { localDb } from '@/services/local-db/client'
 import { seedLocalDemoData } from '@/services/local-db/seeds'
 import { runSync } from '@/services/sync/sync-engine'
@@ -40,10 +41,16 @@ describe('runSync integration', () => {
   beforeEach(async () => {
     await clearLocalDb()
     await seedLocalDemoData()
+    const tenant = await localDb.tenants.get('tenant-demo-main')
+    const user = await localDb.users.get('user-demo-admin')
+    if (tenant && user) {
+      useAuthStore.setState({ currentUser: user, activeTenant: { ...tenant, role: 'owner' } })
+    }
   })
 
   afterEach(async () => {
     await clearLocalDb()
+    useAuthStore.setState({ currentUser: null, activeTenant: null })
   })
 
   it('pushes queued local mutations to the API and marks them synced', async () => {

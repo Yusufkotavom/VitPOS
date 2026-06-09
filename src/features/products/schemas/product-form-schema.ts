@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { parseDigits } from '@/features/catalog/lib/formatters'
 import type { LocalProduct } from '@/services/local-db/schema'
 
@@ -10,6 +11,7 @@ export const productFormSchema = z.object({
   name: z.string().trim().min(1, 'Nama produk wajib diisi'),
   category: z.string().trim().min(1, 'Kategori wajib diisi'),
   type: z.enum(productTypeOptions),
+  costPrice: z.string().trim().optional(),
   price: z.string().trim().min(1, 'Harga wajib diisi'),
   wholesalePrice: z.string().trim().optional(),
   stock: z.string().trim().optional(),
@@ -25,6 +27,7 @@ export const productInitialValues: ProductFormValues = {
   name: '',
   category: 'Umum',
   type: 'Produk Fisik',
+  costPrice: '0',
   price: '0',
   wholesalePrice: '',
   stock: '0',
@@ -36,6 +39,7 @@ export const productInitialValues: ProductFormValues = {
 
 export function mapProductFormToRecord(values: ProductFormValues, id: string, base?: LocalProduct): LocalProduct {
   const isService = values.type === 'Jasa'
+  const parsedCostPrice = values.costPrice ? parseDigits(values.costPrice) : undefined
   const parsedPrice = parseDigits(values.price)
   const parsedWholesalePrice = values.wholesalePrice ? parseDigits(values.wholesalePrice) : undefined
   const manageStock = isService ? false : values.manageStock
@@ -44,9 +48,11 @@ export function mapProductFormToRecord(values: ProductFormValues, id: string, ba
 
   return {
     id,
+    tenantId: resolveTenantId(base?.tenantId),
     name: values.name.trim(),
     category: values.category.trim(),
     type: values.type,
+    costPrice: parsedCostPrice,
     price: parsedPrice,
     wholesalePrice: parsedWholesalePrice,
     stock: parsedStock,
@@ -65,6 +71,7 @@ export function mapProductRecordToFormValues(product: LocalProduct): ProductForm
     name: product.name,
     category: product.category,
     type: product.type,
+    costPrice: String(product.costPrice ?? 0),
     price: String(product.price),
     wholesalePrice: product.wholesalePrice ? String(product.wholesalePrice) : '',
     stock: String(product.stock),

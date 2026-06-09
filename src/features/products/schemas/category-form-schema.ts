@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import type { LocalProductCategory } from '@/services/local-db/schema'
 
 export const categoryStatusOptions = ['Aktif', 'Arsip'] as const
@@ -23,6 +24,7 @@ export function mapCategoryFormToRecord(values: CategoryFormValues, id: string, 
 
   return {
     id,
+    tenantId: resolveTenantId(base?.tenantId),
     name: values.name.trim(),
     description: values.description ? values.description.trim() : undefined,
     status: values.status,

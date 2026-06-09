@@ -11,9 +11,10 @@ import { Field, FieldGroup } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
-import { cashFormSchema, cashInitialValues, cashAccountOptions, cashTypeOptions, cashStatusOptions, type CashFormValues } from '@/features/cash/schemas/cash-form-schema'
+import { cashFormSchema, cashInitialValues, cashTypeOptions, cashStatusOptions, type CashFormValues } from '@/features/cash/schemas/cash-form-schema'
 import { mapCashFormToRecord, mapCashRecordToFormValues } from '@/features/cash/schemas/cash-form-schema'
 import { useCashCategories } from '@/features/cash/hooks/use-cash-categories'
+import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
 import { cashRepository } from '@/services/local-db/repository'
 import type { LocalCash } from '@/services/local-db/schema'
 
@@ -22,7 +23,9 @@ export function CashCrudActions({ cash }: { cash?: LocalCash }) {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const isEdit = Boolean(cash)
   const categories = useCashCategories()
+  const paymentMethods = usePaymentMethods()
   const activeCategories = categories.filter(c => c.status === 'Aktif')
+  const activePaymentMethods = paymentMethods.filter(p => p.status === 'Aktif')
 
   const form = useForm<CashFormValues>({
     resolver: zodResolver(cashFormSchema),
@@ -60,6 +63,13 @@ export function CashCrudActions({ cash }: { cash?: LocalCash }) {
             ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />Ubah</Button>
             : <Button><PlusIcon data-icon="inline-start" />Tambah Transaksi</Button>}
         </DialogTrigger>
+        {!cash && (
+          <Button variant="outline" asChild>
+            <Link to="/cash/categories">
+              <Settings2 data-icon="inline-start" /> Kelola Kategori
+            </Link>
+          </Button>
+        )}
         <DialogContent className="sm:max-w-sm">
           <form onSubmit={form.handleSubmit(handleSubmit)}>
             <DialogHeader>
@@ -75,21 +85,25 @@ export function CashCrudActions({ cash }: { cash?: LocalCash }) {
                 <Label htmlFor="date">Tanggal</Label>
                 <Input id="date" {...form.register('date')} aria-invalid={!!errors.date} placeholder="8 Juni 2026" />
               </Field>
-              <Field>
+              <Field data-invalid={!!errors.account}>
                 <Label htmlFor="account">Akun Kas</Label>
                 <Controller
                   name="account"
                   control={form.control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
                       <SelectTrigger id="account">
                         <SelectValue placeholder="Pilih akun" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          {cashAccountOptions.map(opt => (
-                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                          ))}
+                          {activePaymentMethods.length === 0 ? (
+                            <SelectItem value="_none" disabled>Belum ada metode pembayaran</SelectItem>
+                          ) : (
+                            activePaymentMethods.map(opt => (
+                              <SelectItem key={opt.id} value={opt.name}>{opt.name}</SelectItem>
+                            ))
+                          )}
                         </SelectGroup>
                       </SelectContent>
                     </Select>

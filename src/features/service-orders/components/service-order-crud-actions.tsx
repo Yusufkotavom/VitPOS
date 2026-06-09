@@ -1,12 +1,15 @@
 import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { ServiceOrderForm } from '@/features/service-orders/components/service-order-form'
 import { mapServiceOrderFormToRecord, mapServiceOrderRecordToFormValues, type ServiceOrderFormValues } from '@/features/service-orders/schemas/service-order-form-schema'
+import { localDb } from '@/services/local-db/client'
 import { serviceOrderRepository } from '@/services/local-db/repository'
 import type { LocalServiceOrder } from '@/services/local-db/schema'
 
@@ -16,9 +19,17 @@ export function ServiceOrderCrudActions({ order }: { order?: LocalServiceOrder }
   const isEdit = Boolean(order)
 
   async function handleSubmit(values: ServiceOrderFormValues) {
-    const id = order?.id ?? crypto.randomUUID()
-    await serviceOrderRepository.upsert(mapServiceOrderFormToRecord(values, id, order))
-    toast.success(isEdit ? 'Service order diperbarui' : 'Service order dibuat')
+    if (!order) return // Only used for editing now
+    const tenantId = requireActiveTenantId()
+    const customerName = values.customerName.trim()
+    const customer = customerName
+      ? await localDb.customers.where('[tenantId+name]').equals([tenantId, customerName]).first()
+      : undefined
+    await serviceOrderRepository.upsert({
+      ...mapServiceOrderFormToRecord(values, order.id, order),
+      customerId: customer?.id,
+    })
+    toast.success('Service order diperbarui')
     setFormOpen(false)
   }
 
@@ -29,37 +40,43 @@ export function ServiceOrderCrudActions({ order }: { order?: LocalServiceOrder }
     setDeleteOpen(false)
   }
 
+  if (!order) {
+    return (
+      <Button asChild>
+        <Link to="/service-orders/create">
+          <PlusIcon data-icon="inline-start" className="mr-2 h-4 w-4" /> Buat Service Order
+        </Link>
+      </Button>
+    )
+  }
+
   return (
     <div className="flex flex-wrap gap-2">
       <Sheet open={formOpen} onOpenChange={setFormOpen}>
         <SheetTrigger asChild>
-          {order ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />Ubah</Button> : <Button><PlusIcon data-icon="inline-start" />Buat Service Order</Button>}
+          <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" className="mr-2 h-4 w-4" />Ubah</Button>
         </SheetTrigger>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
           <SheetHeader>
-            <SheetTitle>{isEdit ? 'Ubah service order' : 'Buat service order'}</SheetTitle>
+            <SheetTitle>Ubah service order</SheetTitle>
             <SheetDescription>Service order tersimpan lokal dulu, lalu masuk antrean sinkron.</SheetDescription>
           </SheetHeader>
-          <ServiceOrderForm defaultValues={order ? mapServiceOrderRecordToFormValues(order) : undefined} submitLabel={isEdit ? 'Simpan perubahan' : 'Buat service order'} onCancel={() => setFormOpen(false)} onSubmit={handleSubmit} />
+          <ServiceOrderForm defaultValues={mapServiceOrderRecordToFormValues(order)} submitLabel="Simpan perubahan" onCancel={() => setFormOpen(false)} onSubmit={handleSubmit} />
         </SheetContent>
       </Sheet>
-      {order ? (
-        <>
-          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />Hapus</Button>
-          <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Hapus service order</DialogTitle>
-                <DialogDescription>Service order {order.code} akan dihapus dari data lokal dan masuk antrean sinkron.</DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setDeleteOpen(false)}>Batal</Button>
-                <Button variant="destructive" onClick={handleDelete}>Hapus service order</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </>
-      ) : null}
+      <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" className="mr-2 h-4 w-4" />Hapus</Button>
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hapus service order</DialogTitle>
+            <DialogDescription>Service order {order.code} akan dihapus dari data lokal dan masuk antrean sinkron.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Batal</Button>
+            <Button variant="destructive" onClick={handleDelete}>Hapus service order</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

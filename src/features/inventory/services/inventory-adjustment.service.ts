@@ -9,6 +9,7 @@ export const inventoryAdjustmentService = {
 
     const movement: LocalStockMovement = {
       id: movementId,
+      tenantId: product.tenantId,
       productId: product.id,
       productName: product.name,
       warehouseName: warehouseName.trim(),
@@ -20,9 +21,28 @@ export const inventoryAdjustmentService = {
     }
 
     const nextStock = Math.max(0, product.stock + qty)
+    
+    const inventoryId = `${product.tenantId}_${product.id}_${warehouseName.trim()}`
+    
+    // Status logic: if nextStock <= 0: Habis, if nextStock <= 5: Stok Rendah, else Aman
+    let status = 'Aman'
+    if (nextStock <= 0) status = 'Habis'
+    else if (nextStock <= 5) status = 'Stok Rendah'
 
-    await localDb.transaction('rw', [localDb.stockMovements, localDb.products, localDb.outbox], async () => {
+    const inventory: LocalInventory = {
+      id: inventoryId,
+      tenantId: product.tenantId,
+      product: product.name,
+      warehouse: warehouseName.trim(),
+      stockSystem: nextStock,
+      stockSafe: 5,
+      movement: `${qty >= 0 ? '+' : ''}${qty} (${type})`,
+      status,
+    }
+
+    await localDb.transaction('rw', [localDb.stockMovements, localDb.products, localDb.outbox, localDb.inventory], async () => {
       await localDb.stockMovements.put(movement)
+      await localDb.inventory.put(inventory)
       await productRepository.upsert({ 
         ...product, 
         stock: nextStock, 

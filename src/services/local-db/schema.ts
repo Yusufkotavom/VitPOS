@@ -48,10 +48,12 @@ export type StockMovementType = 'sale' | 'purchase' | 'return' | 'adjustment' | 
 
 export type LocalProduct = {
   id: string
+  tenantId: string
   name: string
   category: string
   type: ProductType
   price: number
+  costPrice?: number
   wholesalePrice?: number
   stock: number
   manageStock?: boolean
@@ -67,6 +69,7 @@ export type LocalProduct = {
 
 export type LocalProductCategory = {
   id: string
+  tenantId: string
   name: string
   description?: string
   status: 'Aktif' | 'Arsip'
@@ -77,6 +80,7 @@ export type LocalProductCategory = {
 
 export type LocalCustomer = {
   id: string
+  tenantId: string
   name: string
   phone: string
   city: string
@@ -90,6 +94,7 @@ export type LocalCustomer = {
 
 export type LocalSalesOrderItem = {
   id: string
+  tenantId: string
   salesOrderId: string
   productId: string
   name: string
@@ -100,6 +105,7 @@ export type LocalSalesOrderItem = {
 
 export type LocalSalesOrder = {
   id: string
+  tenantId: string
   code: string
   customerId?: string
   customerName: string
@@ -118,6 +124,7 @@ export type LocalSalesOrder = {
 
 export type LocalPayment = {
   id: string
+  tenantId: string
   ref: string
   salesOrderId?: string
   source: string
@@ -132,6 +139,7 @@ export type LocalPayment = {
 
 export type LocalStockMovement = {
   id: string
+  tenantId: string
   productId: string
   productName: string
   warehouseId?: string
@@ -147,6 +155,7 @@ export type LocalStockMovement = {
 
 export type LocalInventory = {
   id: string
+  tenantId: string
   product: string
   warehouse: string
   stockSystem: number
@@ -157,6 +166,7 @@ export type LocalInventory = {
 
 export type LocalCash = {
   id: string
+  tenantId: string
   ref: string
   date: string
   account: string
@@ -168,6 +178,7 @@ export type LocalCash = {
 
 export type LocalCashCategory = {
   id: string
+  tenantId: string
   name: string
   type: 'Pemasukan' | 'Pengeluaran'
   status: 'Aktif' | 'Nonaktif'
@@ -178,6 +189,7 @@ export type LocalCashCategory = {
 
 export type LocalSetting = {
   id: string
+  tenantId: string
   area: string
   setting: string
   value: string
@@ -187,6 +199,7 @@ export type LocalSetting = {
 
 export type LocalShift = {
   id: string
+  tenantId: string
   cashierName: string
   startTime: string
   endTime?: string
@@ -199,6 +212,7 @@ export type LocalShift = {
 
 export type LocalSupplier = {
   id: string
+  tenantId: string
   name: string
   phone: string
   city: string
@@ -212,6 +226,7 @@ export type LocalSupplier = {
 
 export type LocalPurchaseItem = {
   id: string
+  tenantId: string
   purchaseId: string
   productId: string
   name: string
@@ -224,6 +239,7 @@ export type PurchaseStatus = 'Draft' | 'Dikirim' | 'Diterima' | 'Batal'
 
 export type LocalPurchase = {
   id: string
+  tenantId: string
   code: string
   supplierId?: string
   supplierName: string
@@ -239,6 +255,7 @@ export type LocalPurchase = {
 
 export type LocalReturnItem = {
   id: string
+  tenantId: string
   returnId: string
   productId: string
   name: string
@@ -252,6 +269,7 @@ export type ReturnStatus = 'Draft' | 'Diproses' | 'Selesai' | 'Batal'
 
 export type LocalReturn = {
   id: string
+  tenantId: string
   code: string
   type: ReturnType
   referenceCode: string
@@ -268,19 +286,50 @@ export type ServiceOrderStatus = 'Diterima' | 'Dikerjakan' | 'Selesai' | 'Diambi
 
 export type LocalServiceOrder = {
   id: string
+  tenantId: string
   code: string
+  customerId?: string
   customerName: string
   description: string
   date: string
   cost: number
   status: ServiceOrderStatus
+  
+  // New fields for POS-like behavior
+  items?: { productId: string, name: string, qty: number, price: number, subtotal: number }[]
+  notes?: string
+  timeline?: { id: string, status: string, date: string, note: string }[]
+
   syncStatus: SyncStatus
   version: number
   updatedAt: string
 }
 
+export type LocalRecipeItem = {
+  id: string
+  tenantId: string
+  recipeId: string
+  productId: string
+  productName: string
+  qty: number
+  unit: string
+}
+
+export type LocalRecipe = {
+  id: string
+  tenantId: string
+  productId: string
+  productName: string
+  name: string
+  batchYield: number
+  items: LocalRecipeItem[]
+  status: 'Draft' | 'Aktif'
+  updatedAt: string
+}
+
 export type LocalPaymentMethod = {
   id: string
+  tenantId: string
   name: string
   provider: string
   type: string
@@ -292,6 +341,7 @@ export type LocalPaymentMethod = {
 
 export type SyncConflict = {
   id: string
+  tenantId: string
   entityType: SyncEntityType
   entityId: string
   localValue: unknown
@@ -305,6 +355,7 @@ export type SyncConflict = {
 
 export type SyncRun = {
   id: string
+  tenantId: string
   startedAt: string
   finishedAt?: string
   status: 'running' | 'success' | 'failed'

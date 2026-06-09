@@ -3,6 +3,14 @@ import { posTransactionService } from './pos-transaction.service'
 import { localDb } from '@/services/local-db/client'
 import type { LocalProduct } from '@/services/local-db/schema'
 
+vi.mock('@/features/auth/stores/auth-store', () => ({
+  requireActiveTenantId: vi.fn(() => 'tenant-1'),
+}))
+
+vi.mock('@/features/sales-orders/services/sales-order-finance.service', () => ({
+  syncCustomerSalesMetrics: vi.fn(),
+}))
+
 vi.mock('@/services/local-db/client', () => ({
   localDb: {
     transaction: vi.fn(),
@@ -11,6 +19,7 @@ vi.mock('@/services/local-db/client', () => ({
     payments: { put: vi.fn() },
     stockMovements: { put: vi.fn() },
     products: { get: vi.fn(), update: vi.fn() },
+    inventory: { put: vi.fn() },
     outbox: { put: vi.fn() }
   }
 }))
@@ -45,9 +54,9 @@ describe('posTransactionService', () => {
       return callback()
     }) as typeof localDb.transaction)
     
-    vi.mocked(localDb.products.get).mockResolvedValue({
-      id: 'p1', name: 'Product 1', type: 'Produk Fisik', stock: 10, version: 1
-    } as LocalProduct)
+     vi.mocked(localDb.products.get).mockResolvedValue({
+      id: 'p1', tenantId: 'tenant-1', name: 'Product 1', type: 'Produk Fisik', stock: 10, version: 1
+     } as LocalProduct)
 
     await posTransactionService.checkout(mockCartItems, mockTotals, 'tunai', 200)
 
@@ -57,6 +66,7 @@ describe('posTransactionService', () => {
     expect(localDb.payments.put).toHaveBeenCalled()
     expect(localDb.stockMovements.put).toHaveBeenCalled()
     expect(localDb.products.update).toHaveBeenCalledWith('p1', expect.objectContaining({ stock: 8 }))
+    expect(localDb.inventory.put).toHaveBeenCalled()
     expect(localDb.outbox.put).toHaveBeenCalled()
   })
 })

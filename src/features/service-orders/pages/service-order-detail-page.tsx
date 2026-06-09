@@ -1,6 +1,8 @@
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Printer, MessageSquare, PencilIcon, XIcon, CheckIcon, Trash2Icon } from 'lucide-react'
+import { ArrowLeft, Printer, MessageSquare, Download, PencilIcon, XIcon, CheckIcon, Trash2Icon } from 'lucide-react'
 import { useState } from 'react'
+import { usePdf } from '@/shared/components/pdf/use-pdf'
+import type { PdfData } from '@/shared/components/pdf/types'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -8,8 +10,12 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency } from '@/lib/format-currency'
+import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { useServiceOrder } from '@/features/service-orders/hooks/use-service-order'
 import { serviceOrderRepository } from '@/services/local-db/repository'
+import { localDb } from '@/services/local-db/client'
+import { messageTemplateService } from '@/services/message-template.service'
+import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { serviceOrderStatusOptions } from '@/features/service-orders/schemas/service-order-form-schema'
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { StatusBadge } from '@/shared/components/display/status-badge'
@@ -30,6 +36,25 @@ export function ServiceOrderDetailPage() {
   const [editCost, setEditCost] = useState('')
   const [editStatus, setEditStatus] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const { downloadPdf, printPdf } = usePdf()
+
+  const serviceData: PdfData | null = order ? {
+    type: 'service',
+    code: order.code,
+    date: order.date,
+    customer: { name: order.customerName },
+    device: order.description.split('\n')[0] || order.description,
+    problem: order.description,
+    cost: order.cost,
+    summary: {
+      subtotal: order.cost,
+      discount: 0,
+      grandTotal: order.cost,
+      paidTotal: 0,
+      status: order.status,
+    },
+  } : null
+  void serviceData
 
   if (isLoading) {
     return (
@@ -58,12 +83,33 @@ export function ServiceOrderDetailPage() {
 
   async function saveEditing() {
     if (!order) return
+    const tenantId = requireActiveTenantId()
+    const customerName = editCustomer.trim()
+    const customer = customerName
+      ? await localDb.customers.where('[tenantId+name]').equals([tenantId, customerName]).first()
+      : undefined
+
+    let updatedTimeline = order.timeline || []
+    if (editStatus !== order.status) {
+      updatedTimeline = [
+        ...updatedTimeline,
+        {
+          id: crypto.randomUUID(),
+          status: editStatus,
+          date: new Date().toISOString(),
+          note: `Status diubah menjadi ${editStatus}`,
+        }
+      ]
+    }
+
     await serviceOrderRepository.upsert({
       ...order,
-      customerName: editCustomer.trim(),
+      customerId: customer?.id,
+      customerName: customerName,
       description: editDesc.trim(),
       cost: Number(editCost) || 0,
       status: editStatus as typeof order.status,
+      timeline: updatedTimeline,
       version: order.version + 1,
       updatedAt: new Date().toISOString(),
     })
@@ -77,6 +123,38 @@ export function ServiceOrderDetailPage() {
     await serviceOrderRepository.remove(order.id)
     toast.success('Service order dihapus')
     setDeleteOpen(false)
+  }
+
+  async function handleWhatsApp() {
+    if (!order) return
+    const tenantId = requireActiveTenantId()
+    const customer = order.customerId
+      ? await localDb.customers.get(order.customerId)
+      : (await localDb.customers.where('[tenantId+name]').equals([tenantId, order.customerName]).toArray())[0]
+    const phone = customer?.tenantId === tenantId ? customer.phone : ''
+    if (!phone) {
+      toast.error('Nomor WhatsApp pelanggan tidak ditemukan')
+      return
+    }
+
+    const text = await messageTemplateService.render('service_order', {
+      code: order.code,
+      customer_name: order.customerName,
+      device: order.description.split('\n')[0] || order.description,
+      problem: order.description,
+      status: order.status,
+      cost: formatCurrency(order.cost),
+      date: order.date,
+      total: formatCurrency(order.cost),
+      paid: '',
+      remaining: '',
+      items: '',
+      change: '',
+      payment_method: '',
+      store_name: '',
+    })
+
+    window.open(buildWhatsAppLink(phone, text), '_blank')
   }
 
   if (!order) {
@@ -98,11 +176,15 @@ export function ServiceOrderDetailPage() {
       description={`${order.customerName} · ${order.date}`}
       actions={
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled>
+          <Button variant="outline" size="sm" onClick={() => serviceData && printPdf(serviceData)}>
             <Printer className="mr-2 h-4 w-4" />
             Print
           </Button>
-          <Button variant="outline" size="sm" className="text-green-600 hover:text-green-700" disabled>
+          <Button variant="outline" size="sm" onClick={() => serviceData && downloadPdf(serviceData, `Service-${order?.code || 'download'}`)}>
+            <Download className="mr-2 h-4 w-4" />
+            PDF
+          </Button>
+          <Button variant="outline" size="sm" className="text-green-600 hover:text-green-700" onClick={handleWhatsApp}>
             <MessageSquare className="mr-2 h-4 w-4" />
             WA
           </Button>
@@ -166,25 +248,29 @@ export function ServiceOrderDetailPage() {
             </div>
           </div>
 
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Timeline</h3>
-            <div className="rounded-lg border p-4">
-              <div className="space-y-4 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border before:to-transparent">
-                {order.timeline?.map((item: { id: string; status: string; date: string; note: string }) => (
-                  <div key={item.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                    <div className="flex items-center justify-center w-5 h-5 rounded-full border-2 border-primary bg-background text-primary shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 shadow-sm" />
-                    <div className="w-[calc(100%-2.5rem)] md:w-[calc(50%-1.25rem)] border bg-card p-3 rounded-lg shadow-sm">
-                      <div className="flex items-center justify-between space-x-2 mb-1">
-                        <StatusBadge label={item.status} tone={tone(item.status)} />
-                        <time className="text-xs text-muted-foreground">{new Date(item.date).toLocaleDateString('id-ID')}</time>
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground mb-3">Timeline</h3>
+              <div className="rounded-lg border p-4">
+                {(!order.timeline || order.timeline.length === 0) ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Belum ada riwayat timeline</p>
+                ) : (
+                  <div className="space-y-4 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border before:to-transparent">
+                    {order.timeline.map((item: { id: string; status: string; date: string; note: string }) => (
+                      <div key={item.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                        <div className="flex items-center justify-center w-5 h-5 rounded-full border-2 border-primary bg-background text-primary shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 shadow-sm" />
+                        <div className="w-[calc(100%-2.5rem)] md:w-[calc(50%-1.25rem)] border bg-card p-3 rounded-lg shadow-sm">
+                          <div className="flex items-center justify-between space-x-2 mb-1">
+                            <StatusBadge label={item.status} tone={tone(item.status)} />
+                            <time className="text-xs text-muted-foreground">{new Date(item.date).toLocaleDateString('id-ID')}</time>
+                          </div>
+                          <p className="text-sm">{item.note}</p>
+                        </div>
                       </div>
-                      <p className="text-sm">{item.note}</p>
-                    </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             </div>
-          </div>
         </div>
 
         <div className="space-y-4">

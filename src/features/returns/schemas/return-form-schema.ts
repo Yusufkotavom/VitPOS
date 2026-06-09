@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { parseDigits } from '@/features/catalog/lib/formatters'
 import type { LocalReturn, LocalReturnItem } from '@/services/local-db/schema'
 
@@ -33,11 +34,13 @@ export const returnInitialValues: ReturnFormValues = {
 }
 
 export function mapReturnFormToRecord(values: ReturnFormValues, id: string, base?: LocalReturn): LocalReturn {
+  const tenantId = resolveTenantId(base?.tenantId)
   const items: LocalReturnItem[] = values.items.map((item, idx) => {
     const qty = parseDigits(item.qty)
     const unitPrice = parseDigits(item.unitPrice)
     return {
       id: base?.items[idx]?.id ?? crypto.randomUUID(),
+      tenantId: base?.items[idx]?.tenantId ?? tenantId,
       returnId: id,
       productId: base?.items[idx]?.productId ?? '',
       name: item.name.trim(),
@@ -51,6 +54,7 @@ export function mapReturnFormToRecord(values: ReturnFormValues, id: string, base
 
   return {
     id,
+    tenantId,
     code: values.code.trim(),
     type: values.type,
     referenceCode: values.referenceCode.trim(),

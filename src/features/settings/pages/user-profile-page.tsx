@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { ContentCard } from '@/shared/components/display/content-card'
 import { PageShell } from '@/shared/components/layout/page-shell'
+import { SettingsNav } from '@/features/settings/components/settings-nav'
 
 export function UserProfilePage() {
   const { currentUser, setAuth } = useAuthStore()
@@ -32,6 +33,7 @@ export function UserProfilePage() {
 
   return (
     <PageShell title="Profil Pengguna" description="Atur nama, email, password, dan langganan akun.">
+      <SettingsNav className="mb-6" />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
         <ContentCard title="Informasi Akun" description="Perbarui detail login pengguna aktif.">
           <form onSubmit={onSubmit} className="flex flex-col gap-5">

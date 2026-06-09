@@ -60,9 +60,10 @@ export function CashPage() {
             </Button>
             <div className="absolute top-full right-0 mt-2 hidden group-hover:flex flex-col gap-2 rounded-md border bg-popover p-2 shadow-md z-10 w-48">
               <select className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-                <option value="">Akun</option>
-                <option value="Kas">Kas</option>
-                <option value="Bank">Bank</option>
+                <option value="">Semua Akun</option>
+                {Array.from(new Set(cash.map(c => c.account))).map(acc => (
+                  <option key={acc} value={acc}>{acc}</option>
+                ))}
               </select>
               <select className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring">
                 <option value="">Kategori</option>

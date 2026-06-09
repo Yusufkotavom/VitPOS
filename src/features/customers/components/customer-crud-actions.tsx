@@ -33,6 +33,18 @@ export function CustomerCrudActions({ customer }: { customer?: LocalCustomer }) 
 
   async function handleSubmit(values: CustomerFormValues) {
     const id = customer?.id ?? createCustomerId()
+    
+    // Check for duplicate phone
+    const existingCustomers = await customerRepository.list()
+    const isDuplicatePhone = existingCustomers.some(
+      (c) => c.phone === values.phone.trim() && c.id !== id
+    )
+    
+    if (isDuplicatePhone) {
+      form.setError('phone', { type: 'manual', message: 'Nomor WhatsApp sudah terdaftar' })
+      return
+    }
+
     await customerRepository.upsert(mapCustomerFormToRecord(values, id, customer))
     toast.success(isEdit ? 'Pelanggan diperbarui' : 'Pelanggan ditambahkan')
     setFormOpen(false)
@@ -63,14 +75,17 @@ export function CustomerCrudActions({ customer }: { customer?: LocalCustomer }) 
               <Field data-invalid={!!errors.name}>
                 <Label htmlFor="name">Nama</Label>
                 <Input id="name" {...form.register('name')} aria-invalid={!!errors.name} />
+                {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
               </Field>
               <Field data-invalid={!!errors.phone}>
                 <Label htmlFor="phone">WhatsApp</Label>
                 <Input id="phone" {...form.register('phone')} aria-invalid={!!errors.phone} />
+                {errors.phone && <p className="text-sm text-destructive">{errors.phone.message}</p>}
               </Field>
               <Field data-invalid={!!errors.city}>
                 <Label htmlFor="city">Alamat</Label>
                 <Textarea id="city" {...form.register('city')} aria-invalid={!!errors.city} className="min-h-[3.5rem]" />
+                {errors.city && <p className="text-sm text-destructive">{errors.city.message}</p>}
               </Field>
               <Field>
                 <Label htmlFor="status">Status</Label>

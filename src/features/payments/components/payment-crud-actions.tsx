@@ -10,12 +10,15 @@ import { Field, FieldGroup } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
+import { syncSalesOrderPaymentSummary, deleteSalesOrderPayment } from '@/features/sales-orders/services/sales-order-finance.service'
+import { useSalesOrders } from '@/features/sales-orders/hooks/use-sales-orders'
 import { paymentFormSchema, paymentInitialValues, paymentMethodOptions, paymentStatusOptions, type PaymentFormValues } from '@/features/payments/schemas/payment-form-schema'
 import { mapPaymentFormToRecord, mapPaymentRecordToFormValues } from '@/features/payments/schemas/payment-form-schema'
 import { paymentRepository } from '@/services/local-db/repository'
 import type { LocalPayment } from '@/services/local-db/schema'
 
 export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
+  const salesOrders = useSalesOrders()
   const [formOpen, setFormOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const isEdit = Boolean(payment)
@@ -31,14 +34,26 @@ export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
 
   async function handleSubmit(values: PaymentFormValues) {
     const id = payment?.id ?? crypto.randomUUID()
-    await paymentRepository.upsert(mapPaymentFormToRecord(values, id, payment))
+    const previousSalesOrderId = payment?.salesOrderId
+    const nextPayment = mapPaymentFormToRecord(values, id, payment)
+    await paymentRepository.upsert(nextPayment)
+    if (previousSalesOrderId && previousSalesOrderId !== nextPayment.salesOrderId) {
+      await syncSalesOrderPaymentSummary(previousSalesOrderId)
+    }
+    if (nextPayment.salesOrderId) {
+      await syncSalesOrderPaymentSummary(nextPayment.salesOrderId)
+    }
     toast.success(isEdit ? 'Pembayaran diperbarui' : 'Pembayaran dicatat')
     setFormOpen(false)
   }
 
   async function handleDelete() {
     if (!payment) return
-    await paymentRepository.remove(payment.id)
+    if (payment.salesOrderId) {
+      await deleteSalesOrderPayment(payment.id)
+    } else {
+      await paymentRepository.remove(payment.id)
+    }
     toast.success('Pembayaran dihapus')
     setDeleteOpen(false)
   }
@@ -67,6 +82,28 @@ export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
               <Field data-invalid={!!errors.source}>
                 <Label htmlFor="source">Sumber</Label>
                 <Input id="source" {...form.register('source')} aria-invalid={!!errors.source} placeholder="Nama pelanggan / invoice" />
+              </Field>
+              <Field>
+                <Label htmlFor="salesOrderId">Link Invoice</Label>
+                <Controller
+                  name="salesOrderId"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select onValueChange={(value) => field.onChange(value === 'none' ? '' : value)} defaultValue={field.value || 'none'}>
+                      <SelectTrigger id="salesOrderId">
+                        <SelectValue placeholder="Pilih invoice" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="none">Tanpa invoice</SelectItem>
+                          {salesOrders.map((order) => (
+                            <SelectItem key={order.id} value={order.id}>{order.code} · {order.customerName}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </Field>
               <Field>
                 <Label htmlFor="method">Metode Bayar</Label>

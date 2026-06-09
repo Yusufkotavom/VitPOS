@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import type { LocalSetting } from '@/services/local-db/schema'
 
 export const settingStatusOptions = ['Lengkap', 'Belum Lengkap', 'Draft'] as const
@@ -16,6 +17,7 @@ export type SettingFormValues = z.infer<typeof settingFormSchema>
 export function mapSettingFormToRecord(values: SettingFormValues, id: string): LocalSetting {
   return {
     id,
+    tenantId: resolveTenantId(),
     area: values.area.trim(),
     setting: values.setting.trim(),
     value: values.value.trim(),

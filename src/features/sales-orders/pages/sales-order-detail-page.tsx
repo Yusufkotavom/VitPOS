@@ -1,6 +1,8 @@
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Printer, MessageSquare, CreditCard, PlusIcon, Trash2Icon, PencilIcon, XIcon, CheckIcon } from 'lucide-react'
+import { ArrowLeft, Printer, MessageSquare, Download, CreditCard, PlusIcon, Trash2Icon, PencilIcon, XIcon, CheckIcon } from 'lucide-react'
 import { useState } from 'react'
+import { usePdf } from '@/shared/components/pdf/use-pdf'
+import type { PdfData } from '@/shared/components/pdf/types'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -8,8 +10,12 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency } from '@/lib/format-currency'
+import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { useSalesOrder } from '@/features/sales-orders/hooks/use-sales-order'
+import { deleteSalesOrder, recordSalesOrderPayment } from '@/features/sales-orders/services/sales-order-finance.service'
 import { salesOrderRepository } from '@/services/local-db/repository'
+import { localDb } from '@/services/local-db/client'
+import { messageTemplateService } from '@/services/message-template.service'
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { DataTable } from '@/shared/components/data-table/data-table'
@@ -32,6 +38,23 @@ export function SalesOrderDetailPage() {
   const [payAmount, setPayAmount] = useState('')
   const [payMethod, setPayMethod] = useState('tunai')
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const { downloadPdf, printPdf } = usePdf()
+
+  const invoiceData: PdfData | null = order ? {
+    type: 'invoice',
+    code: order.code,
+    date: order.date,
+    customer: { name: order.customerName },
+    items: order.items?.map(i => ({ name: i.name, qty: i.qty, price: i.unitPrice, subtotal: i.subtotal })) || [],
+    summary: {
+      subtotal: order.subtotal,
+      discount: order.discountTotal,
+      grandTotal: order.grandTotal,
+      paidTotal: order.paidTotal,
+      status: order.status,
+    },
+    notes: '',
+  } : null
 
   if (isLoading) {
     return (
@@ -69,8 +92,9 @@ export function SalesOrderDetailPage() {
       ...order,
       items: items.map(i => ({
         id: i.id,
+        tenantId: order.tenantId,
         salesOrderId: order.id,
-        productId: '',
+        productId: order.items.find((item) => item.id === i.id)?.productId ?? '',
         name: i.name,
         qty: i.qty,
         unitPrice: i.unitPrice,
@@ -103,16 +127,7 @@ export function SalesOrderDetailPage() {
     const amount = Number(payAmount) || 0
     if (amount <= 0) return toast.error('Nominal pembayaran harus lebih dari 0')
 
-    const newPaidTotal = order.paidTotal + amount
-    const newStatus = newPaidTotal >= order.grandTotal ? 'Lunas' : 'Sebagian'
-
-    await salesOrderRepository.upsert({
-      ...order,
-      paidTotal: newPaidTotal,
-      status: newStatus,
-      version: order.version + 1,
-      updatedAt: new Date().toISOString(),
-    })
+    await recordSalesOrderPayment(order.id, amount, payMethod as 'tunai' | 'qris' | 'kartu' | 'transfer' | 'e-wallet' | 'piutang')
     toast.success(`Pembayaran Rp ${amount.toLocaleString('id-ID')} diterima`)
     setPayOpen(false)
     setPayAmount('')
@@ -121,9 +136,47 @@ export function SalesOrderDetailPage() {
 
   async function handleDelete() {
     if (!order) return
-    await salesOrderRepository.remove(order.id)
+    await deleteSalesOrder(order.id)
     toast.success('Invoice dihapus')
     setDeleteOpen(false)
+  }
+
+  async function handleWhatsApp() {
+    if (!order) return
+    if (!order.customerId) {
+      toast.error('Pelanggan tidak memiliki nomor WhatsApp')
+      return
+    }
+    const customer = await localDb.customers.get(order.customerId)
+    const phone = customer?.phone
+    if (!phone) {
+      toast.error('Nomor WhatsApp pelanggan tidak ditemukan')
+      return
+    }
+
+    const total = formatCurrency(order.grandTotal)
+    const paid = formatCurrency(order.paidTotal)
+    const remaining = formatCurrency(Math.max(0, order.grandTotal - order.paidTotal))
+
+    const items = order.items
+      .map((item) => `${item.name} x${item.qty} = ${formatCurrency(item.subtotal)}`)
+      .join('\n')
+
+    const text = await messageTemplateService.render('invoice', {
+      code: order.code,
+      date: order.date,
+      customer_name: order.customerName,
+      items,
+      total,
+      paid,
+      remaining,
+      status: order.status,
+      change: 'Rp 0',
+      payment_method: order.payments?.[0]?.method ?? '',
+      store_name: '',
+    })
+
+    window.open(buildWhatsAppLink(phone, text), '_blank')
   }
 
   if (!order) {
@@ -146,45 +199,51 @@ export function SalesOrderDetailPage() {
 
   const editSubtotal = editItems.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.unitPrice) || 0), 0)
 
+  const actionButtons = (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button variant="outline" size="sm" onClick={() => invoiceData && printPdf(invoiceData)}>
+        <Printer className="mr-2 h-4 w-4" />
+        Print
+      </Button>
+      <Button variant="outline" size="sm" onClick={() => invoiceData && downloadPdf(invoiceData, `Invoice-${order?.code || 'download'}`)}>
+        <Download className="mr-2 h-4 w-4" />
+        PDF
+      </Button>
+      <Button variant="outline" size="sm" className="text-green-600 hover:text-green-700" onClick={handleWhatsApp}>
+        <MessageSquare className="mr-2 h-4 w-4" />
+        WA
+      </Button>
+      {editing ? (
+        <>
+          <Button variant="outline" size="sm" onClick={cancelEditing}>
+            <XIcon className="mr-2 h-4 w-4" />
+            Batal
+          </Button>
+          <Button size="sm" onClick={saveEditing}>
+            <CheckIcon className="mr-2 h-4 w-4" />
+            Simpan
+          </Button>
+        </>
+      ) : (
+        <>
+          <Button variant="outline" size="sm" onClick={startEditing}>
+            <PencilIcon className="mr-2 h-4 w-4" />
+            Ubah
+          </Button>
+          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
+            <Trash2Icon className="mr-2 h-4 w-4" />
+            Hapus
+          </Button>
+        </>
+      )}
+    </div>
+  )
+
   return (
     <PageShell
       title={order.code}
       description={`${order.customerName} · ${order.date}`}
-      actions={
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled>
-            <Printer className="mr-2 h-4 w-4" />
-            Print
-          </Button>
-          <Button variant="outline" size="sm" className="text-green-600 hover:text-green-700" disabled>
-            <MessageSquare className="mr-2 h-4 w-4" />
-            WA
-          </Button>
-          {editing ? (
-            <>
-              <Button variant="outline" size="sm" onClick={cancelEditing}>
-                <XIcon className="mr-2 h-4 w-4" />
-                Batal
-              </Button>
-              <Button size="sm" onClick={saveEditing}>
-                <CheckIcon className="mr-2 h-4 w-4" />
-                Simpan
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="outline" size="sm" onClick={startEditing}>
-                <PencilIcon className="mr-2 h-4 w-4" />
-                Ubah
-              </Button>
-              <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
-                <Trash2Icon className="mr-2 h-4 w-4" />
-                Hapus
-              </Button>
-            </>
-          )}
-        </div>
-      }
+      actions={actionButtons}
     >
       <div className="grid gap-6 md:grid-cols-3">
         <div className="space-y-6 md:col-span-2">

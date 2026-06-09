@@ -35,14 +35,11 @@ export function CategoryCrudActions({ category }: { category?: LocalProductCateg
         <DialogTrigger asChild>
           {category ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />Ubah</Button> : <Button><PlusIcon data-icon="inline-start" />Tambah Kategori</Button>}
         </DialogTrigger>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{isEdit ? 'Ubah kategori' : 'Tambah kategori'}</DialogTitle>
-            <DialogDescription>Simpan data lokal dulu. Outbox sinkron terisi otomatis.</DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <CategoryForm defaultValues={category ? mapCategoryRecordToFormValues(category) : undefined} submitLabel={isEdit ? 'Simpan perubahan' : 'Simpan kategori'} onCancel={() => setFormOpen(false)} onSubmit={handleSubmit} />
-          </div>
+          <CategoryForm defaultValues={category ? mapCategoryRecordToFormValues(category) : undefined} submitLabel={isEdit ? 'Simpan perubahan' : 'Simpan kategori'} onCancel={() => setFormOpen(false)} onSubmit={handleSubmit} />
         </DialogContent>
       </Dialog>
       {category ? (

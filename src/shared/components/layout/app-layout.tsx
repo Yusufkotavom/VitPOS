@@ -1,19 +1,34 @@
-import { Building2 } from 'lucide-react'
+import { Building2, Store, ShoppingCart, Coffee, Monitor } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
 import { mobileNavigation } from '@/app/navigation'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import { useSyncStore } from '@/features/sync/stores/sync-store'
+import { useSettings } from '@/features/settings/hooks/use-settings'
 import { cn } from '@/lib/utils'
 import { AppSidebar } from '@/shared/components/layout/app-sidebar'
 import { OfflineBanner } from '@/shared/components/sync/offline-banner'
 import { SyncStatusBadge } from '@/shared/components/sync/sync-status-badge'
+import { UserMenu } from '@/shared/components/nav/user-menu'
+
+const ICONS: Record<string, React.ElementType> = {
+  Store,
+  ShoppingCart,
+  Coffee,
+  Monitor,
+}
 
 export function AppLayout() {
   const syncSummary = useSyncStore()
+  const settings = useSettings()
   const location = useLocation()
   const isPos = location.pathname === '/pos'
+
+  const companyName = settings?.find(s => s.id === 'company-name')?.value || 'KOTACOM'
+  const companyLogo = settings?.find(s => s.id === 'company-logo')?.value
+  const companyIconId = settings?.find(s => s.id === 'company-icon')?.value
+  const CompanyIcon = companyIconId && ICONS[companyIconId] ? ICONS[companyIconId] : Building2
 
   return (
     <SidebarProvider>
@@ -27,21 +42,28 @@ export function AppLayout() {
             </div>
             <div className="lg:hidden">
               <div className="flex items-center gap-2">
-                <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Building2 className="size-4" />
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground overflow-hidden">
+                  {companyLogo ? (
+                    <img src={companyLogo} alt={companyName} className="size-full object-cover" />
+                  ) : (
+                    <CompanyIcon className="size-5" />
+                  )}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold">KOTACOM</p>
+                  <p className="text-sm font-semibold">{companyName}</p>
                   <p className="text-xs text-muted-foreground">Business Suite</p>
                 </div>
               </div>
             </div>
-            <div className="ml-auto hidden items-center gap-2 md:flex">
-              <Button variant="outline">Toko Sumber Rejeki</Button>
-              <Button variant="outline">Cabang Utama</Button>
-              <NavLink to="/sync">
-                <SyncStatusBadge summary={syncSummary} />
-              </NavLink>
+            <div className="ml-auto flex items-center gap-2">
+              <div className="hidden items-center gap-2 md:flex">
+                <Button variant="outline">{companyName}</Button>
+                <Button variant="outline">Cabang Utama</Button>
+                <NavLink to="/sync">
+                  <SyncStatusBadge summary={syncSummary} />
+                </NavLink>
+              </div>
+              <UserMenu />
             </div>
           </header>
 

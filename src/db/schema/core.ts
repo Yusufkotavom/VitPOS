@@ -8,6 +8,12 @@ export const paymentStatusEnum = pgEnum('payment_status', ['success', 'pending',
 export const productTypeEnum = pgEnum('product_type', ['physical', 'service'])
 export const stockMovementTypeEnum = pgEnum('stock_movement_type', ['sale', 'purchase', 'return', 'adjustment', 'transfer_in', 'transfer_out', 'damage_lost'])
 export const syncStatusEnum = pgEnum('sync_status', ['synced', 'pending', 'failed', 'conflict'])
+export const cashCategoryTypeEnum = pgEnum('cash_category_type', ['income', 'expense'])
+export const shiftStatusEnum = pgEnum('shift_status', ['open', 'closed'])
+export const purchaseStatusEnum = pgEnum('purchase_status', ['draft', 'shipped', 'received', 'cancelled'])
+export const returnTypeEnum = pgEnum('return_type', ['sale', 'purchase'])
+export const returnStatusEnum = pgEnum('return_status', ['draft', 'processing', 'completed', 'cancelled'])
+export const serviceOrderStatusEnum = pgEnum('service_order_status', ['received', 'in_progress', 'completed', 'picked_up', 'cancelled'])
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -72,6 +78,8 @@ export const productCategories = pgTable('product_categories', {
   tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
   name: varchar('name', { length: 120 }).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
+  syncStatus: syncStatusEnum('sync_status').default('synced').notNull(),
+  version: integer('version').default(1).notNull(),
   ...timestamps,
 }, (table) => [index('product_categories_tenant_id_idx').on(table.tenantId)])
 
@@ -170,6 +178,142 @@ export const stockMovements = pgTable('stock_movements', {
   ...timestamps,
 }, (table) => [index('stock_movements_tenant_id_idx').on(table.tenantId), index('stock_movements_warehouse_id_idx').on(table.warehouseId), index('stock_movements_product_id_idx').on(table.productId)])
 
+export const cashCategories = pgTable('cash_categories', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  name: varchar('name', { length: 120 }).notNull(),
+  type: cashCategoryTypeEnum('type').notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  syncStatus: syncStatusEnum('sync_status').default('synced').notNull(),
+  version: integer('version').default(1).notNull(),
+  ...timestamps,
+}, (table) => [index('cash_categories_tenant_id_idx').on(table.tenantId)])
+
+export const cash = pgTable('cash', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  branchId: uuid('branch_id').references(() => branches.id),
+  ref: varchar('ref', { length: 80 }).notNull(),
+  date: timestamp('date', { withTimezone: true }).defaultNow().notNull(),
+  categoryId: uuid('category_id').references(() => cashCategories.id),
+  income: numeric('income', { precision: 14, scale: 2 }).default('0').notNull(),
+  expense: numeric('expense', { precision: 14, scale: 2 }).default('0').notNull(),
+  status: varchar('status', { length: 40 }).default('posted').notNull(),
+  syncStatus: syncStatusEnum('sync_status').default('synced').notNull(),
+  ...timestamps,
+}, (table) => [index('cash_tenant_id_idx').on(table.tenantId), index('cash_branch_id_idx').on(table.branchId)])
+
+export const settings = pgTable('settings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  key: varchar('key', { length: 120 }).notNull(),
+  area: varchar('area', { length: 80 }).notNull(),
+  value: text('value').notNull(),
+  status: varchar('status', { length: 40 }).default('active').notNull(),
+  syncStatus: syncStatusEnum('sync_status').default('synced').notNull(),
+  ...timestamps,
+}, (table) => [index('settings_tenant_id_idx').on(table.tenantId), index('settings_tenant_key_idx').on(table.tenantId, table.key)])
+
+export const shifts = pgTable('shifts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  branchId: uuid('branch_id').references(() => branches.id),
+  cashierName: varchar('cashier_name', { length: 120 }).notNull(),
+  startTime: timestamp('start_time', { withTimezone: true }).defaultNow().notNull(),
+  endTime: timestamp('end_time', { withTimezone: true }),
+  startCash: numeric('start_cash', { precision: 14, scale: 2 }).default('0').notNull(),
+  expectedCash: numeric('expected_cash', { precision: 14, scale: 2 }),
+  actualCash: numeric('actual_cash', { precision: 14, scale: 2 }),
+  difference: numeric('difference', { precision: 14, scale: 2 }),
+  status: shiftStatusEnum('status').default('open').notNull(),
+  syncStatus: syncStatusEnum('sync_status').default('synced').notNull(),
+  ...timestamps,
+}, (table) => [index('shifts_tenant_id_idx').on(table.tenantId), index('shifts_branch_id_idx').on(table.branchId)])
+
+export const suppliers = pgTable('suppliers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  name: varchar('name', { length: 160 }).notNull(),
+  phone: varchar('phone', { length: 40 }),
+  city: varchar('city', { length: 80 }),
+  payable: numeric('payable', { precision: 14, scale: 2 }).default('0').notNull(),
+  orders: integer('orders').default(0).notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  syncStatus: syncStatusEnum('sync_status').default('synced').notNull(),
+  version: integer('version').default(1).notNull(),
+  ...timestamps,
+}, (table) => [index('suppliers_tenant_id_idx').on(table.tenantId)])
+
+export const purchases = pgTable('purchases', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  branchId: uuid('branch_id').references(() => branches.id),
+  supplierId: uuid('supplier_id').references(() => suppliers.id),
+  code: varchar('code', { length: 80 }).notNull(),
+  date: timestamp('date', { withTimezone: true }).defaultNow().notNull(),
+  subtotal: numeric('subtotal', { precision: 14, scale: 2 }).default('0').notNull(),
+  grandTotal: numeric('grand_total', { precision: 14, scale: 2 }).default('0').notNull(),
+  status: purchaseStatusEnum('status').default('draft').notNull(),
+  syncStatus: syncStatusEnum('sync_status').default('synced').notNull(),
+  version: integer('version').default(1).notNull(),
+  ...timestamps,
+}, (table) => [index('purchases_tenant_id_idx').on(table.tenantId), index('purchases_branch_id_idx').on(table.branchId), index('purchases_supplier_id_idx').on(table.supplierId)])
+
+export const purchaseItems = pgTable('purchase_items', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  purchaseId: uuid('purchase_id').notNull().references(() => purchases.id),
+  productId: uuid('product_id').references(() => products.id),
+  name: varchar('name', { length: 180 }).notNull(),
+  qty: numeric('qty', { precision: 14, scale: 3 }).notNull(),
+  unitPrice: numeric('unit_price', { precision: 14, scale: 2 }).notNull(),
+  subtotal: numeric('subtotal', { precision: 14, scale: 2 }).notNull(),
+  ...timestamps,
+}, (table) => [index('purchase_items_tenant_id_idx').on(table.tenantId), index('purchase_items_purchase_id_idx').on(table.purchaseId), index('purchase_items_product_id_idx').on(table.productId)])
+
+export const returns = pgTable('returns', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  branchId: uuid('branch_id').references(() => branches.id),
+  code: varchar('code', { length: 80 }).notNull(),
+  type: returnTypeEnum('type').notNull(),
+  referenceCode: varchar('reference_code', { length: 80 }).notNull(),
+  date: timestamp('date', { withTimezone: true }).defaultNow().notNull(),
+  total: numeric('total', { precision: 14, scale: 2 }).default('0').notNull(),
+  status: returnStatusEnum('status').default('draft').notNull(),
+  syncStatus: syncStatusEnum('sync_status').default('synced').notNull(),
+  version: integer('version').default(1).notNull(),
+  ...timestamps,
+}, (table) => [index('returns_tenant_id_idx').on(table.tenantId), index('returns_branch_id_idx').on(table.branchId)])
+
+export const returnItems = pgTable('return_items', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  returnId: uuid('return_id').notNull().references(() => returns.id),
+  productId: uuid('product_id').references(() => products.id),
+  name: varchar('name', { length: 180 }).notNull(),
+  qty: numeric('qty', { precision: 14, scale: 3 }).notNull(),
+  unitPrice: numeric('unit_price', { precision: 14, scale: 2 }).notNull(),
+  subtotal: numeric('subtotal', { precision: 14, scale: 2 }).notNull(),
+  ...timestamps,
+}, (table) => [index('return_items_tenant_id_idx').on(table.tenantId), index('return_items_return_id_idx').on(table.returnId), index('return_items_product_id_idx').on(table.productId)])
+
+export const serviceOrders = pgTable('service_orders', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  branchId: uuid('branch_id').references(() => branches.id),
+  customerId: uuid('customer_id').references(() => customers.id),
+  code: varchar('code', { length: 80 }).notNull(),
+  customerName: varchar('customer_name', { length: 160 }).notNull(),
+  description: text('description'),
+  date: timestamp('date', { withTimezone: true }).defaultNow().notNull(),
+  cost: numeric('cost', { precision: 14, scale: 2 }).default('0').notNull(),
+  status: serviceOrderStatusEnum('status').default('received').notNull(),
+  syncStatus: syncStatusEnum('sync_status').default('synced').notNull(),
+  version: integer('version').default(1).notNull(),
+  ...timestamps,
+}, (table) => [index('service_orders_tenant_id_idx').on(table.tenantId), index('service_orders_branch_id_idx').on(table.branchId), index('service_orders_customer_id_idx').on(table.customerId)])
+
 export const outboxLogs = pgTable('outbox_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
   tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
@@ -204,4 +348,42 @@ export const salesOrdersRelations = relations(salesOrders, ({ one, many }) => ({
   customer: one(customers, { fields: [salesOrders.customerId], references: [customers.id] }),
   items: many(salesOrderItems),
   payments: many(payments),
+}))
+
+export const cashRelations = relations(cash, ({ one }) => ({
+  tenant: one(tenants, { fields: [cash.tenantId], references: [tenants.id] }),
+  branch: one(branches, { fields: [cash.branchId], references: [branches.id] }),
+  category: one(cashCategories, { fields: [cash.categoryId], references: [cashCategories.id] }),
+}))
+
+export const settingsRelations = relations(settings, ({ one }) => ({
+  tenant: one(tenants, { fields: [settings.tenantId], references: [tenants.id] }),
+}))
+
+export const shiftsRelations = relations(shifts, ({ one }) => ({
+  tenant: one(tenants, { fields: [shifts.tenantId], references: [tenants.id] }),
+  branch: one(branches, { fields: [shifts.branchId], references: [branches.id] }),
+}))
+
+export const suppliersRelations = relations(suppliers, ({ one }) => ({
+  tenant: one(tenants, { fields: [suppliers.tenantId], references: [tenants.id] }),
+}))
+
+export const purchasesRelations = relations(purchases, ({ one, many }) => ({
+  tenant: one(tenants, { fields: [purchases.tenantId], references: [tenants.id] }),
+  branch: one(branches, { fields: [purchases.branchId], references: [branches.id] }),
+  supplier: one(suppliers, { fields: [purchases.supplierId], references: [suppliers.id] }),
+  items: many(purchaseItems),
+}))
+
+export const returnsRelations = relations(returns, ({ one, many }) => ({
+  tenant: one(tenants, { fields: [returns.tenantId], references: [tenants.id] }),
+  branch: one(branches, { fields: [returns.branchId], references: [branches.id] }),
+  items: many(returnItems),
+}))
+
+export const serviceOrdersRelations = relations(serviceOrders, ({ one }) => ({
+  tenant: one(tenants, { fields: [serviceOrders.tenantId], references: [tenants.id] }),
+  branch: one(branches, { fields: [serviceOrders.branchId], references: [branches.id] }),
+  customer: one(customers, { fields: [serviceOrders.customerId], references: [customers.id] }),
 }))

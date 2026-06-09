@@ -50,7 +50,7 @@ export function RegisterPage() {
         id: crypto.randomUUID(),
         name,
         email,
-        passwordHash: 'mock-hash', // Mocked hash for now
+        passwordHash: password,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }

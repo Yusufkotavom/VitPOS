@@ -4,9 +4,14 @@ import { apiGet, apiPost, buildTenantQuery } from '@/services/api/client'
 import { listOutboxItems, updateOutboxStatus } from '@/services/sync/outbox-service'
 import { indexPushResults, partitionSyncMutations, toLocalOutboxStatus } from '@/services/sync/sync-transport'
 import type {
+  LocalCashCategory,
   LocalPayment,
   LocalProduct,
+  LocalPurchase,
+  LocalReturn,
   LocalSalesOrder,
+  LocalServiceOrder,
+  LocalShift,
   LocalStockMovement,
   PosPaymentMethodCode,
 } from '@/services/local-db/schema'
@@ -36,6 +41,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 async function applyPullItem(item: SyncPullItem) {
+  const tenantId = baimRuntime.tenantId
   if (item.mutationType === 'delete') {
     if (item.entityType === 'product') await localDb.products.delete(item.entityId)
     else if (item.entityType === 'sale') await localDb.salesOrders.delete(item.entityId)
@@ -43,6 +49,14 @@ async function applyPullItem(item: SyncPullItem) {
     else if (item.entityType === 'stock_movement') await localDb.stockMovements.delete(item.entityId)
     else if (item.entityType === 'customer') await localDb.customers.delete(item.entityId)
     else if (item.entityType === 'cash') await localDb.cash.delete(item.entityId)
+    else if (item.entityType === 'product_category') await localDb.productCategories.delete(item.entityId)
+    else if (item.entityType === 'cash_category') await localDb.cashCategories.delete(item.entityId)
+    else if (item.entityType === 'setting') await localDb.settings.delete(item.entityId)
+    else if (item.entityType === 'shift') await localDb.shifts.delete(item.entityId)
+    else if (item.entityType === 'supplier') await localDb.suppliers.delete(item.entityId)
+    else if (item.entityType === 'purchase') await localDb.purchases.delete(item.entityId)
+    else if (item.entityType === 'return') await localDb.returns.delete(item.entityId)
+    else if (item.entityType === 'service_order') await localDb.serviceOrders.delete(item.entityId)
     return
   }
 
@@ -52,6 +66,7 @@ async function applyPullItem(item: SyncPullItem) {
   if (item.entityType === 'product') {
     const product: LocalProduct = {
       id: item.entityId,
+      tenantId,
       name: typeof payload.name === 'string' ? payload.name : '',
       category: typeof payload.category === 'string' ? payload.category : '',
       type: payload.type === 'Jasa' ? 'Jasa' : 'Produk Fisik',
@@ -68,6 +83,7 @@ async function applyPullItem(item: SyncPullItem) {
   } else if (item.entityType === 'sale') {
     const order: LocalSalesOrder = {
       id: item.entityId,
+      tenantId,
       code: typeof payload.orderNumber === 'string' ? payload.orderNumber : typeof payload.code === 'string' ? payload.code : '',
       customerId: typeof payload.customerId === 'string' ? payload.customerId : undefined,
       customerName: typeof payload.customerName === 'string' ? payload.customerName : 'Umum',
@@ -87,6 +103,7 @@ async function applyPullItem(item: SyncPullItem) {
   } else if (item.entityType === 'payment') {
     const payment: LocalPayment = {
       id: item.entityId,
+      tenantId,
       ref: typeof payload.paymentNumber === 'string' ? payload.paymentNumber : typeof payload.ref === 'string' ? payload.ref : '',
       salesOrderId: typeof payload.salesOrderId === 'string' ? payload.salesOrderId : undefined,
       source: typeof payload.source === 'string' ? payload.source : 'cloud',
@@ -102,6 +119,7 @@ async function applyPullItem(item: SyncPullItem) {
   } else if (item.entityType === 'stock_movement') {
     const movement: LocalStockMovement = {
       id: item.entityId,
+      tenantId,
       productId: typeof payload.productId === 'string' ? payload.productId : '',
       productName: typeof payload.productName === 'string' ? payload.productName : '',
       warehouseId: typeof payload.warehouseId === 'string' ? payload.warehouseId : undefined,
@@ -118,6 +136,7 @@ async function applyPullItem(item: SyncPullItem) {
   } else if (item.entityType === 'customer') {
     await localDb.customers.put({
       id: item.entityId,
+      tenantId,
       name: typeof payload.name === 'string' ? payload.name : '',
       phone: typeof payload.phone === 'string' ? payload.phone : '',
       city: typeof payload.city === 'string' ? payload.city : '',
@@ -131,6 +150,7 @@ async function applyPullItem(item: SyncPullItem) {
   } else if (item.entityType === 'cash') {
     await localDb.cash.put({
       id: item.entityId,
+      tenantId,
       ref: typeof payload.ref === 'string' ? payload.ref : '',
       date: typeof payload.date === 'string' ? payload.date : '',
       account: typeof payload.account === 'string' ? payload.account : '',
@@ -139,13 +159,123 @@ async function applyPullItem(item: SyncPullItem) {
       expense: Number(payload.expense ?? 0),
       status: typeof payload.status === 'string' ? payload.status : 'Tercatat',
     })
+  } else if (item.entityType === 'product_category') {
+    await localDb.productCategories.put({
+      id: item.entityId,
+      tenantId,
+      name: typeof payload.name === 'string' ? payload.name : '',
+      description: typeof payload.description === 'string' ? payload.description : undefined,
+      status: (typeof payload.status === 'string' ? payload.status : 'Aktif') as 'Aktif' | 'Arsip',
+      syncStatus: 'synced',
+      version: typeof payload.version === 'number' ? payload.version : 1,
+      updatedAt: item.updatedAt,
+    })
+  } else if (item.entityType === 'cash_category') {
+    await localDb.cashCategories.put({
+      id: item.entityId,
+      tenantId,
+      name: typeof payload.name === 'string' ? payload.name : '',
+      type: (typeof payload.type === 'string' ? payload.type : 'Pemasukan') as LocalCashCategory['type'],
+      status: (typeof payload.status === 'string' ? payload.status : 'Aktif') as LocalCashCategory['status'],
+      syncStatus: 'synced',
+      version: typeof payload.version === 'number' ? payload.version : 1,
+      updatedAt: item.updatedAt,
+    })
+  } else if (item.entityType === 'setting') {
+    await localDb.settings.put({
+      id: typeof payload.key === 'string' ? payload.key : item.entityId,
+      tenantId,
+      area: typeof payload.area === 'string' ? payload.area : 'general',
+      setting: typeof payload.key === 'string' ? payload.key : '',
+      value: typeof payload.value === 'string' ? payload.value : '',
+      updatedAt: item.updatedAt,
+      status: typeof payload.status === 'string' ? payload.status : 'active',
+    })
+  } else if (item.entityType === 'shift') {
+    await localDb.shifts.put({
+      id: item.entityId,
+      tenantId,
+      cashierName: typeof payload.cashierName === 'string' ? payload.cashierName : '',
+      startTime: typeof payload.startTime === 'string' ? payload.startTime : '',
+      endTime: typeof payload.endTime === 'string' ? payload.endTime : undefined,
+      startCash: Number(payload.startCash ?? 0),
+      expectedCash: typeof payload.expectedCash === 'number' ? payload.expectedCash : undefined,
+      actualCash: typeof payload.actualCash === 'number' ? payload.actualCash : undefined,
+      difference: typeof payload.difference === 'number' ? payload.difference : undefined,
+      status: (typeof payload.status === 'string' ? payload.status : 'open') as LocalShift['status'],
+    })
+  } else if (item.entityType === 'supplier') {
+    await localDb.suppliers.put({
+      id: item.entityId,
+      tenantId,
+      name: typeof payload.name === 'string' ? payload.name : '',
+      phone: typeof payload.phone === 'string' ? payload.phone : '',
+      city: typeof payload.city === 'string' ? payload.city : '',
+      payable: Number(payload.payable ?? 0),
+      orders: Number(payload.orders ?? 0),
+      status: typeof payload.status === 'string' ? payload.status : 'Aktif',
+      syncStatus: 'synced',
+      version: typeof payload.version === 'number' ? payload.version : 1,
+      updatedAt: item.updatedAt,
+    })
+  } else if (item.entityType === 'purchase') {
+    await localDb.purchases.put({
+      id: item.entityId,
+      tenantId,
+      code: typeof payload.code === 'string' ? payload.code : '',
+      supplierId: typeof payload.supplierId === 'string' ? payload.supplierId : undefined,
+      supplierName: typeof payload.supplierName === 'string' ? payload.supplierName : '',
+      date: typeof payload.date === 'string' ? payload.date : '',
+      subtotal: Number(payload.subtotal ?? 0),
+      grandTotal: Number(payload.grandTotal ?? 0),
+      status: (typeof payload.status === 'string' ? payload.status : 'Draft') as LocalPurchase['status'],
+      items: [],
+      syncStatus: 'synced',
+      version: typeof payload.version === 'number' ? payload.version : 1,
+      updatedAt: item.updatedAt,
+    })
+  } else if (item.entityType === 'return') {
+    await localDb.returns.put({
+      id: item.entityId,
+      tenantId,
+      code: typeof payload.code === 'string' ? payload.code : '',
+      type: (typeof payload.type === 'string' ? payload.type : 'Penjualan') as LocalReturn['type'],
+      referenceCode: typeof payload.referenceCode === 'string' ? payload.referenceCode : '',
+      date: typeof payload.date === 'string' ? payload.date : '',
+      total: Number(payload.total ?? 0),
+      status: (typeof payload.status === 'string' ? payload.status : 'Draft') as LocalReturn['status'],
+      items: [],
+      syncStatus: 'synced',
+      version: typeof payload.version === 'number' ? payload.version : 1,
+      updatedAt: item.updatedAt,
+    })
+  } else if (item.entityType === 'service_order') {
+    await localDb.serviceOrders.put({
+      id: item.entityId,
+      tenantId,
+      code: typeof payload.code === 'string' ? payload.code : '',
+      customerId: typeof payload.customerId === 'string' ? payload.customerId : undefined,
+      customerName: typeof payload.customerName === 'string' ? payload.customerName : '',
+      description: typeof payload.description === 'string' ? payload.description : '',
+      date: typeof payload.date === 'string' ? payload.date : '',
+      cost: Number(payload.cost ?? 0),
+      status: (typeof payload.status === 'string' ? payload.status : 'Diterima') as LocalServiceOrder['status'],
+      syncStatus: 'synced',
+      version: typeof payload.version === 'number' ? payload.version : 1,
+      updatedAt: item.updatedAt,
+    })
   }
 }
 
 export async function applyPullItems(items: SyncPullItem[]) {
   await localDb.transaction(
     'rw',
-    [localDb.products, localDb.customers, localDb.salesOrders, localDb.payments, localDb.stockMovements, localDb.cash],
+    [
+      localDb.products, localDb.customers, localDb.salesOrders, localDb.payments,
+      localDb.stockMovements, localDb.cash, localDb.productCategories, localDb.cashCategories,
+      localDb.settings, localDb.shifts, localDb.suppliers, localDb.purchases,
+      localDb.returns, localDb.serviceOrders,
+    ],
     async () => {
       for (const item of items) {
         await applyPullItem(item)
@@ -160,6 +290,7 @@ export async function runSync() {
 
   await localDb.syncRuns.put({
     id: runId,
+    tenantId: baimRuntime.tenantId,
     startedAt,
     status: 'running',
     processed: 0,

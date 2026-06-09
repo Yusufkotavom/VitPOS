@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { parseDigits } from '@/features/catalog/lib/formatters'
 import type { LocalCash } from '@/services/local-db/schema'
 
@@ -22,8 +23,8 @@ export type CashFormValues = z.infer<typeof cashFormSchema>
 export const cashInitialValues: CashFormValues = {
   ref: '',
   date: new Intl.DateTimeFormat('id-ID', { dateStyle: 'long' }).format(new Date()),
-  account: 'Kas Toko',
-  category: 'Penjualan',
+  account: '',
+  category: '',
   type: 'Pemasukan',
   amount: '0',
   status: 'Tercatat',
@@ -33,6 +34,7 @@ export function mapCashFormToRecord(values: CashFormValues, id: string): LocalCa
   const parsedAmount = parseDigits(values.amount)
   return {
     id,
+    tenantId: resolveTenantId(),
     ref: values.ref.trim(),
     date: values.date.trim(),
     account: values.account.trim(),

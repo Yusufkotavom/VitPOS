@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Building2, CheckCircle2, ShieldCheck } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -11,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
@@ -20,6 +22,11 @@ export function LoginPage() {
   const navigate = useNavigate()
   const { setAuth } = useAuthStore()
   const [error, setError] = useState<string | null>(null)
+  const [resetOpen, setResetOpen] = useState(false)
+  const [resetStep, setResetStep] = useState<'email' | 'password'>('email')
+  const [resetEmail, setResetEmail] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [resetLoading, setResetLoading] = useState(false)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -27,8 +34,9 @@ export function LoginPage() {
 
     const formData = new FormData(event.currentTarget)
     const email = formData.get('email')?.toString().trim().toLowerCase()
-    
-    if (!email) return
+    const password = formData.get('password')?.toString()
+
+    if (!email || !password) return
 
     let user = await localDb.users.where('email').equals(email).first()
 
@@ -37,7 +45,7 @@ export function LoginPage() {
         id: crypto.randomUUID(),
         name: 'Owner',
         email: 'owner@usaha.co.id',
-        passwordHash: 'mock-hash',
+        passwordHash: password,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }
@@ -45,13 +53,53 @@ export function LoginPage() {
       user = mockUser
     }
 
-    if (!user) {
+    if (!user || user.passwordHash !== password) {
       setError('Email tidak terdaftar atau kata sandi salah')
       return
     }
 
     setAuth(user)
     navigate('/tenants')
+  }
+
+  function openReset() {
+    setResetEmail('')
+    setNewPassword('')
+    setResetStep('email')
+    setResetOpen(true)
+  }
+
+  async function handleResetEmail() {
+    const email = resetEmail.trim().toLowerCase()
+    if (!email) return
+    setResetLoading(true)
+    const user = await localDb.users.where('email').equals(email).first()
+    setResetLoading(false)
+    if (!user) {
+      toast.error('Email tidak ditemukan')
+      return
+    }
+    setResetStep('password')
+  }
+
+  async function handleResetPassword() {
+    if (!newPassword) return
+    setResetLoading(true)
+    const email = resetEmail.trim().toLowerCase()
+    const user = await localDb.users.where('email').equals(email).first()
+    if (!user) {
+      toast.error('Email tidak ditemukan')
+      setResetLoading(false)
+      setResetStep('email')
+      return
+    }
+    await localDb.users.update(user.id, {
+      passwordHash: newPassword,
+      updatedAt: new Date().toISOString(),
+    })
+    setResetLoading(false)
+    toast.success('Kata sandi berhasil direset')
+    setResetOpen(false)
   }
 
   return (
@@ -110,7 +158,9 @@ export function LoginPage() {
                 <Input id="password" name="password" type="password" placeholder="Masukkan kata sandi" autoComplete="current-password" />
               </label>
               <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="text-muted-foreground">Belum punya akun?</span>
+                <button type="button" onClick={openReset} className="text-sm font-medium text-primary hover:underline">
+                  Lupa password?
+                </button>
                 <Link className="font-medium text-primary hover:underline" to="/register">
                   Daftar di sini
                 </Link>
@@ -124,6 +174,47 @@ export function LoginPage() {
           </CardFooter>
         </Card>
       </div>
+
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Atur Ulang Kata Sandi</DialogTitle>
+            <DialogDescription>
+              {resetStep === 'email'
+                ? 'Masukkan email untuk verifikasi akun.'
+                : 'Masukkan kata sandi baru.'}
+            </DialogDescription>
+          </DialogHeader>
+          {resetStep === 'email' ? (
+            <div className="space-y-4">
+              <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="reset-email">
+                Email
+                <Input id="reset-email" type="email" value={resetEmail} onChange={e => setResetEmail(e.target.value)} placeholder="owner@usaha.co.id" />
+              </label>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setResetOpen(false)}>Batal</Button>
+                <Button onClick={handleResetEmail} disabled={resetLoading || !resetEmail.trim()}>
+                  {resetLoading ? 'Memeriksa...' : 'Lanjutkan'}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">Akun <span className="font-medium text-foreground">{resetEmail}</span> ditemukan.</p>
+              <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="new-password">
+                Kata sandi baru
+                <Input id="new-password" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Minimal 8 karakter" />
+              </label>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setResetStep('email')}>Kembali</Button>
+                <Button onClick={handleResetPassword} disabled={resetLoading || !newPassword}>
+                  {resetLoading ? 'Menyimpan...' : 'Simpan'}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </main>
   )
 }

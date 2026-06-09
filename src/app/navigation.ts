@@ -1,6 +1,7 @@
 import {
   BarChart3,
   Boxes,
+  MessageSquare,
   ClipboardList,
   CreditCard,
   Home,
@@ -62,6 +63,7 @@ export const sidebarNavigation: SidebarNavigationGroup[] = [
         icon: Package,
         items: [
           { to: '/products/categories', label: 'Kategori Produk', icon: Package },
+          { to: '/products/recipes', label: 'Resep / BOM', icon: Package },
         ],
       },
       { to: '/inventory', label: appLabels.inventory, icon: Boxes },
@@ -99,6 +101,7 @@ export const sidebarNavigation: SidebarNavigationGroup[] = [
         icon: Settings,
         items: [
           { to: '/settings/profile', label: 'Profil Pengguna', icon: Users },
+          { to: '/settings/templates', label: 'Template WhatsApp', icon: MessageSquare },
         ],
       },
       { to: '/platform-admin', label: 'Platform Admin', icon: Shield },

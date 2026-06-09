@@ -18,7 +18,8 @@ export function partitionSyncMutations(items: SyncMutationRecord[]) {
   const rejected: Array<{ item: SyncMutationRecord; message: string }> = []
 
   for (const item of items) {
-    if (!isSyncEntityId(item.entityId)) {
+    // Settings use semantic keys (like 'company-name') as IDs - bypass UUID validation
+    if (!isSyncEntityId(item.entityId) && item.entityType !== 'setting') {
       rejected.push({ item, message: 'ID lokal belum kompatibel sinkron. Simpan ulang data ini.' })
       continue
     }

@@ -4,8 +4,8 @@ import type { LocalProduct } from '@/services/local-db/schema'
 
 describe('filterProducts', () => {
   const products: LocalProduct[] = [
-    { id: '1', name: 'Baju M', category: 'Pakaian', type: 'Produk Fisik', price: 100, stock: 10, status: 'Aktif', syncStatus: 'pending', version: 1, updatedAt: '' },
-    { id: '2', name: 'Celana', category: 'Pakaian', type: 'Produk Fisik', price: 200, stock: 5, status: 'Aktif', syncStatus: 'pending', version: 1, updatedAt: '' }
+    { id: '1', tenantId: 'tenant-1', name: 'Baju M', category: 'Pakaian', type: 'Produk Fisik', price: 100, stock: 10, status: 'Aktif', syncStatus: 'pending', version: 1, updatedAt: '' },
+    { id: '2', tenantId: 'tenant-1', name: 'Celana', category: 'Pakaian', type: 'Produk Fisik', price: 200, stock: 5, status: 'Aktif', syncStatus: 'pending', version: 1, updatedAt: '' }
   ]
 
   it('returns all when query is empty', () => {

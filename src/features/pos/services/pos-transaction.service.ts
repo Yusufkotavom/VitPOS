@@ -1,4 +1,6 @@
 import { localDb } from '@/services/local-db/client'
+import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
+import { syncCustomerSalesMetrics } from '@/features/sales-orders/services/sales-order-finance.service'
 import type { LocalPayment, LocalSalesOrder, LocalSalesOrderItem, LocalStockMovement, OutboxItem, PosPaymentMethodCode } from '@/services/local-db/schema'
 import type { PosPaymentMethod } from '@/features/pos/types/pos.types'
 
@@ -36,14 +38,16 @@ function isPaidStatus(total: number, paid: number): LocalSalesOrder['status'] {
 }
 
 export const posTransactionService = {
-  async saveDraft(cartItems: CartItem[], totals: PosTotals, discountTotal: number = 0, customerName?: string | null) {
+  async saveDraft(cartItems: CartItem[], totals: PosTotals, discountTotal: number = 0, customerName?: string | null, customerId?: string | null) {
     if (cartItems.length === 0) return
 
+    const tenantId = requireActiveTenantId()
     const draftId = crypto.randomUUID()
     const nowIso = new Date().toISOString()
 
     const draftItems: LocalSalesOrderItem[] = cartItems.map((cartItem) => ({
       id: newId('soi'),
+      tenantId,
       salesOrderId: draftId,
       productId: cartItem.productId,
       name: cartItem.name,
@@ -54,7 +58,9 @@ export const posTransactionService = {
 
     const draftOrder: LocalSalesOrder = {
       id: draftId,
+      tenantId,
       code: `DRF-${Date.now()}`,
+      customerId: customerId ?? undefined,
       customerName: customerName || 'Draft',
       date: todayLabel(),
       subtotal: totals.subtotal,
@@ -88,15 +94,17 @@ export const posTransactionService = {
     })
   },
 
-  async checkout(cartItems: CartItem[], totals: PosTotals, paymentMethod: PosPaymentMethod, paidAmount: number, discountTotal: number = 0, customerName?: string | null) {
+  async checkout(cartItems: CartItem[], totals: PosTotals, paymentMethod: PosPaymentMethod, paidAmount: number, discountTotal: number = 0, customerName?: string | null, customerId?: string | null) {
     if (cartItems.length === 0) return
 
+    const tenantId = requireActiveTenantId()
     const nowIso = new Date().toISOString()
     const salesOrderId = crypto.randomUUID()
     const paymentId = newId('pay')
 
     const items: LocalSalesOrderItem[] = cartItems.map((cartItem) => ({
       id: newId('soi'),
+      tenantId,
       salesOrderId,
       productId: cartItem.productId,
       name: cartItem.name,
@@ -105,19 +113,22 @@ export const posTransactionService = {
       subtotal: cartItem.subtotal,
     }))
 
-    const actualPaid = Math.max(paidAmount, 0)
+    const rawPaid = Math.max(paidAmount, 0)
+    const retainedAmount = Math.min(rawPaid, totals.total)
 
     const salesOrder: LocalSalesOrder = {
       id: salesOrderId,
+      tenantId,
       code: orderCode(),
+      customerId: customerId ?? undefined,
       customerName: customerName || 'Umum',
       date: todayLabel(),
       subtotal: totals.subtotal,
       discountTotal: discountTotal,
       taxTotal: 0,
       grandTotal: totals.total,
-      paidTotal: actualPaid,
-      status: isPaidStatus(totals.total, actualPaid),
+      paidTotal: retainedAmount,
+      status: isPaidStatus(totals.total, retainedAmount),
       items,
       syncStatus: 'pending',
       version: 1,
@@ -126,11 +137,12 @@ export const posTransactionService = {
 
     const payment: LocalPayment = {
       id: paymentId,
+      tenantId,
       ref: `PAY-${Date.now().toString().slice(-6)}`,
       salesOrderId,
       source: 'POS',
       method: paymentMethod as PosPaymentMethodCode,
-      amount: actualPaid,
+      amount: retainedAmount,
       date: todayLabel(),
       status: paymentMethod === 'piutang' ? 'Pending' : 'Berhasil',
       syncStatus: 'pending',
@@ -142,6 +154,7 @@ export const posTransactionService = {
       .filter((cartItem) => cartItem.qty > 0)
       .map((cartItem) => ({
         id: newId('sm'),
+        tenantId,
         productId: cartItem.productId,
         productName: cartItem.name,
         warehouseName: 'Gudang Toko',
@@ -189,31 +202,50 @@ export const posTransactionService = {
       })),
     ]
 
-    await localDb.transaction('rw', [localDb.salesOrders, localDb.salesOrderItems, localDb.payments, localDb.stockMovements, localDb.products, localDb.outbox], async () => {
+    const warehouseName = 'Gudang Toko'
+    const productIds = [...new Set(cartItems.map((i) => i.productId))]
+    const existingProducts = await localDb.products.bulkGet(productIds)
+    const productMap = new Map(existingProducts.filter(Boolean).map((p) => [p!.id, p!]))
+
+    const inventoryRows: LocalInventory[] = []
+    const productUpdates: { id: string; stock: number; updatedAt: string; version: number; syncStatus: string }[] = []
+
+    for (const cartItem of cartItems) {
+      const existing = productMap.get(cartItem.productId)
+      if (!existing || existing.tenantId !== tenantId || existing.type !== 'Produk Fisik') continue
+
+      const nextStock = Math.max(0, existing.stock - cartItem.qty)
+      productUpdates.push({ id: cartItem.productId, stock: nextStock, updatedAt: nowIso, version: existing.version + 1, syncStatus: 'pending' })
+
+      let status = 'Aman'
+      if (nextStock <= 0) status = 'Habis'
+      else if (nextStock <= 5) status = 'Stok Rendah'
+
+      inventoryRows.push({
+        id: `${tenantId}_${cartItem.productId}_${warehouseName}`,
+        tenantId,
+        product: existing.name,
+        warehouse: warehouseName,
+        stockSystem: nextStock,
+        stockSafe: 5,
+        movement: `-${cartItem.qty} (sale)`,
+        status,
+      })
+    }
+
+    await localDb.transaction('rw', [localDb.salesOrders, localDb.salesOrderItems, localDb.payments, localDb.stockMovements, localDb.products, localDb.inventory, localDb.outbox], async () => {
       await localDb.salesOrders.put(salesOrder)
-      for (const item of items) {
-        await localDb.salesOrderItems.put(item)
-      }
+      if (items.length > 0) await localDb.salesOrderItems.bulkPut(items)
       await localDb.payments.put(payment)
-      for (const movement of stockMovements) {
-        await localDb.stockMovements.put(movement)
+      if (stockMovements.length > 0) await localDb.stockMovements.bulkPut(stockMovements)
+      for (const upd of productUpdates) {
+        await localDb.products.update(upd.id, upd)
       }
-      for (const cartItem of cartItems) {
-        const existing = await localDb.products.get(cartItem.productId)
-        if (existing && existing.type === 'Produk Fisik') {
-          const nextStock = Math.max(0, existing.stock - cartItem.qty)
-          await localDb.products.update(cartItem.productId, {
-            stock: nextStock,
-            updatedAt: nowIso,
-            version: existing.version + 1,
-            syncStatus: 'pending',
-          })
-        }
-      }
-      for (const outboxItem of outboxPayload) {
-        await localDb.outbox.put(outboxItem)
-      }
+      if (inventoryRows.length > 0) await localDb.inventory.bulkPut(inventoryRows)
+      if (outboxPayload.length > 0) await localDb.outbox.bulkPut(outboxPayload)
     })
+
+    syncCustomerSalesMetrics(customerId ?? undefined, tenantId)
 
     return { salesOrderId, paymentId, code: salesOrder.code }
   }
