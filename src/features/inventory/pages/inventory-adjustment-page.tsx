@@ -10,7 +10,7 @@ import { useProducts } from '@/features/products/hooks/use-products'
 import { inventoryAdjustmentService } from '@/features/inventory/services/inventory-adjustment.service'
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { ContentCard } from '@/shared/components/display/content-card'
-import type { LocalStockMovement } from '@/services/local-db/schema'
+import type { LocalStockMovement, StockMovementType } from '@/services/local-db/schema'
 
 type AdjustmentItem = {
   id: string // temporary random id for list
@@ -133,7 +133,7 @@ export function InventoryAdjustmentPage() {
                 <select 
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   value={type}
-                  onChange={e => setType(e.target.value as any)}
+                  onChange={e => setType(e.target.value as StockMovementType)}
                 >
                   <option value="adjustment">Adjustment (Penyesuaian)</option>
                   <option value="purchase">Purchase (Pembelian / Masuk)</option>

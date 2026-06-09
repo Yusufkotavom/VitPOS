@@ -6,7 +6,8 @@ import type {
   LocalStockMovement, 
   LocalInventory, 
   OutboxItem,
-  PosPaymentMethodCode
+  PosPaymentMethodCode,
+  ServiceOrderStatus,
 } from '@/services/local-db/schema'
 
 export type SocItem = {
@@ -59,7 +60,8 @@ export const socTransactionService = {
       date: new Intl.DateTimeFormat('id-ID', { dateStyle: 'long' }).format(new Date()),
       estimatedCompletion: serviceData.estimatedCompletion,
       cost: totals.total,
-      status: serviceData.status as any,
+      paidTotal: retainedAmount,
+      status: serviceData.status as ServiceOrderStatus,
       items: items.map(c => ({ ...c })),
       notes: serviceData.notes,
       timeline: [{

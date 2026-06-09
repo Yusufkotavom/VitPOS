@@ -27,6 +27,7 @@ export type PdfSummary = {
   discount: number
   grandTotal: number
   paidTotal: number
+  change?: number
   status: string
 }
 

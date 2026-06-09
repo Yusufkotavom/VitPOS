@@ -48,11 +48,10 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
     paymentMethod: successOrder.paymentMethod,
   } : null
 
-  const setPaidAmount = store.setPaidAmount
-  const initialTotal = totals.total
+  const setPaidAmount = usePosStore(s => s.setPaidAmount)
   useEffect(() => {
-    setPaidAmount(initialTotal)
-  }, [setPaidAmount, initialTotal])
+    setPaidAmount(totals.total)
+  }, [setPaidAmount, totals.total])
 
   async function handleCheckout() {
     if (store.cartItems.length === 0) return

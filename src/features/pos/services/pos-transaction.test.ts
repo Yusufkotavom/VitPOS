@@ -20,6 +20,7 @@ vi.mock('@/services/local-db/client', () => ({
     stockMovements: { put: vi.fn(), bulkPut: vi.fn() },
     products: { get: vi.fn(), bulkGet: vi.fn(), update: vi.fn() },
     inventory: { put: vi.fn(), bulkPut: vi.fn() },
+    recipes: { where: vi.fn(() => ({ equals: vi.fn(() => ({ filter: vi.fn(() => ({ toArray: vi.fn(async () => []) })) })) })) },
     outbox: { put: vi.fn(), bulkPut: vi.fn() }
   }
 }))

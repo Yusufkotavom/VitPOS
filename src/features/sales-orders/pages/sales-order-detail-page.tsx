@@ -1,6 +1,7 @@
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Printer, MessageSquare, Download, CreditCard, PlusIcon, Trash2Icon, PencilIcon, XIcon, CheckIcon } from 'lucide-react'
 import { useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { usePdf } from '@/shared/components/pdf/use-pdf'
 import type { PdfData } from '@/shared/components/pdf/types'
 import { toast } from 'sonner'
@@ -40,20 +41,26 @@ export function SalesOrderDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const { downloadPdf, printPdf } = usePdf()
 
+  const invoiceCustomer = useLiveQuery(
+    () => order?.customerId ? localDb.customers.get(order.customerId) : undefined,
+    [order?.customerId],
+  )
+
   const invoiceData: PdfData | null = order ? {
     type: 'invoice',
     code: order.code,
     date: order.date,
-    customer: { name: order.customerName },
+    customer: { name: order.customerName, phone: invoiceCustomer?.phone },
     items: order.items?.map(i => ({ name: i.name, qty: i.qty, price: i.unitPrice, subtotal: i.subtotal })) || [],
     summary: {
       subtotal: order.subtotal,
       discount: order.discountTotal,
       grandTotal: order.grandTotal,
       paidTotal: order.paidTotal,
+      change: Math.max(0, order.paidTotal - order.grandTotal),
       status: order.status,
     },
-    notes: '',
+    notes: order.notes || '',
   } : null
 
   if (isLoading) {

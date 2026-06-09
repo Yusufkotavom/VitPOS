@@ -157,9 +157,10 @@ export const demoSettings: LocalSetting[] = [
   { id: 'set-3', tenantId: DEMO_TENANT_ID, area: 'Struk', setting: 'Header/footer struk', value: 'Template default', updatedAt: '8 Juni 2026', status: 'Lengkap' },
 ]
 
-export const demoOutboxItems: OutboxItem[] = [
+export const demoOutboxItems: (OutboxItem & { tenantId: string })[] = [
   {
     id: 'seed-outbox-pos-001',
+    tenantId: DEMO_TENANT_ID,
     entityType: 'sale',
     entityId: baimRuntime.salesOrderId,
     mutationType: 'create',
@@ -171,6 +172,7 @@ export const demoOutboxItems: OutboxItem[] = [
   },
   {
     id: 'seed-outbox-stock-001',
+    tenantId: DEMO_TENANT_ID,
     entityType: 'stock_movement',
     entityId: baimRuntime.stockMovementId,
     mutationType: 'create',

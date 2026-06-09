@@ -1,21 +1,27 @@
-import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { PencilIcon, PlusIcon, Trash2Icon, CreditCard } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { PurchaseForm } from '@/features/purchases/components/purchase-form'
 import { receivePurchaseOrder, syncSupplierPurchaseMetrics } from '@/features/purchases/services/purchase-receiving.service'
+import { recordPurchasePayment } from '@/features/purchases/services/purchase-payment.service'
 import { mapPurchaseFormToRecord, mapPurchaseRecordToFormValues, type PurchaseFormValues } from '@/features/purchases/schemas/purchase-form-schema'
 import { localDb } from '@/services/local-db/client'
 import { purchaseRepository } from '@/services/local-db/repository'
+import { formatCurrency } from '@/lib/format-currency'
 import type { LocalPurchase } from '@/services/local-db/schema'
 
 export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) {
   const [formOpen, setFormOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [payOpen, setPayOpen] = useState(false)
+  const [payAmount, setPayAmount] = useState(0)
+  const [payMethod, setPayMethod] = useState('transfer')
   const isEdit = Boolean(purchase)
 
   async function handleSubmit(values: PurchaseFormValues) {
@@ -57,6 +63,16 @@ export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) 
     toast.success('Barang diterima dan stok diperbarui')
   }
 
+  async function handlePay() {
+    if (!purchase || payAmount <= 0) return
+    await recordPurchasePayment(purchase.id, payAmount, payMethod, 'Pembelian')
+    toast.success('Pembayaran berhasil dicatat')
+    setPayOpen(false)
+    setPayAmount(0)
+  }
+
+  const remainingPay = purchase ? Math.max(0, purchase.grandTotal - (purchase.paidTotal ?? 0)) : 0
+
   return (
     <div className="flex flex-wrap gap-2">
       <Sheet open={formOpen} onOpenChange={setFormOpen}>
@@ -74,6 +90,7 @@ export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) 
       {purchase ? (
         <>
           {purchase.status !== 'Diterima' && purchase.status !== 'Batal' ? <Button size="sm" onClick={handleReceive}>Terima Barang</Button> : null}
+          {remainingPay > 0 && purchase.status === 'Diterima' ? <Button size="sm" onClick={() => { setPayAmount(remainingPay); setPayOpen(true) }}><CreditCard data-icon="inline-start" />Bayar</Button> : null}
           <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />Hapus</Button>
           <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
             <DialogContent>
@@ -84,6 +101,42 @@ export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) 
               <DialogFooter>
                 <Button variant="outline" onClick={() => setDeleteOpen(false)}>Batal</Button>
                 <Button variant="destructive" onClick={handleDelete}>Hapus PO</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={payOpen} onOpenChange={setPayOpen}>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Bayar ke Supplier</DialogTitle>
+                <DialogDescription>PO {purchase?.code} - Sisa tagihan {formatCurrency(remainingPay)}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div>
+                  <label className="text-sm font-medium">Metode</label>
+                  <select
+                    value={payMethod}
+                    onChange={(e) => setPayMethod(e.target.value)}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring mt-1"
+                  >
+                    <option value="tunai">Tunai</option>
+                    <option value="transfer">Transfer</option>
+                    <option value="kartu">Kartu</option>
+                    <option value="qris">QRIS</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Nominal</label>
+                  <Input
+                    type="number"
+                    value={payAmount || ''}
+                    onChange={(e) => setPayAmount(Number(e.target.value) || 0)}
+                    className="mt-1 text-lg font-bold"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setPayOpen(false)}>Batal</Button>
+                <Button onClick={handlePay} disabled={payAmount <= 0}>Bayar</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

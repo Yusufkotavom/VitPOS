@@ -10,6 +10,8 @@ export const paymentStatusOptions = ['Berhasil', 'Pending', 'Gagal', 'Refund'] a
 export const paymentFormSchema = z.object({
   ref: z.string().trim().min(1, 'Nomor referensi wajib diisi'),
   salesOrderId: z.string().trim().optional(),
+  serviceOrderId: z.string().trim().optional(),
+  purchaseId: z.string().trim().optional(),
   source: z.string().trim().min(1, 'Sumber pembayaran wajib diisi'),
   method: z.enum(paymentMethodOptions),
   amount: z.string().trim().min(1, 'Nominal wajib diisi'),
@@ -22,6 +24,8 @@ export type PaymentFormValues = z.infer<typeof paymentFormSchema>
 export const paymentInitialValues: PaymentFormValues = {
   ref: '',
   salesOrderId: '',
+  serviceOrderId: '',
+  purchaseId: '',
   source: '',
   method: 'tunai',
   amount: '0',
@@ -35,6 +39,8 @@ export function mapPaymentFormToRecord(values: PaymentFormValues, id: string, ba
     tenantId: resolveTenantId(base?.tenantId),
     ref: values.ref.trim(),
     salesOrderId: values.salesOrderId?.trim() || undefined,
+    serviceOrderId: values.serviceOrderId?.trim() || undefined,
+    purchaseId: values.purchaseId?.trim() || undefined,
     source: values.source.trim(),
     method: values.method,
     amount: parseDigits(values.amount),
@@ -50,6 +56,8 @@ export function mapPaymentRecordToFormValues(payment: LocalPayment): PaymentForm
   return {
     ref: payment.ref,
     salesOrderId: payment.salesOrderId ?? '',
+    serviceOrderId: payment.serviceOrderId ?? '',
+    purchaseId: payment.purchaseId ?? '',
     source: payment.source,
     method: payment.method as PaymentFormValues['method'],
     amount: String(payment.amount),

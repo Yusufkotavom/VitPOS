@@ -44,7 +44,7 @@ export type ProductType = 'Produk Fisik' | 'Jasa'
 export type SalesOrderStatus = 'Draft' | 'Lunas' | 'Sebagian' | 'Belum Bayar' | 'Batal'
 export type PaymentStatus = 'Berhasil' | 'Pending' | 'Gagal' | 'Refund'
 export type PosPaymentMethodCode = string
-export type StockMovementType = 'sale' | 'purchase' | 'return' | 'adjustment' | 'transfer_in' | 'transfer_out' | 'damage_lost'
+export type StockMovementType = 'sale' | 'purchase' | 'return' | 'adjustment' | 'transfer_in' | 'transfer_out' | 'damage_lost' | 'production'
 
 export type LocalProduct = {
   id: string
@@ -115,6 +115,7 @@ export type LocalSalesOrder = {
   taxTotal: number
   grandTotal: number
   paidTotal: number
+  notes?: string
   status: SalesOrderStatus
   items: LocalSalesOrderItem[]
   syncStatus: SyncStatus
@@ -128,6 +129,7 @@ export type LocalPayment = {
   ref: string
   salesOrderId?: string
   serviceOrderId?: string
+  purchaseId?: string
   source: string
   method: PosPaymentMethodCode
   amount: number
@@ -247,6 +249,7 @@ export type LocalPurchase = {
   date: string
   subtotal: number
   grandTotal: number
+  paidTotal: number
   status: PurchaseStatus
   items: LocalPurchaseItem[]
   syncStatus: SyncStatus
@@ -295,6 +298,7 @@ export type LocalServiceOrder = {
   date: string
   estimatedCompletion?: string
   cost: number
+  paidTotal: number
   status: ServiceOrderStatus
   
   // New fields for POS-like behavior
@@ -338,6 +342,20 @@ export type LocalPaymentMethod = {
   accountNumber?: string
   accountName?: string
   status: 'Aktif' | 'Tidak Aktif'
+  updatedAt: string
+}
+
+export type LocalProductionBatch = {
+  id: string
+  tenantId: string
+  recipeId: string
+  recipeName: string
+  productId: string
+  productName: string
+  batchQty: number
+  date: string
+  syncStatus: SyncStatus
+  version: number
   updatedAt: string
 }
 

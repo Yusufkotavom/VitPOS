@@ -54,6 +54,7 @@ describe('purchaseReceivingService', () => {
       date: '2026-06-09',
       subtotal: 24000,
       grandTotal: 24000,
+      paidTotal: 0,
       status: 'Draft' as const,
       items: [{ id: 'item-1', tenantId: 'tenant-1', purchaseId: 'po-1', productId: '', name: 'Gula', qty: 2, unitPrice: 12000, subtotal: 24000 }],
       syncStatus: 'pending' as const,

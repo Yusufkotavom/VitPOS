@@ -46,7 +46,7 @@ export function ProductGrid() {
     return <EmptyState title="Produk tidak ditemukan" description="Coba kata kunci lain atau pilih kategori berbeda." />
   }
 
-  function handleAddItem(product: any) {
+  function handleAddItem(product: { id: string; sku?: string; barcode?: string; name: string; category: string; price: number; stock: number; type: string }) {
     addItem({
       id: product.id,
       sku: product.sku ?? product.id.slice(0, 8),

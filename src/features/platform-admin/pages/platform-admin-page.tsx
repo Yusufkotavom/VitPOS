@@ -1,5 +1,8 @@
 import { ShieldCheck, ServerCog } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { format } from 'date-fns'
 
+import { formatCurrency } from '@/lib/format-currency'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ContentCard } from '@/shared/components/display/content-card'
@@ -7,24 +10,18 @@ import { StatusBadge } from '@/shared/components/display/status-badge'
 import { DataTable } from '@/shared/components/data-table/data-table'
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { getPlatformAdminSummary } from '@/features/platform-admin/lib/platform-admin-summary'
-import { platformAdminTenants, type PlatformAdminTenant } from '@/features/platform-admin/mocks/platform-admin-data'
+import { platformAdminService, type PlatformTenant } from '@/services/api/platform-admin.service'
 
-function subscriptionTone(status: PlatformAdminTenant['subscriptionStatus']) {
-  if (status === 'Aktif') return 'success'
-  if (status === 'Uji Coba') return 'info'
-  if (status === 'Tertunda') return 'warning'
+function subscriptionTone(status: string) {
+  if (status === 'active') return 'success'
+  if (status === 'trial') return 'info'
+  if (status === 'past_due' || status === 'pending_payment') return 'warning'
+  if (status === 'suspended' || status === 'cancelled') return 'danger'
   return 'neutral'
 }
 
-function syncTone(status: PlatformAdminTenant['syncStatus']) {
-  if (status === 'Data sudah aman di cloud') return 'success'
-  if (status === 'Data menunggu sinkron') return 'warning'
-  if (status === 'Butuh pemeriksaan') return 'danger'
-  return 'info'
-}
-
-function PlatformAdminSummaryCards() {
-  const summary = getPlatformAdminSummary(platformAdminTenants)
+function PlatformAdminSummaryCards({ tenants }: { tenants: PlatformTenant[] }) {
+  const summary = getPlatformAdminSummary(tenants)
 
   return (
     <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -41,7 +38,7 @@ function PlatformAdminSummaryCards() {
       <article className="rounded-2xl border bg-background p-4 shadow-sm">
         <p className="text-xs text-muted-foreground">Pemakaian storage</p>
         <p className="mt-2 text-2xl font-semibold">{summary.storageUsed}</p>
-        <p className="mt-1 text-sm text-muted-foreground">Akumulasi ruang file tenant</p>
+        <p className="mt-1 text-sm text-muted-foreground">Akumulasi limit storage tenant</p>
       </article>
       <article className="rounded-2xl border bg-background p-4 shadow-sm">
         <p className="text-xs text-muted-foreground">Tenant perlu review sync</p>
@@ -52,28 +49,24 @@ function PlatformAdminSummaryCards() {
   )
 }
 
-function PlatformAdminHealthPanel() {
-  const pendingTenants = platformAdminTenants.filter((tenant) => tenant.syncStatus !== 'Data sudah aman di cloud')
-  const delayedBilling = platformAdminTenants.filter((tenant) => tenant.subscriptionStatus === 'Tertunda')
+function PlatformAdminHealthPanel({ tenants }: { tenants: PlatformTenant[] }) {
+  const delayedBilling = tenants.filter((tenant) => tenant.subscriptionStatus === 'past_due')
 
   return (
     <ContentCard title="Ringkasan health platform" description="Pantau sinkronisasi, billing, dan kapasitas tenant lintas bisnis.">
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="grid gap-3">
-          {pendingTenants.map((tenant) => (
-            <article key={tenant.id} className="rounded-2xl border bg-muted/20 p-4">
+            <article className="rounded-2xl border bg-muted/20 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
                   <ServerCog className="text-muted-foreground" />
                   <div className="flex flex-col gap-1">
-                    <p className="font-medium">{tenant.tenantName}</p>
-                    <p className="text-sm text-muted-foreground">{tenant.city} · terakhir sync {tenant.lastSyncAt}</p>
+                    <p className="font-medium">All Systems Operational</p>
+                    <p className="text-sm text-muted-foreground">Semua tenant terpantau sinkron.</p>
                   </div>
                 </div>
-                <StatusBadge label={tenant.syncStatus} tone={syncTone(tenant.syncStatus)} />
               </div>
             </article>
-          ))}
         </div>
         <article className="rounded-2xl border bg-muted/20 p-4">
           <div className="flex items-center gap-3">
@@ -90,11 +83,11 @@ function PlatformAdminHealthPanel() {
             </div>
             <div className="rounded-2xl border bg-background p-4">
               <p className="text-xs text-muted-foreground">Tenant enterprise</p>
-              <p className="mt-2 text-2xl font-semibold">{platformAdminTenants.filter((tenant) => tenant.packageName === 'Enterprise').length}</p>
+              <p className="mt-2 text-2xl font-semibold">{tenants.filter((tenant) => tenant.packageName === 'enterprise').length}</p>
             </div>
             <div className="rounded-2xl border bg-background p-4">
               <p className="text-xs text-muted-foreground">Uji coba berjalan</p>
-              <p className="mt-2 text-2xl font-semibold">{platformAdminTenants.filter((tenant) => tenant.subscriptionStatus === 'Uji Coba').length}</p>
+              <p className="mt-2 text-2xl font-semibold">{tenants.filter((tenant) => tenant.subscriptionStatus === 'trial').length}</p>
             </div>
           </div>
         </article>
@@ -103,7 +96,8 @@ function PlatformAdminHealthPanel() {
   )
 }
 
-function PlatformAdminTenantTable() {
+function PlatformAdminTenantTable({ tenants }: { tenants: PlatformTenant[] }) {
+  const { getFee } = getPlatformAdminSummary(tenants)
   return (
     <ContentCard
       title="Daftar tenant dan langganan"
@@ -111,7 +105,7 @@ function PlatformAdminTenantTable() {
       action={<Button variant="outline">Export tenant</Button>}
     >
       <DataTable
-        data={platformAdminTenants}
+        data={tenants}
         columns={[
           {
             key: 'tenantName',
@@ -119,7 +113,7 @@ function PlatformAdminTenantTable() {
             render: (row) => (
               <div className="flex flex-col gap-1">
                 <p className="font-medium">{row.tenantName}</p>
-                <p className="text-sm text-muted-foreground">{row.ownerName} · {row.city}</p>
+                <p className="text-sm text-muted-foreground">{row.ownerName ?? '-'} · {row.city ?? '-'}</p>
               </div>
             ),
           },
@@ -127,34 +121,32 @@ function PlatformAdminTenantTable() {
             key: 'packageName',
             header: 'Paket',
             render: (row) => (
-              <div className="flex flex-col gap-2">
-                <span>{row.packageName}</span>
+              <div className="flex flex-col items-start gap-2">
+                <span className="capitalize">{row.packageName}</span>
                 <StatusBadge label={row.subscriptionStatus} tone={subscriptionTone(row.subscriptionStatus)} />
               </div>
             ),
           },
-          { key: 'monthlyFee', header: 'Billing / bulan', render: (row) => <span className="font-medium">{row.monthlyFee === 0 ? 'Gratis' : getPlatformAdminSummary([row]).monthlyRecurringRevenue}</span> },
-          { key: 'storage', header: 'Storage', render: (row) => <span>{row.storageUsedGb} GB / {row.storageLimitGb} GB</span> },
-          { key: 'syncStatus', header: 'Sync health', render: (row) => <StatusBadge label={row.syncStatus} tone={syncTone(row.syncStatus)} /> },
-          { key: 'lastSyncAt', header: 'Sync terakhir' },
+          { key: 'monthlyFee', header: 'Billing / bulan', render: (row) => <span className="font-medium">{getFee(row.packageName) === 0 ? 'Gratis' : formatCurrency(getFee(row.packageName))}</span> },
+          { key: 'storage', header: 'Storage Limit', render: (row) => <span>{row.storageLimitGb} GB</span> },
+          { key: 'planValidUntil', header: 'Berlaku Sampai', render: (row) => <span>{row.planValidUntil ? format(new Date(row.planValidUntil), 'dd MMM yyyy') : '-'}</span> },
         ]}
         mobileRender={(row) => (
           <div className="flex flex-col gap-3">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="font-medium">{row.tenantName}</p>
-                <p className="text-sm text-muted-foreground">{row.ownerName} · {row.city}</p>
+                <p className="text-sm text-muted-foreground">{row.ownerName ?? '-'} · {row.city ?? '-'}</p>
               </div>
-              <Badge variant="secondary">{row.packageName}</Badge>
+              <Badge variant="secondary" className="capitalize">{row.packageName}</Badge>
             </div>
             <div className="flex flex-wrap gap-2">
               <StatusBadge label={row.subscriptionStatus} tone={subscriptionTone(row.subscriptionStatus)} />
-              <StatusBadge label={row.syncStatus} tone={syncTone(row.syncStatus)} />
             </div>
             <div className="grid gap-1 text-sm">
-              <p>Billing: {row.monthlyFee === 0 ? 'Gratis' : getPlatformAdminSummary([row]).monthlyRecurringRevenue}</p>
-              <p>Storage: {row.storageUsedGb} GB / {row.storageLimitGb} GB</p>
-              <p>Sync terakhir: {row.lastSyncAt}</p>
+              <p>Billing: {getFee(row.packageName) === 0 ? 'Gratis' : formatCurrency(getFee(row.packageName))}</p>
+              <p>Storage Limit: {row.storageLimitGb} GB</p>
+              <p>Berlaku Sampai: {row.planValidUntil ? format(new Date(row.planValidUntil), 'dd MMM yyyy') : '-'}</p>
             </div>
           </div>
         )}
@@ -164,6 +156,19 @@ function PlatformAdminTenantTable() {
 }
 
 export function PlatformAdminPage() {
+  const { data: tenants = [], isLoading } = useQuery({
+    queryKey: ['platform-tenants'],
+    queryFn: platformAdminService.getTenants
+  })
+
+  if (isLoading) {
+    return (
+      <PageShell title="Platform Admin" description="Memuat data tenant...">
+        <p>Loading...</p>
+      </PageShell>
+    )
+  }
+
   return (
     <PageShell
       title="Platform Admin"
@@ -175,9 +180,9 @@ export function PlatformAdminPage() {
         </>
       }
     >
-      <PlatformAdminSummaryCards />
-      <PlatformAdminHealthPanel />
-      <PlatformAdminTenantTable />
+      <PlatformAdminSummaryCards tenants={tenants} />
+      <PlatformAdminHealthPanel tenants={tenants} />
+      <PlatformAdminTenantTable tenants={tenants} />
     </PageShell>
   )
 }

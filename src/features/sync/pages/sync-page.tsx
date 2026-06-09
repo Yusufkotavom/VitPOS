@@ -80,9 +80,10 @@ export function SyncPage() {
           <p className="mt-3 text-2xl font-semibold">{openCount}</p>
         </div>
         <div className="rounded-2xl border bg-background p-5 shadow-sm">
-          <p className="text-sm text-muted-foreground">Status</p>
-          <div className="mt-3">
+          <p className="text-sm text-muted-foreground">Status Jaringan</p>
+          <div className="mt-3 flex flex-col gap-2">
             <StatusBadge label={isOnline ? 'Online' : 'Offline Mode'} tone={isOnline ? 'success' : 'warning'} />
+            <StatusBadge label={useSyncStore((s) => s.isApiConnected) ? 'API Terhubung' : 'API Terputus'} tone={useSyncStore((s) => s.isApiConnected) ? 'success' : 'danger'} />
           </div>
         </div>
       </div>

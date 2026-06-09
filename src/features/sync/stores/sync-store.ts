@@ -4,6 +4,7 @@ import { type SyncHealthStatus, type SyncSummary } from '@/features/sync/types/s
 
 type SyncStore = SyncSummary & {
   setOnline: (isOnline: boolean) => void
+  setApiConnected: (isApiConnected: boolean) => void
   setStatus: (status: SyncHealthStatus) => void
   setCounts: (counts: Pick<SyncSummary, 'pendingCount' | 'failedCount' | 'conflictCount'>) => void
   markSynced: () => void
@@ -11,6 +12,7 @@ type SyncStore = SyncSummary & {
 
 export const useSyncStore = create<SyncStore>((set) => ({
   isOnline: true,
+  isApiConnected: true,
   status: 'pending',
   pendingCount: 0,
   failedCount: 0,
@@ -21,6 +23,7 @@ export const useSyncStore = create<SyncStore>((set) => ({
     if (state.isOnline === isOnline && state.status === nextStatus) return state
     return { isOnline, status: nextStatus }
   }),
+  setApiConnected: (isApiConnected) => set((state) => (state.isApiConnected === isApiConnected ? state : { isApiConnected })),
   setStatus: (status) => set((state) => (state.status === status ? state : { status })),
   setCounts: (counts) => set((state) => {
     if (

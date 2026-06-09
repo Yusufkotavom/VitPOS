@@ -2,6 +2,7 @@ export type SyncHealthStatus = 'synced' | 'pending' | 'syncing' | 'failed' | 'co
 
 export type SyncSummary = {
   isOnline: boolean
+  isApiConnected: boolean
   status: SyncHealthStatus
   pendingCount: number
   failedCount: number

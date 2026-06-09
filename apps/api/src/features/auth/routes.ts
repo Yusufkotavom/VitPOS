@@ -82,10 +82,17 @@ authRoutes.post('/register', async (c) => {
       updatedAt: now,
     })
 
+    const planValidUntil = new Date(now)
+    planValidUntil.setDate(planValidUntil.getDate() + 14)
+
     await tx.insert(tenants).values({
       id: tenantId,
       name: tenantName,
       planCode: 'trial',
+      subscriptionStatus: 'trial',
+      planValidUntil,
+      storageLimitMb: 1024,
+      maxBranches: 1,
       isActive: true,
       createdAt: now,
       updatedAt: now,

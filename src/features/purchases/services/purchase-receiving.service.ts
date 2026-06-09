@@ -15,9 +15,13 @@ export async function syncSupplierPurchaseMetrics(supplierId?: string, tenantId:
 
   const purchases = await localDb.purchases.where('tenantId').equals(tenantId).toArray()
   const supplierPurchases = purchases.filter((purchase) => purchase.supplierId === supplierId && purchase.status !== 'Batal')
-  const payable = supplierPurchases
+  const grossPayable = supplierPurchases
     .filter((purchase) => purchase.status === 'Diterima')
     .reduce((sum, purchase) => sum + purchase.grandTotal, 0)
+  const totalPaid = supplierPurchases
+    .filter((purchase) => purchase.status === 'Diterima')
+    .reduce((sum, purchase) => sum + (purchase.paidTotal || 0), 0)
+  const payable = Math.max(0, grossPayable - totalPaid)
 
   await localDb.suppliers.update(supplierId, {
     orders: supplierPurchases.length,

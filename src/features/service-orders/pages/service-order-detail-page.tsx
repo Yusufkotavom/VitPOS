@@ -18,10 +18,10 @@ import { localDb } from '@/services/local-db/client'
 import { messageTemplateService } from '@/services/message-template.service'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { serviceOrderStatusOptions } from '@/features/service-orders/schemas/service-order-form-schema'
+import { recordServiceOrderPayment } from '@/features/service-orders/services/service-order-finance.service'
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
-import type { PosPaymentMethodCode, OutboxItem } from '@/services/local-db/schema'
 
 function tone(status: string) {
   if (status === 'Selesai' || status === 'Diambil') return 'success'
@@ -151,42 +151,8 @@ export function ServiceOrderDetailPage() {
 
   async function handleAddPayment() {
     if (!order || payAmount <= 0) return
-    
-    const nowIso = new Date().toISOString()
-    const paymentId = `pay-${crypto.randomUUID()}`
-    
-    const payment = {
-      id: paymentId,
-      tenantId,
-      ref: `PAY-SRV-${Date.now().toString().slice(-6)}`,
-      serviceOrderId: order.id,
-      source: 'SERVICE',
-      method: payMethod as PosPaymentMethodCode,
-      amount: payAmount,
-      date: new Intl.DateTimeFormat('id-ID', { dateStyle: 'long' }).format(new Date()),
-      status: 'Berhasil' as const,
-      syncStatus: 'pending' as const,
-      version: 1,
-      updatedAt: nowIso,
-    }
 
-    const outboxItem: OutboxItem = {
-      id: `outbox-${crypto.randomUUID()}`,
-      entityType: 'payment',
-      entityId: paymentId,
-      mutationType: 'create',
-      payload: payment,
-      status: 'queued',
-      attempts: 0,
-      createdAt: nowIso,
-      updatedAt: nowIso,
-    }
-
-    await localDb.transaction('rw', [localDb.payments, localDb.outbox], async () => {
-      await localDb.payments.put(payment)
-      await localDb.outbox.put(outboxItem)
-    })
-    
+    await recordServiceOrderPayment(order.id, payAmount, payMethod, 'Service Order', tenantId)
     toast.success('Pembayaran berhasil ditambahkan')
     setPaymentOpen(false)
   }

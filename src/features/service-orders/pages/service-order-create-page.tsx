@@ -115,7 +115,6 @@ export function ServiceOrderCreatePage() {
                     mode="single"
                     selected={store.estimatedCompletion ? new Date(store.estimatedCompletion) : undefined}
                     onSelect={(date) => store.setEstimatedCompletion(date ? date.toISOString() : undefined)}
-                    initialFocus
                   />
                 </PopoverContent>
               </Popover>

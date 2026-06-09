@@ -35,6 +35,7 @@ export function mapServiceOrderFormToRecord(values: ServiceOrderFormValues, id: 
     description: values.description.trim(),
     date: values.date,
     cost: parseDigits(values.cost),
+    paidTotal: base?.paidTotal ?? 0,
     status: values.status,
     syncStatus: 'pending',
     version: (base?.version ?? 0) + 1,

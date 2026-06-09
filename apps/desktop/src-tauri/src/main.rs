@@ -1,8 +1,6 @@
 // Prevents additional console window on Windows in release builds
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tauri::Manager;
-
 // Health check command for desktop runtime detection
 #[tauri::command]
 async fn sqlite_health() -> Result<String, String> {

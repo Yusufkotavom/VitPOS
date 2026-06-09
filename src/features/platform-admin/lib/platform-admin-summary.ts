@@ -1,13 +1,25 @@
 import { formatCurrency } from '@/lib/format-currency'
-import type { PlatformAdminTenant } from '@/features/platform-admin/mocks/platform-admin-data'
+import type { PlatformTenant } from '@/services/api/platform-admin.service'
 
-export function getPlatformAdminSummary(tenants: PlatformAdminTenant[]) {
+export function getPlatformAdminSummary(tenants: PlatformTenant[]) {
   const totalTenants = tenants.length
-  const activeTenants = tenants.filter((tenant) => tenant.subscriptionStatus === 'Aktif' || tenant.subscriptionStatus === 'Uji Coba').length
-  const monthlyRecurringRevenue = formatCurrency(tenants.reduce((total, tenant) => total + tenant.monthlyFee, 0))
-  const storageUsed = tenants.reduce((total, tenant) => total + tenant.storageUsedGb, 0)
+  const activeTenants = tenants.filter((tenant) => tenant.subscriptionStatus === 'active' || tenant.subscriptionStatus === 'trial').length
+  
+  // Calculate mockup MRR based on package name since it's not yet dynamic
+  const getFee = (pkg: string) => {
+    if (pkg === 'enterprise') return 2700000
+    if (pkg === 'pro') return 1490000
+    if (pkg === 'starter') return 1250000
+    return 0
+  }
+  
+  const monthlyRecurringRevenue = formatCurrency(tenants.reduce((total, tenant) => total + getFee(tenant.packageName), 0))
+  // Mock usage for now, use 0 for actual DB fields
+  const storageUsed = 0 
   const storageLimit = tenants.reduce((total, tenant) => total + tenant.storageLimitGb, 0)
-  const tenantsNeedingSyncReview = tenants.filter((tenant) => tenant.syncStatus === 'Butuh pemeriksaan' || tenant.syncStatus === 'Data menunggu sinkron' || tenant.syncStatus === 'Coba sinkron ulang').length
+  
+  // Sync status is now abstracted to individual tenant metrics, keeping mock count 0 for platform wide
+  const tenantsNeedingSyncReview = 0
 
   return {
     totalTenants,
@@ -15,5 +27,6 @@ export function getPlatformAdminSummary(tenants: PlatformAdminTenant[]) {
     monthlyRecurringRevenue,
     storageUsed: `${storageUsed} GB / ${storageLimit} GB`,
     tenantsNeedingSyncReview,
+    getFee
   }
 }

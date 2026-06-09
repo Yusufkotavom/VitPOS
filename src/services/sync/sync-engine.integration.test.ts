@@ -6,7 +6,7 @@ import { config } from 'dotenv'
 import { createApp } from '../../../apps/api/src/app'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { localDb } from '@/services/local-db/client'
-import { DEMO_TENANT_ID, DEMO_USER_ID, seedLocalDemoData } from '@/services/local-db/seeds'
+import { DEMO_TENANT_ID, seedLocalDemoData } from '@/services/local-db/seeds'
 import { runSync } from '@/services/sync/sync-engine'
 
 config({ path: '.env.local' })
@@ -44,10 +44,28 @@ describe('runSync integration', () => {
   beforeEach(async () => {
     localStorage.removeItem('kotacom-auth-store')
     await clearLocalDb()
+    await localDb.tenants.put({
+      id: DEMO_TENANT_ID,
+      name: 'Demo Tenant',
+      type: 'toko',
+      phone: '',
+      planCode: 'free',
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
+    await localDb.users.put({
+      id: 'test-user',
+      name: 'Test User',
+      email: 'test@vitpos.local',
+      passwordHash: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
     await seedLocalDemoData()
     const tenant = await localDb.tenants.get(DEMO_TENANT_ID)
-    const user = await localDb.users.get(DEMO_USER_ID)
-    useAuthStore.setState({ currentUser: user, activeTenant: { ...tenant, role: 'owner' } })
+    const user = await localDb.users.get('test-user')
+    useAuthStore.setState({ currentUser: user, activeTenant: { ...tenant!, role: 'owner' } })
   })
 
   afterEach(async () => {

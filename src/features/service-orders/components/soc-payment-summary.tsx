@@ -6,7 +6,7 @@ import { useServiceOrderCreateStore } from '@/features/service-orders/stores/ser
 import { socTransactionService } from '@/features/service-orders/services/soc-transaction.service'
 import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
 import { toast } from 'sonner'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { PosSuccessDialog } from '@/features/pos/components/pos-success-dialog'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { localDb } from '@/services/local-db/client'
@@ -52,12 +52,8 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
     paymentMethod: successOrder.paymentMethod,
   } : null
 
-  const [paidAmount, setPaidAmount] = useState(0)
+  const [paidAmount, setPaidAmount] = useState(totals.total)
   const [paymentMethod, setPaymentMethod] = useState('tunai')
-
-  useEffect(() => {
-    setPaidAmount(totals.total)
-  }, [totals.total])
 
   async function handleCheckout() {
     try {

@@ -6,7 +6,7 @@ export const orderStatusEnum = pgEnum('order_status', ['draft', 'confirmed', 'un
 export const paymentMethodEnum = pgEnum('payment_method', ['cash', 'qris', 'card', 'transfer', 'ewallet', 'receivable'])
 export const paymentStatusEnum = pgEnum('payment_status', ['success', 'pending', 'failed', 'refunded', 'partial_refund'])
 export const productTypeEnum = pgEnum('product_type', ['physical', 'service'])
-export const stockMovementTypeEnum = pgEnum('stock_movement_type', ['sale', 'purchase', 'return', 'adjustment', 'transfer_in', 'transfer_out', 'damage_lost'])
+export const stockMovementTypeEnum = pgEnum('stock_movement_type', ['sale', 'purchase', 'return', 'adjustment', 'transfer_in', 'transfer_out', 'damage_lost', 'production'])
 export const syncStatusEnum = pgEnum('sync_status', ['synced', 'pending', 'failed', 'conflict'])
 export const cashCategoryTypeEnum = pgEnum('cash_category_type', ['income', 'expense'])
 export const shiftStatusEnum = pgEnum('shift_status', ['open', 'closed'])
@@ -22,6 +22,8 @@ const timestamps = {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }
 
+export const subscriptionStatusEnum = pgEnum('subscription_status', ['trial', 'active', 'past_due', 'suspended', 'cancelled'])
+
 export const tenants = pgTable('tenants', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: varchar('name', { length: 160 }).notNull(),
@@ -32,6 +34,10 @@ export const tenants = pgTable('tenants', {
   email: varchar('email', { length: 160 }),
   address: text('address'),
   planCode: varchar('plan_code', { length: 40 }).default('free').notNull(),
+  subscriptionStatus: subscriptionStatusEnum('subscription_status').default('trial').notNull(),
+  planValidUntil: timestamp('plan_valid_until', { withTimezone: true }),
+  storageLimitMb: integer('storage_limit_mb').default(512).notNull(),
+  maxBranches: integer('max_branches').default(1).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
   ...timestamps,
 })
@@ -338,6 +344,19 @@ export const recipes = pgTable('recipes', {
   status: recipeStatusEnum('status').default('draft').notNull(),
   ...timestamps,
 }, (table) => [index('recipes_tenant_id_idx').on(table.tenantId), index('recipes_product_id_idx').on(table.productId)])
+
+export const productionBatches = pgTable('production_batches', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  branchId: uuid('branch_id').references(() => branches.id),
+  recipeId: uuid('recipe_id').notNull().references(() => recipes.id),
+  productId: uuid('product_id').notNull().references(() => products.id),
+  batchQty: integer('batch_qty').default(1).notNull(),
+  date: timestamp('date', { withTimezone: true }).defaultNow().notNull(),
+  syncStatus: syncStatusEnum('sync_status').default('synced').notNull(),
+  version: integer('version').default(1).notNull(),
+  ...timestamps,
+}, (table) => [index('production_batches_tenant_id_idx').on(table.tenantId), index('production_batches_branch_id_idx').on(table.branchId), index('production_batches_recipe_id_idx').on(table.recipeId), index('production_batches_product_id_idx').on(table.productId)])
 
 export const outboxLogs = pgTable('outbox_logs', {
   id: uuid('id').primaryKey().defaultRandom(),

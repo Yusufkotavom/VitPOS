@@ -150,9 +150,16 @@ export const posTransactionService = {
       updatedAt: nowIso,
     }
 
-    const stockMovements: LocalStockMovement[] = cartItems
-      .filter((cartItem) => cartItem.qty > 0)
-      .map((cartItem) => ({
+    const recipes = await localDb.recipes
+      .where('tenantId').equals(tenantId)
+      .filter((r) => r.status === 'Aktif')
+      .toArray()
+    const recipeMap = new Map(recipes.map((r) => [r.productId, r]))
+
+    const stockMovements: LocalStockMovement[] = []
+    for (const cartItem of cartItems) {
+      if (cartItem.qty <= 0) continue
+      stockMovements.push({
         id: newId('sm'),
         tenantId,
         productId: cartItem.productId,
@@ -164,7 +171,27 @@ export const posTransactionService = {
         referenceId: salesOrderId,
         syncStatus: 'pending',
         updatedAt: nowIso,
-      }))
+      })
+      const recipe = recipeMap.get(cartItem.productId)
+      if (recipe) {
+        for (const ri of recipe.items) {
+          const consumeQty = (ri.qty / recipe.batchYield) * cartItem.qty
+          stockMovements.push({
+            id: newId('sm'),
+            tenantId,
+            productId: ri.productId,
+            productName: ri.productName,
+            warehouseName: 'Gudang Toko',
+            type: 'production',
+            qty: -consumeQty,
+            referenceType: 'sale',
+            referenceId: salesOrderId,
+            syncStatus: 'pending',
+            updatedAt: nowIso,
+          })
+        }
+      }
+    }
 
     const outboxPayload: OutboxItem[] = [
       {
@@ -203,32 +230,36 @@ export const posTransactionService = {
     ]
 
     const warehouseName = 'Gudang Toko'
-    const productIds = [...new Set(cartItems.map((i) => i.productId))]
-    const existingProducts = await localDb.products.bulkGet(productIds)
+    const allProductIds = [...new Set([
+      ...cartItems.map((i) => i.productId),
+      ...stockMovements.filter((sm) => sm.type === 'production').map((sm) => sm.productId),
+    ])]
+    const existingProducts = await localDb.products.bulkGet(allProductIds)
     const productMap = new Map(existingProducts.filter(Boolean).map((p) => [p!.id, p!]))
 
     const inventoryRows: LocalInventory[] = []
     const productUpdates: { id: string; stock: number; updatedAt: string; version: number; syncStatus: 'pending' }[] = []
 
-    for (const cartItem of cartItems) {
-      const existing = productMap.get(cartItem.productId)
+    for (const sm of stockMovements) {
+      const existing = productMap.get(sm.productId)
       if (!existing || existing.tenantId !== tenantId || existing.type !== 'Produk Fisik') continue
 
-      const nextStock = Math.max(0, existing.stock - cartItem.qty)
-      productUpdates.push({ id: cartItem.productId, stock: nextStock, updatedAt: nowIso, version: existing.version + 1, syncStatus: 'pending' })
+      const nextStock = Math.max(0, existing.stock + sm.qty)
+      productUpdates.push({ id: sm.productId, stock: nextStock, updatedAt: nowIso, version: existing.version + 1, syncStatus: 'pending' })
 
       let status = 'Aman'
       if (nextStock <= 0) status = 'Habis'
       else if (nextStock <= 5) status = 'Stok Rendah'
 
+      const label = sm.type === 'production' ? `produksi` : 'sale'
       inventoryRows.push({
-        id: `${tenantId}_${cartItem.productId}_${warehouseName}`,
+        id: `${tenantId}_${sm.productId}_${warehouseName}`,
         tenantId,
         product: existing.name,
         warehouse: warehouseName,
         stockSystem: nextStock,
         stockSafe: 5,
-        movement: `-${cartItem.qty} (sale)`,
+        movement: `${sm.qty > 0 ? '+' : ''}${sm.qty} (${label})`,
         status,
       })
     }
