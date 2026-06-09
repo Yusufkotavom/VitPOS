@@ -1,6 +1,7 @@
 import { requireActiveTenantId, resolveTenantId } from '@/features/auth/stores/auth-store'
 import { localDb } from '@/services/local-db/client'
-import type { LocalInventory, LocalProduct, LocalPurchase, LocalStockMovement } from '@/services/local-db/schema'
+import { productRepository, stockMovementRepository, purchaseRepository } from '@/services/local-db/repository'
+import type { LocalInventory, LocalProduct, LocalPurchase } from '@/services/local-db/schema'
 
 function createId(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`
@@ -46,7 +47,7 @@ async function findOrCreateProduct(tenantId: string, name: string, unitPrice: nu
     version: 1,
     updatedAt: now,
   }
-  await localDb.products.put(product)
+  await productRepository.upsert(product)
   return product
 }
 
@@ -58,20 +59,19 @@ export async function receivePurchaseOrder(purchase: LocalPurchase, warehouseNam
     return purchase
   }
 
-  await localDb.transaction('rw', [localDb.products, localDb.purchases, localDb.stockMovements, localDb.inventory], async () => {
+  await localDb.transaction('rw', [localDb.products, localDb.purchases, localDb.stockMovements, localDb.inventory, localDb.outbox], async () => {
     for (const item of purchase.items) {
       const product = await findOrCreateProduct(tenantId, item.name, item.unitPrice)
       const nextStock = product.stock + item.qty
 
-      await localDb.products.update(product.id, {
+      await productRepository.upsert({
+        ...product,
         stock: nextStock,
         price: item.unitPrice,
         updatedAt: now,
-        version: product.version + 1,
-        syncStatus: 'pending',
       })
 
-      const movement: LocalStockMovement = {
+      await stockMovementRepository.upsert({
         id: createId('sm'),
         tenantId,
         productId: product.id,
@@ -83,8 +83,7 @@ export async function receivePurchaseOrder(purchase: LocalPurchase, warehouseNam
         referenceId: purchase.id,
         syncStatus: 'pending',
         updatedAt: now,
-      }
-      await localDb.stockMovements.put(movement)
+      })
 
       const inventoryId = `${tenantId}_${product.id}_${warehouseName}`
       let status = 'Aman'
@@ -104,12 +103,9 @@ export async function receivePurchaseOrder(purchase: LocalPurchase, warehouseNam
       await localDb.inventory.put(inventoryRow)
     }
 
-    await localDb.purchases.put({
+    await purchaseRepository.upsert({
       ...purchase,
-      items: purchase.items,
       status: 'Diterima',
-      syncStatus: 'pending',
-      version: purchase.version + 1,
       updatedAt: now,
     })
   })

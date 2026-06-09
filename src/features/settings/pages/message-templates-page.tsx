@@ -7,7 +7,7 @@ import { SettingsNav } from '@/features/settings/components/settings-nav'
 import { messageTemplateService, TEMPLATE_LABELS, TEMPLATE_VARIABLES, DEFAULT_TEMPLATES, type MessageTemplateType } from '@/services/message-template.service'
 import { RotateCcw, Save } from 'lucide-react'
 
-const TEMPLATE_TYPES: MessageTemplateType[] = ['invoice', 'shortage', 'paid', 'status', 'product_info', 'service_order']
+const TEMPLATE_TYPES: MessageTemplateType[] = ['invoice', 'shortage', 'paid', 'status', 'product_info', 'service_order_masuk', 'service_order_selesai']
 
 export function MessageTemplatesPage() {
   const [templates, setTemplates] = useState<Record<string, string>>({})

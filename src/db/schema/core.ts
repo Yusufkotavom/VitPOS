@@ -14,6 +14,7 @@ export const purchaseStatusEnum = pgEnum('purchase_status', ['draft', 'shipped',
 export const returnTypeEnum = pgEnum('return_type', ['sale', 'purchase'])
 export const returnStatusEnum = pgEnum('return_status', ['draft', 'processing', 'completed', 'cancelled'])
 export const serviceOrderStatusEnum = pgEnum('service_order_status', ['received', 'in_progress', 'completed', 'picked_up', 'cancelled'])
+export const recipeStatusEnum = pgEnum('recipe_status', ['draft', 'active'])
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -313,6 +314,30 @@ export const serviceOrders = pgTable('service_orders', {
   version: integer('version').default(1).notNull(),
   ...timestamps,
 }, (table) => [index('service_orders_tenant_id_idx').on(table.tenantId), index('service_orders_branch_id_idx').on(table.branchId), index('service_orders_customer_id_idx').on(table.customerId)])
+
+export const paymentMethods = pgTable('payment_methods', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  name: varchar('name', { length: 120 }).notNull(),
+  provider: varchar('provider', { length: 80 }).notNull(),
+  type: varchar('type', { length: 80 }).notNull(),
+  accountNumber: varchar('account_number', { length: 80 }),
+  accountName: varchar('account_name', { length: 160 }),
+  status: varchar('status', { length: 40 }).default('active').notNull(),
+  ...timestamps,
+}, (table) => [index('payment_methods_tenant_id_idx').on(table.tenantId)])
+
+export const recipes = pgTable('recipes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  productId: uuid('product_id').notNull().references(() => products.id),
+  productName: varchar('product_name', { length: 180 }).notNull(),
+  name: varchar('name', { length: 180 }).notNull(),
+  batchYield: integer('batch_yield').default(1).notNull(),
+  items: jsonb('items').default([]).notNull(),
+  status: recipeStatusEnum('status').default('draft').notNull(),
+  ...timestamps,
+}, (table) => [index('recipes_tenant_id_idx').on(table.tenantId), index('recipes_product_id_idx').on(table.productId)])
 
 export const outboxLogs = pgTable('outbox_logs', {
   id: uuid('id').primaryKey().defaultRandom(),

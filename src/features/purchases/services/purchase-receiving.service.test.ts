@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { receivePurchaseOrder, syncSupplierPurchaseMetrics } from '@/features/purchases/services/purchase-receiving.service'
 import { localDb } from '@/services/local-db/client'
+import * as repository from '@/services/local-db/repository'
 
 vi.mock('@/features/auth/stores/auth-store', () => ({
   requireActiveTenantId: vi.fn(() => 'tenant-1'),
@@ -16,7 +17,14 @@ vi.mock('@/services/local-db/client', () => ({
     stockMovements: { put: vi.fn() },
     inventory: { put: vi.fn() },
     suppliers: { get: vi.fn(), update: vi.fn() },
+    outbox: { put: vi.fn() },
   },
+}))
+
+vi.mock('@/services/local-db/repository', () => ({
+  productRepository: { upsert: vi.fn() },
+  stockMovementRepository: { upsert: vi.fn() },
+  purchaseRepository: { upsert: vi.fn() },
 }))
 
 describe('purchaseReceivingService', () => {
@@ -55,10 +63,10 @@ describe('purchaseReceivingService', () => {
 
     await receivePurchaseOrder(purchase)
 
-    expect(localDb.products.update).toHaveBeenCalledWith('p1', expect.objectContaining({ stock: 7 }))
-    expect(localDb.stockMovements.put).toHaveBeenCalled()
+    expect(repository.productRepository.upsert).toHaveBeenCalledWith(expect.objectContaining({ stock: 7 }))
+    expect(repository.stockMovementRepository.upsert).toHaveBeenCalled()
+    expect(repository.purchaseRepository.upsert).toHaveBeenCalledWith(expect.objectContaining({ status: 'Diterima' }))
     expect(localDb.inventory.put).toHaveBeenCalled()
-    expect(localDb.purchases.put).toHaveBeenCalledWith(expect.objectContaining({ status: 'Diterima' }))
   })
 
   it('recalculates supplier metrics from received purchases', async () => {

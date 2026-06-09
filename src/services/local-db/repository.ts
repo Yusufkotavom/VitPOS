@@ -9,6 +9,7 @@ import type {
   LocalProduct,
   LocalProductCategory,
   LocalPurchase,
+  LocalRecipe,
   LocalReturn,
   LocalSalesOrder,
   LocalServiceOrder,
@@ -109,4 +110,5 @@ export const supplierRepository = createRepository<LocalSupplier>({ table: local
 export const purchaseRepository = createRepository<LocalPurchase>({ table: localDb.purchases, outboxTable: localDb.outbox, entityType: 'purchase' })
 export const returnRepository = createRepository<LocalReturn>({ table: localDb.returns, outboxTable: localDb.outbox, entityType: 'return' })
 export const serviceOrderRepository = createRepository<LocalServiceOrder>({ table: localDb.serviceOrders, outboxTable: localDb.outbox, entityType: 'service_order' })
-export const paymentMethodRepository = createRepository<LocalPaymentMethod>({ table: localDb.paymentMethods, outboxTable: localDb.outbox, entityType: 'setting' })
+export const paymentMethodRepository = createRepository<LocalPaymentMethod>({ table: localDb.paymentMethods, outboxTable: localDb.outbox, entityType: 'payment_method' })
+export const recipeRepository = createRepository<LocalRecipe>({ table: localDb.recipes, outboxTable: localDb.outbox, entityType: 'recipe' })

@@ -2,13 +2,13 @@ import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 
 import { db, type AppDb } from '../../lib/db.js'
-import { tenantMembers, tenants, users } from '../../../../../src/db/schema/index.js'
+import { branches, tenantMembers, tenants, users, warehouses } from '../../../../../src/db/schema/index.js'
 
 export const authRoutes = new Hono()
 
 type AuthUser = typeof users.$inferSelect
 
-function readUserId(request: Request) {
+export function readUserId(request: Request) {
   const userId = request.headers.get('x-user-id')
   const authorization = request.headers.get('authorization')
 
@@ -50,6 +50,88 @@ function userResponse(user: AuthUser) {
     avatarUrl: user.avatarUrl,
   }
 }
+
+authRoutes.post('/register', async (c) => {
+  const body = await c.req.json().catch(() => null) as { name?: string; email?: string; password?: string; tenantName?: string } | null
+
+  const name = body?.name?.trim()
+  const email = body?.email?.trim().toLowerCase()
+  const tenantName = body?.tenantName?.trim()
+
+  if (!name || !email || !tenantName) {
+    return c.json({ ok: false, message: 'name, email, and tenantName required' }, 400)
+  }
+
+  const existingUser = await findUserByEmail(db, email)
+  if (existingUser) {
+    return c.json({ ok: false, message: 'Email already registered' }, 409)
+  }
+
+  const userId = crypto.randomUUID()
+  const tenantId = crypto.randomUUID()
+  const branchId = crypto.randomUUID()
+  const warehouseId = crypto.randomUUID()
+  const now = new Date()
+
+  await db.transaction(async (tx) => {
+    await tx.insert(users).values({
+      id: userId,
+      email,
+      name,
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    await tx.insert(tenants).values({
+      id: tenantId,
+      name: tenantName,
+      planCode: 'trial',
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    await tx.insert(branches).values({
+      id: branchId,
+      tenantId,
+      name: 'Cabang Utama',
+      isDefault: true,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    await tx.insert(warehouses).values({
+      id: warehouseId,
+      tenantId,
+      branchId,
+      name: 'Gudang Utama',
+      isDefault: true,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    await tx.insert(tenantMembers).values({
+      id: crypto.randomUUID(),
+      tenantId,
+      userId,
+      role: 'owner',
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    })
+  })
+
+  const memberships = await listActiveMemberships(db, userId)
+
+  return c.json({
+    ok: true,
+    accessToken: `dev-${userId}`,
+    user: { id: userId, email, name },
+    memberships,
+  })
+})
 
 authRoutes.get('/me', async (c) => {
   const userId = readUserId(c.req.raw)

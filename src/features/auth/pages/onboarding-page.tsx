@@ -32,6 +32,7 @@ import { Badge } from '@/components/ui/badge'
 
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { localDb } from '@/services/local-db/client'
+import { enqueueOutboxItem } from '@/services/sync/outbox-service'
 import { TEMPLATE_PRESETS, type TemplatePreset } from '@/features/auth/data/template-data'
 
 const steps = [
@@ -186,22 +187,27 @@ export function OnboardingPage() {
       await localDb.tenants.put(newTenant)
       await localDb.tenantMembers.put(newMember)
 
+      setActiveTenant(newTenant, 'owner')
+
       for (const cat of editableCategories) {
+        const catId = crypto.randomUUID()
         await localDb.productCategories.put({
-          id: crypto.randomUUID(),
+          id: catId,
           tenantId,
           name: cat.name,
           description: '',
           status: 'Aktif',
-          syncStatus: 'synced',
+          syncStatus: 'pending',
           version: 1,
           updatedAt: now,
         })
+        await enqueueOutboxItem({ entityType: 'product_category', entityId: catId, mutationType: 'create', payload: { name: cat.name } })
       }
 
       for (const prod of editableProducts) {
+        const prodId = crypto.randomUUID()
         await localDb.products.put({
-          id: crypto.randomUUID(),
+          id: prodId,
           tenantId,
           name: prod.name,
           category: prod.category,
@@ -209,16 +215,18 @@ export function OnboardingPage() {
           price: prod.price,
           stock: 0,
           status: 'Aktif',
-          syncStatus: 'synced',
+          syncStatus: 'pending',
           version: 1,
           updatedAt: now,
         })
+        await enqueueOutboxItem({ entityType: 'product', entityId: prodId, mutationType: 'create', payload: { name: prod.name, category: prod.category, type: prod.type, price: prod.price } })
       }
 
       for (const pm of editablePaymentMethods) {
         if (selectedPayments[pm.name]) {
+          const pmId = crypto.randomUUID()
           await localDb.paymentMethods.put({
-            id: crypto.randomUUID(),
+            id: pmId,
             tenantId,
             name: pm.name,
             provider: pm.provider,
@@ -226,24 +234,28 @@ export function OnboardingPage() {
             status: 'Aktif',
             updatedAt: now,
           })
+          await enqueueOutboxItem({ entityType: 'setting', entityId: pmId, mutationType: 'create', payload: { key: `payment_method_${pm.name}`, value: pm.name, area: 'payment' } })
         }
       }
 
       for (const cc of editableCashCategories) {
+        const ccId = crypto.randomUUID()
         await localDb.cashCategories.put({
-          id: crypto.randomUUID(),
+          id: ccId,
           tenantId,
           name: cc.name,
           type: cc.type,
           status: 'Aktif',
-          syncStatus: 'synced',
+          syncStatus: 'pending',
           version: 1,
           updatedAt: now,
         })
+        await enqueueOutboxItem({ entityType: 'cash_category', entityId: ccId, mutationType: 'create', payload: { name: cc.name, type: cc.type } })
       }
 
+      const customerId = crypto.randomUUID()
       await localDb.customers.put({
-        id: crypto.randomUUID(),
+        id: customerId,
         tenantId,
         name: editableCustomer.name,
         phone: editableCustomer.phone,
@@ -251,13 +263,15 @@ export function OnboardingPage() {
         receivable: 0,
         orders: 0,
         status: 'Aktif',
-        syncStatus: 'synced',
+        syncStatus: 'pending',
         version: 1,
         updatedAt: now,
       })
+      await enqueueOutboxItem({ entityType: 'customer', entityId: customerId, mutationType: 'create', payload: { name: editableCustomer.name, phone: editableCustomer.phone, city: editableCustomer.city } })
 
+      const supplierId = crypto.randomUUID()
       await localDb.suppliers.put({
-        id: crypto.randomUUID(),
+        id: supplierId,
         tenantId,
         name: editableSupplier.name,
         phone: editableSupplier.phone,
@@ -265,10 +279,11 @@ export function OnboardingPage() {
         payable: 0,
         orders: 0,
         status: 'Aktif',
-        syncStatus: 'synced',
+        syncStatus: 'pending',
         version: 1,
         updatedAt: now,
       })
+      await enqueueOutboxItem({ entityType: 'supplier', entityId: supplierId, mutationType: 'create', payload: { name: editableSupplier.name, phone: editableSupplier.phone, city: editableSupplier.city } })
 
       const printSettings = [
         { id: 'company-name', area: 'Profil Usaha', setting: 'Nama Usaha', value: tenantName },
@@ -284,7 +299,6 @@ export function OnboardingPage() {
         await localDb.settings.put({ ...s, status: 'Lengkap', updatedAt: now, tenantId })
       }
 
-      setActiveTenant(newTenant, 'owner')
       navigate('/billing')
     } catch (err) {
       console.error(err)

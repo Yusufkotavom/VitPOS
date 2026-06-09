@@ -1,6 +1,6 @@
 import { localDb } from '@/services/local-db/client'
 import { productRepository, stockMovementRepository } from '@/services/local-db/repository'
-import type { LocalProduct, LocalStockMovement } from '@/services/local-db/schema'
+import type { LocalProduct, LocalStockMovement, LocalInventory } from '@/services/local-db/schema'
 
 export const inventoryAdjustmentService = {
   async adjustStock(product: LocalProduct, qty: number, type: LocalStockMovement['type'], warehouseName: string, notes?: string) {

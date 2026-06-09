@@ -4,6 +4,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { mobileNavigation } from '@/app/navigation'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
+import { useAutoSync } from '@/features/sync/hooks/use-auto-sync'
 import { useSyncStore } from '@/features/sync/stores/sync-store'
 import { useSettings } from '@/features/settings/hooks/use-settings'
 import { cn } from '@/lib/utils'
@@ -20,6 +21,7 @@ const ICONS: Record<string, React.ElementType> = {
 }
 
 export function AppLayout() {
+  useAutoSync()
   const syncSummary = useSyncStore()
   const settings = useSettings()
   const location = useLocation()

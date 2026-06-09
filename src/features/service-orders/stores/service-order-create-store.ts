@@ -14,30 +14,34 @@ interface ServiceOrderCreateState {
   description: string
   notes: string
   status: string
+  estimatedCompletion?: string
   items: ServiceItem[]
 
   setCustomer: (name: string, id: string | null) => void
   setDescription: (desc: string) => void
   setNotes: (notes: string) => void
   setStatus: (status: string) => void
+  setEstimatedCompletion: (date?: string) => void
   addItem: (item: { productId: string; name: string; price: number }) => void
   updateItemQty: (productId: string, qty: number) => void
   removeItem: (productId: string) => void
   clear: () => void
 }
 
-export const useServiceOrderCreateStore = create<ServiceOrderCreateState>((set, get) => ({
+export const useServiceOrderCreateStore = create<ServiceOrderCreateState>((set) => ({
   customerName: 'Umum',
   customerId: null,
   description: '',
   notes: '',
   status: 'Baru',
+  estimatedCompletion: undefined,
   items: [],
 
   setCustomer: (name, id) => set({ customerName: name, customerId: id }),
   setDescription: (desc) => set({ description: desc }),
   setNotes: (notes) => set({ notes }),
   setStatus: (status) => set({ status }),
+  setEstimatedCompletion: (date) => set({ estimatedCompletion: date }),
 
   addItem: (product) => {
     set((state) => {
@@ -70,5 +74,5 @@ export const useServiceOrderCreateStore = create<ServiceOrderCreateState>((set, 
     }))
   },
 
-  clear: () => set({ customerName: 'Umum', customerId: null, description: '', notes: '', status: 'Baru', items: [] }),
+  clear: () => set({ customerName: 'Umum', customerId: null, description: '', notes: '', status: 'Baru', estimatedCompletion: undefined, items: [] }),
 }))

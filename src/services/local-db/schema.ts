@@ -127,6 +127,7 @@ export type LocalPayment = {
   tenantId: string
   ref: string
   salesOrderId?: string
+  serviceOrderId?: string
   source: string
   method: PosPaymentMethodCode
   amount: number
@@ -292,6 +293,7 @@ export type LocalServiceOrder = {
   customerName: string
   description: string
   date: string
+  estimatedCompletion?: string
   cost: number
   status: ServiceOrderStatus
   

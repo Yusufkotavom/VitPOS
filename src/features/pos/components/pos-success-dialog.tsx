@@ -9,6 +9,7 @@ export type PosSuccessDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   order: PosOrderSummary | null
+  detailRoute?: string
   onPrint: () => void
   onWhatsApp: () => void
   onNewSale: () => void
@@ -18,6 +19,7 @@ export function PosSuccessDialog({
   open,
   onOpenChange,
   order,
+  detailRoute,
   onPrint,
   onWhatsApp,
   onNewSale,
@@ -73,7 +75,7 @@ export function PosSuccessDialog({
           </div>
           <div className="grid grid-cols-2 gap-2 w-full mt-2">
             <Button variant="secondary" asChild className="w-full">
-              <Link to={`/sales-orders/${order.id}`}>
+              <Link to={`${detailRoute || '/sales-orders'}/${order.id}`}>
                 <FileText data-icon="inline-start" className="mr-2" />
                 Buka Detail
               </Link>

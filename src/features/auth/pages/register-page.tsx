@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { localDb } from '@/services/local-db/client'
+import { apiPost } from '@/services/api/client'
 
 export function RegisterPage() {
   const navigate = useNavigate()
@@ -46,8 +47,9 @@ export function RegisterPage() {
         return
       }
 
+      const userId = crypto.randomUUID()
       const newUser = {
-        id: crypto.randomUUID(),
+        id: userId,
         name,
         email,
         passwordHash: password,
@@ -57,6 +59,9 @@ export function RegisterPage() {
 
       await localDb.users.add(newUser)
       setAuth(newUser)
+
+      apiPost('/auth/register', { name, email, password, tenantName: '' }).catch(() => {})
+
       navigate('/onboarding')
     } catch (err) {
       setError('Terjadi kesalahan saat pendaftaran')
@@ -138,7 +143,7 @@ export function RegisterPage() {
             <Button type="submit" form="register-form" disabled={loading}>
               {loading ? 'Mendaftar...' : 'Daftar'}
             </Button>
-            <p className="text-center text-xs text-muted-foreground">Mode demo auth. Validasi backend menyusul.</p>
+            <p className="text-center text-xs text-muted-foreground">Data aman offline. Sinkron cloud otomatis saat online.</p>
           </CardFooter>
         </Card>
       </div>

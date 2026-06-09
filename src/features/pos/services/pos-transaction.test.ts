@@ -15,12 +15,12 @@ vi.mock('@/services/local-db/client', () => ({
   localDb: {
     transaction: vi.fn(),
     salesOrders: { put: vi.fn() },
-    salesOrderItems: { put: vi.fn() },
+    salesOrderItems: { put: vi.fn(), bulkPut: vi.fn() },
     payments: { put: vi.fn() },
-    stockMovements: { put: vi.fn() },
-    products: { get: vi.fn(), update: vi.fn() },
-    inventory: { put: vi.fn() },
-    outbox: { put: vi.fn() }
+    stockMovements: { put: vi.fn(), bulkPut: vi.fn() },
+    products: { get: vi.fn(), bulkGet: vi.fn(), update: vi.fn() },
+    inventory: { put: vi.fn(), bulkPut: vi.fn() },
+    outbox: { put: vi.fn(), bulkPut: vi.fn() }
   }
 }))
 
@@ -54,19 +54,19 @@ describe('posTransactionService', () => {
       return callback()
     }) as typeof localDb.transaction)
     
-     vi.mocked(localDb.products.get).mockResolvedValue({
+     vi.mocked(localDb.products.bulkGet).mockResolvedValue([{
       id: 'p1', tenantId: 'tenant-1', name: 'Product 1', type: 'Produk Fisik', stock: 10, version: 1
-     } as LocalProduct)
+     } as LocalProduct])
 
     await posTransactionService.checkout(mockCartItems, mockTotals, 'tunai', 200)
 
     expect(localDb.transaction).toHaveBeenCalled()
     expect(localDb.salesOrders.put).toHaveBeenCalled()
-    expect(localDb.salesOrderItems.put).toHaveBeenCalled()
+    expect(localDb.salesOrderItems.bulkPut).toHaveBeenCalled()
     expect(localDb.payments.put).toHaveBeenCalled()
-    expect(localDb.stockMovements.put).toHaveBeenCalled()
+    expect(localDb.stockMovements.bulkPut).toHaveBeenCalled()
     expect(localDb.products.update).toHaveBeenCalledWith('p1', expect.objectContaining({ stock: 8 }))
-    expect(localDb.inventory.put).toHaveBeenCalled()
-    expect(localDb.outbox.put).toHaveBeenCalled()
+    expect(localDb.inventory.bulkPut).toHaveBeenCalled()
+    expect(localDb.outbox.bulkPut).toHaveBeenCalled()
   })
 })

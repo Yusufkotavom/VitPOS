@@ -5,11 +5,13 @@ import {
   cash,
   cashCategories,
   customers,
+  paymentMethods,
   payments,
   productCategories,
   products,
   purchaseItems,
   purchases,
+  recipes,
   returnItems,
   returns,
   salesOrderItems,
@@ -444,6 +446,32 @@ type ServiceOrderPayload = {
   description?: string
   date?: string
   cost?: number | string
+  status?: string
+}
+
+type PaymentMethodPayload = {
+  id?: string
+  name?: string
+  provider?: string
+  type?: string
+  accountNumber?: string
+  accountName?: string
+  status?: string
+}
+
+type RecipePayload = {
+  id?: string
+  productId?: string
+  productName?: string
+  name?: string
+  batchYield?: number
+  items?: Array<{
+    id?: string
+    productId?: string
+    productName?: string
+    qty?: number
+    unit?: string
+  }>
   status?: string
 }
 
@@ -903,6 +931,76 @@ async function applyServiceOrder(db: AppDb, ctx: ApplyContext, entityId: string,
     })
 }
 
+async function applyPaymentMethod(db: AppDb, ctx: ApplyContext, entityId: string, mutationType: string, payload: PaymentMethodPayload) {
+  if (mutationType === 'delete') {
+    await db.delete(paymentMethods).where(eq(paymentMethods.id, entityId))
+    return
+  }
+
+  const now = new Date()
+  await db
+    .insert(paymentMethods)
+    .values({
+      id: entityId,
+      tenantId: ctx.tenantId,
+      name: payload.name ?? '',
+      provider: payload.provider ?? '',
+      type: payload.type ?? '',
+      accountNumber: payload.accountNumber ?? null,
+      accountName: payload.accountName ?? null,
+      status: payload.status === 'Tidak Aktif' ? 'inactive' : 'active',
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: paymentMethods.id,
+      set: {
+        name: payload.name ?? '',
+        provider: payload.provider ?? '',
+        type: payload.type ?? '',
+        accountNumber: payload.accountNumber ?? null,
+        accountName: payload.accountName ?? null,
+        status: payload.status === 'Tidak Aktif' ? 'inactive' : 'active',
+        updatedAt: now,
+      },
+    })
+}
+
+async function applyRecipe(db: AppDb, ctx: ApplyContext, entityId: string, mutationType: string, payload: RecipePayload) {
+  if (mutationType === 'delete') {
+    await db.delete(recipes).where(eq(recipes.id, entityId))
+    return
+  }
+
+  const now = new Date()
+  await db
+    .insert(recipes)
+    .values({
+      id: entityId,
+      tenantId: ctx.tenantId,
+      productId: payload.productId ?? entityId,
+      productName: payload.productName ?? '',
+      name: payload.name ?? '',
+      batchYield: payload.batchYield ?? 1,
+      items: payload.items ?? [],
+      status: payload.status === 'Aktif' ? 'active' : 'draft',
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: recipes.id,
+      set: {
+        productId: payload.productId ?? entityId,
+        productName: payload.productName ?? '',
+        name: payload.name ?? '',
+        batchYield: payload.batchYield ?? 1,
+        items: payload.items ?? [],
+        status: payload.status === 'Aktif' ? 'active' : 'draft',
+        updatedAt: now,
+      },
+    })
+}
+
 export async function applyMutation(
   db: AppDb,
   ctx: ApplyContext,
@@ -965,6 +1063,14 @@ export async function applyMutation(
   }
   if (entityType === 'service_order') {
     await applyServiceOrder(db, ctx, entityId, mutationType, (payload ?? {}) as ServiceOrderPayload)
+    return
+  }
+  if (entityType === 'payment_method') {
+    await applyPaymentMethod(db, ctx, entityId, mutationType, (payload ?? {}) as PaymentMethodPayload)
+    return
+  }
+  if (entityType === 'recipe') {
+    await applyRecipe(db, ctx, entityId, mutationType, (payload ?? {}) as RecipePayload)
     return
   }
 }

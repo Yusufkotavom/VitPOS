@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 import { UserProfilePage } from './user-profile-page'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 
@@ -32,8 +33,16 @@ describe('UserProfilePage', () => {
     vi.restoreAllMocks()
   })
 
+  function renderPage() {
+    return render(
+      <MemoryRouter>
+        <UserProfilePage />
+      </MemoryRouter>
+    )
+  }
+
   test('renders user profile form', () => {
-    render(<UserProfilePage />)
+    renderPage()
     expect(screen.getByLabelText(/nama/i)).toHaveValue('Test User')
     expect(screen.getByLabelText(/email/i)).toHaveValue('test@example.com')
   })
@@ -55,7 +64,7 @@ describe('UserProfilePage', () => {
       logout: vi.fn(),
     })
 
-    render(<UserProfilePage />)
+    renderPage()
     
     const nameInput = screen.getByLabelText(/nama/i)
     fireEvent.change(nameInput, { target: { value: 'New Name' } })

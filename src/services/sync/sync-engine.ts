@@ -6,8 +6,10 @@ import { indexPushResults, partitionSyncMutations, toLocalOutboxStatus } from '@
 import type {
   LocalCashCategory,
   LocalPayment,
+  LocalPaymentMethod,
   LocalProduct,
   LocalPurchase,
+  LocalRecipe,
   LocalReturn,
   LocalSalesOrder,
   LocalServiceOrder,
@@ -57,6 +59,8 @@ async function applyPullItem(item: SyncPullItem) {
     else if (item.entityType === 'purchase') await localDb.purchases.delete(item.entityId)
     else if (item.entityType === 'return') await localDb.returns.delete(item.entityId)
     else if (item.entityType === 'service_order') await localDb.serviceOrders.delete(item.entityId)
+    else if (item.entityType === 'payment_method') await localDb.paymentMethods.delete(item.entityId)
+    else if (item.entityType === 'recipe') await localDb.recipes.delete(item.entityId)
     return
   }
 
@@ -249,23 +253,47 @@ async function applyPullItem(item: SyncPullItem) {
       version: typeof payload.version === 'number' ? payload.version : 1,
       updatedAt: item.updatedAt,
     })
-  } else if (item.entityType === 'service_order') {
-    await localDb.serviceOrders.put({
-      id: item.entityId,
-      tenantId,
-      code: typeof payload.code === 'string' ? payload.code : '',
-      customerId: typeof payload.customerId === 'string' ? payload.customerId : undefined,
-      customerName: typeof payload.customerName === 'string' ? payload.customerName : '',
-      description: typeof payload.description === 'string' ? payload.description : '',
-      date: typeof payload.date === 'string' ? payload.date : '',
-      cost: Number(payload.cost ?? 0),
-      status: (typeof payload.status === 'string' ? payload.status : 'Diterima') as LocalServiceOrder['status'],
-      syncStatus: 'synced',
-      version: typeof payload.version === 'number' ? payload.version : 1,
-      updatedAt: item.updatedAt,
-    })
+    } else if (item.entityType === 'service_order') {
+      await localDb.serviceOrders.put({
+        id: item.entityId,
+        tenantId,
+        code: typeof payload.code === 'string' ? payload.code : '',
+        customerId: typeof payload.customerId === 'string' ? payload.customerId : undefined,
+        customerName: typeof payload.customerName === 'string' ? payload.customerName : '',
+        description: typeof payload.description === 'string' ? payload.description : '',
+        date: typeof payload.date === 'string' ? payload.date : '',
+        cost: Number(payload.cost ?? 0),
+        status: (typeof payload.status === 'string' ? payload.status : 'Diterima') as LocalServiceOrder['status'],
+        syncStatus: 'synced',
+        version: typeof payload.version === 'number' ? payload.version : 1,
+        updatedAt: item.updatedAt,
+      })
+    } else if (item.entityType === 'payment_method') {
+      await localDb.paymentMethods.put({
+        id: item.entityId,
+        tenantId,
+        name: typeof payload.name === 'string' ? payload.name : '',
+        provider: typeof payload.provider === 'string' ? payload.provider : '',
+        type: typeof payload.type === 'string' ? payload.type : '',
+        accountNumber: typeof payload.accountNumber === 'string' ? payload.accountNumber : undefined,
+        accountName: typeof payload.accountName === 'string' ? payload.accountName : undefined,
+        status: (typeof payload.status === 'string' ? payload.status : 'Aktif') as LocalPaymentMethod['status'],
+        updatedAt: item.updatedAt,
+      })
+    } else if (item.entityType === 'recipe') {
+      await localDb.recipes.put({
+        id: item.entityId,
+        tenantId,
+        productId: typeof payload.productId === 'string' ? payload.productId : '',
+        productName: typeof payload.productName === 'string' ? payload.productName : '',
+        name: typeof payload.name === 'string' ? payload.name : '',
+        batchYield: Number(payload.batchYield ?? 1),
+        items: Array.isArray(payload.items) ? payload.items : [],
+        status: (typeof payload.status === 'string' ? payload.status : 'Draft') as LocalRecipe['status'],
+        updatedAt: item.updatedAt,
+      })
+    }
   }
-}
 
 export async function applyPullItems(items: SyncPullItem[]) {
   await localDb.transaction(
@@ -274,7 +302,7 @@ export async function applyPullItems(items: SyncPullItem[]) {
       localDb.products, localDb.customers, localDb.salesOrders, localDb.payments,
       localDb.stockMovements, localDb.cash, localDb.productCategories, localDb.cashCategories,
       localDb.settings, localDb.shifts, localDb.suppliers, localDb.purchases,
-      localDb.returns, localDb.serviceOrders,
+      localDb.returns, localDb.serviceOrders, localDb.paymentMethods, localDb.recipes,
     ],
     async () => {
       for (const item of items) {

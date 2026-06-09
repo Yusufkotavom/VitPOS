@@ -26,7 +26,9 @@ describe('createApp', () => {
   describe('sync endpoints', () => {
     it('rejects /api/v1/sync/pull when tenantId missing', async () => {
       const app = createApp()
-      const response = await app.request('/api/v1/sync/pull')
+      const response = await app.request('/api/v1/sync/pull', {
+        headers: { 'x-user-id': 'test-user' },
+      })
       const body = await response.json()
 
       expect(response.status).toBe(400)
@@ -36,7 +38,9 @@ describe('createApp', () => {
     it('rejects /api/v1/sync/pull when branchId invalid', async () => {
       const app = createApp()
       const validTenantId = '550e8400-e29b-41d4-a716-446655440000'
-      const response = await app.request(`/api/v1/sync/pull?tenantId=${validTenantId}&branchId=not-a-uuid`)
+      const response = await app.request(`/api/v1/sync/pull?tenantId=${validTenantId}&branchId=not-a-uuid`, {
+        headers: { 'x-user-id': 'test-user' },
+      })
       const body = await response.json()
 
       expect(response.status).toBe(400)
@@ -47,7 +51,7 @@ describe('createApp', () => {
       const app = createApp()
       const response = await app.request('/api/v1/sync/push', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-user-id': 'test-user' },
         body: JSON.stringify(null),
       })
       const body = await response.json()
@@ -61,7 +65,7 @@ describe('createApp', () => {
       const validTenantId = '550e8400-e29b-41d4-a716-446655440000'
       const response = await app.request('/api/v1/sync/push', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-user-id': 'test-user' },
         body: JSON.stringify({
           tenantId: validTenantId,
           deviceId: 'test-device',

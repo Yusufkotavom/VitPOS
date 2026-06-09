@@ -1,7 +1,7 @@
 import { localDb } from '@/services/local-db/client'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { syncCustomerSalesMetrics } from '@/features/sales-orders/services/sales-order-finance.service'
-import type { LocalPayment, LocalSalesOrder, LocalSalesOrderItem, LocalStockMovement, OutboxItem, PosPaymentMethodCode } from '@/services/local-db/schema'
+import type { LocalPayment, LocalSalesOrder, LocalSalesOrderItem, LocalStockMovement, OutboxItem, PosPaymentMethodCode, LocalInventory } from '@/services/local-db/schema'
 import type { PosPaymentMethod } from '@/features/pos/types/pos.types'
 
 interface CartItem {
@@ -61,7 +61,7 @@ export const posTransactionService = {
       tenantId,
       code: `DRF-${Date.now()}`,
       customerId: customerId ?? undefined,
-      customerName: customerName || 'Draft',
+      customerName: customerName || 'Umum',
       date: todayLabel(),
       subtotal: totals.subtotal,
       discountTotal: discountTotal,
@@ -208,7 +208,7 @@ export const posTransactionService = {
     const productMap = new Map(existingProducts.filter(Boolean).map((p) => [p!.id, p!]))
 
     const inventoryRows: LocalInventory[] = []
-    const productUpdates: { id: string; stock: number; updatedAt: string; version: number; syncStatus: string }[] = []
+    const productUpdates: { id: string; stock: number; updatedAt: string; version: number; syncStatus: 'pending' }[] = []
 
     for (const cartItem of cartItems) {
       const existing = productMap.get(cartItem.productId)
@@ -245,7 +245,7 @@ export const posTransactionService = {
       if (outboxPayload.length > 0) await localDb.outbox.bulkPut(outboxPayload)
     })
 
-    syncCustomerSalesMetrics(customerId ?? undefined, tenantId)
+    await syncCustomerSalesMetrics(customerId ?? undefined, tenantId)
 
     return { salesOrderId, paymentId, code: salesOrder.code }
   }

@@ -7,7 +7,8 @@ export type MessageTemplateType =
   | 'paid'
   | 'status'
   | 'product_info'
-  | 'service_order'
+  | 'service_order_masuk'
+  | 'service_order_selesai'
 
 export const TEMPLATE_LABELS: Record<MessageTemplateType, string> = {
   invoice: 'Nota / Invoice',
@@ -15,7 +16,8 @@ export const TEMPLATE_LABELS: Record<MessageTemplateType, string> = {
   paid: 'Pembayaran Lunas',
   status: 'Update Status Pesanan',
   product_info: 'Info Produk',
-  service_order: 'Service Order',
+  service_order_masuk: 'Service Order (Baru Masuk)',
+  service_order_selesai: 'Service Order (Selesai)',
 }
 
 export const TEMPLATE_VARIABLES: Record<MessageTemplateType, string[]> = {
@@ -24,7 +26,8 @@ export const TEMPLATE_VARIABLES: Record<MessageTemplateType, string[]> = {
   paid: ['code', 'date', 'customer_name', 'items', 'total', 'paid', 'change', 'payment_method', 'store_name', 'remaining', 'status'],
   status: ['code', 'date', 'customer_name', 'items', 'total', 'paid', 'remaining', 'status', 'change', 'payment_method', 'store_name'],
   product_info: ['product_name', 'price', 'stock', 'category'],
-  service_order: ['code', 'customer_name', 'device', 'problem', 'status', 'cost', 'date', 'total', 'paid', 'remaining', 'items', 'change', 'payment_method', 'store_name'],
+  service_order_masuk: ['code', 'customer_name', 'device', 'problem', 'status', 'cost', 'estimated_completion', 'date', 'total', 'paid', 'remaining', 'items', 'change', 'payment_method', 'store_name'],
+  service_order_selesai: ['code', 'customer_name', 'device', 'problem', 'status', 'cost', 'date', 'total', 'paid', 'remaining', 'items', 'change', 'payment_method', 'store_name'],
 }
 
 export const DEFAULT_TEMPLATES: Record<MessageTemplateType, string> = {
@@ -79,16 +82,33 @@ Terima kasih.`,
 *Kategori:* {{category}}
 ─────────────────`,
 
-  service_order: `🔧 *SERVICE ORDER*
+  service_order_masuk: `🔧 *TANDA TERIMA SERVICE*
+─────────────────
+*No Service:* {{code}}
+*Tanggal:* {{date}}
+*Pelanggan:* {{customer_name}}
+*Perangkat:* {{device}}
+*Kerusakan:* {{problem}}
+─────────────────
+*Estimasi Selesai:* {{estimated_completion}}
+*Estimasi Biaya:* {{cost}}
+*DP Dibayar:* {{paid}}
+*Sisa Biaya:* {{remaining}}
+─────────────────
+Mohon konfirmasi jika setuju dengan estimasi di atas. Terima kasih.`,
+
+  service_order_selesai: `✅ *SERVICE SELESAI*
 ─────────────────
 *No Service:* {{code}}
 *Pelanggan:* {{customer_name}}
-*Device:* {{device}}
-*Masalah:* {{problem}}
-*Status:* {{status}}
-*Biaya:* {{cost}}
+*Perangkat:* {{device}}
 ─────────────────
-Terima kasih.`,
+Pekerjaan telah selesai dan perangkat siap diambil.
+*Total Biaya:* {{total}}
+*Sudah Dibayar:* {{paid}}
+*Sisa Tagihan:* {{remaining}}
+─────────────────
+Silakan tunjukkan pesan ini atau nomor service saat pengambilan. Terima kasih.`,
 }
 
 function renderTemplate(template: string, variables: Record<string, string>): string {

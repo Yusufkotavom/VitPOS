@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { useProducts } from '@/features/products/hooks/use-products'
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
-import { localDb } from '@/services/local-db/client'
+import { recipeRepository } from '@/services/local-db/repository'
 import type { LocalRecipe } from '@/services/local-db/schema'
 
 type FormItem = { id: string; productId: string; productName: string; qty: string; unit: string }
@@ -63,13 +63,13 @@ export function RecipeCrudActions({ recipe }: { recipe?: LocalRecipe }) {
     }
 
     nextRecipe.items = nextRecipe.items.map((item) => ({ ...item, recipeId: nextRecipe.id }))
-    await localDb.recipes.put(nextRecipe)
+    await recipeRepository.upsert(nextRecipe)
     setFormOpen(false)
   }
 
   async function handleDelete() {
     if (!recipe) return
-    await localDb.recipes.delete(recipe.id)
+    await recipeRepository.remove(recipe.id)
     setDeleteOpen(false)
   }
 

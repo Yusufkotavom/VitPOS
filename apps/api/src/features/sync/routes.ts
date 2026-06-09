@@ -2,6 +2,7 @@ import { and, desc, eq, gte, isNull } from 'drizzle-orm'
 import { Hono } from 'hono'
 
 import { db } from '../../lib/db.js'
+import { authMiddleware } from '../auth/middleware.js'
 import {
   buildSyncPushResponse,
   serverSyncStatusToApiItemStatus,
@@ -16,10 +17,12 @@ import {
   cashCategories,
   customers,
   outboxLogs,
+  paymentMethods,
   payments,
   productCategories,
   products,
   purchases,
+  recipes,
   returns,
   salesOrders,
   serviceOrders,
@@ -30,6 +33,8 @@ import {
 } from '../../../../../src/db/schema/index.js'
 
 export const syncRoutes = new Hono()
+
+syncRoutes.use('*', authMiddleware)
 
 syncRoutes.get('/pull', async (c) => {
   const parsed = parseSyncPullQuery({
@@ -147,6 +152,20 @@ syncRoutes.get('/pull', async (c) => {
   const serviceOrderRows = await db.query.serviceOrders.findMany({
     where: and(eq(serviceOrders.tenantId, parsed.value.tenantId), serviceOrderBranchFilter, serviceOrderSinceFilter),
     orderBy: [desc(serviceOrders.updatedAt)],
+    limit: 100,
+  })
+
+  const paymentMethodsSinceFilter = parsed.value.since ? gte(paymentMethods.updatedAt, parsed.value.since) : undefined
+  const paymentMethodsRows = await db.query.paymentMethods.findMany({
+    where: and(eq(paymentMethods.tenantId, parsed.value.tenantId), paymentMethodsSinceFilter),
+    orderBy: [desc(paymentMethods.updatedAt)],
+    limit: 100,
+  })
+
+  const recipeSinceFilter = parsed.value.since ? gte(recipes.updatedAt, parsed.value.since) : undefined
+  const recipeRows = await db.query.recipes.findMany({
+    where: and(eq(recipes.tenantId, parsed.value.tenantId), recipeSinceFilter),
+    orderBy: [desc(recipes.updatedAt)],
     limit: 100,
   })
 
@@ -411,6 +430,44 @@ syncRoutes.get('/pull', async (c) => {
       },
       transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
       serverSyncStatus: row.syncStatus,
+      updatedAt: row.updatedAt.toISOString(),
+    })),
+
+    ...paymentMethodsRows.map<SyncPullItem>((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: 'payment_method',
+      mutationType: 'update',
+      payload: {
+        id: row.id,
+        name: row.name,
+        provider: row.provider,
+        type: row.type,
+        accountNumber: row.accountNumber,
+        accountName: row.accountName,
+        status: row.status === 'inactive' ? 'Tidak Aktif' : 'Aktif',
+      },
+      transportStatus: 'applied',
+      serverSyncStatus: 'synced',
+      updatedAt: row.updatedAt.toISOString(),
+    })),
+
+    ...recipeRows.map<SyncPullItem>((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: 'recipe',
+      mutationType: 'update',
+      payload: {
+        id: row.id,
+        productId: row.productId,
+        productName: row.productName,
+        name: row.name,
+        batchYield: row.batchYield,
+        items: row.items,
+        status: row.status === 'active' ? 'Aktif' : 'Draft',
+      },
+      transportStatus: 'applied',
+      serverSyncStatus: 'synced',
       updatedAt: row.updatedAt.toISOString(),
     })),
   ]

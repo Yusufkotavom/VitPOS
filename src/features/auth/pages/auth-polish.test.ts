@@ -22,7 +22,7 @@ describe('auth polish behavior', () => {
   afterEach(() => cleanup())
 
   it('login exposes accessible fields and submits to tenant selector with keyboard/form flow', async () => {
-    await localDb.users.add({ id: 'u1', email: 'owner@usaha.co.id', name: 'Owner', passwordHash: 'mock', createdAt: '', updatedAt: '' })
+    await localDb.users.add({ id: 'u1', email: 'owner@usaha.co.id', name: 'Owner', passwordHash: 'password123', createdAt: '', updatedAt: '' })
 
     render(
       createElement(MemoryRouter, { initialEntries: ['/login'] },

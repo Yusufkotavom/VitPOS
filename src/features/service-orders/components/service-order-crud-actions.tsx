@@ -16,7 +16,6 @@ import type { LocalServiceOrder } from '@/services/local-db/schema'
 export function ServiceOrderCrudActions({ order }: { order?: LocalServiceOrder }) {
   const [formOpen, setFormOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
-  const isEdit = Boolean(order)
 
   async function handleSubmit(values: ServiceOrderFormValues) {
     if (!order) return // Only used for editing now
