@@ -8,7 +8,7 @@ if (!rawVersion) {
   process.exit(1)
 }
 
-const version = rawVersion.replace(/^v/i, '')
+const version = rawVersion.replace(/^[v.]+/i, '')
 const [major = 0, minor = 0, patch = 0] = version.split('.').map((part) => Number.parseInt(part, 10) || 0)
 const versionCode = major * 10000 + minor * 100 + patch
 
