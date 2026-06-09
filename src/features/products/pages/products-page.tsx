@@ -1,10 +1,13 @@
 import { useState } from 'react'
-import { LayoutGrid, List, Filter, Image as ImageIcon, Package, Coffee, Shirt, MonitorSmartphone } from 'lucide-react'
+import { LayoutGrid, List, Filter, Image as ImageIcon, Package, Coffee, Shirt, MonitorSmartphone, Download, Upload } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency } from '@/lib/format-currency'
 import { ProductCrudActions } from '@/features/products/components/product-crud-actions'
+import { ProductImportDialog } from '@/features/products/components/product-import-dialog'
 import { useProducts } from '@/features/products/hooks/use-products'
+import { exportProducts } from '@/features/products/lib/export-products'
 import { DataTable } from '@/shared/components/data-table/data-table'
 import { ContentCard } from '@/shared/components/display/content-card'
 import { StatusBadge } from '@/shared/components/display/status-badge'
@@ -51,6 +54,7 @@ export function ProductsPage() {
   const [filterOpen, setFilterOpen] = useState(false)
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [importOpen, setImportOpen] = useState(false)
   const activeView = view
 
   const filtered = productRows.filter(row => {
@@ -65,77 +69,102 @@ export function ProductsPage() {
   return (
     <PageShell title="Barang & Jasa" description="Kelola produk fisik, jasa, harga grosir, gambar, dan stok." actions={<ProductCrudActions />}>
       <ContentCard>
-        <div className="mb-4 flex flex-row items-center gap-2 border-b pb-4">
-          <input type="text" placeholder="Cari barang..." value={search} onChange={e => setSearch(e.target.value)} className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+        <div className="mb-4 flex flex-col gap-2 border-b pb-4 sm:flex-row sm:items-center">
+          <input type="text" placeholder="Cari barang..." value={search} onChange={e => setSearch(e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring sm:flex-1" />
 
-          <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
-            <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setFilterOpen(true)}>
-              <Filter className="h-4 w-4" />
-              {hasActiveFilter && <span className="absolute -top-1 -right-1 size-2 rounded-full bg-primary" />}
-            </Button>
-            <DialogContent className="max-w-xs">
-              <DialogHeader>
-                <DialogTitle>Filter</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Jenis</label>
-                  <select
-                    value={filterType}
-                    onChange={e => setFilterType(e.target.value)}
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <option value="">Semua</option>
-                    <option value="Produk Fisik">Barang</option>
-                    <option value="Jasa">Jasa</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Status</label>
-                  <select
-                    value={filterStatus}
-                    onChange={e => setFilterStatus(e.target.value)}
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <option value="">Semua</option>
-                    <option value="Aktif">Aktif</option>
-                    <option value="Draft">Draft</option>
-                    <option value="Arsip">Arsip</option>
-                  </select>
-                </div>
-                <div className="flex gap-2 pt-2">
-                  {hasActiveFilter && (
-                    <Button variant="outline" className="flex-1" onClick={() => { setFilterType(''); setFilterStatus('') }}>
-                      Reset
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto sm:flex-nowrap">
+            <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
+              <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setFilterOpen(true)}>
+                <Filter className="h-4 w-4" />
+                {hasActiveFilter && <span className="absolute -top-1 -right-1 size-2 rounded-full bg-primary" />}
+              </Button>
+              <DialogContent className="max-w-xs">
+                <DialogHeader>
+                  <DialogTitle>Filter</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Jenis</label>
+                    <select
+                      value={filterType}
+                      onChange={e => setFilterType(e.target.value)}
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      <option value="">Semua</option>
+                      <option value="Produk Fisik">Barang</option>
+                      <option value="Jasa">Jasa</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Status</label>
+                    <select
+                      value={filterStatus}
+                      onChange={e => setFilterStatus(e.target.value)}
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      <option value="">Semua</option>
+                      <option value="Aktif">Aktif</option>
+                      <option value="Draft">Draft</option>
+                      <option value="Arsip">Arsip</option>
+                    </select>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    {hasActiveFilter && (
+                      <Button variant="outline" className="flex-1" onClick={() => { setFilterType(''); setFilterStatus('') }}>
+                        Reset
+                      </Button>
+                    )}
+                    <Button className="flex-1" onClick={() => setFilterOpen(false)}>
+                      Tutup
                     </Button>
-                  )}
-                  <Button className="flex-1" onClick={() => setFilterOpen(false)}>
-                    Tutup
-                  </Button>
+                  </div>
                 </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
 
-          <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-1 shrink-0">
             <Button
-              variant={activeView === 'list' ? 'secondary' : 'ghost'}
-              size="icon"
-              onClick={() => setView('list')}
-              className="h-7 w-7"
-              title="List View"
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5 shrink-0"
+              onClick={() => {
+                exportProducts(productRows)
+                toast.success('CSV produk berhasil diexport')
+              }}
             >
-              <List className="h-4 w-4" />
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Export</span>
             </Button>
+
             <Button
-              variant={activeView === 'card' ? 'secondary' : 'ghost'}
-              size="icon"
-              onClick={() => setView('card')}
-              className="h-7 w-7"
-              title="Card View"
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5 shrink-0"
+              onClick={() => setImportOpen(true)}
             >
-              <LayoutGrid className="h-4 w-4" />
+              <Upload className="h-4 w-4" />
+              <span className="hidden sm:inline">Import</span>
             </Button>
+
+            <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-1 shrink-0">
+              <Button
+                variant={activeView === 'list' ? 'secondary' : 'ghost'}
+                size="icon"
+                onClick={() => setView('list')}
+                className="h-7 w-7"
+                title="List View"
+              >
+                <List className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={activeView === 'card' ? 'secondary' : 'ghost'}
+                size="icon"
+                onClick={() => setView('card')}
+                className="h-7 w-7"
+                title="Card View"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -196,6 +225,13 @@ export function ProductsPage() {
           </div>
         )}
       </ContentCard>
+
+      <ProductImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        existingProducts={productRows}
+        onComplete={() => {}}
+      />
     </PageShell>
   )
 }

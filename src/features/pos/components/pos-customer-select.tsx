@@ -80,8 +80,8 @@ export function PosCustomerSelect() {
         </Combobox>
       </div>
 
-      <Button variant="outline" className="h-11 w-11 rounded-xl" onClick={() => setIsAddOpen(true)}>
-        <Plus className="size-5" />
+      <Button variant="outline" className="h-9 w-9 shrink-0" onClick={() => setIsAddOpen(true)}>
+        <Plus className="size-4" />
       </Button>
 
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>

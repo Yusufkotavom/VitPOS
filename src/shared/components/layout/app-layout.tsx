@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import { AppSidebar } from '@/shared/components/layout/app-sidebar'
 import { OfflineBanner } from '@/shared/components/sync/offline-banner'
 import { SyncStatusBadge } from '@/shared/components/sync/sync-status-badge'
+import { ThemeToggle } from '@/shared/components/nav/theme-toggle'
 import { UserMenu } from '@/shared/components/nav/user-menu'
 
 const ICONS: Record<string, React.ElementType> = {
@@ -27,6 +28,7 @@ export function AppLayout() {
   const settings = useSettings()
   const location = useLocation()
   const isPos = location.pathname === '/pos'
+  const hideMobileNavigation = isPos || location.pathname === '/service-orders/create'
 
   const companyName = settings?.find(s => s.id === 'company-name')?.value || 'KOTACOM'
   const companyLogo = settings?.find(s => s.id === 'company-logo')?.value
@@ -66,6 +68,7 @@ export function AppLayout() {
                   <SyncStatusBadge summary={syncSummary} />
                 </NavLink>
               </div>
+              <ThemeToggle />
               <UserMenu />
             </div>
           </header>
@@ -78,7 +81,7 @@ export function AppLayout() {
             <Outlet />
           </main>
 
-          {!isPos ? (
+          {!hideMobileNavigation ? (
             <nav className="fixed inset-x-0 bottom-0 z-20 grid h-16 grid-cols-5 border-t bg-background lg:hidden">
               {mobileNavigation.map((item) => (
                 <NavLink

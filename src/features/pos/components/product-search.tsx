@@ -44,15 +44,15 @@ export function ProductSearch() {
           value={searchQuery}
           onChange={(event) => handleInputChange(event.target.value)}
           placeholder="Cari produk / scan barcode"
-          className="h-11 rounded-xl pl-10"
+          className="pl-10"
         />
       </div>
-      <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-1 shrink-0 h-11">
+      <div className="flex h-9 shrink-0 items-center gap-1 rounded-lg border bg-muted/50 p-1">
         <Button
           variant={viewMode === 'list' ? 'secondary' : 'ghost'}
           size="icon"
           onClick={() => setViewMode('list')}
-          className="h-full w-9"
+          className="size-7"
           title="List View"
         >
           <List className="h-4 w-4" />
@@ -61,7 +61,7 @@ export function ProductSearch() {
           variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
           size="icon"
           onClick={() => setViewMode('grid')}
-          className="h-full w-9"
+          className="size-7"
           title="Grid View"
         >
           <LayoutGrid className="h-4 w-4" />

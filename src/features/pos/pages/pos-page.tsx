@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { HeldSaleBanner } from '@/features/pos/components/held-sale-banner'
 import { useSyncStore } from '@/features/sync/stores/sync-store'
@@ -35,16 +34,16 @@ export function PosPage() {
 
   return (
     <div className="flex h-[100dvh] flex-col bg-muted/20">
-      <header className="bg-card px-4 py-4">
+      <header className="px-4 py-4">
         <div className="mx-auto grid max-w-screen-2xl gap-3 md:grid-cols-2">
-          <Card className="p-3">
+          <div>
             <p className="mb-2 text-xs font-medium text-muted-foreground">Pelanggan</p>
             <PosCustomerSelect />
-          </Card>
-          <Card className="p-3">
+          </div>
+          <div>
             <p className="mb-2 text-xs font-medium text-muted-foreground">Produk</p>
             <ProductSearch />
-          </Card>
+          </div>
         </div>
       </header>
 
@@ -117,4 +116,3 @@ export function PosPage() {
     </div>
   )
 }
-
