@@ -48,6 +48,7 @@ function userResponse(user: AuthUser) {
     id: user.id,
     email: user.email,
     name: user.name,
+    role: user.role,
     avatarUrl: user.avatarUrl,
   }
 }
@@ -139,7 +140,7 @@ authRoutes.post('/register', async (c) => {
   return c.json({
     ok: true,
     accessToken: `dev-${userId}`,
-    user: { id: userId, email, name },
+    user: { id: userId, email, name, role: 'user' },
     defaultBranchId: branchId,
     defaultWarehouseId: warehouseId,
     memberships,
@@ -204,7 +205,7 @@ authRoutes.post('/login', async (c) => {
 
   const memberships = await listActiveMemberships(db, user.id)
 
-  if (memberships.length === 0) {
+  if (memberships.length === 0 && user.role !== 'platform_admin') {
     return c.json({ ok: false, message: 'Active tenant membership required' }, 403)
   }
 

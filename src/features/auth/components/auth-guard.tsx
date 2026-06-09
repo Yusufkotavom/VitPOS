@@ -11,9 +11,10 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
+  const isPlatformAdmin = currentUser.role === 'platform_admin'
   const isSetupRoute = location.pathname === '/tenants' || location.pathname === '/onboarding' || location.pathname === '/billing'
 
-  if (!activeTenant && !isSetupRoute) {
+  if (!activeTenant && !isSetupRoute && !isPlatformAdmin) {
     return <Navigate to="/tenants" replace />
   }
 

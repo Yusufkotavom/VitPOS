@@ -34,6 +34,7 @@ type AuthApiResponse = {
     id: string
     email: string
     name: string
+    role?: 'user' | 'platform_admin'
     avatarUrl?: string
   }
   memberships: AuthApiMembership[]
@@ -67,6 +68,7 @@ export function LoginPage() {
         id: response.user.id,
         name: response.user.name,
         email: response.user.email,
+        role: response.user.role ?? 'user',
         avatarUrl: response.user.avatarUrl,
         passwordHash,
         createdAt: now,
@@ -98,6 +100,10 @@ export function LoginPage() {
       }
 
       setAuth(user)
+      if (user.role === 'platform_admin') {
+        navigate('/platform-admin')
+        return
+      }
       navigate('/tenants')
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Gagal masuk ke akun')

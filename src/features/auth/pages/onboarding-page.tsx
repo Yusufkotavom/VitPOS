@@ -44,6 +44,7 @@ type RegisterResponse = {
     id: string
     email: string
     name: string
+    role?: 'user' | 'platform_admin'
   }
   memberships: Array<{
     tenantId: string
@@ -52,7 +53,6 @@ type RegisterResponse = {
     tenantPlan: string
   }>
 }
-
 const steps = [
   { id: 1, title: 'Informasi Perusahaan', icon: Store },
   { id: 2, title: 'Pilih Template Bisnis', icon: Building2 },
@@ -181,19 +181,52 @@ export function OnboardingPage() {
       const shouldProvisionCloudTenant = membershipCount === 0
 
       let tenantId = crypto.randomUUID()
+      let cloudUser: RegisterResponse['user'] | undefined
       if (shouldProvisionCloudTenant) {
-        const registerResponse = await apiPost<RegisterResponse>('/auth/register', {
-          name: normalizedName,
-          email: normalizedEmail,
-          password: normalizedPassword,
-          tenantName: tenantName.trim(),
-        })
+        type RegisterLikeResponse = RegisterResponse
+        let registerResponse: RegisterLikeResponse | null = null
+        let registerError: unknown = null
+
+        try {
+          registerResponse = await apiPost<RegisterLikeResponse>('/auth/register', {
+            name: normalizedName,
+            email: normalizedEmail,
+            password: normalizedPassword,
+            tenantName: tenantName.trim(),
+          })
+        } catch (err) {
+          registerError = err
+          const message = err instanceof Error ? err.message : ''
+          const isAlreadyRegistered =
+            /409/.test(message) || /already registered/i.test(message) || /email sudah terdaftar/i.test(message)
+
+          if (isAlreadyRegistered) {
+            try {
+              registerResponse = await apiPost<RegisterLikeResponse>('/auth/login', {
+                email: normalizedEmail,
+                password: normalizedPassword,
+              })
+            } catch (loginErr) {
+              const loginMessage = loginErr instanceof Error ? loginErr.message : 'Login gagal'
+              setError(`Email sudah terdaftar, namun gagal login: ${loginMessage}`)
+              setStep(1)
+              return
+            }
+          }
+        }
+
+        if (!registerResponse) {
+          throw registerError instanceof Error
+            ? registerError
+            : new Error('Registrasi cloud gagal dan tidak dapat dipulihkan')
+        }
 
         const primaryMembership = registerResponse.memberships[0]
         if (!primaryMembership) {
           throw new Error('Membership cloud tidak ditemukan setelah registrasi')
         }
 
+        cloudUser = registerResponse.user
         userId = registerResponse.user.id
         tenantId = primaryMembership.tenantId as `${string}-${string}-${string}-${string}-${string}`
         tenantRole = primaryMembership.role
@@ -208,6 +241,7 @@ export function OnboardingPage() {
         name: normalizedName,
         email: normalizedEmail,
         passwordHash: normalizedPassword,
+        role: currentUser?.role ?? cloudUser?.role,
         createdAt: currentUser?.createdAt ?? now,
         updatedAt: now,
       }
@@ -365,7 +399,8 @@ export function OnboardingPage() {
       navigate('/billing')
     } catch (err) {
       console.error(err)
-      setError('Terjadi kesalahan saat menyimpan data.')
+      const detail = err instanceof Error ? err.message : String(err)
+      setError(`Terjadi kesalahan saat menyimpan data: ${detail}`)
     }
   }
 

@@ -2,6 +2,7 @@ import { relations } from 'drizzle-orm'
 import { boolean, index, integer, jsonb, numeric, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
 
 export const memberRoleEnum = pgEnum('member_role', ['owner', 'admin', 'cashier', 'staff'])
+export const userRoleEnum = pgEnum('user_role', ['user', 'platform_admin'])
 export const orderStatusEnum = pgEnum('order_status', ['draft', 'confirmed', 'unpaid', 'partial', 'paid', 'receivable', 'cancelled', 'refunded'])
 export const paymentMethodEnum = pgEnum('payment_method', ['cash', 'qris', 'card', 'transfer', 'ewallet', 'receivable'])
 export const paymentStatusEnum = pgEnum('payment_status', ['success', 'pending', 'failed', 'refunded', 'partial_refund'])
@@ -58,9 +59,33 @@ export const users = pgTable('users', {
   email: varchar('email', { length: 160 }).notNull().unique(),
   name: varchar('name', { length: 160 }).notNull(),
   passwordHash: text('password_hash').notNull(),
+  role: userRoleEnum('role').default('user').notNull(),
   avatarUrl: text('avatar_url'),
   ...timestamps,
 })
+
+export const subscriptionPlans = pgTable('subscription_plans', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  code: varchar('code', { length: 40 }).notNull().unique(),
+  name: varchar('name', { length: 120 }).notNull(),
+  monthlyPrice: numeric('monthly_price', { precision: 14, scale: 2 }).default('0').notNull(),
+  storageLimitMb: integer('storage_limit_mb').default(512).notNull(),
+  maxBranches: integer('max_branches').default(1).notNull(),
+  maxUsers: integer('max_users').default(1).notNull(),
+  features: jsonb('features').default({}).notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  ...timestamps,
+})
+
+export const platformAuditLogs = pgTable('platform_audit_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  actorId: uuid('actor_id').notNull().references(() => users.id),
+  action: varchar('action', { length: 80 }).notNull(),
+  targetType: varchar('target_type', { length: 40 }).notNull(),
+  targetId: uuid('target_id'),
+  payload: jsonb('payload').default({}).notNull(),
+  ...timestamps,
+}, (table) => [index('platform_audit_logs_actor_id_idx').on(table.actorId), index('platform_audit_logs_target_idx').on(table.targetType, table.targetId)])
 
 export const tenantMembers = pgTable('tenant_members', {
   id: uuid('id').primaryKey().defaultRandom(),

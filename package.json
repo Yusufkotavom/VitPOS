@@ -1,7 +1,7 @@
 {
   "name": "vitpos-bootstrap",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -21,6 +21,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:seed:baim": "node scripts/seed-baim.mjs",
+    "db:seed:admin": "node scripts/seed-platform-admin.mjs",
     "db:studio": "drizzle-kit studio",
     "preview": "vite preview"
   },

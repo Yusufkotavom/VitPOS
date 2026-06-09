@@ -34,6 +34,24 @@ import { localDb } from '@/services/local-db/client'
 
 describe('onboarding registration flow', () => {
   it('creates owner user + tenant when no authenticated user exists', async () => {
+    apiPostMock.mockReset()
+    apiPostMock.mockResolvedValueOnce({
+      ok: true,
+      user: {
+        id: '11111111-1111-4111-8111-111111111111',
+        email: 'budi@toko.id',
+        name: 'Budi',
+      },
+      defaultBranchId: '33333333-3333-4333-8333-333333333333',
+      defaultWarehouseId: '44444444-4444-4444-8444-444444444444',
+      memberships: [{
+        tenantId: '22222222-2222-4222-8222-222222222222',
+        role: 'owner',
+        tenantName: 'Toko Regis',
+        tenantPlan: 'trial',
+      }],
+    })
+
     useAuthStore.getState().logout()
     await localDb.users.clear()
     await localDb.tenants.clear()
@@ -66,5 +84,59 @@ describe('onboarding registration flow', () => {
     expect(await localDb.users.count()).toBe(1)
     expect(await localDb.tenants.count()).toBe(1)
     expect(await localDb.tenantMembers.count()).toBe(1)
+  })
+
+  it('falls back to /auth/login when /auth/register returns 409 email already registered', async () => {
+    apiPostMock.mockReset()
+    apiPostMock.mockImplementationOnce(async () => {
+      throw new Error('Email already registered')
+    })
+    apiPostMock.mockImplementationOnce(async () => ({
+      ok: true,
+      user: {
+        id: '99999999-9999-4999-8999-999999999999',
+        email: 'sudah@ada.id',
+        name: 'Sudah Ada',
+      },
+      defaultBranchId: '77777777-7777-4777-8777-777777777777',
+      defaultWarehouseId: '66666666-6666-4666-8666-666666666666',
+      memberships: [{
+        tenantId: '88888888-8888-4888-8888-888888888888',
+        role: 'owner',
+        tenantName: 'Toko Lama',
+        tenantPlan: 'trial',
+      }],
+    }))
+
+    useAuthStore.getState().logout()
+    await localDb.users.clear()
+    await localDb.tenants.clear()
+    await localDb.tenantMembers.clear()
+
+    render(
+      createElement(MemoryRouter, { initialEntries: ['/onboarding'] },
+        createElement(Routes, null,
+          createElement(Route, { path: '/onboarding', element: createElement(OnboardingPage) }),
+          createElement(Route, { path: '/billing', element: createElement('div', null, 'Billing Route') }),
+        ),
+      ),
+    )
+
+    fireEvent.change(screen.getByLabelText(/Nama owner/), { target: { value: 'Sudah Ada' } })
+    fireEvent.change(screen.getByLabelText(/Email owner/), { target: { value: 'sudah@ada.id' } })
+    fireEvent.change(screen.getByLabelText(/Kata sandi owner/), { target: { value: 'password123' } })
+    fireEvent.change(screen.getByLabelText(/Nama Bisnis/), { target: { value: 'Toko Lama' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Lanjut' }))
+    fireEvent.click(screen.getByRole('button', { name: /Lanjut/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Lanjut/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Lanjut ke Tagihan/ }))
+
+    expect(await screen.findByText('Billing Route')).toBeInTheDocument()
+    await vi.waitFor(() => {
+      expect(apiPostMock).toHaveBeenCalledWith('/auth/login', expect.objectContaining({ email: 'sudah@ada.id', password: 'password123' }))
+      expect(useAuthStore.getState().currentUser?.email).toBe('sudah@ada.id')
+    })
+    expect(apiPostMock).toHaveBeenCalledWith('/auth/register', expect.objectContaining({ email: 'sudah@ada.id' }))
   })
 })

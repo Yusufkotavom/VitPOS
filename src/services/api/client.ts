@@ -64,3 +64,34 @@ export async function apiPost<T>(path: string, body: unknown) {
 
   return response.json() as Promise<T>
 }
+
+export async function apiPatch<T>(path: string, body: unknown) {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3010'
+  const url = buildApiUrl(baseUrl, path)
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response))
+  }
+
+  return response.json() as Promise<T>
+}
+
+export async function apiDelete<T = { ok: boolean }>(path: string) {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3010'
+  const url = buildApiUrl(baseUrl, path)
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  })
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response))
+  }
+
+  return response.json() as Promise<T>
+}

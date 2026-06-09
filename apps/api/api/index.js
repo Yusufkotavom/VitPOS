@@ -33,6 +33,7 @@ __export(schema_exports, {
   paymentMethods: () => paymentMethods,
   paymentStatusEnum: () => paymentStatusEnum,
   payments: () => payments,
+  platformAuditLogs: () => platformAuditLogs,
   productCategories: () => productCategories,
   productTypeEnum: () => productTypeEnum,
   productionBatches: () => productionBatches,
@@ -61,6 +62,7 @@ __export(schema_exports, {
   shiftsRelations: () => shiftsRelations,
   stockMovementTypeEnum: () => stockMovementTypeEnum,
   stockMovements: () => stockMovements,
+  subscriptionPlans: () => subscriptionPlans,
   subscriptionStatusEnum: () => subscriptionStatusEnum,
   suppliers: () => suppliers,
   suppliersRelations: () => suppliersRelations,
@@ -68,6 +70,7 @@ __export(schema_exports, {
   tenantMembers: () => tenantMembers,
   tenants: () => tenants,
   tenantsRelations: () => tenantsRelations,
+  userRoleEnum: () => userRoleEnum,
   users: () => users,
   warehouses: () => warehouses
 });
@@ -76,6 +79,7 @@ __export(schema_exports, {
 import { relations } from "drizzle-orm";
 import { boolean, index, integer, jsonb, numeric, pgEnum, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 var memberRoleEnum = pgEnum("member_role", ["owner", "admin", "cashier", "staff"]);
+var userRoleEnum = pgEnum("user_role", ["user", "platform_admin"]);
 var orderStatusEnum = pgEnum("order_status", ["draft", "confirmed", "unpaid", "partial", "paid", "receivable", "cancelled", "refunded"]);
 var paymentMethodEnum = pgEnum("payment_method", ["cash", "qris", "card", "transfer", "ewallet", "receivable"]);
 var paymentStatusEnum = pgEnum("payment_status", ["success", "pending", "failed", "refunded", "partial_refund"]);
@@ -127,9 +131,31 @@ var users = pgTable("users", {
   email: varchar("email", { length: 160 }).notNull().unique(),
   name: varchar("name", { length: 160 }).notNull(),
   passwordHash: text("password_hash").notNull(),
+  role: userRoleEnum("role").default("user").notNull(),
   avatarUrl: text("avatar_url"),
   ...timestamps
 });
+var subscriptionPlans = pgTable("subscription_plans", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: varchar("code", { length: 40 }).notNull().unique(),
+  name: varchar("name", { length: 120 }).notNull(),
+  monthlyPrice: numeric("monthly_price", { precision: 14, scale: 2 }).default("0").notNull(),
+  storageLimitMb: integer("storage_limit_mb").default(512).notNull(),
+  maxBranches: integer("max_branches").default(1).notNull(),
+  maxUsers: integer("max_users").default(1).notNull(),
+  features: jsonb("features").default({}).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  ...timestamps
+});
+var platformAuditLogs = pgTable("platform_audit_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  actorId: uuid("actor_id").notNull().references(() => users.id),
+  action: varchar("action", { length: 80 }).notNull(),
+  targetType: varchar("target_type", { length: 40 }).notNull(),
+  targetId: uuid("target_id"),
+  payload: jsonb("payload").default({}).notNull(),
+  ...timestamps
+}, (table) => [index("platform_audit_logs_actor_id_idx").on(table.actorId), index("platform_audit_logs_target_idx").on(table.targetType, table.targetId)]);
 var tenantMembers = pgTable("tenant_members", {
   id: uuid("id").primaryKey().defaultRandom(),
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
@@ -538,6 +564,7 @@ function userResponse(user) {
     id: user.id,
     email: user.email,
     name: user.name,
+    role: user.role,
     avatarUrl: user.avatarUrl
   };
 }
@@ -616,7 +643,7 @@ authRoutes.post("/register", async (c) => {
   return c.json({
     ok: true,
     accessToken: `dev-${userId}`,
-    user: { id: userId, email, name },
+    user: { id: userId, email, name, role: "user" },
     defaultBranchId: branchId,
     defaultWarehouseId: warehouseId,
     memberships
@@ -662,7 +689,7 @@ authRoutes.post("/login", async (c) => {
     return c.json({ ok: false, message: "Email tidak terdaftar atau kata sandi salah" }, 401);
   }
   const memberships = await listActiveMemberships(db, user.id);
-  if (memberships.length === 0) {
+  if (memberships.length === 0 && user.role !== "platform_admin") {
     return c.json({ ok: false, message: "Active tenant membership required" }, 403);
   }
   return c.json({
@@ -2152,22 +2179,267 @@ syncRoutes.post("/push", async (c) => {
 });
 
 // src/features/platform/routes.ts
-import { eq as eq5, sql } from "drizzle-orm";
+import { count as count2, desc as desc2, eq as eq6, sql } from "drizzle-orm";
 import { Hono as Hono5 } from "hono";
+import { z } from "zod";
+
+// src/features/platform/middleware.ts
+import { eq as eq5 } from "drizzle-orm";
+async function platformAdminMiddleware(c, next) {
+  const userId = c.get("userId");
+  if (!userId) {
+    return c.json({ ok: false, message: "Authentication required" }, 401);
+  }
+  const rows = await db.select({ id: users.id, role: users.role }).from(users).where(eq5(users.id, userId));
+  const user = rows[0];
+  if (!user || user.role !== "platform_admin") {
+    return c.json({ ok: false, message: "Platform admin only" }, 403);
+  }
+  c.set("platformAdminId", user.id);
+  await next();
+}
+
+// src/features/platform/audit.ts
+async function writeAuditLog(input) {
+  await db.insert(platformAuditLogs).values({
+    actorId: input.actorId,
+    action: input.action,
+    targetType: input.targetType,
+    targetId: input.targetId ?? null,
+    payload: input.payload ?? {},
+    updatedAt: /* @__PURE__ */ new Date()
+  });
+}
+
+// src/features/platform/routes.ts
 var platformRoutes = new Hono5();
+platformRoutes.use("*", authMiddleware, platformAdminMiddleware);
 platformRoutes.get("/tenants", async (c) => {
   const result = await db.select({
     id: tenants.id,
     tenantName: tenants.name,
     ownerName: users.name,
+    ownerEmail: users.email,
     city: tenants.address,
     packageName: tenants.planCode,
     subscriptionStatus: tenants.subscriptionStatus,
     planValidUntil: tenants.planValidUntil,
     storageLimitGb: sql`${tenants.storageLimitMb} / 1024.0`,
+    maxBranches: tenants.maxBranches,
     isActive: tenants.isActive
-  }).from(tenants).leftJoin(tenantMembers, eq5(tenants.id, tenantMembers.tenantId)).leftJoin(users, eq5(tenantMembers.userId, users.id)).where(eq5(tenantMembers.role, "owner"));
+  }).from(tenants).leftJoin(tenantMembers, eq6(tenants.id, tenantMembers.tenantId)).leftJoin(users, eq6(tenantMembers.userId, users.id)).where(eq6(tenantMembers.role, "owner"));
   return c.json({ ok: true, items: result });
+});
+platformRoutes.get("/tenants/:id", async (c) => {
+  const id = c.req.param("id");
+  const tenant = await db.select().from(tenants).where(eq6(tenants.id, id)).then((r) => r[0]);
+  if (!tenant) return c.json({ ok: false, message: "Tenant not found" }, 404);
+  const members = await db.select({
+    id: tenantMembers.id,
+    userId: tenantMembers.userId,
+    role: tenantMembers.role,
+    isActive: tenantMembers.isActive,
+    name: users.name,
+    email: users.email
+  }).from(tenantMembers).leftJoin(users, eq6(tenantMembers.userId, users.id)).where(eq6(tenantMembers.tenantId, id));
+  return c.json({ ok: true, item: tenant, members });
+});
+var updateTenantSchema = z.object({
+  planCode: z.string().min(1).max(40).optional(),
+  planValidUntil: z.string().datetime().nullable().optional(),
+  storageLimitMb: z.number().int().min(0).optional(),
+  maxBranches: z.number().int().min(1).optional(),
+  isActive: z.boolean().optional(),
+  subscriptionStatus: z.enum(["trial", "active", "past_due", "suspended", "cancelled"]).optional()
+});
+platformRoutes.patch("/tenants/:id", async (c) => {
+  const id = c.req.param("id");
+  const body = updateTenantSchema.parse(await c.req.json());
+  const actorId = c.get("platformAdminId");
+  const dbSet = { updatedAt: /* @__PURE__ */ new Date() };
+  if (body.planCode !== void 0) dbSet.planCode = body.planCode;
+  if (body.storageLimitMb !== void 0) dbSet.storageLimitMb = body.storageLimitMb;
+  if (body.maxBranches !== void 0) dbSet.maxBranches = body.maxBranches;
+  if (body.isActive !== void 0) dbSet.isActive = body.isActive;
+  if (body.subscriptionStatus !== void 0) dbSet.subscriptionStatus = body.subscriptionStatus;
+  if (body.planValidUntil !== void 0) {
+    dbSet.planValidUntil = body.planValidUntil === null ? null : new Date(body.planValidUntil);
+  }
+  const updated = await db.update(tenants).set(dbSet).where(eq6(tenants.id, id)).returning();
+  if (updated.length === 0) return c.json({ ok: false, message: "Tenant not found" }, 404);
+  await writeAuditLog({
+    actorId,
+    action: "tenant.updated",
+    targetType: "tenant",
+    targetId: id,
+    payload: body
+  });
+  return c.json({ ok: true, item: updated[0] });
+});
+platformRoutes.post("/tenants/:id/suspend", async (c) => {
+  const id = c.req.param("id");
+  const actorId = c.get("platformAdminId");
+  await db.update(tenants).set({ isActive: false, subscriptionStatus: "suspended", updatedAt: /* @__PURE__ */ new Date() }).where(eq6(tenants.id, id));
+  await writeAuditLog({ actorId, action: "tenant.suspended", targetType: "tenant", targetId: id });
+  return c.json({ ok: true });
+});
+platformRoutes.post("/tenants/:id/reactivate", async (c) => {
+  const id = c.req.param("id");
+  const actorId = c.get("platformAdminId");
+  await db.update(tenants).set({ isActive: true, subscriptionStatus: "active", updatedAt: /* @__PURE__ */ new Date() }).where(eq6(tenants.id, id));
+  await writeAuditLog({ actorId, action: "tenant.reactivated", targetType: "tenant", targetId: id });
+  return c.json({ ok: true });
+});
+platformRoutes.get("/plans", async (c) => {
+  const includeInactive = c.req.query("includeInactive") === "true";
+  const condition = includeInactive ? void 0 : eq6(subscriptionPlans.isActive, true);
+  const items = await db.select().from(subscriptionPlans).where(condition).orderBy(subscriptionPlans.monthlyPrice);
+  return c.json({ ok: true, items });
+});
+var planSchema = z.object({
+  code: z.string().min(1).max(40),
+  name: z.string().min(1).max(120),
+  monthlyPrice: z.number().min(0),
+  storageLimitMb: z.number().int().min(0),
+  maxBranches: z.number().int().min(1),
+  maxUsers: z.number().int().min(1),
+  features: z.record(z.string(), z.unknown()).optional(),
+  isActive: z.boolean().optional()
+});
+platformRoutes.post("/plans", async (c) => {
+  const body = planSchema.parse(await c.req.json());
+  const actorId = c.get("platformAdminId");
+  const inserted = await db.insert(subscriptionPlans).values({
+    code: body.code,
+    name: body.name,
+    monthlyPrice: String(body.monthlyPrice),
+    storageLimitMb: body.storageLimitMb,
+    maxBranches: body.maxBranches,
+    maxUsers: body.maxUsers,
+    features: body.features ?? {},
+    isActive: body.isActive ?? true,
+    updatedAt: /* @__PURE__ */ new Date()
+  }).returning();
+  await writeAuditLog({
+    actorId,
+    action: "plan.created",
+    targetType: "plan",
+    targetId: inserted[0].id,
+    payload: body
+  });
+  return c.json({ ok: true, item: inserted[0] });
+});
+var planUpdateSchema = planSchema.partial();
+platformRoutes.patch("/plans/:id", async (c) => {
+  const id = c.req.param("id");
+  const body = planUpdateSchema.parse(await c.req.json());
+  const actorId = c.get("platformAdminId");
+  const dbSet = { updatedAt: /* @__PURE__ */ new Date() };
+  if (body.code !== void 0) dbSet.code = body.code;
+  if (body.name !== void 0) dbSet.name = body.name;
+  if (body.monthlyPrice !== void 0) dbSet.monthlyPrice = String(body.monthlyPrice);
+  if (body.storageLimitMb !== void 0) dbSet.storageLimitMb = body.storageLimitMb;
+  if (body.maxBranches !== void 0) dbSet.maxBranches = body.maxBranches;
+  if (body.maxUsers !== void 0) dbSet.maxUsers = body.maxUsers;
+  if (body.features !== void 0) dbSet.features = body.features;
+  if (body.isActive !== void 0) dbSet.isActive = body.isActive;
+  const updated = await db.update(subscriptionPlans).set(dbSet).where(eq6(subscriptionPlans.id, id)).returning();
+  if (updated.length === 0) return c.json({ ok: false, message: "Plan not found" }, 404);
+  await writeAuditLog({
+    actorId,
+    action: "plan.updated",
+    targetType: "plan",
+    targetId: id,
+    payload: body
+  });
+  return c.json({ ok: true, item: updated[0] });
+});
+platformRoutes.delete("/plans/:id", async (c) => {
+  const id = c.req.param("id");
+  const actorId = c.get("platformAdminId");
+  const updated = await db.update(subscriptionPlans).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq6(subscriptionPlans.id, id)).returning();
+  if (updated.length === 0) return c.json({ ok: false, message: "Plan not found" }, 404);
+  await writeAuditLog({ actorId, action: "plan.deleted", targetType: "plan", targetId: id });
+  return c.json({ ok: true });
+});
+platformRoutes.get("/users", async (c) => {
+  const items = await db.select({
+    id: users.id,
+    name: users.name,
+    email: users.email,
+    role: users.role,
+    createdAt: users.createdAt,
+    membershipCount: count2(tenantMembers.id)
+  }).from(users).leftJoin(tenantMembers, eq6(users.id, tenantMembers.userId)).groupBy(users.id).orderBy(desc2(users.createdAt));
+  return c.json({ ok: true, items });
+});
+platformRoutes.get("/users/:id", async (c) => {
+  const id = c.req.param("id");
+  const user = await db.select().from(users).where(eq6(users.id, id)).then((r) => r[0]);
+  if (!user) return c.json({ ok: false, message: "User not found" }, 404);
+  const memberships = await db.select({
+    id: tenantMembers.id,
+    tenantId: tenantMembers.tenantId,
+    role: tenantMembers.role,
+    isActive: tenantMembers.isActive,
+    tenantName: tenants.name
+  }).from(tenantMembers).leftJoin(tenants, eq6(tenantMembers.tenantId, tenants.id)).where(eq6(tenantMembers.userId, id));
+  return c.json({ ok: true, item: user, memberships });
+});
+var updateUserSchema = z.object({
+  role: z.enum(["user", "platform_admin"]).optional()
+});
+platformRoutes.patch("/users/:id", async (c) => {
+  const id = c.req.param("id");
+  const body = updateUserSchema.parse(await c.req.json());
+  const actorId = c.get("platformAdminId");
+  if (id === actorId && body.role && body.role !== "platform_admin") {
+    return c.json({ ok: false, message: "Cannot demote yourself" }, 400);
+  }
+  const updated = await db.update(users).set({ ...body, updatedAt: /* @__PURE__ */ new Date() }).where(eq6(users.id, id)).returning();
+  if (updated.length === 0) return c.json({ ok: false, message: "User not found" }, 404);
+  await writeAuditLog({
+    actorId,
+    action: "user.role_changed",
+    targetType: "user",
+    targetId: id,
+    payload: body
+  });
+  return c.json({ ok: true, item: updated[0] });
+});
+var updateMembershipSchema = z.object({
+  role: z.enum(["owner", "admin", "cashier", "staff"])
+});
+platformRoutes.patch("/users/:id/memberships/:memberId", async (c) => {
+  const memberId = c.req.param("memberId");
+  const body = updateMembershipSchema.parse(await c.req.json());
+  const actorId = c.get("platformAdminId");
+  const updated = await db.update(tenantMembers).set({ ...body, updatedAt: /* @__PURE__ */ new Date() }).where(eq6(tenantMembers.id, memberId)).returning();
+  if (updated.length === 0) return c.json({ ok: false, message: "Membership not found" }, 404);
+  await writeAuditLog({
+    actorId,
+    action: "membership.role_changed",
+    targetType: "membership",
+    targetId: memberId,
+    payload: { userId: c.req.param("id"), ...body }
+  });
+  return c.json({ ok: true, item: updated[0] });
+});
+platformRoutes.get("/audit", async (c) => {
+  const limit = Math.min(Number(c.req.query("limit") ?? 50), 200);
+  const offset = Number(c.req.query("offset") ?? 0);
+  const items = await db.select({
+    id: platformAuditLogs.id,
+    actorId: platformAuditLogs.actorId,
+    actorName: users.name,
+    action: platformAuditLogs.action,
+    targetType: platformAuditLogs.targetType,
+    targetId: platformAuditLogs.targetId,
+    payload: platformAuditLogs.payload,
+    createdAt: platformAuditLogs.createdAt
+  }).from(platformAuditLogs).leftJoin(users, eq6(platformAuditLogs.actorId, users.id)).orderBy(desc2(platformAuditLogs.createdAt)).limit(limit).offset(offset);
+  const total = await db.select({ c: count2() }).from(platformAuditLogs).then((r) => r[0].c);
+  return c.json({ ok: true, items, total });
 });
 
 // src/features/updates/routes.ts

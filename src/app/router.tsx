@@ -3,6 +3,7 @@ import { createBrowserRouter } from 'react-router-dom'
 
 import { AppLayout } from '@/shared/components/layout/app-layout'
 import { AuthGuard } from '@/features/auth/components/auth-guard'
+import { PlatformAdminGuard } from '@/features/auth/components/platform-admin-guard'
 import { LoadingState } from '@/shared/components/feedback/loading-state'
 
 const DashboardPage = lazy(() => import('@/features/dashboard/pages/dashboard-page').then(pick('DashboardPage')))
@@ -92,7 +93,7 @@ export const router = createBrowserRouter([
       { path: 'settings/templates', element: routeElement(MessageTemplatesPage) },
       { path: 'sync', element: routeElement(SyncPage) },
       { path: 'shift', element: routeElement(ShiftPage) },
-      { path: 'platform-admin', element: routeElement(PlatformAdminPage) },
+      { path: 'platform-admin', element: <PlatformAdminGuard>{routeElement(PlatformAdminPage)}</PlatformAdminGuard> },
     ],
   },
 ])

@@ -12,6 +12,7 @@ export type LocalUser = {
   name: string
   email: string
   passwordHash: string
+  role?: 'user' | 'platform_admin'
   avatarUrl?: string
   createdAt: string
   updatedAt: string

@@ -1,24 +1,36 @@
 import { formatCurrency } from '@/lib/format-currency'
-import type { PlatformTenant } from '@/services/api/platform-admin.service'
+import type { PlatformPlan, PlatformTenant } from '@/services/api/platform-admin.service'
 
-export function getPlatformAdminSummary(tenants: PlatformTenant[]) {
+const FALLBACK_FEE: Record<string, number> = {
+  free: 0,
+  trial: 0,
+  starter: 1250000,
+  pro: 1490000,
+  enterprise: 2700000,
+}
+
+export function getPlatformAdminSummary(tenants: PlatformTenant[], plans: PlatformPlan[] = []) {
   const totalTenants = tenants.length
-  const activeTenants = tenants.filter((tenant) => tenant.subscriptionStatus === 'active' || tenant.subscriptionStatus === 'trial').length
-  
-  // Calculate mockup MRR based on package name since it's not yet dynamic
+  const activeTenants = tenants.filter((tenant) =>
+    tenant.subscriptionStatus === 'active' || tenant.subscriptionStatus === 'trial'
+  ).length
+
+  const priceByCode = new Map(plans.map((p) => [p.code, Number(p.monthlyPrice)]))
+
   const getFee = (pkg: string) => {
-    if (pkg === 'enterprise') return 2700000
-    if (pkg === 'pro') return 1490000
-    if (pkg === 'starter') return 1250000
-    return 0
+    if (priceByCode.has(pkg)) return priceByCode.get(pkg) ?? 0
+    return FALLBACK_FEE[pkg] ?? 0
   }
-  
-  const monthlyRecurringRevenue = formatCurrency(tenants.reduce((total, tenant) => total + getFee(tenant.packageName), 0))
-  // Mock usage for now, use 0 for actual DB fields
-  const storageUsed = 0 
+
+  const monthlyRecurringRevenue = formatCurrency(
+    tenants
+      .filter((t) => t.subscriptionStatus === 'active' || t.subscriptionStatus === 'trial')
+      .reduce((total, tenant) => total + getFee(tenant.packageName), 0)
+  )
+
+  const storageUsed = 0
   const storageLimit = tenants.reduce((total, tenant) => total + tenant.storageLimitGb, 0)
-  
-  // Sync status is now abstracted to individual tenant metrics, keeping mock count 0 for platform wide
+
   const tenantsNeedingSyncReview = 0
 
   return {
@@ -27,6 +39,6 @@ export function getPlatformAdminSummary(tenants: PlatformTenant[]) {
     monthlyRecurringRevenue,
     storageUsed: `${storageUsed} GB / ${storageLimit} GB`,
     tenantsNeedingSyncReview,
-    getFee
+    getFee,
   }
 }
