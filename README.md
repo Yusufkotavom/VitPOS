@@ -27,12 +27,14 @@ Sudah ada:
 - POS checkout terintegrasi ke sales order, payment, stock movement, dan customer receivable
 - invoice manual terintegrasi ke payment record dan history pembayaran riil
 - halaman admin dasar reusable
-- local-first runtime via Dexie
+- local-first runtime via Dexie (26 tables)
 - live Dexie hooks untuk products, customers, sales orders, payments, inventory, cash
-- sync queue/conflict UI
-- Drizzle schema untuk PostgreSQL
+- **sync engine full**: outbox pattern, 16 entity types push+pull ke Hono API
+- **auto-sync** setiap 30 detik + trigger online event
+- sync queue/conflict UI + halaman sinkronisasi
+- Drizzle schema untuk PostgreSQL (19 tables + enums)
 - Neon/Postgres connection-ready
-- Vitest setup
+- Vitest setup (107 tests passing)
 
 ## Struktur proyek saat ini
 
@@ -159,6 +161,7 @@ Entitas operasional yang sudah ditenantkan mencakup:
 - purchases dan items
 - returns dan items
 - service orders
+- recipes
 
 Implikasi pemakaian:
 
@@ -198,7 +201,6 @@ Belum penuh:
 
 - payment khusus service order
 - timeline kerja yang persisted
-- sinkron cloud penuh untuk `service_order`
 
 ## Purchase Receiving
 
@@ -217,7 +219,6 @@ Belum penuh:
 
 - hutang supplier settlement/payment
 - riwayat receiving per PO
-- sinkron cloud penuh untuk `purchase` dan `supplier`
 
 ## Recipe / BOM
 
@@ -228,12 +229,15 @@ Status implementasi saat ini:
 - recipe terhubung ke produk jadi dan daftar bahan baku tenant aktif
 - CRUD dasar sudah tersedia
 
+Sudah penuh:
+
+- sinkron cloud untuk `recipe` via outbox pattern
+
 Belum penuh:
 
 - HPP/costing otomatis
 - produksi batch
 - konsumsi bahan otomatis saat POS checkout
-- sinkron cloud untuk `recipe`
 
 ## Agent reporting
 
@@ -247,6 +251,33 @@ Isi minimal:
 - file yang disentuh
 - verifikasi yang dijalankan
 - gap yang masih tersisa
+
+## Sync Engine
+
+Sync engine memakai **outbox pattern**: setiap mutasi data lokal otomatis tercatat ke tabel `outbox`, lalu di-push ke Hono API secara periodik.
+
+**Auto-sync**: setiap 30 detik (saat online) + trigger saat koneksi kembali.
+
+**16 entity types** sudah full round-trip (local Dexie ↔ Hono API ↔ PostgreSQL):
+
+| Entity | Push | Pull |
+|--------|------|------|
+| product | ✅ | ✅ |
+| product_category | ✅ | ✅ |
+| customer | ✅ | ✅ |
+| sale | ✅ | ✅ |
+| payment | ✅ | ✅ |
+| stock_movement | ✅ | ✅ |
+| cash | ✅ | ✅ |
+| cash_category | ✅ | ✅ |
+| setting | ✅ | ✅ |
+| payment_method | ✅ | ✅ |
+| shift | ✅ | ✅ |
+| supplier | ✅ | ✅ |
+| purchase | ✅ | ✅ |
+| return | ✅ | ✅ |
+| service_order | ✅ | ✅ |
+| recipe | ✅ | ✅ |
 
 ## Catatan penting
 
