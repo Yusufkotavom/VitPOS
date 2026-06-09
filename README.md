@@ -1,289 +1,134 @@
-# KOTACOM Business Suite
+# VitPOS / KOTACOM Business Suite
+**Comprehensive Technical Architecture & Implementation Guide**
 
-KOTACOM Business Suite adalah aplikasi SaaS POS + CRM + accounting ringan untuk UMKM Indonesia dengan target **web + Android + desktop**.
+VitPOS (KOTACOM Business Suite) is an advanced, Offline-First SaaS Point of Sale (POS), CRM, and Accounting engine designed specifically for the Indonesian SME market. 
 
-## Engine delivery
+This repository implements a **multi-target deployment architecture**, providing a unified Vite/React web engine that powers three distinct platforms simultaneously:
+1. **Web Dashboard (PWA)** - Deployed statically to Vercel/Cloudflare Pages.
+2. **Android Application** - Wrapped using Capacitor.
+3. **Desktop Application (Windows/Linux)** - Wrapped using Tauri (Rust).
 
-Project sekarang diarahkan ke 4 engine paralel:
+---
 
-1. **Web App** — Vite React SPA, UI utama, Dexie local-first
-2. **Backend API** — Hono + Drizzle + PostgreSQL, deploy Vercel terpisah
-3. **Android Shell** — Capacitor + SQLite adapter
-4. **Desktop Shell** — Tauri + SQLite adapter
+## 🏗️ System Architecture
 
-Plan utama parallel-agent ada di:
+### 1. Frontend & UI Layer (Web/Android/Desktop)
+- **Framework:** Vite + React 19.
+- **Styling:** Tailwind CSS v4 + shadcn/ui.
+- **State Management (Client-Side):** `zustand` for persistent UI states (active tenant, auth state, sync UI queues).
+- **Server State & Data Fetching:** `@tanstack/react-query` to handle REST API fetches for real-time cloud data (e.g., Platform Admin dashboards).
+- **Form & Validation:** `react-hook-form` + `zod` for strictly typed forms.
 
-- `docs/superpowers/plans/2026-06-07-kotacom-multi-track.md`
+### 2. The Offline-First Engine (Local DB)
+To guarantee 100% uptime regardless of internet availability, the core POS features operate entirely locally.
+- **Engine:** `dexie` (IndexedDB wrapper).
+- **Structure:** 26 separate tables reflecting cloud structure (Products, Sales, Stock Movements, Customers, etc).
+- **Philosophy:** Read from local, write to local. The local DB is the *Single Source of Truth* during operational hours.
 
-## Status saat ini
+### 3. Synchronization Engine (Outbox Pattern)
+Instead of executing direct API calls for operational mutations, the system utilizes a resilient sync engine:
+1. **Outbox Logger:** Every insert/update/delete operation writes a serialized JSON payload to a local `outbox` table.
+2. **Auto-Sync Hook (`useAutoSync`):** A background worker pings the `/health` API every 15 seconds. If the API is reachable and the device is `navigator.onLine`, it flushes the outbox.
+3. **Conflict Resolver:** If the server rejects a payload (e.g., version mismatch or data collision), the outbox item is flagged as `conflict` and surfaced to the UI (`/sync` page) for manual resolution.
+4. **Push & Pull APIs:** The Hono API exposes `/api/v1/sync/push` (to process outbox) and `/api/v1/sync/pull` (cursor-based pagination to retrieve newly updated rows from the cloud).
 
-Sudah ada:
+### 4. Backend API Layer
+- **Framework:** Hono (Deployed as Vercel Serverless Functions).
+- **Database ORM:** Drizzle ORM (`drizzle-kit` for migrations).
+- **Primary Database:** PostgreSQL (Neon DB).
+- **Authentication:** Custom JWT-like tokens (`x-user-id` and `Authorization: Bearer dev-*` for development scaling). 
+- **Multi-Tenancy:** Strict row-level isolation via `tenantId`. A single `users` row can belong to multiple `tenants` via the `tenant_members` junction table.
 
-- app shell responsive dengan shadcn sidebar
-- login, tenant selector, onboarding UI mock
-- multi-tenant local isolation per `activeTenant.id`
-- dashboard modular
-- POS foundation + summary strip + held draft banner
-- POS checkout terintegrasi ke sales order, payment, stock movement, dan customer receivable
-- invoice manual terintegrasi ke payment record dan history pembayaran riil
-- halaman admin dasar reusable
-- local-first runtime via Dexie (26 tables)
-- live Dexie hooks untuk products, customers, sales orders, payments, inventory, cash
-- **sync engine full**: outbox pattern, 16 entity types push+pull ke Hono API
-- **auto-sync** setiap 30 detik + trigger online event
-- sync queue/conflict UI + halaman sinkronisasi
-- Drizzle schema untuk PostgreSQL (19 tables + enums)
-- Neon/Postgres connection-ready
-- Vitest setup (107 tests passing)
+### 5. SaaS Platform Billing
+- **Schema:** The `tenants` table contains robust billing mechanisms: `subscriptionStatus` (trial, active, suspended), `planValidUntil` (expiration timestamp), `storageLimitMb`, and `maxBranches`.
+- **Onboarding Workflow:** When `authRoutes.post('/register')` is hit, the system inherently calculates a 14-day `trial` logic. 
+- **Admin Visibility:** Super Admins can access `/platform-admin` to fetch real-time joining between users and tenants via `/api/v1/platform/tenants`.
 
-## Struktur proyek saat ini
+---
 
-```txt
-src/
-  app/
-  components/ui/
-  db/
-  features/
-  lib/
-  services/
-  shared/
-  stores/
+## 📂 Repository Structure
+
+The architecture enforces a Feature-Sliced Design (FSD) approach inside a monolithic React project:
+
+```text
+VitPOS/
+├── apps/
+│   ├── api/            # Hono Backend API (Vercel target)
+│   ├── desktop/        # Tauri Rust Shell (Desktop target)
+│   └── mobile/         # Capacitor Shell (Android target)
+├── src/
+│   ├── components/     # Global UI primitives (shadcn)
+│   ├── db/             # Drizzle Schema & core definitions
+│   ├── features/       # Business modules (pos, inventory, platform-admin)
+│   ├── lib/            # Utilities (formatters, cn, math)
+│   ├── services/       # Local DB instances, API Clients, Sync Engine
+│   └── shared/         # Reusable layouts, hooks, pdf generators
+└── docs/               # Architecture diagrams, agent plans, logs
 ```
 
-## Environment
+---
 
-1. Copy `.env.example` ke `.env.local`
-2. Isi `DATABASE_URL`
-3. Set `VITE_API_BASE_URL` saat web harus bicara ke API terpisah
+## 🚀 Environment Variables
 
-```bash
-cp .env.example .env.local
+You only need minimal environment configurations.
+
+**Frontend (`.env.production` / Vercel Web Dashboard):**
+```env
+VITE_API_BASE_URL="https://vit-pos-8vle.vercel.app"
+```
+*(When building Tauri/APK, Vite will bake this URL into the binary. If omitted, it falls back to `http://localhost:3010`)*
+
+**Backend (`apps/api/.vercel/.env.production.local` / Vercel API):**
+```env
+DATABASE_URL="postgres://neondb_owner:.../neondb?sslmode=require"
 ```
 
-## Database
+---
 
-Lihat:
+## 🛠️ Development & Tooling
 
-- `docs/architecture/database.md`
-- `drizzle.config.ts`
-- `src/db/schema/index.ts`
-- `src/db/db.ts`
+We provide unified scripts for cross-platform validation.
 
-Script database:
-
-- `npm run db:generate`
-- `npm run db:migrate`
-- `npm run db:push`
-- `npm run db:studio`
-
-## Development
-
-Web app:
-
+### Web & Frontend Development
 ```bash
 npm install
-npm run dev
+npm run dev       # Start Vite dev server
+npm run check     # Run linting, typecheck, vitest, and build
 ```
 
-Backend API:
-
+### Database Operations (Drizzle)
 ```bash
-npm run api:dev
+npm run db:generate   # Generate SQL migrations
+npm run db:migrate    # Apply migrations locally
+npm run db:push       # Push schema directly to Neon DB
+npm run db:studio     # Launch Drizzle Studio UI
 ```
 
-## Verification
-
-Web:
-
+### API Backend Development
 ```bash
-npm run check
+npm run api:dev       # Start Hono server locally
+npm run api:check     # Test and typecheck API
 ```
 
-API:
-
+### Mobile & Desktop Validation
 ```bash
-npm run api:check
+npm run mobile:check  # Sync Capacitor and validate Android setup
+npm run desktop:check # Validate Tauri Rust toolchain and web build
 ```
 
-Android shell:
+---
 
+## 🔄 CI/CD & Release Pipeline
+
+We utilize **GitHub Actions** (`.github/workflows/release.yml`) for automated cross-platform building.
+
+1. The pipeline triggers on Git Tags (e.g., `v1.0.0`).
+2. **Android Pipeline:** Bootstraps Java 21 & Android SDK, syncs Capacitor, and builds Signed/Debug APKs via Gradle.
+3. **Desktop Pipeline:** Bootstraps Rust toolchain, fetches `libwebkit2gtk`, and compiles `.exe`, `.deb`, and `.AppImage` via `tauri-action`.
+4. Artifacts are automatically attached to the GitHub Release.
+
+To trigger a release manually:
 ```bash
-npm run mobile:check
+git tag -a v1.0.0 -m "Release v1.0.0"
+git push origin v1.0.0
 ```
-
-Desktop shell:
-
-```bash
-npm run desktop:check
-```
-
-`npm run check` menjalankan:
-
-- lint
-- typecheck
-- test
-- build
-
-`npm run api:check` menjalankan:
-
-- API test
-- API typecheck
-- API build
-
-`npm run mobile:check` memvalidasi konfigurasi Capacitor dan memastikan build web tersedia untuk shell Android.
-
-`npm run desktop:check` memvalidasi scaffold Tauri tanpa perlu Rust toolchain lokal.
-
-## Multi-Tenant
-
-App sekarang memakai model `1 user -> banyak tenant/usaha`.
-
-Aturan utamanya:
-
-- `users`, `tenants`, dan `tenantMembers` tetap global untuk auth
-- semua data operasional wajib punya `tenantId`
-- semua list/detail operasional dibaca berdasarkan `activeTenant.id`
-- onboarding tenant baru hanya membuat seed data untuk tenant yang baru dibuat
-
-Entitas operasional yang sudah ditenantkan mencakup:
-
-- products
-- product categories
-- customers
-- sales orders dan items
-- payments
-- stock movements
-- inventory
-- cash dan cash categories
-- settings dan payment methods
-- shifts
-- suppliers
-- purchases dan items
-- returns dan items
-- service orders
-- recipes
-
-Implikasi pemakaian:
-
-1. Login
-2. Pilih usaha di tenant selector
-3. Semua dashboard, POS, customer, invoice, stok, dan settings hanya membaca data tenant aktif
-4. Jika pindah usaha, data layar ikut pindah karena query terfilter `tenantId`
-
-## Status Integrasi Transaksi
-
-Yang sudah terintegrasi penuh untuk slice transaksi inti:
-
-- POS checkout membuat `salesOrder`, `salesOrderItems`, `payment`, `stockMovements`
-- POS checkout menyimpan `customerId` jika pelanggan dipilih
-- invoice detail menerima pembayaran dengan membuat row `payments` sungguhan
-- customer `orders` dan `receivable` dihitung ulang dari invoice tenant aktif
-- WhatsApp POS dan invoice memakai template `invoice`
-- history pembayaran invoice dibaca dari tabel `payments`, bukan mock UI
-
-Yang masih belum penuh:
-
-- print/PDF invoice dan service order masih dalam iterasi
-- service order payment/settlement khusus masih belum ada
-- purchase payment/hutang supplier settlement masih belum ada
-- recipe/BOM belum terhubung ke proses produksi atau pengurangan bahan otomatis dari POS
-
-## Service Order
-
-Status implementasi saat ini:
-
-- service order sudah tenant-scoped
-- create/edit akan mencoba resolve `customerId` dari nama customer tenant aktif
-- detail page WhatsApp juga memakai customer terhubung bila tersedia
-- customer detail sekarang membaca service order via `customerId` atau fallback nama
-
-Belum penuh:
-
-- payment khusus service order
-- timeline kerja yang persisted
-
-## Purchase Receiving
-
-Status implementasi saat ini:
-
-- create/edit purchase order sudah mencoba resolve `supplierId`
-- item PO akan mencoba resolve `productId` dari produk tenant aktif
-- aksi `Terima Barang` akan:
-  - ubah status PO ke `Diterima`
-  - buat `stockMovements` tipe `purchase`
-  - update stok produk
-  - update tabel inventory
-  - hitung ulang `supplier.orders` dan `supplier.payable`
-
-Belum penuh:
-
-- hutang supplier settlement/payment
-- riwayat receiving per PO
-
-## Recipe / BOM
-
-Status implementasi saat ini:
-
-- modul `Resep / BOM` sudah tersedia di `/products/recipes`
-- Dexie sudah punya tabel `recipes`
-- recipe terhubung ke produk jadi dan daftar bahan baku tenant aktif
-- CRUD dasar sudah tersedia
-
-Sudah penuh:
-
-- sinkron cloud untuk `recipe` via outbox pattern
-
-Belum penuh:
-
-- HPP/costing otomatis
-- produksi batch
-- konsumsi bahan otomatis saat POS checkout
-
-## Agent reporting
-
-Setiap agent selesai harus update:
-
-- `docs/agent-changelog.md`
-
-Isi minimal:
-
-- status done / partial / failed
-- file yang disentuh
-- verifikasi yang dijalankan
-- gap yang masih tersisa
-
-## Sync Engine
-
-Sync engine memakai **outbox pattern**: setiap mutasi data lokal otomatis tercatat ke tabel `outbox`, lalu di-push ke Hono API secara periodik.
-
-**Auto-sync**: setiap 30 detik (saat online) + trigger saat koneksi kembali.
-
-**16 entity types** sudah full round-trip (local Dexie ↔ Hono API ↔ PostgreSQL):
-
-| Entity | Push | Pull |
-|--------|------|------|
-| product | ✅ | ✅ |
-| product_category | ✅ | ✅ |
-| customer | ✅ | ✅ |
-| sale | ✅ | ✅ |
-| payment | ✅ | ✅ |
-| stock_movement | ✅ | ✅ |
-| cash | ✅ | ✅ |
-| cash_category | ✅ | ✅ |
-| setting | ✅ | ✅ |
-| payment_method | ✅ | ✅ |
-| shift | ✅ | ✅ |
-| supplier | ✅ | ✅ |
-| purchase | ✅ | ✅ |
-| return | ✅ | ✅ |
-| service_order | ✅ | ✅ |
-| recipe | ✅ | ✅ |
-
-## Catatan penting
-
-- `.env.local` dipakai untuk secret lokal dan sudah di-ignore.
-- Web local DB pakai Dexie.
-- Android/Desktop akan pakai SQLite adapter.
-- Cloud DB siap pakai PostgreSQL, termasuk Neon atau Supabase.
-- Backend tetap terpisah dari frontend dan deploy ke Vercel sendiri.
-- Schema stok memakai `stock_movements`, bukan angka stok final tunggal.
