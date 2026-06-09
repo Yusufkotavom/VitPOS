@@ -3,10 +3,10 @@
   "version": "0.0.0",
   "identifier": "com.kotacom.vitpos",
   "build": {
-    "beforeDevCommand": "npm run dev",
+    "beforeDevCommand": "npm run dev --prefix ../../",
     "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "npm run build",
-    "frontendDist": "../../dist"
+    "beforeBuildCommand": "npm run build --prefix ../../",
+    "frontendDist": "../../../dist"
   },
   "app": {
     "windows": [
