@@ -15,6 +15,13 @@
       "when": 1781009881757,
       "tag": "0001_milky_reaper",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781025400166,
+      "tag": "0002_bright_the_enforcers",
+      "breakpoints": true
     }
   ]
 }

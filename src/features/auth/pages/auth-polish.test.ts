@@ -3,13 +3,21 @@ import 'fake-indexeddb/auto'
 import { createElement } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { LoginPage } from '@/features/auth/pages/login-page'
 import { OnboardingPage } from '@/features/auth/pages/onboarding-page'
 import { TenantSelectorPage } from '@/features/auth/pages/tenant-selector-page'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { localDb } from '@/services/local-db/client'
+
+const { apiPostMock } = vi.hoisted(() => ({
+  apiPostMock: vi.fn(),
+}))
+
+vi.mock('@/services/api/client', () => ({
+  apiPost: apiPostMock,
+}))
 
 describe('auth polish behavior', () => {
   beforeEach(async () => {
@@ -22,7 +30,12 @@ describe('auth polish behavior', () => {
   afterEach(() => cleanup())
 
   it('login exposes accessible fields and submits to tenant selector with keyboard/form flow', async () => {
-    await localDb.users.add({ id: 'u1', email: 'owner@usaha.co.id', name: 'Owner', passwordHash: 'password123', createdAt: '', updatedAt: '' })
+    apiPostMock.mockResolvedValueOnce({
+      ok: true,
+      accessToken: 'dev-u1',
+      user: { id: 'u1', email: 'owner@usaha.co.id', name: 'Owner' },
+      memberships: [{ tenantId: 't1', role: 'owner', tenantName: 'Toko Demo', tenantPlan: 'Pro' }],
+    })
 
     render(
       createElement(MemoryRouter, { initialEntries: ['/login'] },
@@ -42,6 +55,10 @@ describe('auth polish behavior', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Masuk' }))
 
     expect(await screen.findByText('Tenant Route')).toBeInTheDocument()
+    expect(apiPostMock).toHaveBeenCalledWith('/auth/login', {
+      email: 'owner@usaha.co.id',
+      password: 'password123',
+    })
   })
 
   it('tenant selector shows compact tenant cards with badges and clear actions', async () => {

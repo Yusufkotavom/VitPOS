@@ -99,7 +99,50 @@ describe('createApp', () => {
       const body = await response.json()
 
       expect(response.status).toBe(400)
-      expect(body).toEqual({ ok: false, message: 'email required' })
+      expect(body).toEqual({ ok: false, message: 'email and password required' })
+    })
+
+    it('rejects /api/v1/auth/register without password', async () => {
+      const app = createApp()
+      const response = await app.request('/api/v1/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Owner',
+          email: 'owner@example.com',
+          tenantName: 'Usaha Baru',
+        }),
+      })
+      const body = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(body).toEqual({ ok: false, message: 'name, email, password, and tenantName required' })
+    })
+
+    it('rejects /api/v1/auth/login without password', async () => {
+      const app = createApp()
+      const response = await app.request('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'owner@example.com' }),
+      })
+      const body = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(body).toEqual({ ok: false, message: 'email and password required' })
+    })
+
+    it('rejects /api/v1/auth/reset-password without required fields', async () => {
+      const app = createApp()
+      const response = await app.request('/api/v1/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'owner@example.com' }),
+      })
+      const body = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(body).toEqual({ ok: false, message: 'email and newPassword required' })
     })
   })
 

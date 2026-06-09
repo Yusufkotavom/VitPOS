@@ -16,7 +16,28 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { hashPassword } from '@/lib/crypto'
+import { apiPost } from '@/services/api/client'
 import { localDb } from '@/services/local-db/client'
+
+type AuthApiMembership = {
+  tenantId: string
+  role: string
+  tenantName: string
+  tenantPlan: string
+}
+
+type AuthApiResponse = {
+  ok: boolean
+  accessToken: string
+  user: {
+    id: string
+    email: string
+    name: string
+    avatarUrl?: string
+  }
+  memberships: AuthApiMembership[]
+}
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -38,28 +59,50 @@ export function LoginPage() {
 
     if (!email || !password) return
 
-    let user = await localDb.users.where('email').equals(email).first()
-
-    if (!user && email === 'owner@usaha.co.id') {
-      const mockUser = {
-        id: crypto.randomUUID(),
-        name: 'Owner',
-        email: 'owner@usaha.co.id',
-        passwordHash: password,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+    try {
+      const response = await apiPost<AuthApiResponse>('/auth/login', { email, password })
+      const now = new Date().toISOString()
+      const passwordHash = await hashPassword(password)
+      const user = {
+        id: response.user.id,
+        name: response.user.name,
+        email: response.user.email,
+        avatarUrl: response.user.avatarUrl,
+        passwordHash,
+        createdAt: now,
+        updatedAt: now,
       }
-      await localDb.users.add(mockUser)
-      user = mockUser
-    }
 
-    if (!user || user.passwordHash !== password) {
-      setError('Email tidak terdaftar atau kata sandi salah')
+      await localDb.users.put(user)
+      for (const membership of response.memberships) {
+        await localDb.tenants.put({
+          id: membership.tenantId,
+          name: membership.tenantName,
+          type: 'Usaha',
+          phone: '',
+          planCode: membership.tenantPlan,
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        })
+
+        await localDb.tenantMembers.put({
+          id: `${response.user.id}:${membership.tenantId}`,
+          tenantId: membership.tenantId,
+          userId: response.user.id,
+          role: membership.role,
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        })
+      }
+
+      setAuth(user)
+      navigate('/tenants')
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Gagal masuk ke akun')
       return
     }
-
-    setAuth(user)
-    navigate('/tenants')
   }
 
   function openReset() {
@@ -72,13 +115,6 @@ export function LoginPage() {
   async function handleResetEmail() {
     const email = resetEmail.trim().toLowerCase()
     if (!email) return
-    setResetLoading(true)
-    const user = await localDb.users.where('email').equals(email).first()
-    setResetLoading(false)
-    if (!user) {
-      toast.error('Email tidak ditemukan')
-      return
-    }
     setResetStep('password')
   }
 
@@ -86,20 +122,23 @@ export function LoginPage() {
     if (!newPassword) return
     setResetLoading(true)
     const email = resetEmail.trim().toLowerCase()
-    const user = await localDb.users.where('email').equals(email).first()
-    if (!user) {
-      toast.error('Email tidak ditemukan')
+    try {
+      await apiPost('/auth/reset-password', { email, newPassword })
+      const user = await localDb.users.where('email').equals(email).first()
+      if (user) {
+        await localDb.users.update(user.id, {
+          passwordHash: await hashPassword(newPassword),
+          updatedAt: new Date().toISOString(),
+        })
+      }
       setResetLoading(false)
+      toast.success('Kata sandi berhasil direset')
+      setResetOpen(false)
+    } catch (error) {
+      setResetLoading(false)
+      toast.error(error instanceof Error ? error.message : 'Gagal reset password')
       setResetStep('email')
-      return
     }
-    await localDb.users.update(user.id, {
-      passwordHash: newPassword,
-      updatedAt: new Date().toISOString(),
-    })
-    setResetLoading(false)
-    toast.success('Kata sandi berhasil direset')
-    setResetOpen(false)
   }
 
   return (
@@ -170,7 +209,7 @@ export function LoginPage() {
           </CardContent>
           <CardFooter className="flex flex-col items-stretch gap-3">
             <Button type="submit" form="login-form">Masuk</Button>
-            <p className="text-center text-xs text-muted-foreground">Mode demo auth. Validasi backend menyusul.</p>
+            <p className="text-center text-xs text-muted-foreground">Login dan reset password tersimpan di cloud.</p>
           </CardFooter>
         </Card>
       </div>

@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 
 import { db, type AppDb } from '../../lib/db.js'
 import { branches, tenantMembers, tenants, users, warehouses } from '../../../../../src/db/schema/index.js'
+import { hashPassword } from '../../../../../src/lib/crypto.js'
 
 export const authRoutes = new Hono()
 
@@ -56,10 +57,11 @@ authRoutes.post('/register', async (c) => {
 
   const name = body?.name?.trim()
   const email = body?.email?.trim().toLowerCase()
+  const password = body?.password?.trim()
   const tenantName = body?.tenantName?.trim()
 
-  if (!name || !email || !tenantName) {
-    return c.json({ ok: false, message: 'name, email, and tenantName required' }, 400)
+  if (!name || !email || !password || !tenantName) {
+    return c.json({ ok: false, message: 'name, email, password, and tenantName required' }, 400)
   }
 
   const existingUser = await findUserByEmail(db, email)
@@ -72,12 +74,14 @@ authRoutes.post('/register', async (c) => {
   const branchId = crypto.randomUUID()
   const warehouseId = crypto.randomUUID()
   const now = new Date()
+  const passwordHash = await hashPassword(password)
 
   await db.transaction(async (tx) => {
     await tx.insert(users).values({
       id: userId,
       email,
       name,
+      passwordHash,
       createdAt: now,
       updatedAt: now,
     })
@@ -179,17 +183,23 @@ authRoutes.get('/tenants', async (c) => {
 })
 
 authRoutes.post('/login', async (c) => {
-  const body = await c.req.json().catch(() => null) as { email?: string } | null
+  const body = await c.req.json().catch(() => null) as { email?: string; password?: string } | null
   const email = body?.email?.trim().toLowerCase()
+  const password = body?.password?.trim()
 
-  if (!email) {
-    return c.json({ ok: false, message: 'email required' }, 400)
+  if (!email || !password) {
+    return c.json({ ok: false, message: 'email and password required' }, 400)
   }
 
   const user = await findUserByEmail(db, email)
 
   if (!user) {
     return c.json({ ok: false, message: 'User not found' }, 404)
+  }
+
+  const passwordHash = await hashPassword(password)
+  if (user.passwordHash !== passwordHash) {
+    return c.json({ ok: false, message: 'Email tidak terdaftar atau kata sandi salah' }, 401)
   }
 
   const memberships = await listActiveMemberships(db, user.id)
@@ -204,4 +214,26 @@ authRoutes.post('/login', async (c) => {
     user: userResponse(user),
     memberships,
   })
+})
+
+authRoutes.post('/reset-password', async (c) => {
+  const body = await c.req.json().catch(() => null) as { email?: string; newPassword?: string } | null
+  const email = body?.email?.trim().toLowerCase()
+  const newPassword = body?.newPassword?.trim()
+
+  if (!email || !newPassword) {
+    return c.json({ ok: false, message: 'email and newPassword required' }, 400)
+  }
+
+  const user = await findUserByEmail(db, email)
+  if (!user) {
+    return c.json({ ok: false, message: 'Email tidak ditemukan' }, 404)
+  }
+
+  await db.update(users).set({
+    passwordHash: await hashPassword(newPassword),
+    updatedAt: new Date(),
+  }).where(eq(users.id, user.id))
+
+  return c.json({ ok: true })
 })
