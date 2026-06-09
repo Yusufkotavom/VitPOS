@@ -4,8 +4,15 @@ import { eq } from 'drizzle-orm'
 import { db } from '../../lib/db.js'
 import { users } from '../../../../../src/db/schema/index.js'
 
-export async function platformAdminMiddleware(c: Context<any>, next: Next) {
-  const userId = c.get('userId') as string | undefined
+type PlatformAdminEnv = {
+  Variables: {
+    userId?: string
+    platformAdminId: string
+  }
+}
+
+export async function platformAdminMiddleware(c: Context<PlatformAdminEnv>, next: Next) {
+  const userId = c.get('userId')
 
   if (!userId) {
     return c.json({ ok: false, message: 'Authentication required' }, 401)

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { useAutoSync } from '@/features/sync/hooks/use-auto-sync'
 import { useSyncStore } from '@/features/sync/stores/sync-store'
 import { useSettings } from '@/features/settings/hooks/use-settings'
+import { SubscriptionGate } from '@/features/billing/components/subscription-gate'
 import { cn } from '@/lib/utils'
 import { AppSidebar } from '@/shared/components/layout/app-sidebar'
 import { OfflineBanner } from '@/shared/components/sync/offline-banner'
@@ -73,6 +74,7 @@ export function AppLayout() {
             <div className="mb-4">
               <OfflineBanner visible={!syncSummary.isOnline} />
             </div>
+            <SubscriptionGate />
             <Outlet />
           </main>
 

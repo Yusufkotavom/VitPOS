@@ -66,6 +66,8 @@ type PaymentPayload = {
   ref?: string
   paymentNumber?: string
   salesOrderId?: string
+  serviceOrderId?: string
+  purchaseId?: string
   source?: string
   method?: string
   amount?: number | string
@@ -271,7 +273,10 @@ async function applyPayment(db: AppDb, ctx: ApplyContext, entityId: string, muta
       tenantId: ctx.tenantId,
       branchId: ctx.branchId,
       salesOrderId: toNullableUuid(payload.salesOrderId),
+      serviceOrderId: toNullableUuid(payload.serviceOrderId),
+      purchaseId: toNullableUuid(payload.purchaseId),
       paymentNumber: payload.paymentNumber ?? payload.ref ?? entityId,
+      source: payload.source ?? null,
       method: mapClientPaymentMethod(payload.method),
       amount: toNumeric(payload.amount),
       referenceNumber: null,
@@ -285,6 +290,7 @@ async function applyPayment(db: AppDb, ctx: ApplyContext, entityId: string, muta
       set: {
         status: mapClientPaymentStatus(payload.status),
         amount: toNumeric(payload.amount),
+        source: payload.source ?? undefined,
         syncStatus: 'synced',
         updatedAt: now,
       },
@@ -446,6 +452,7 @@ type ServiceOrderPayload = {
   description?: string
   date?: string
   cost?: number | string
+  paidTotal?: number | string
   status?: string
 }
 
@@ -912,6 +919,7 @@ async function applyServiceOrder(db: AppDb, ctx: ApplyContext, entityId: string,
       description: payload.description ?? null,
       date: payload.date ? new Date(payload.date) : now,
       cost: toNumeric(payload.cost),
+      paidTotal: toNumeric(payload.paidTotal),
       status: mapClientServiceOrderStatus(payload.status),
       syncStatus: 'synced',
       version: 1,
@@ -924,6 +932,7 @@ async function applyServiceOrder(db: AppDb, ctx: ApplyContext, entityId: string,
         customerName: payload.customerName ?? '',
         description: payload.description ?? null,
         cost: toNumeric(payload.cost),
+        paidTotal: toNumeric(payload.paidTotal),
         status: mapClientServiceOrderStatus(payload.status),
         syncStatus: 'synced',
         updatedAt: now,

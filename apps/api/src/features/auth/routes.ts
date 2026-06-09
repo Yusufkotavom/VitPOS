@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 
 import { db, type AppDb } from '../../lib/db.js'
-import { branches, tenantMembers, tenants, users, warehouses } from '../../../../../src/db/schema/index.js'
+import { branches, subscriptionPlans, tenantMembers, tenants, users, warehouses } from '../../../../../src/db/schema/index.js'
 import { hashPassword } from '../../../../../src/lib/crypto.js'
 
 export const authRoutes = new Hono()
@@ -37,6 +37,11 @@ async function listActiveMemberships(appDb: AppDb, userId: string) {
       role: tenantMembers.role,
       tenantName: tenants.name,
       tenantPlan: tenants.planCode,
+      tenantBillingPeriod: tenants.billingPeriod,
+      tenantSubscriptionStatus: tenants.subscriptionStatus,
+      tenantPlanValidUntil: tenants.planValidUntil,
+      tenantStorageLimitMb: tenants.storageLimitMb,
+      tenantMaxBranches: tenants.maxBranches,
     })
     .from(tenantMembers)
     .innerJoin(tenants, eq(tenantMembers.tenantId, tenants.id))
@@ -54,12 +59,21 @@ function userResponse(user: AuthUser) {
 }
 
 authRoutes.post('/register', async (c) => {
-  const body = await c.req.json().catch(() => null) as { name?: string; email?: string; password?: string; tenantName?: string } | null
+  const body = await c.req.json().catch(() => null) as {
+    name?: string
+    email?: string
+    password?: string
+    tenantName?: string
+    planCode?: string
+    billingPeriod?: 'monthly' | 'yearly'
+  } | null
 
   const name = body?.name?.trim()
   const email = body?.email?.trim().toLowerCase()
   const password = body?.password?.trim()
   const tenantName = body?.tenantName?.trim()
+  const planCode = body?.planCode?.trim() || 'trial-monthly'
+  const billingPeriod = body?.billingPeriod === 'yearly' ? 'yearly' : 'monthly'
 
   if (!name || !email || !password || !tenantName) {
     return c.json({ ok: false, message: 'name, email, password, and tenantName required' }, 400)
@@ -70,11 +84,43 @@ authRoutes.post('/register', async (c) => {
     return c.json({ ok: false, message: 'Email already registered' }, 409)
   }
 
+  const planRows = await db
+    .select()
+    .from(subscriptionPlans)
+    .where(and(eq(subscriptionPlans.code, planCode), eq(subscriptionPlans.isActive, true)))
+  const plan = planRows[0]
+
+  const now = new Date()
+  let planValidUntil: Date | null = null
+  let subscriptionStatus: 'trial' | 'active' = 'active'
+  let storageLimitMb = 1024
+  let maxBranches = 1
+
+  if (plan) {
+    storageLimitMb = plan.storageLimitMb
+    maxBranches = plan.maxBranches
+    if (plan.trialDays > 0) {
+      subscriptionStatus = 'trial'
+      planValidUntil = new Date(now)
+      planValidUntil.setDate(planValidUntil.getDate() + plan.trialDays)
+    } else if (plan.code.startsWith('free')) {
+      subscriptionStatus = 'active'
+      planValidUntil = null
+    } else {
+      subscriptionStatus = 'active'
+      planValidUntil = new Date(now)
+      planValidUntil.setDate(planValidUntil.getDate() + plan.durationDays)
+    }
+  } else {
+    subscriptionStatus = 'trial'
+    planValidUntil = new Date(now)
+    planValidUntil.setDate(planValidUntil.getDate() + 14)
+  }
+
   const userId = crypto.randomUUID()
   const tenantId = crypto.randomUUID()
   const branchId = crypto.randomUUID()
   const warehouseId = crypto.randomUUID()
-  const now = new Date()
   const passwordHash = await hashPassword(password)
 
   await db.transaction(async (tx) => {
@@ -87,17 +133,15 @@ authRoutes.post('/register', async (c) => {
       updatedAt: now,
     })
 
-    const planValidUntil = new Date(now)
-    planValidUntil.setDate(planValidUntil.getDate() + 14)
-
     await tx.insert(tenants).values({
       id: tenantId,
       name: tenantName,
-      planCode: 'trial',
-      subscriptionStatus: 'trial',
+      planCode,
+      billingPeriod,
+      subscriptionStatus,
       planValidUntil,
-      storageLimitMb: 1024,
-      maxBranches: 1,
+      storageLimitMb,
+      maxBranches,
       isActive: true,
       createdAt: now,
       updatedAt: now,

@@ -38,7 +38,11 @@ export type PlatformPlan = {
   id: string
   code: string
   name: string
+  billingPeriod: 'monthly' | 'yearly'
+  durationDays: number
+  trialDays: number
   monthlyPrice: string
+  yearlyPrice: string | null
   storageLimitMb: number
   maxBranches: number
   maxUsers: number
@@ -85,7 +89,11 @@ type AuditResponse = { ok: boolean; items: PlatformAuditLog[]; total: number }
 export type PlanInput = {
   code: string
   name: string
+  billingPeriod: 'monthly' | 'yearly'
+  durationDays: number
+  trialDays: number
   monthlyPrice: number
+  yearlyPrice?: number | null
   storageLimitMb: number
   maxBranches: number
   maxUsers: number

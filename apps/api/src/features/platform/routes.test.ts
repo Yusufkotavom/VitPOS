@@ -3,7 +3,7 @@ import { Hono } from 'hono'
 
 const { dbMock } = vi.hoisted(() => {
   const makeChain = (initial: unknown[] = []) => {
-    const chain: any = Object.assign(Promise.resolve(initial), {
+    const chain = Object.assign(Promise.resolve(initial), {
       from: vi.fn(),
       where: vi.fn(),
       orderBy: vi.fn(),
@@ -14,7 +14,7 @@ const { dbMock } = vi.hoisted(() => {
       returning: vi.fn(),
       values: vi.fn(),
       set: vi.fn(),
-    })
+    }) as Promise<unknown[]> & Record<string, ReturnType<typeof vi.fn>>
     for (const key of ['from', 'where', 'orderBy', 'limit', 'offset', 'leftJoin', 'groupBy', 'returning', 'values', 'set']) {
       chain[key].mockReturnValue(chain)
     }

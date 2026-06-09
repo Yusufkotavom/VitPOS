@@ -24,6 +24,7 @@ const timestamps = {
 }
 
 export const subscriptionStatusEnum = pgEnum('subscription_status', ['trial', 'active', 'past_due', 'suspended', 'cancelled'])
+export const billingPeriodEnum = pgEnum('billing_period', ['monthly', 'yearly'])
 
 export const tenants = pgTable('tenants', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -35,6 +36,7 @@ export const tenants = pgTable('tenants', {
   email: varchar('email', { length: 160 }),
   address: text('address'),
   planCode: varchar('plan_code', { length: 40 }).default('free').notNull(),
+  billingPeriod: billingPeriodEnum('billing_period').default('monthly').notNull(),
   subscriptionStatus: subscriptionStatusEnum('subscription_status').default('trial').notNull(),
   planValidUntil: timestamp('plan_valid_until', { withTimezone: true }),
   storageLimitMb: integer('storage_limit_mb').default(512).notNull(),
@@ -68,7 +70,11 @@ export const subscriptionPlans = pgTable('subscription_plans', {
   id: uuid('id').primaryKey().defaultRandom(),
   code: varchar('code', { length: 40 }).notNull().unique(),
   name: varchar('name', { length: 120 }).notNull(),
+  billingPeriod: billingPeriodEnum('billing_period').default('monthly').notNull(),
+  durationDays: integer('duration_days').default(30).notNull(),
+  trialDays: integer('trial_days').default(0).notNull(),
   monthlyPrice: numeric('monthly_price', { precision: 14, scale: 2 }).default('0').notNull(),
+  yearlyPrice: numeric('yearly_price', { precision: 14, scale: 2 }),
   storageLimitMb: integer('storage_limit_mb').default(512).notNull(),
   maxBranches: integer('max_branches').default(1).notNull(),
   maxUsers: integer('max_users').default(1).notNull(),
@@ -187,14 +193,23 @@ export const payments = pgTable('payments', {
   tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
   branchId: uuid('branch_id').notNull().references(() => branches.id),
   salesOrderId: uuid('sales_order_id').references(() => salesOrders.id),
+  serviceOrderId: uuid('service_order_id').references(() => serviceOrders.id),
+  purchaseId: uuid('purchase_id').references(() => purchases.id),
   paymentNumber: varchar('payment_number', { length: 80 }).notNull(),
+  source: varchar('source', { length: 80 }),
   method: paymentMethodEnum('method').notNull(),
   amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
   referenceNumber: varchar('reference_number', { length: 120 }),
   status: paymentStatusEnum('status').default('pending').notNull(),
   syncStatus: syncStatusEnum('sync_status').default('pending').notNull(),
   ...timestamps,
-}, (table) => [index('payments_tenant_id_idx').on(table.tenantId), index('payments_branch_id_idx').on(table.branchId), index('payments_order_id_idx').on(table.salesOrderId)])
+}, (table) => [
+  index('payments_tenant_id_idx').on(table.tenantId),
+  index('payments_branch_id_idx').on(table.branchId),
+  index('payments_order_id_idx').on(table.salesOrderId),
+  index('payments_service_order_id_idx').on(table.serviceOrderId),
+  index('payments_purchase_id_idx').on(table.purchaseId),
+])
 
 export const stockMovements = pgTable('stock_movements', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -341,6 +356,7 @@ export const serviceOrders = pgTable('service_orders', {
   description: text('description'),
   date: timestamp('date', { withTimezone: true }).defaultNow().notNull(),
   cost: numeric('cost', { precision: 14, scale: 2 }).default('0').notNull(),
+  paidTotal: numeric('paid_total', { precision: 14, scale: 2 }).default('0').notNull(),
   status: serviceOrderStatusEnum('status').default('received').notNull(),
   syncStatus: syncStatusEnum('sync_status').default('synced').notNull(),
   version: integer('version').default(1).notNull(),

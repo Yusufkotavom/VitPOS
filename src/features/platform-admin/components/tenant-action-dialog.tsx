@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
@@ -30,6 +30,26 @@ type TenantActionState = {
   subscriptionStatus: 'trial' | 'active' | 'past_due' | 'suspended' | 'cancelled'
 }
 
+function getInitialForm(tenant: PlatformTenant | null): TenantActionState {
+  if (!tenant) {
+    return {
+      planCode: '',
+      planValidUntil: '',
+      storageLimitMb: '',
+      maxBranches: '',
+      subscriptionStatus: 'active',
+    }
+  }
+
+  return {
+    planCode: tenant.packageName,
+    planValidUntil: toLocalDateInput(tenant.planValidUntil),
+    storageLimitMb: String(Math.round(tenant.storageLimitGb * 1024)),
+    maxBranches: String(tenant.maxBranches),
+    subscriptionStatus: tenant.subscriptionStatus as TenantActionState['subscriptionStatus'],
+  }
+}
+
 function toLocalDateInput(iso: string | null) {
   if (!iso) return ''
   const d = new Date(iso)
@@ -52,27 +72,8 @@ export function TenantActionDialog({
   onReactivate: (id: string) => void
   onUpdated: () => void
 }) {
-  const [form, setForm] = useState<TenantActionState>({
-    planCode: '',
-    planValidUntil: '',
-    storageLimitMb: '',
-    maxBranches: '',
-    subscriptionStatus: 'active',
-  })
+  const [form, setForm] = useState<TenantActionState>(() => getInitialForm(tenant))
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (tenant) {
-      setForm({
-        planCode: tenant.packageName,
-        planValidUntil: toLocalDateInput(tenant.planValidUntil),
-        storageLimitMb: String(Math.round(tenant.storageLimitGb * 1024)),
-        maxBranches: String(tenant.maxBranches),
-        subscriptionStatus: tenant.subscriptionStatus as TenantActionState['subscriptionStatus'],
-      })
-      setError(null)
-    }
-  }, [tenant])
 
   const updateMutation = useMutation({
     mutationFn: (input: TenantUpdateInput) => platformAdminService.updateTenant(tenant!.id, input),

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
@@ -32,15 +32,8 @@ export function UserRoleDialog({
   onUpdated: () => void
 }) {
   const currentUserId = useAuthStore((s) => s.currentUser?.id)
-  const [role, setRole] = useState<'user' | 'platform_admin'>(user?.role ?? 'user')
+  const [role, setRole] = useState<'user' | 'platform_admin'>(() => user?.role ?? 'user')
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (user) {
-      setRole(user.role)
-      setError(null)
-    }
-  }, [user])
 
   const updateMutation = useMutation({
     mutationFn: (newRole: 'user' | 'platform_admin') =>

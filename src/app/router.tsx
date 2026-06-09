@@ -21,8 +21,14 @@ const InventoryAdjustmentPage = lazy(() => import('@/features/inventory/pages/in
 const CashPage = lazy(() => import('@/features/cash/pages/cash-page').then(pick('CashPage')))
 const CashCategoriesPage = lazy(() => import('@/features/cash/pages/cash-categories-page').then(pick('CashCategoriesPage')))
 const ReportsPage = lazy(() => import('@/features/reports/pages/reports-page').then(pick('ReportsPage')))
+const ProfitLossPage = lazy(() => import('@/features/reports/pages/profit-loss-page').then(pick('ProfitLossPage')))
+const BalanceSheetPage = lazy(() => import('@/features/reports/pages/balance-sheet-page').then(pick('BalanceSheetPage')))
+const SalesReportPage = lazy(() => import('@/features/reports/pages/sales-report-page').then(pick('SalesReportPage')))
+const PaymentReportPage = lazy(() => import('@/features/reports/pages/payment-report-page').then(pick('PaymentReportPage')))
+const InventoryReportPage = lazy(() => import('@/features/reports/pages/inventory-report-page').then(pick('InventoryReportPage')))
 const SettingsPage = lazy(() => import('@/features/settings/pages/settings-page').then(pick('SettingsPage')))
 const UserProfilePage = lazy(() => import('@/features/settings/pages/user-profile-page').then(pick('UserProfilePage')))
+const SubscriptionPage = lazy(() => import('@/features/settings/pages/subscription-page').then(pick('SubscriptionPage')))
 const PaymentMethodsPage = lazy(() => import('@/features/settings/pages/payment-methods-page').then(pick('PaymentMethodsPage')))
 const MessageTemplatesPage = lazy(() => import('@/features/settings/pages/message-templates-page').then(pick('MessageTemplatesPage')))
 const SyncPage = lazy(() => import('@/features/sync/pages/sync-page').then(pick('SyncPage')))
@@ -82,6 +88,11 @@ export const router = createBrowserRouter([
       { path: 'cash/categories', element: routeElement(CashCategoriesPage) },
       { path: 'cash/payment-methods', element: routeElement(PaymentMethodsPage) },
       { path: 'reports', element: routeElement(ReportsPage) },
+      { path: 'reports/profit-loss', element: routeElement(ProfitLossPage) },
+      { path: 'reports/balance-sheet', element: routeElement(BalanceSheetPage) },
+      { path: 'reports/sales', element: routeElement(SalesReportPage) },
+      { path: 'reports/payments', element: routeElement(PaymentReportPage) },
+      { path: 'reports/inventory', element: routeElement(InventoryReportPage) },
       { path: 'service-orders', element: routeElement(ServiceOrdersPage) },
       { path: 'service-orders/create', element: routeElement(ServiceOrderCreatePage) },
       { path: 'service-orders/:id', element: routeElement(ServiceOrderDetailPage) },
@@ -90,6 +101,7 @@ export const router = createBrowserRouter([
       { path: 'returns', element: routeElement(ReturnsPage) },
       { path: 'settings', element: routeElement(SettingsPage) },
       { path: 'settings/profile', element: routeElement(UserProfilePage) },
+      { path: 'settings/billing', element: routeElement(SubscriptionPage) },
       { path: 'settings/templates', element: routeElement(MessageTemplatesPage) },
       { path: 'sync', element: routeElement(SyncPage) },
       { path: 'shift', element: routeElement(ShiftPage) },

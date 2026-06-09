@@ -5,7 +5,7 @@ var __export = (target, all) => {
 };
 
 // src/app.ts
-import { Hono as Hono7 } from "hono";
+import { Hono as Hono8 } from "hono";
 import { cors } from "hono/cors";
 
 // src/features/auth/routes.ts
@@ -19,6 +19,7 @@ import postgres from "postgres";
 // ../../src/db/schema/index.ts
 var schema_exports = {};
 __export(schema_exports, {
+  billingPeriodEnum: () => billingPeriodEnum,
   branches: () => branches,
   branchesRelations: () => branchesRelations,
   cash: () => cash,
@@ -99,6 +100,7 @@ var timestamps = {
   deletedAt: timestamp("deleted_at", { withTimezone: true })
 };
 var subscriptionStatusEnum = pgEnum("subscription_status", ["trial", "active", "past_due", "suspended", "cancelled"]);
+var billingPeriodEnum = pgEnum("billing_period", ["monthly", "yearly"]);
 var tenants = pgTable("tenants", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 160 }).notNull(),
@@ -109,6 +111,7 @@ var tenants = pgTable("tenants", {
   email: varchar("email", { length: 160 }),
   address: text("address"),
   planCode: varchar("plan_code", { length: 40 }).default("free").notNull(),
+  billingPeriod: billingPeriodEnum("billing_period").default("monthly").notNull(),
   subscriptionStatus: subscriptionStatusEnum("subscription_status").default("trial").notNull(),
   planValidUntil: timestamp("plan_valid_until", { withTimezone: true }),
   storageLimitMb: integer("storage_limit_mb").default(512).notNull(),
@@ -139,7 +142,11 @@ var subscriptionPlans = pgTable("subscription_plans", {
   id: uuid("id").primaryKey().defaultRandom(),
   code: varchar("code", { length: 40 }).notNull().unique(),
   name: varchar("name", { length: 120 }).notNull(),
+  billingPeriod: billingPeriodEnum("billing_period").default("monthly").notNull(),
+  durationDays: integer("duration_days").default(30).notNull(),
+  trialDays: integer("trial_days").default(0).notNull(),
   monthlyPrice: numeric("monthly_price", { precision: 14, scale: 2 }).default("0").notNull(),
+  yearlyPrice: numeric("yearly_price", { precision: 14, scale: 2 }),
   storageLimitMb: integer("storage_limit_mb").default(512).notNull(),
   maxBranches: integer("max_branches").default(1).notNull(),
   maxUsers: integer("max_users").default(1).notNull(),
@@ -249,14 +256,23 @@ var payments = pgTable("payments", {
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   branchId: uuid("branch_id").notNull().references(() => branches.id),
   salesOrderId: uuid("sales_order_id").references(() => salesOrders.id),
+  serviceOrderId: uuid("service_order_id").references(() => serviceOrders.id),
+  purchaseId: uuid("purchase_id").references(() => purchases.id),
   paymentNumber: varchar("payment_number", { length: 80 }).notNull(),
+  source: varchar("source", { length: 80 }),
   method: paymentMethodEnum("method").notNull(),
   amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
   referenceNumber: varchar("reference_number", { length: 120 }),
   status: paymentStatusEnum("status").default("pending").notNull(),
   syncStatus: syncStatusEnum("sync_status").default("pending").notNull(),
   ...timestamps
-}, (table) => [index("payments_tenant_id_idx").on(table.tenantId), index("payments_branch_id_idx").on(table.branchId), index("payments_order_id_idx").on(table.salesOrderId)]);
+}, (table) => [
+  index("payments_tenant_id_idx").on(table.tenantId),
+  index("payments_branch_id_idx").on(table.branchId),
+  index("payments_order_id_idx").on(table.salesOrderId),
+  index("payments_service_order_id_idx").on(table.serviceOrderId),
+  index("payments_purchase_id_idx").on(table.purchaseId)
+]);
 var stockMovements = pgTable("stock_movements", {
   id: uuid("id").primaryKey().defaultRandom(),
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
@@ -392,6 +408,7 @@ var serviceOrders = pgTable("service_orders", {
   description: text("description"),
   date: timestamp("date", { withTimezone: true }).defaultNow().notNull(),
   cost: numeric("cost", { precision: 14, scale: 2 }).default("0").notNull(),
+  paidTotal: numeric("paid_total", { precision: 14, scale: 2 }).default("0").notNull(),
   status: serviceOrderStatusEnum("status").default("received").notNull(),
   syncStatus: syncStatusEnum("sync_status").default("synced").notNull(),
   version: integer("version").default(1).notNull(),
@@ -556,7 +573,12 @@ async function listActiveMemberships(appDb, userId) {
     tenantId: tenantMembers.tenantId,
     role: tenantMembers.role,
     tenantName: tenants.name,
-    tenantPlan: tenants.planCode
+    tenantPlan: tenants.planCode,
+    tenantBillingPeriod: tenants.billingPeriod,
+    tenantSubscriptionStatus: tenants.subscriptionStatus,
+    tenantPlanValidUntil: tenants.planValidUntil,
+    tenantStorageLimitMb: tenants.storageLimitMb,
+    tenantMaxBranches: tenants.maxBranches
   }).from(tenantMembers).innerJoin(tenants, eq(tenantMembers.tenantId, tenants.id)).where(and(eq(tenantMembers.userId, userId), eq(tenantMembers.isActive, true), eq(tenants.isActive, true)));
 }
 function userResponse(user) {
@@ -574,6 +596,8 @@ authRoutes.post("/register", async (c) => {
   const email = body?.email?.trim().toLowerCase();
   const password = body?.password?.trim();
   const tenantName = body?.tenantName?.trim();
+  const planCode = body?.planCode?.trim() || "trial-monthly";
+  const billingPeriod = body?.billingPeriod === "yearly" ? "yearly" : "monthly";
   if (!name || !email || !password || !tenantName) {
     return c.json({ ok: false, message: "name, email, password, and tenantName required" }, 400);
   }
@@ -581,11 +605,37 @@ authRoutes.post("/register", async (c) => {
   if (existingUser) {
     return c.json({ ok: false, message: "Email already registered" }, 409);
   }
+  const planRows = await db.select().from(subscriptionPlans).where(and(eq(subscriptionPlans.code, planCode), eq(subscriptionPlans.isActive, true)));
+  const plan = planRows[0];
+  const now = /* @__PURE__ */ new Date();
+  let planValidUntil = null;
+  let subscriptionStatus = "active";
+  let storageLimitMb = 1024;
+  let maxBranches = 1;
+  if (plan) {
+    storageLimitMb = plan.storageLimitMb;
+    maxBranches = plan.maxBranches;
+    if (plan.trialDays > 0) {
+      subscriptionStatus = "trial";
+      planValidUntil = new Date(now);
+      planValidUntil.setDate(planValidUntil.getDate() + plan.trialDays);
+    } else if (plan.code.startsWith("free")) {
+      subscriptionStatus = "active";
+      planValidUntil = null;
+    } else {
+      subscriptionStatus = "active";
+      planValidUntil = new Date(now);
+      planValidUntil.setDate(planValidUntil.getDate() + plan.durationDays);
+    }
+  } else {
+    subscriptionStatus = "trial";
+    planValidUntil = new Date(now);
+    planValidUntil.setDate(planValidUntil.getDate() + 14);
+  }
   const userId = crypto.randomUUID();
   const tenantId = crypto.randomUUID();
   const branchId = crypto.randomUUID();
   const warehouseId = crypto.randomUUID();
-  const now = /* @__PURE__ */ new Date();
   const passwordHash = await hashPassword(password);
   await db.transaction(async (tx) => {
     await tx.insert(users).values({
@@ -596,16 +646,15 @@ authRoutes.post("/register", async (c) => {
       createdAt: now,
       updatedAt: now
     });
-    const planValidUntil = new Date(now);
-    planValidUntil.setDate(planValidUntil.getDate() + 14);
     await tx.insert(tenants).values({
       id: tenantId,
       name: tenantName,
-      planCode: "trial",
-      subscriptionStatus: "trial",
+      planCode,
+      billingPeriod,
+      subscriptionStatus,
       planValidUntil,
-      storageLimitMb: 1024,
-      maxBranches: 1,
+      storageLimitMb,
+      maxBranches,
       isActive: true,
       createdAt: now,
       updatedAt: now
@@ -728,7 +777,10 @@ healthRoutes.get("/", (c) => {
 import { Hono as Hono3 } from "hono";
 
 // src/features/reports/service.ts
-import { and as and2, count, eq as eq2, gte, lte, sum } from "drizzle-orm";
+import { and as and2, count, desc, eq as eq2, gte, inArray, lte, ne, sql, sum } from "drizzle-orm";
+function n(val) {
+  return Number(val ?? 0);
+}
 async function getSalesSummary(db2, input) {
   const filters = [eq2(salesOrders.tenantId, input.tenantId)];
   if (input.branchId) filters.push(eq2(salesOrders.branchId, input.branchId));
@@ -777,51 +829,396 @@ async function getInventoryMovementSummary(db2, input) {
     count: Number(row.count ?? 0)
   }));
 }
+async function getProfitLoss(db2, input) {
+  const tenantId = input.tenantId;
+  const saleFilters = [eq2(salesOrders.tenantId, tenantId), inArray(salesOrders.status, ["paid", "partial"])];
+  if (input.branchId) saleFilters.push(eq2(salesOrders.branchId, input.branchId));
+  if (input.from) saleFilters.push(gte(salesOrders.createdAt, new Date(input.from)));
+  if (input.to) saleFilters.push(lte(salesOrders.createdAt, new Date(input.to)));
+  const [salesRev] = await db2.select({ revenue: sum(salesOrders.grandTotal), orderCount: count(salesOrders.id) }).from(salesOrders).where(and2(...saleFilters));
+  const svcFilters = [eq2(serviceOrders.tenantId, tenantId), inArray(serviceOrders.status, ["completed", "picked_up"])];
+  if (input.branchId) svcFilters.push(eq2(serviceOrders.branchId, input.branchId));
+  if (input.from) svcFilters.push(gte(serviceOrders.date, new Date(input.from)));
+  if (input.to) svcFilters.push(lte(serviceOrders.date, new Date(input.to)));
+  const [svcRev] = await db2.select({ revenue: sum(serviceOrders.cost), orderCount: count(serviceOrders.id) }).from(serviceOrders).where(and2(...svcFilters));
+  const cogsFilters = [eq2(salesOrders.tenantId, tenantId)];
+  if (input.branchId) cogsFilters.push(eq2(salesOrders.branchId, input.branchId));
+  if (input.from) cogsFilters.push(gte(salesOrders.createdAt, new Date(input.from)));
+  if (input.to) cogsFilters.push(lte(salesOrders.createdAt, new Date(input.to)));
+  const [cogsRow] = await db2.select({ cogs: sum(sql`${salesOrderItems.qty} * COALESCE(${products.costPrice}, 0)`) }).from(salesOrderItems).innerJoin(salesOrders, eq2(salesOrderItems.salesOrderId, salesOrders.id)).leftJoin(products, eq2(salesOrderItems.productId, products.id)).where(and2(...cogsFilters));
+  const cashFilters = [eq2(cash.tenantId, tenantId)];
+  if (input.branchId) cashFilters.push(eq2(cash.branchId, input.branchId));
+  if (input.from) cashFilters.push(gte(cash.date, new Date(input.from)));
+  if (input.to) cashFilters.push(lte(cash.date, new Date(input.to)));
+  const expenseRows = await db2.select({
+    category: cashCategories.name,
+    total: sum(cash.expense)
+  }).from(cash).leftJoin(cashCategories, eq2(cash.categoryId, cashCategories.id)).where(and2(...cashFilters, eq2(cashCategories.type, "expense"), sql`${cash.expense} > 0`)).groupBy(cashCategories.name);
+  const [incomeRow] = await db2.select({ total: sum(cash.income) }).from(cash).leftJoin(cashCategories, eq2(cash.categoryId, cashCategories.id)).where(and2(...cashFilters, eq2(cashCategories.type, "income"), sql`${cash.income} > 0`));
+  const payFilters = [eq2(payments.tenantId, tenantId), eq2(payments.status, "success")];
+  if (input.branchId) payFilters.push(eq2(payments.branchId, input.branchId));
+  if (input.from) payFilters.push(gte(payments.createdAt, new Date(input.from)));
+  if (input.to) payFilters.push(lte(payments.createdAt, new Date(input.to)));
+  const paymentBreakdown = await db2.select({ method: payments.method, total: sum(payments.amount), count: count(payments.id) }).from(payments).where(and2(...payFilters)).groupBy(payments.method).orderBy(payments.method);
+  const salesRevenue = n(salesRev?.revenue);
+  const serviceRevenue = n(svcRev?.revenue);
+  const totalRevenue = salesRevenue + serviceRevenue;
+  const cogs = n(cogsRow?.cogs);
+  const grossProfit = totalRevenue - cogs;
+  const totalExpenses = expenseRows.reduce((s, r) => s + n(r.total), 0);
+  const otherIncome = n(incomeRow?.total);
+  const netProfit = grossProfit - totalExpenses + otherIncome;
+  return {
+    salesRevenue,
+    serviceRevenue,
+    totalRevenue,
+    salesOrderCount: Number(salesRev?.orderCount ?? 0),
+    serviceOrderCount: Number(svcRev?.orderCount ?? 0),
+    cogs,
+    grossProfit,
+    expenses: expenseRows.map((r) => ({ category: r.category ?? "Lainnya", total: n(r.total) })),
+    totalExpenses,
+    otherIncome,
+    netProfit,
+    paymentBreakdown: paymentBreakdown.map((r) => ({
+      method: r.method,
+      total: n(r.total),
+      count: Number(r.count ?? 0)
+    }))
+  };
+}
+async function getBalanceSheet(db2, input) {
+  const tenantId = input.tenantId;
+  const cashFilters = [eq2(cash.tenantId, tenantId)];
+  if (input.branchId) cashFilters.push(eq2(cash.branchId, input.branchId));
+  if (input.to) cashFilters.push(lte(cash.date, new Date(input.to)));
+  const [cashRow] = await db2.select({
+    totalIncome: sum(cash.income),
+    totalExpense: sum(cash.expense)
+  }).from(cash).where(and2(...cashFilters));
+  const cashOnHand = n(cashRow?.totalIncome) - n(cashRow?.totalExpense);
+  const arFilters = [eq2(salesOrders.tenantId, tenantId), ne(salesOrders.status, "cancelled")];
+  if (input.branchId) arFilters.push(eq2(salesOrders.branchId, input.branchId));
+  if (input.to) arFilters.push(lte(salesOrders.createdAt, new Date(input.to)));
+  const [arRow] = await db2.select({ outstanding: sum(sql`${salesOrders.grandTotal} - ${salesOrders.paidTotal}`) }).from(salesOrders).where(and2(...arFilters));
+  const accountsReceivable = Math.max(0, n(arRow?.outstanding));
+  const invRows = await db2.select({
+    productId: stockMovements.productId,
+    totalQty: sum(stockMovements.qty)
+  }).from(stockMovements).where(eq2(stockMovements.tenantId, tenantId)).groupBy(stockMovements.productId);
+  const productIds = invRows.map((r) => r.productId);
+  const costMap = /* @__PURE__ */ new Map();
+  if (productIds.length > 0) {
+    const prodRows = await db2.select({ id: products.id, costPrice: products.costPrice }).from(products).where(and2(eq2(products.tenantId, tenantId), inArray(products.id, productIds)));
+    for (const p of prodRows) {
+      costMap.set(p.id, n(p.costPrice));
+    }
+  }
+  let inventoryValue = 0;
+  const inventoryDetail = invRows.map((r) => {
+    const stock = n(r.totalQty);
+    const unitCost = costMap.get(r.productId) ?? 0;
+    const value = Math.max(0, stock) * unitCost;
+    inventoryValue += value;
+    return { productId: r.productId, stock: Math.max(0, stock), unitCost, value };
+  });
+  const totalAssets = cashOnHand + accountsReceivable + inventoryValue;
+  const supplierFilters = [eq2(suppliers.tenantId, tenantId)];
+  const [payableRow] = await db2.select({ total: sum(suppliers.payable) }).from(suppliers).where(and2(...supplierFilters));
+  const accountsPayable = n(payableRow?.total);
+  const totalLiabilities = accountsPayable;
+  const allTimeSaleFilters = [eq2(salesOrders.tenantId, tenantId), inArray(salesOrders.status, ["paid", "partial"])];
+  const [allTimeSalesRev] = await db2.select({ revenue: sum(salesOrders.grandTotal) }).from(salesOrders).where(and2(...allTimeSaleFilters));
+  const allTimeSvcFilters = [eq2(serviceOrders.tenantId, tenantId), inArray(serviceOrders.status, ["completed", "picked_up"])];
+  const [allTimeSvcRev] = await db2.select({ revenue: sum(serviceOrders.cost) }).from(serviceOrders).where(and2(...allTimeSvcFilters));
+  const [allTimeCogs] = await db2.select({ cogs: sum(sql`${salesOrderItems.qty} * COALESCE(${products.costPrice}, 0)`) }).from(salesOrderItems).innerJoin(salesOrders, eq2(salesOrderItems.salesOrderId, salesOrders.id)).leftJoin(products, eq2(salesOrderItems.productId, products.id)).where(eq2(salesOrders.tenantId, tenantId));
+  const [allTimeExpense] = await db2.select({ total: sum(cash.expense) }).from(cash).leftJoin(cashCategories, eq2(cash.categoryId, cashCategories.id)).where(and2(eq2(cash.tenantId, tenantId), eq2(cashCategories.type, "expense")));
+  const [allTimeIncome] = await db2.select({ total: sum(cash.income) }).from(cash).leftJoin(cashCategories, eq2(cash.categoryId, cashCategories.id)).where(and2(eq2(cash.tenantId, tenantId), eq2(cashCategories.type, "income")));
+  const retainedEarnings = n(allTimeSalesRev?.revenue) + n(allTimeSvcRev?.revenue) - n(allTimeCogs?.cogs) - n(allTimeExpense?.total) + n(allTimeIncome?.total);
+  const totalEquity = retainedEarnings;
+  const totalLiabilitiesAndEquity = totalLiabilities + totalEquity;
+  return {
+    assets: {
+      cashOnHand,
+      accountsReceivable,
+      inventoryValue,
+      inventoryDetail,
+      totalAssets
+    },
+    liabilities: {
+      accountsPayable,
+      totalLiabilities
+    },
+    equity: {
+      retainedEarnings,
+      totalEquity
+    },
+    totalLiabilitiesAndEquity
+  };
+}
+async function getSalesReport(db2, input) {
+  const tenantId = input.tenantId;
+  const saleFilters = [eq2(salesOrders.tenantId, tenantId), ne(salesOrders.status, "cancelled")];
+  if (input.branchId) saleFilters.push(eq2(salesOrders.branchId, input.branchId));
+  if (input.from) saleFilters.push(gte(salesOrders.createdAt, new Date(input.from)));
+  if (input.to) saleFilters.push(lte(salesOrders.createdAt, new Date(input.to)));
+  const dailySales = await db2.select({
+    date: sql`DATE(${salesOrders.createdAt})`.as("date"),
+    orderCount: count(salesOrders.id),
+    revenue: sum(salesOrders.grandTotal),
+    paid: sum(salesOrders.paidTotal)
+  }).from(salesOrders).where(and2(...saleFilters)).groupBy(sql`DATE(${salesOrders.createdAt})`).orderBy(sql`DATE(${salesOrders.createdAt})`);
+  const svcFilters = [eq2(serviceOrders.tenantId, tenantId), ne(serviceOrders.status, "cancelled")];
+  if (input.branchId) svcFilters.push(eq2(serviceOrders.branchId, input.branchId));
+  if (input.from) svcFilters.push(gte(serviceOrders.date, new Date(input.from)));
+  if (input.to) svcFilters.push(lte(serviceOrders.date, new Date(input.to)));
+  const dailyService = await db2.select({
+    date: sql`DATE(${serviceOrders.date})`.as("date"),
+    orderCount: count(serviceOrders.id),
+    revenue: sum(serviceOrders.cost)
+  }).from(serviceOrders).where(and2(...svcFilters)).groupBy(sql`DATE(${serviceOrders.date})`).orderBy(sql`DATE(${serviceOrders.date})`);
+  const topProductRows = await db2.select({
+    productId: salesOrderItems.productId,
+    name: salesOrderItems.name,
+    totalQty: sum(salesOrderItems.qty),
+    totalRevenue: sum(salesOrderItems.subtotal)
+  }).from(salesOrderItems).innerJoin(salesOrders, eq2(salesOrderItems.salesOrderId, salesOrders.id)).where(and2(...saleFilters)).groupBy(salesOrderItems.productId, salesOrderItems.name).orderBy(desc(sum(salesOrderItems.subtotal))).limit(20);
+  const [totals] = await db2.select({
+    orderCount: count(salesOrders.id),
+    revenue: sum(salesOrders.grandTotal),
+    paid: sum(salesOrders.paidTotal)
+  }).from(salesOrders).where(and2(...saleFilters));
+  const [svcTotals] = await db2.select({
+    orderCount: count(serviceOrders.id),
+    revenue: sum(serviceOrders.cost)
+  }).from(serviceOrders).where(and2(...svcFilters));
+  const totalRevenue = n(totals?.revenue) + n(svcTotals?.revenue);
+  const totalOrders = Number(totals?.orderCount ?? 0) + Number(svcTotals?.orderCount ?? 0);
+  return {
+    summary: {
+      totalRevenue,
+      salesRevenue: n(totals?.revenue),
+      serviceRevenue: n(svcTotals?.revenue),
+      totalOrders,
+      salesOrders: Number(totals?.orderCount ?? 0),
+      serviceOrders: Number(svcTotals?.orderCount ?? 0),
+      totalPaid: n(totals?.paid),
+      avgOrderValue: totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0
+    },
+    dailySales: dailySales.map((r) => ({
+      date: r.date,
+      orderCount: Number(r.orderCount ?? 0),
+      revenue: n(r.revenue),
+      paid: n(r.paid)
+    })),
+    dailyService: dailyService.map((r) => ({
+      date: r.date,
+      orderCount: Number(r.orderCount ?? 0),
+      revenue: n(r.revenue)
+    })),
+    topProducts: topProductRows.map((r) => ({
+      productId: r.productId,
+      name: r.name,
+      totalQty: n(r.totalQty),
+      totalRevenue: n(r.totalRevenue)
+    }))
+  };
+}
+async function getPaymentReport(db2, input) {
+  const tenantId = input.tenantId;
+  const payFilters = [eq2(payments.tenantId, tenantId), eq2(payments.status, "success")];
+  if (input.branchId) payFilters.push(eq2(payments.branchId, input.branchId));
+  if (input.from) payFilters.push(gte(payments.createdAt, new Date(input.from)));
+  if (input.to) payFilters.push(lte(payments.createdAt, new Date(input.to)));
+  const byMethod = await db2.select({ method: payments.method, total: sum(payments.amount), count: count(payments.id) }).from(payments).where(and2(...payFilters)).groupBy(payments.method).orderBy(payments.method);
+  const bySource = await db2.select({ source: payments.source, total: sum(payments.amount), count: count(payments.id) }).from(payments).where(and2(...payFilters)).groupBy(payments.source).orderBy(payments.source);
+  const dailyFlow = await db2.select({
+    date: sql`DATE(${payments.createdAt})`.as("date"),
+    method: payments.method,
+    total: sum(payments.amount)
+  }).from(payments).where(and2(...payFilters)).groupBy(sql`DATE(${payments.createdAt})`, payments.method).orderBy(sql`DATE(${payments.createdAt})`);
+  const arFilters = [eq2(salesOrders.tenantId, tenantId), ne(salesOrders.status, "cancelled"), sql`${salesOrders.grandTotal} > ${salesOrders.paidTotal}`];
+  if (input.branchId) arFilters.push(eq2(salesOrders.branchId, input.branchId));
+  const receivables = await db2.select({
+    id: salesOrders.id,
+    orderNumber: salesOrders.orderNumber,
+    grandTotal: salesOrders.grandTotal,
+    paidTotal: salesOrders.paidTotal,
+    outstanding: sql`${salesOrders.grandTotal} - ${salesOrders.paidTotal}`,
+    createdAt: salesOrders.createdAt
+  }).from(salesOrders).where(and2(...arFilters)).orderBy(salesOrders.createdAt).limit(50);
+  const now = /* @__PURE__ */ new Date();
+  const aging = { current: 0, days7: 0, days30: 0, days60: 0, over60: 0 };
+  for (const r of receivables) {
+    const days = Math.floor((now.getTime() - new Date(r.createdAt).getTime()) / 864e5);
+    const amount = n(r.outstanding);
+    if (days <= 7) aging.current += amount;
+    else if (days <= 30) aging.days7 += amount;
+    else if (days <= 60) aging.days30 += amount;
+    else aging.over60 += amount;
+  }
+  const totalCollected = byMethod.reduce((s, r) => s + n(r.total), 0);
+  const totalReceivable = receivables.reduce((s, r) => s + n(r.outstanding), 0);
+  return {
+    summary: {
+      totalCollected,
+      totalReceivable,
+      transactionCount: byMethod.reduce((s, r) => s + Number(r.count ?? 0), 0)
+    },
+    byMethod: byMethod.map((r) => ({ method: r.method, total: n(r.total), count: Number(r.count ?? 0) })),
+    bySource: bySource.map((r) => ({ source: r.source ?? "Unknown", total: n(r.total), count: Number(r.count ?? 0) })),
+    dailyFlow: dailyFlow.map((r) => ({ date: r.date, method: r.method, total: n(r.total) })),
+    aging,
+    receivables: receivables.map((r) => ({
+      id: r.id,
+      orderNumber: r.orderNumber,
+      grandTotal: n(r.grandTotal),
+      paidTotal: n(r.paidTotal),
+      outstanding: n(r.outstanding),
+      createdAt: r.createdAt.toISOString()
+    }))
+  };
+}
+async function getInventoryReport(db2, input) {
+  const tenantId = input.tenantId;
+  const prodRows = await db2.select({
+    id: products.id,
+    name: products.name,
+    sku: products.sku,
+    type: products.type,
+    costPrice: products.costPrice,
+    salePrice: products.salePrice,
+    minimumStock: products.minimumStock,
+    isActive: products.isActive
+  }).from(products).where(and2(eq2(products.tenantId, tenantId), eq2(products.isActive, true)));
+  const movementTotals = await db2.select({
+    productId: stockMovements.productId,
+    totalQty: sum(stockMovements.qty)
+  }).from(stockMovements).where(eq2(stockMovements.tenantId, tenantId)).groupBy(stockMovements.productId);
+  const stockMap = new Map(movementTotals.map((r) => [r.productId, Math.max(0, n(r.totalQty))]));
+  const valuation = prodRows.map((p) => {
+    const stock = stockMap.get(p.id) ?? 0;
+    const unitCost = n(p.costPrice);
+    return {
+      id: p.id,
+      name: p.name,
+      sku: p.sku,
+      type: p.type,
+      stock,
+      unitCost,
+      unitPrice: n(p.salePrice),
+      value: stock * unitCost,
+      minimumStock: p.minimumStock,
+      isLow: stock <= p.minimumStock
+    };
+  });
+  const movFilters = [eq2(stockMovements.tenantId, tenantId)];
+  if (input.branchId) movFilters.push(eq2(stockMovements.branchId, input.branchId));
+  if (input.from) movFilters.push(gte(stockMovements.createdAt, new Date(input.from)));
+  if (input.to) movFilters.push(lte(stockMovements.createdAt, new Date(input.to)));
+  const movementSummary = await db2.select({
+    type: stockMovements.type,
+    totalQty: sum(sql`ABS(${stockMovements.qty})`),
+    count: count(stockMovements.id)
+  }).from(stockMovements).where(and2(...movFilters)).groupBy(stockMovements.type).orderBy(stockMovements.type);
+  const movementDetail = await db2.select({
+    id: stockMovements.id,
+    productName: products.name,
+    type: stockMovements.type,
+    qty: stockMovements.qty,
+    referenceType: stockMovements.referenceType,
+    notes: stockMovements.notes,
+    createdAt: stockMovements.createdAt
+  }).from(stockMovements).leftJoin(products, eq2(stockMovements.productId, products.id)).where(and2(...movFilters)).orderBy(desc(stockMovements.createdAt)).limit(200);
+  const totalSkus = valuation.length;
+  const totalValue = valuation.reduce((s, v) => s + v.value, 0);
+  const lowStockCount = valuation.filter((v) => v.isLow).length;
+  return {
+    summary: {
+      totalSkus,
+      totalValue,
+      lowStockCount
+    },
+    valuation,
+    movementSummary: movementSummary.map((r) => ({
+      type: r.type,
+      totalQty: n(r.totalQty),
+      count: Number(r.count ?? 0)
+    })),
+    movementDetail: movementDetail.map((r) => ({
+      id: r.id,
+      productName: r.productName ?? "Unknown",
+      type: r.type,
+      qty: n(r.qty),
+      referenceType: r.referenceType,
+      notes: r.notes,
+      createdAt: r.createdAt.toISOString()
+    })),
+    lowStock: valuation.filter((v) => v.isLow)
+  };
+}
 
 // src/features/reports/routes.ts
 var reportRoutes = new Hono3();
-reportRoutes.get("/sales/summary", async (c) => {
-  const tenantId = c.req.query("tenantId");
-  if (!tenantId) {
-    return c.json({ ok: false, message: "tenantId required" }, 400);
-  }
-  const summary = await getSalesSummary(db, {
-    tenantId,
+function getInput(c) {
+  return {
+    tenantId: c.req.query("tenantId") ?? "",
     branchId: c.req.query("branchId") ?? void 0,
     from: c.req.query("from") ?? void 0,
     to: c.req.query("to") ?? void 0
-  });
+  };
+}
+reportRoutes.get("/sales/summary", async (c) => {
+  const input = getInput(c);
+  if (!input.tenantId) return c.json({ ok: false, message: "tenantId required" }, 400);
+  const summary = await getSalesSummary(db, input);
   return c.json({ ok: true, summary });
 });
 reportRoutes.get("/payments/summary", async (c) => {
-  const tenantId = c.req.query("tenantId");
-  if (!tenantId) {
-    return c.json({ ok: false, message: "tenantId required" }, 400);
-  }
-  const items = await getPaymentSummary(db, {
-    tenantId,
-    branchId: c.req.query("branchId") ?? void 0,
-    from: c.req.query("from") ?? void 0,
-    to: c.req.query("to") ?? void 0
-  });
+  const input = getInput(c);
+  if (!input.tenantId) return c.json({ ok: false, message: "tenantId required" }, 400);
+  const items = await getPaymentSummary(db, input);
   return c.json({ ok: true, items });
 });
 reportRoutes.get("/inventory/movements", async (c) => {
-  const tenantId = c.req.query("tenantId");
-  if (!tenantId) {
-    return c.json({ ok: false, message: "tenantId required" }, 400);
-  }
-  const items = await getInventoryMovementSummary(db, {
-    tenantId,
-    branchId: c.req.query("branchId") ?? void 0,
-    from: c.req.query("from") ?? void 0,
-    to: c.req.query("to") ?? void 0
-  });
+  const input = getInput(c);
+  if (!input.tenantId) return c.json({ ok: false, message: "tenantId required" }, 400);
+  const items = await getInventoryMovementSummary(db, input);
   return c.json({ ok: true, items });
+});
+reportRoutes.get("/profit-loss", async (c) => {
+  const input = getInput(c);
+  if (!input.tenantId) return c.json({ ok: false, message: "tenantId required" }, 400);
+  const data = await getProfitLoss(db, input);
+  return c.json({ ok: true, data });
+});
+reportRoutes.get("/balance-sheet", async (c) => {
+  const input = getInput(c);
+  if (!input.tenantId) return c.json({ ok: false, message: "tenantId required" }, 400);
+  const data = await getBalanceSheet(db, input);
+  return c.json({ ok: true, data });
+});
+reportRoutes.get("/sales", async (c) => {
+  const input = getInput(c);
+  if (!input.tenantId) return c.json({ ok: false, message: "tenantId required" }, 400);
+  const data = await getSalesReport(db, input);
+  return c.json({ ok: true, data });
+});
+reportRoutes.get("/payments", async (c) => {
+  const input = getInput(c);
+  if (!input.tenantId) return c.json({ ok: false, message: "tenantId required" }, 400);
+  const data = await getPaymentReport(db, input);
+  return c.json({ ok: true, data });
+});
+reportRoutes.get("/inventory", async (c) => {
+  const input = getInput(c);
+  if (!input.tenantId) return c.json({ ok: false, message: "tenantId required" }, 400);
+  const data = await getInventoryReport(db, input);
+  return c.json({ ok: true, data });
 });
 
 // src/features/sync/routes.ts
-import { and as and4, desc, eq as eq4, gte as gte2, isNull } from "drizzle-orm";
+import { and as and4, desc as desc2, eq as eq4, gte as gte2, isNull } from "drizzle-orm";
 import { Hono as Hono4 } from "hono";
 
 // src/features/auth/middleware.ts
@@ -1115,7 +1512,10 @@ async function applyPayment(db2, ctx, entityId, mutationType, payload) {
     tenantId: ctx.tenantId,
     branchId: ctx.branchId,
     salesOrderId: toNullableUuid(payload.salesOrderId),
+    serviceOrderId: toNullableUuid(payload.serviceOrderId),
+    purchaseId: toNullableUuid(payload.purchaseId),
     paymentNumber: payload.paymentNumber ?? payload.ref ?? entityId,
+    source: payload.source ?? null,
     method: mapClientPaymentMethod(payload.method),
     amount: toNumeric(payload.amount),
     referenceNumber: null,
@@ -1128,6 +1528,7 @@ async function applyPayment(db2, ctx, entityId, mutationType, payload) {
     set: {
       status: mapClientPaymentStatus(payload.status),
       amount: toNumeric(payload.amount),
+      source: payload.source ?? void 0,
       syncStatus: "synced",
       updatedAt: now
     }
@@ -1540,6 +1941,7 @@ async function applyServiceOrder(db2, ctx, entityId, mutationType, payload) {
     description: payload.description ?? null,
     date: payload.date ? new Date(payload.date) : now,
     cost: toNumeric(payload.cost),
+    paidTotal: toNumeric(payload.paidTotal),
     status: mapClientServiceOrderStatus(payload.status),
     syncStatus: "synced",
     version: 1,
@@ -1551,6 +1953,7 @@ async function applyServiceOrder(db2, ctx, entityId, mutationType, payload) {
       customerName: payload.customerName ?? "",
       description: payload.description ?? null,
       cost: toNumeric(payload.cost),
+      paidTotal: toNumeric(payload.paidTotal),
       status: mapClientServiceOrderStatus(payload.status),
       syncStatus: "synced",
       updatedAt: now
@@ -1700,105 +2103,105 @@ syncRoutes.get("/pull", async (c) => {
   const sinceFilter = parsed.value.since ? gte2(products.updatedAt, parsed.value.since) : void 0;
   const productRows = await db.query.products.findMany({
     where: and4(eq4(products.tenantId, parsed.value.tenantId), isNull(products.deletedAt), branchFilter, sinceFilter),
-    orderBy: [desc(products.updatedAt)],
+    orderBy: [desc2(products.updatedAt)],
     limit: 100
   });
   const saleBranchFilter = parsed.value.branchId ? eq4(salesOrders.branchId, parsed.value.branchId) : void 0;
   const saleSinceFilter = parsed.value.since ? gte2(salesOrders.updatedAt, parsed.value.since) : void 0;
   const saleRows = await db.query.salesOrders.findMany({
     where: and4(eq4(salesOrders.tenantId, parsed.value.tenantId), isNull(salesOrders.deletedAt), saleBranchFilter, saleSinceFilter),
-    orderBy: [desc(salesOrders.updatedAt)],
+    orderBy: [desc2(salesOrders.updatedAt)],
     limit: 100
   });
   const paymentBranchFilter = parsed.value.branchId ? eq4(payments.branchId, parsed.value.branchId) : void 0;
   const paymentSinceFilter = parsed.value.since ? gte2(payments.updatedAt, parsed.value.since) : void 0;
   const paymentRows = await db.query.payments.findMany({
     where: and4(eq4(payments.tenantId, parsed.value.tenantId), isNull(payments.deletedAt), paymentBranchFilter, paymentSinceFilter),
-    orderBy: [desc(payments.updatedAt)],
+    orderBy: [desc2(payments.updatedAt)],
     limit: 100
   });
   const stockBranchFilter = parsed.value.branchId ? eq4(stockMovements.branchId, parsed.value.branchId) : void 0;
   const stockSinceFilter = parsed.value.since ? gte2(stockMovements.updatedAt, parsed.value.since) : void 0;
   const stockRows = await db.query.stockMovements.findMany({
     where: and4(eq4(stockMovements.tenantId, parsed.value.tenantId), isNull(stockMovements.deletedAt), stockBranchFilter, stockSinceFilter),
-    orderBy: [desc(stockMovements.updatedAt)],
+    orderBy: [desc2(stockMovements.updatedAt)],
     limit: 100
   });
   const customerSinceFilter = parsed.value.since ? gte2(customers.updatedAt, parsed.value.since) : void 0;
   const customerRows = await db.query.customers.findMany({
     where: and4(eq4(customers.tenantId, parsed.value.tenantId), isNull(customers.deletedAt), customerSinceFilter),
-    orderBy: [desc(customers.updatedAt)],
+    orderBy: [desc2(customers.updatedAt)],
     limit: 100
   });
   const categoriesSinceFilter = parsed.value.since ? gte2(productCategories.updatedAt, parsed.value.since) : void 0;
   const categoryRows = await db.query.productCategories.findMany({
     where: and4(eq4(productCategories.tenantId, parsed.value.tenantId), isNull(productCategories.deletedAt), categoriesSinceFilter),
-    orderBy: [desc(productCategories.updatedAt)],
+    orderBy: [desc2(productCategories.updatedAt)],
     limit: 100
   });
   const cashCategoriesSinceFilter = parsed.value.since ? gte2(cashCategories.updatedAt, parsed.value.since) : void 0;
   const cashCategoryRows = await db.query.cashCategories.findMany({
     where: and4(eq4(cashCategories.tenantId, parsed.value.tenantId), isNull(cashCategories.deletedAt), cashCategoriesSinceFilter),
-    orderBy: [desc(cashCategories.updatedAt)],
+    orderBy: [desc2(cashCategories.updatedAt)],
     limit: 100
   });
   const cashBranchFilter = parsed.value.branchId ? eq4(cash.branchId, parsed.value.branchId) : void 0;
   const cashSinceFilter = parsed.value.since ? gte2(cash.updatedAt, parsed.value.since) : void 0;
   const cashRows = await db.query.cash.findMany({
     where: and4(eq4(cash.tenantId, parsed.value.tenantId), cashBranchFilter, cashSinceFilter),
-    orderBy: [desc(cash.updatedAt)],
+    orderBy: [desc2(cash.updatedAt)],
     limit: 100
   });
   const settingsSinceFilter = parsed.value.since ? gte2(settings.updatedAt, parsed.value.since) : void 0;
   const settingRows = await db.query.settings.findMany({
     where: and4(eq4(settings.tenantId, parsed.value.tenantId), settingsSinceFilter),
-    orderBy: [desc(settings.updatedAt)],
+    orderBy: [desc2(settings.updatedAt)],
     limit: 100
   });
   const shiftsBranchFilter = parsed.value.branchId ? eq4(shifts.branchId, parsed.value.branchId) : void 0;
   const shiftsSinceFilter = parsed.value.since ? gte2(shifts.updatedAt, parsed.value.since) : void 0;
   const shiftRows = await db.query.shifts.findMany({
     where: and4(eq4(shifts.tenantId, parsed.value.tenantId), shiftsBranchFilter, shiftsSinceFilter),
-    orderBy: [desc(shifts.updatedAt)],
+    orderBy: [desc2(shifts.updatedAt)],
     limit: 100
   });
   const supplierSinceFilter = parsed.value.since ? gte2(suppliers.updatedAt, parsed.value.since) : void 0;
   const supplierRows = await db.query.suppliers.findMany({
     where: and4(eq4(suppliers.tenantId, parsed.value.tenantId), isNull(suppliers.deletedAt), supplierSinceFilter),
-    orderBy: [desc(suppliers.updatedAt)],
+    orderBy: [desc2(suppliers.updatedAt)],
     limit: 100
   });
   const purchaseBranchFilter = parsed.value.branchId ? eq4(purchases.branchId, parsed.value.branchId) : void 0;
   const purchaseSinceFilter = parsed.value.since ? gte2(purchases.updatedAt, parsed.value.since) : void 0;
   const purchaseRows = await db.query.purchases.findMany({
     where: and4(eq4(purchases.tenantId, parsed.value.tenantId), purchaseBranchFilter, purchaseSinceFilter),
-    orderBy: [desc(purchases.updatedAt)],
+    orderBy: [desc2(purchases.updatedAt)],
     limit: 100
   });
   const returnBranchFilter = parsed.value.branchId ? eq4(returns.branchId, parsed.value.branchId) : void 0;
   const returnSinceFilter = parsed.value.since ? gte2(returns.updatedAt, parsed.value.since) : void 0;
   const returnRows = await db.query.returns.findMany({
     where: and4(eq4(returns.tenantId, parsed.value.tenantId), returnBranchFilter, returnSinceFilter),
-    orderBy: [desc(returns.updatedAt)],
+    orderBy: [desc2(returns.updatedAt)],
     limit: 100
   });
   const serviceOrderBranchFilter = parsed.value.branchId ? eq4(serviceOrders.branchId, parsed.value.branchId) : void 0;
   const serviceOrderSinceFilter = parsed.value.since ? gte2(serviceOrders.updatedAt, parsed.value.since) : void 0;
   const serviceOrderRows = await db.query.serviceOrders.findMany({
     where: and4(eq4(serviceOrders.tenantId, parsed.value.tenantId), serviceOrderBranchFilter, serviceOrderSinceFilter),
-    orderBy: [desc(serviceOrders.updatedAt)],
+    orderBy: [desc2(serviceOrders.updatedAt)],
     limit: 100
   });
   const paymentMethodsSinceFilter = parsed.value.since ? gte2(paymentMethods.updatedAt, parsed.value.since) : void 0;
   const paymentMethodsRows = await db.query.paymentMethods.findMany({
     where: and4(eq4(paymentMethods.tenantId, parsed.value.tenantId), paymentMethodsSinceFilter),
-    orderBy: [desc(paymentMethods.updatedAt)],
+    orderBy: [desc2(paymentMethods.updatedAt)],
     limit: 100
   });
   const recipeSinceFilter = parsed.value.since ? gte2(recipes.updatedAt, parsed.value.since) : void 0;
   const recipeRows = await db.query.recipes.findMany({
     where: and4(eq4(recipes.tenantId, parsed.value.tenantId), recipeSinceFilter),
-    orderBy: [desc(recipes.updatedAt)],
+    orderBy: [desc2(recipes.updatedAt)],
     limit: 100
   });
   const items = [
@@ -2179,7 +2582,7 @@ syncRoutes.post("/push", async (c) => {
 });
 
 // src/features/platform/routes.ts
-import { count as count2, desc as desc2, eq as eq6, sql } from "drizzle-orm";
+import { count as count2, desc as desc3, eq as eq6, sql as sql2 } from "drizzle-orm";
 import { Hono as Hono5 } from "hono";
 import { z } from "zod";
 
@@ -2224,7 +2627,7 @@ platformRoutes.get("/tenants", async (c) => {
     packageName: tenants.planCode,
     subscriptionStatus: tenants.subscriptionStatus,
     planValidUntil: tenants.planValidUntil,
-    storageLimitGb: sql`${tenants.storageLimitMb} / 1024.0`,
+    storageLimitGb: sql2`${tenants.storageLimitMb} / 1024.0`,
     maxBranches: tenants.maxBranches,
     isActive: tenants.isActive
   }).from(tenants).leftJoin(tenantMembers, eq6(tenants.id, tenantMembers.tenantId)).leftJoin(users, eq6(tenantMembers.userId, users.id)).where(eq6(tenantMembers.role, "owner"));
@@ -2246,6 +2649,7 @@ platformRoutes.get("/tenants/:id", async (c) => {
 });
 var updateTenantSchema = z.object({
   planCode: z.string().min(1).max(40).optional(),
+  billingPeriod: z.enum(["monthly", "yearly"]).optional(),
   planValidUntil: z.string().datetime().nullable().optional(),
   storageLimitMb: z.number().int().min(0).optional(),
   maxBranches: z.number().int().min(1).optional(),
@@ -2258,6 +2662,7 @@ platformRoutes.patch("/tenants/:id", async (c) => {
   const actorId = c.get("platformAdminId");
   const dbSet = { updatedAt: /* @__PURE__ */ new Date() };
   if (body.planCode !== void 0) dbSet.planCode = body.planCode;
+  if (body.billingPeriod !== void 0) dbSet.billingPeriod = body.billingPeriod;
   if (body.storageLimitMb !== void 0) dbSet.storageLimitMb = body.storageLimitMb;
   if (body.maxBranches !== void 0) dbSet.maxBranches = body.maxBranches;
   if (body.isActive !== void 0) dbSet.isActive = body.isActive;
@@ -2299,7 +2704,11 @@ platformRoutes.get("/plans", async (c) => {
 var planSchema = z.object({
   code: z.string().min(1).max(40),
   name: z.string().min(1).max(120),
+  billingPeriod: z.enum(["monthly", "yearly"]).optional(),
+  durationDays: z.number().int().min(1).optional(),
+  trialDays: z.number().int().min(0).optional(),
   monthlyPrice: z.number().min(0),
+  yearlyPrice: z.number().min(0).nullable().optional(),
   storageLimitMb: z.number().int().min(0),
   maxBranches: z.number().int().min(1),
   maxUsers: z.number().int().min(1),
@@ -2312,7 +2721,11 @@ platformRoutes.post("/plans", async (c) => {
   const inserted = await db.insert(subscriptionPlans).values({
     code: body.code,
     name: body.name,
+    billingPeriod: body.billingPeriod ?? "monthly",
+    durationDays: body.durationDays ?? 30,
+    trialDays: body.trialDays ?? 0,
     monthlyPrice: String(body.monthlyPrice),
+    yearlyPrice: body.yearlyPrice === null || body.yearlyPrice === void 0 ? null : String(body.yearlyPrice),
     storageLimitMb: body.storageLimitMb,
     maxBranches: body.maxBranches,
     maxUsers: body.maxUsers,
@@ -2337,7 +2750,13 @@ platformRoutes.patch("/plans/:id", async (c) => {
   const dbSet = { updatedAt: /* @__PURE__ */ new Date() };
   if (body.code !== void 0) dbSet.code = body.code;
   if (body.name !== void 0) dbSet.name = body.name;
+  if (body.billingPeriod !== void 0) dbSet.billingPeriod = body.billingPeriod;
+  if (body.durationDays !== void 0) dbSet.durationDays = body.durationDays;
+  if (body.trialDays !== void 0) dbSet.trialDays = body.trialDays;
   if (body.monthlyPrice !== void 0) dbSet.monthlyPrice = String(body.monthlyPrice);
+  if (body.yearlyPrice !== void 0) {
+    dbSet.yearlyPrice = body.yearlyPrice === null ? null : String(body.yearlyPrice);
+  }
   if (body.storageLimitMb !== void 0) dbSet.storageLimitMb = body.storageLimitMb;
   if (body.maxBranches !== void 0) dbSet.maxBranches = body.maxBranches;
   if (body.maxUsers !== void 0) dbSet.maxUsers = body.maxUsers;
@@ -2370,7 +2789,7 @@ platformRoutes.get("/users", async (c) => {
     role: users.role,
     createdAt: users.createdAt,
     membershipCount: count2(tenantMembers.id)
-  }).from(users).leftJoin(tenantMembers, eq6(users.id, tenantMembers.userId)).groupBy(users.id).orderBy(desc2(users.createdAt));
+  }).from(users).leftJoin(tenantMembers, eq6(users.id, tenantMembers.userId)).groupBy(users.id).orderBy(desc3(users.createdAt));
   return c.json({ ok: true, items });
 });
 platformRoutes.get("/users/:id", async (c) => {
@@ -2437,13 +2856,110 @@ platformRoutes.get("/audit", async (c) => {
     targetId: platformAuditLogs.targetId,
     payload: platformAuditLogs.payload,
     createdAt: platformAuditLogs.createdAt
-  }).from(platformAuditLogs).leftJoin(users, eq6(platformAuditLogs.actorId, users.id)).orderBy(desc2(platformAuditLogs.createdAt)).limit(limit).offset(offset);
+  }).from(platformAuditLogs).leftJoin(users, eq6(platformAuditLogs.actorId, users.id)).orderBy(desc3(platformAuditLogs.createdAt)).limit(limit).offset(offset);
   const total = await db.select({ c: count2() }).from(platformAuditLogs).then((r) => r[0].c);
   return c.json({ ok: true, items, total });
 });
 
-// src/features/updates/routes.ts
+// src/features/subscription/routes.ts
+import { and as and5, eq as eq7 } from "drizzle-orm";
 import { Hono as Hono6 } from "hono";
+import { z as z2 } from "zod";
+var subscriptionRoutes = new Hono6();
+subscriptionRoutes.use("*", authMiddleware);
+subscriptionRoutes.get("/plans", async (c) => {
+  const period = c.req.query("period");
+  const conditions = [eq7(subscriptionPlans.isActive, true)];
+  if (period === "monthly" || period === "yearly") {
+    conditions.push(eq7(subscriptionPlans.billingPeriod, period));
+  }
+  const items = await db.select().from(subscriptionPlans).where(and5(...conditions)).orderBy(subscriptionPlans.monthlyPrice);
+  return c.json({ ok: true, items });
+});
+subscriptionRoutes.get("/plans/:code", async (c) => {
+  const code = c.req.param("code");
+  const rows = await db.select().from(subscriptionPlans).where(and5(eq7(subscriptionPlans.code, code), eq7(subscriptionPlans.isActive, true)));
+  if (rows.length === 0) return c.json({ ok: false, message: "Plan not found" }, 404);
+  return c.json({ ok: true, item: rows[0] });
+});
+var subscribeSchema = z2.object({
+  planCode: z2.string().min(1).max(40),
+  billingPeriod: z2.enum(["monthly", "yearly"]).optional()
+});
+async function requireTenantOwnerOrAdmin(userId, tenantId) {
+  const rows = await db.select({ role: tenantMembers.role }).from(tenantMembers).where(and5(eq7(tenantMembers.tenantId, tenantId), eq7(tenantMembers.userId, userId), eq7(tenantMembers.isActive, true)));
+  const member = rows[0];
+  if (!member || !["owner", "admin"].includes(member.role)) {
+    return { ok: false, message: "Owner or admin only" };
+  }
+  return { ok: true, role: member.role };
+}
+subscriptionRoutes.post("/tenants/:tenantId/subscribe", async (c) => {
+  const tenantId = c.req.param("tenantId");
+  const userId = c.get("userId");
+  const body = subscribeSchema.parse(await c.req.json());
+  const planRows = await db.select().from(subscriptionPlans).where(and5(eq7(subscriptionPlans.code, body.planCode), eq7(subscriptionPlans.isActive, true)));
+  const plan = planRows[0];
+  if (!plan) return c.json({ ok: false, message: "Plan not found" }, 404);
+  const billingPeriod = body.billingPeriod ?? plan.billingPeriod;
+  const tenantRows = await db.select().from(tenants).where(eq7(tenants.id, tenantId));
+  if (tenantRows.length === 0) return c.json({ ok: false, message: "Tenant not found" }, 404);
+  const auth = await requireTenantOwnerOrAdmin(userId, tenantId);
+  if (!auth.ok) return c.json({ ok: false, message: auth.message }, 403);
+  const now = /* @__PURE__ */ new Date();
+  const trialDays = plan.trialDays ?? 0;
+  const subscriptionStatus = trialDays > 0 ? "trial" : "active";
+  const planValidUntil = trialDays > 0 ? (() => {
+    const date = new Date(now);
+    date.setDate(date.getDate() + trialDays);
+    return date;
+  })() : plan.code.startsWith("free") ? null : (() => {
+    const date = new Date(now);
+    date.setDate(date.getDate() + plan.durationDays);
+    return date;
+  })();
+  const [updated] = await db.update(tenants).set({
+    planCode: plan.code,
+    billingPeriod,
+    subscriptionStatus,
+    planValidUntil,
+    storageLimitMb: plan.storageLimitMb,
+    maxBranches: plan.maxBranches,
+    isActive: true,
+    updatedAt: now
+  }).where(eq7(tenants.id, tenantId)).returning();
+  await writeAuditLog({
+    actorId: userId,
+    action: "tenant.subscribed",
+    targetType: "subscription",
+    targetId: tenantId,
+    payload: { planCode: plan.code, billingPeriod, subscriptionStatus }
+  });
+  return c.json({ ok: true, item: updated });
+});
+subscriptionRoutes.post("/tenants/:tenantId/cancel", async (c) => {
+  const tenantId = c.req.param("tenantId");
+  const userId = c.get("userId");
+  const tenantRows = await db.select().from(tenants).where(eq7(tenants.id, tenantId));
+  if (tenantRows.length === 0) return c.json({ ok: false, message: "Tenant not found" }, 404);
+  const auth = await requireTenantOwnerOrAdmin(userId, tenantId);
+  if (!auth.ok) return c.json({ ok: false, message: auth.message }, 403);
+  const [updated] = await db.update(tenants).set({
+    subscriptionStatus: "cancelled",
+    updatedAt: /* @__PURE__ */ new Date()
+  }).where(eq7(tenants.id, tenantId)).returning();
+  await writeAuditLog({
+    actorId: userId,
+    action: "tenant.cancelled",
+    targetType: "subscription",
+    targetId: tenantId,
+    payload: { previousStatus: tenantRows[0].subscriptionStatus }
+  });
+  return c.json({ ok: true, item: updated });
+});
+
+// src/features/updates/routes.ts
+import { Hono as Hono7 } from "hono";
 
 // src/features/updates/service.ts
 var GITHUB_RELEASES_API_URL = process.env.GITHUB_RELEASES_API_URL ?? "https://api.github.com/repos/Yusufkotavom/VitPOS/releases/latest";
@@ -2581,7 +3097,7 @@ async function resolveAppUpdate(platform, currentVersion) {
 }
 
 // src/features/updates/routes.ts
-var updateRoutes = new Hono6();
+var updateRoutes = new Hono7();
 updateRoutes.get("/latest", async (c) => {
   const platform = c.req.query("platform");
   const currentVersion = c.req.query("currentVersion");
@@ -2604,7 +3120,7 @@ updateRoutes.get("/desktop/:target/:arch/:currentVersion", async (c) => {
 
 // src/app.ts
 function createApp() {
-  const app2 = new Hono7();
+  const app2 = new Hono8();
   app2.use("*", cors());
   app2.get("/", (c) => c.json({ message: "VitPOS API is running!" }));
   app2.route("/health", healthRoutes);
@@ -2613,6 +3129,7 @@ function createApp() {
   app2.route("/api/v1/sync", syncRoutes);
   app2.route("/api/v1/reports", reportRoutes);
   app2.route("/api/v1/platform", platformRoutes);
+  app2.route("/api/v1/subscription", subscriptionRoutes);
   app2.route("/api/v1/updates", updateRoutes);
   app2.onError((error, c) => {
     return c.json({ ok: false, message: error.message }, 500);

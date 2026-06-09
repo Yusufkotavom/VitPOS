@@ -190,6 +190,7 @@ function TenantsTab({ tenants, plans }: { tenants: PlatformTenant[]; plans: Plat
       />
 
       <TenantActionDialog
+        key={selectedTenant?.id ?? 'tenant-none'}
         tenant={selectedTenant}
         plans={plans}
         onClose={() => setSelectedTenant(null)}
@@ -224,7 +225,11 @@ function PlansTab({ plans }: { plans: PlatformPlan[] }) {
         columns={[
           { key: 'code', header: 'Kode', render: (row) => <span className="font-mono">{row.code}</span> },
           { key: 'name', header: 'Nama Paket', render: (row) => <span className="font-medium">{row.name}</span> },
+          { key: 'billingPeriod', header: 'Periode', render: (row) => <span>{row.billingPeriod === 'yearly' ? 'Tahunan' : 'Bulanan'}</span> },
+          { key: 'durationDays', header: 'Durasi', render: (row) => <span>{row.durationDays} hari</span> },
+          { key: 'trialDays', header: 'Trial', render: (row) => <span>{row.trialDays} hari</span> },
           { key: 'monthlyPrice', header: 'Harga / bulan', render: (row) => <span>{Number(row.monthlyPrice) === 0 ? 'Gratis' : formatCurrency(Number(row.monthlyPrice))}</span> },
+          { key: 'yearlyPrice', header: 'Harga / tahun', render: (row) => <span>{row.yearlyPrice ? formatCurrency(Number(row.yearlyPrice)) : '-'}</span> },
           { key: 'storageLimitMb', header: 'Storage', render: (row) => <span>{Math.round(row.storageLimitMb / 1024 * 10) / 10} GB</span> },
           { key: 'maxBranches', header: 'Max Cabang' },
           { key: 'maxUsers', header: 'Max User' },
@@ -253,7 +258,8 @@ function PlansTab({ plans }: { plans: PlatformPlan[] }) {
               <Badge variant={row.isActive ? 'default' : 'outline'}>{row.isActive ? 'Aktif' : 'Non-aktif'}</Badge>
             </div>
             <p className="text-sm text-muted-foreground font-mono">{row.code}</p>
-            <p className="text-sm">{Number(row.monthlyPrice) === 0 ? 'Gratis' : formatCurrency(Number(row.monthlyPrice))} / bulan</p>
+            <p className="text-sm">{row.billingPeriod === 'yearly' ? 'Tahunan' : 'Bulanan'} · {row.durationDays} hari · Trial {row.trialDays} hari</p>
+            <p className="text-sm">{Number(row.monthlyPrice) === 0 ? 'Gratis' : formatCurrency(Number(row.monthlyPrice))} / bulan{row.yearlyPrice ? ` · ${formatCurrency(Number(row.yearlyPrice))} / tahun` : ''}</p>
             <p className="text-sm">Storage {Math.round(row.storageLimitMb / 1024 * 10) / 10} GB · {row.maxBranches} cabang · {row.maxUsers} user</p>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={() => { setEditingPlan(row); setDialogOpen(true) }}>Edit</Button>
@@ -266,6 +272,7 @@ function PlansTab({ plans }: { plans: PlatformPlan[] }) {
       />
 
       <PlanFormDialog
+        key={dialogOpen ? editingPlan?.id ?? 'plan-new-open' : 'plan-closed'}
         open={dialogOpen}
         plan={editingPlan}
         onClose={() => { setDialogOpen(false); setEditingPlan(null) }}
@@ -336,6 +343,7 @@ function UsersTab({ users }: { users: PlatformUser[] }) {
       />
 
       <UserRoleDialog
+        key={editingUser?.id ?? 'user-none'}
         user={editingUser}
         onClose={() => setEditingUser(null)}
         onUpdated={() => {

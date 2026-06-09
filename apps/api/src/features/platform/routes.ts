@@ -73,6 +73,7 @@ platformRoutes.get('/tenants/:id', async (c) => {
 
 const updateTenantSchema = z.object({
   planCode: z.string().min(1).max(40).optional(),
+  billingPeriod: z.enum(['monthly', 'yearly']).optional(),
   planValidUntil: z.string().datetime().nullable().optional(),
   storageLimitMb: z.number().int().min(0).optional(),
   maxBranches: z.number().int().min(1).optional(),
@@ -89,6 +90,7 @@ platformRoutes.patch('/tenants/:id', async (c) => {
 
   const dbSet: Record<string, unknown> = { updatedAt: new Date() }
   if (body.planCode !== undefined) dbSet.planCode = body.planCode
+  if (body.billingPeriod !== undefined) dbSet.billingPeriod = body.billingPeriod
   if (body.storageLimitMb !== undefined) dbSet.storageLimitMb = body.storageLimitMb
   if (body.maxBranches !== undefined) dbSet.maxBranches = body.maxBranches
   if (body.isActive !== undefined) dbSet.isActive = body.isActive
@@ -156,7 +158,11 @@ platformRoutes.get('/plans', async (c) => {
 const planSchema = z.object({
   code: z.string().min(1).max(40),
   name: z.string().min(1).max(120),
+  billingPeriod: z.enum(['monthly', 'yearly']).optional(),
+  durationDays: z.number().int().min(1).optional(),
+  trialDays: z.number().int().min(0).optional(),
   monthlyPrice: z.number().min(0),
+  yearlyPrice: z.number().min(0).nullable().optional(),
   storageLimitMb: z.number().int().min(0),
   maxBranches: z.number().int().min(1),
   maxUsers: z.number().int().min(1),
@@ -173,7 +179,11 @@ platformRoutes.post('/plans', async (c) => {
     .values({
       code: body.code,
       name: body.name,
+      billingPeriod: body.billingPeriod ?? 'monthly',
+      durationDays: body.durationDays ?? 30,
+      trialDays: body.trialDays ?? 0,
       monthlyPrice: String(body.monthlyPrice),
+      yearlyPrice: body.yearlyPrice === null || body.yearlyPrice === undefined ? null : String(body.yearlyPrice),
       storageLimitMb: body.storageLimitMb,
       maxBranches: body.maxBranches,
       maxUsers: body.maxUsers,
@@ -204,7 +214,13 @@ platformRoutes.patch('/plans/:id', async (c) => {
   const dbSet: Record<string, unknown> = { updatedAt: new Date() }
   if (body.code !== undefined) dbSet.code = body.code
   if (body.name !== undefined) dbSet.name = body.name
+  if (body.billingPeriod !== undefined) dbSet.billingPeriod = body.billingPeriod
+  if (body.durationDays !== undefined) dbSet.durationDays = body.durationDays
+  if (body.trialDays !== undefined) dbSet.trialDays = body.trialDays
   if (body.monthlyPrice !== undefined) dbSet.monthlyPrice = String(body.monthlyPrice)
+  if (body.yearlyPrice !== undefined) {
+    dbSet.yearlyPrice = body.yearlyPrice === null ? null : String(body.yearlyPrice)
+  }
   if (body.storageLimitMb !== undefined) dbSet.storageLimitMb = body.storageLimitMb
   if (body.maxBranches !== undefined) dbSet.maxBranches = body.maxBranches
   if (body.maxUsers !== undefined) dbSet.maxUsers = body.maxUsers

@@ -4,10 +4,11 @@ import { platformAuditLogs } from '../../../../../src/db/schema/index.js'
 export type PlatformAuditAction =
   | 'plan.created' | 'plan.updated' | 'plan.deleted'
   | 'tenant.updated' | 'tenant.suspended' | 'tenant.reactivated'
+  | 'tenant.subscribed' | 'tenant.cancelled'
   | 'user.role_changed' | 'user.suspended' | 'user.reactivated'
   | 'membership.role_changed'
 
-export type PlatformAuditTargetType = 'plan' | 'tenant' | 'user' | 'membership'
+export type PlatformAuditTargetType = 'plan' | 'tenant' | 'user' | 'membership' | 'subscription'
 
 export async function writeAuditLog(input: {
   actorId: string

@@ -257,46 +257,78 @@ export function SalesOrderDetailPage() {
           <div>
             <h3 className="text-sm font-medium text-muted-foreground mb-3">Item Pesanan</h3>
             {editing ? (
-              <div className="rounded-lg border">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/40">
-                      <th className="text-left py-2 px-3 font-medium">Nama</th>
-                      <th className="text-right py-2 px-3 font-medium w-20">Qty</th>
-                      <th className="text-right py-2 px-3 font-medium w-28">Harga</th>
-                      <th className="text-right py-2 px-3 font-medium w-28">Subtotal</th>
-                      <th className="w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {editItems.map((item, idx) => (
-                      <tr key={item.id} className="border-b last:border-0">
-                        <td className="py-1.5 px-2">
-                          <Input value={item.name} onChange={e => updateItem(idx, 'name', e.target.value)} placeholder="Nama produk" className="h-8 text-sm" />
-                        </td>
-                        <td className="py-1.5 px-2">
-                          <Input value={item.qty} onChange={e => updateItem(idx, 'qty', e.target.value)} inputMode="numeric" className="h-8 text-sm text-right" />
-                        </td>
-                        <td className="py-1.5 px-2">
-                          <Input value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)} inputMode="numeric" className="h-8 text-sm text-right" />
-                        </td>
-                        <td className="py-1.5 px-3 text-right font-medium">{(Number(item.qty) || 0) * (Number(item.unitPrice) || 0) > 0 ? formatCurrency((Number(item.qty) || 0) * (Number(item.unitPrice) || 0)) : '-'}</td>
-                        <td className="py-1.5 px-2">
+              <div className="flex flex-col gap-3">
+                <div className="hidden sm:block rounded-lg border overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/40">
+                        <th className="text-left py-2 px-3 font-medium">Nama</th>
+                        <th className="text-right py-2 px-3 font-medium w-20">Qty</th>
+                        <th className="text-right py-2 px-3 font-medium w-28">Harga</th>
+                        <th className="text-right py-2 px-3 font-medium w-28">Subtotal</th>
+                        <th className="w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {editItems.map((item, idx) => (
+                        <tr key={item.id} className="border-b last:border-0">
+                          <td className="py-1.5 px-2">
+                            <Input value={item.name} onChange={e => updateItem(idx, 'name', e.target.value)} placeholder="Nama produk" className="h-8 text-sm" />
+                          </td>
+                          <td className="py-1.5 px-2">
+                            <Input value={item.qty} onChange={e => updateItem(idx, 'qty', e.target.value)} inputMode="numeric" className="h-8 text-sm text-right" />
+                          </td>
+                          <td className="py-1.5 px-2">
+                            <Input value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)} inputMode="numeric" className="h-8 text-sm text-right" />
+                          </td>
+                          <td className="py-1.5 px-3 text-right font-medium">{(Number(item.qty) || 0) * (Number(item.unitPrice) || 0) > 0 ? formatCurrency((Number(item.qty) || 0) * (Number(item.unitPrice) || 0)) : '-'}</td>
+                          <td className="py-1.5 px-2">
+                            {editItems.length > 1 && (
+                              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem(idx)}>
+                                <Trash2Icon className="h-3.5 w-3.5 text-destructive" />
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex flex-col gap-3 sm:hidden">
+                  {editItems.map((item, idx) => {
+                    const itemSubtotal = (Number(item.qty) || 0) * (Number(item.unitPrice) || 0)
+                    return (
+                      <div key={item.id} className="rounded-xl border bg-muted/20 p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium text-muted-foreground">Item {idx + 1}</span>
                           {editItems.length > 1 && (
-                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem(idx)}>
+                            <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeItem(idx)}>
                               <Trash2Icon className="h-3.5 w-3.5 text-destructive" />
                             </Button>
                           )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="p-2 border-t">
-                  <Button type="button" variant="ghost" size="sm" onClick={addItem}>
-                    <PlusIcon className="mr-1 h-3.5 w-3.5" />Tambah Item
-                  </Button>
+                        </div>
+                        <Input value={item.name} onChange={e => updateItem(idx, 'name', e.target.value)} placeholder="Nama produk" className="h-8 text-sm" />
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-xs text-muted-foreground">Qty</span>
+                            <Input value={item.qty} onChange={e => updateItem(idx, 'qty', e.target.value)} inputMode="numeric" className="h-8 text-sm" />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-xs text-muted-foreground">Harga</span>
+                            <Input value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)} inputMode="numeric" className="h-8 text-sm" />
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center pt-1">
+                          <span className="text-xs text-muted-foreground">Subtotal</span>
+                          <span className="text-sm font-medium">{itemSubtotal > 0 ? formatCurrency(itemSubtotal) : '-'}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
+                <Button type="button" variant="ghost" size="sm" onClick={addItem} className="self-start">
+                  <PlusIcon className="mr-1 h-3.5 w-3.5" />Tambah Item
+                </Button>
               </div>
             ) : (
               <DataTable

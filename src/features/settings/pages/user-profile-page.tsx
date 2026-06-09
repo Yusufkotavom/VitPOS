@@ -1,15 +1,34 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { useSubscription } from '@/features/settings/hooks/use-subscription'
 import { ContentCard } from '@/shared/components/display/content-card'
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { SettingsNav } from '@/features/settings/components/settings-nav'
 
+function formatPeriod(period: 'monthly' | 'yearly') {
+  return period === 'yearly' ? 'Tahunan' : 'Bulanan'
+}
+
+function statusLabel(status: string) {
+  switch (status) {
+    case 'trial': return 'Trial'
+    case 'active': return 'Aktif'
+    case 'past_due': return 'Tertunggak'
+    case 'suspended': return 'Ditangguhkan'
+    case 'cancelled': return 'Dibatalkan'
+    case 'free': return 'Free'
+    default: return status
+  }
+}
+
 export function UserProfilePage() {
   const { currentUser, setAuth } = useAuthStore()
+  const subscription = useSubscription()
   const [loading, setLoading] = useState(false)
 
   const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -61,20 +80,22 @@ export function UserProfilePage() {
           <div className="flex flex-col gap-4">
             <div className="rounded-xl border bg-muted/30 p-4">
               <p className="text-sm text-muted-foreground">Paket aktif</p>
-              <p className="mt-1 text-xl font-semibold">Free Trial</p>
-              <p className="mt-2 text-sm text-muted-foreground">Coba gratis 14 hari untuk semua fitur utama.</p>
+              <p className="mt-1 text-xl font-semibold">{subscription.planName}</p>
+              <p className="mt-2 text-sm text-muted-foreground">Periode {formatPeriod(subscription.billingPeriod)}</p>
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-lg border p-3">
                 <p className="text-muted-foreground">Status</p>
-                <p className="font-medium">Aktif</p>
+                <p className="font-medium">{statusLabel(subscription.status)}</p>
               </div>
               <div className="rounded-lg border p-3">
-                <p className="text-muted-foreground">Tagihan</p>
-                <p className="font-medium">Rp0</p>
+                <p className="text-muted-foreground">Berlaku sampai</p>
+                <p className="font-medium">{subscription.planValidUntil ? new Date(subscription.planValidUntil).toLocaleDateString('id-ID') : 'Tidak terbatas'}</p>
               </div>
             </div>
-            <Button variant="outline">Upgrade Paket</Button>
+            <Button asChild variant="outline">
+              <Link to="/settings/billing">Kelola Langganan</Link>
+            </Button>
           </div>
         </ContentCard>
       </div>

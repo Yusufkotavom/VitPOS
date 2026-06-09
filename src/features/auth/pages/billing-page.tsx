@@ -1,19 +1,45 @@
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, Loader2 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { subscriptionService, type SubscriptionPlan } from '@/services/api/subscription.service'
+import type { LocalTenant } from '@/services/local-db/schema'
 import { localDb } from '@/services/local-db/client'
+
+function formatRupiah(n: number) {
+  return 'Rp ' + n.toLocaleString('id-ID')
+}
+
+function formatPeriod(period: 'monthly' | 'yearly') {
+  return period === 'yearly' ? 'Tahunan' : 'Bulanan'
+}
 
 export function BillingPage() {
   const navigate = useNavigate()
   const { activeTenant, setActiveTenant } = useAuthStore()
 
-  async function handleSelectPlan(planCode: string) {
+  const plansQuery = useQuery({
+    queryKey: ['subscription-plans', 'billing-onboarding'],
+    queryFn: () => subscriptionService.listPlans(),
+  })
+
+  async function handleSelectPlan(plan: SubscriptionPlan) {
     if (activeTenant) {
-      const updated = { ...activeTenant, planCode }
+      const { role, ...tenantBase } = activeTenant
+      const subscriptionStatus: NonNullable<LocalTenant['subscriptionStatus']> = plan.trialDays > 0 ? 'trial' : 'active'
+      const updated: LocalTenant = {
+        ...tenantBase,
+        planCode: plan.code,
+        billingPeriod: plan.billingPeriod,
+        subscriptionStatus,
+        storageLimitMb: plan.storageLimitMb,
+        maxBranches: plan.maxBranches,
+      }
       await localDb.tenants.put(updated)
-      setActiveTenant(updated, activeTenant.role)
+      setActiveTenant(updated, role)
     }
     navigate('/')
   }
@@ -23,46 +49,51 @@ export function BillingPage() {
       <div className="w-full max-w-3xl">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold mb-2">Pilih Paket Langganan</h1>
-          <p className="text-muted-foreground">Mulai dengan free trial atau upgrade sekarang.</p>
+          <p className="text-muted-foreground">Pilih paket dari katalog langganan yang sama dengan halaman billing di dalam aplikasi.</p>
         </div>
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card className="border-2 border-primary relative overflow-hidden bg-primary/5">
-            <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-3 py-1 text-xs font-semibold rounded-bl-lg">REKOMENDASI</div>
-            <CardHeader>
-              <CardTitle className="text-2xl">Free Trial</CardTitle>
-              <CardDescription>Coba 14 Hari</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-3xl font-bold">Rp0<span className="text-sm font-normal text-muted-foreground">/bulan</span></div>
-              <ul className="text-sm space-y-2">
-                <li className="flex items-center gap-2"><CheckCircle2 className="size-4 text-primary" /> Kasir POS lengkap</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="size-4 text-primary" /> Manajemen stok</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="size-4 text-primary" /> Laporan real-time</li>
-              </ul>
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full" onClick={() => handleSelectPlan('trial')}>Mulai Trial Sekarang</Button>
-            </CardFooter>
-          </Card>
+        {plansQuery.isLoading ? (
+          <div className="flex items-center justify-center gap-2 rounded-xl border bg-background px-4 py-12 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" /> Memuat daftar paket...
+          </div>
+        ) : plansQuery.isError ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-6 text-sm text-destructive">
+            Gagal memuat daftar paket. Coba lagi beberapa saat lagi.
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {(plansQuery.data ?? []).map((plan: SubscriptionPlan) => {
+              const price = plan.billingPeriod === 'yearly' && plan.yearlyPrice ? Number(plan.yearlyPrice) : Number(plan.monthlyPrice)
+              const isCurrent = activeTenant?.planCode === plan.code
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-2xl">Pro</CardTitle>
-              <CardDescription>Untuk bisnis berkembang</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-3xl font-bold">Rp149rb<span className="text-sm font-normal text-muted-foreground">/bulan</span></div>
-              <ul className="text-sm space-y-2">
-                <li className="flex items-center gap-2"><CheckCircle2 className="size-4 text-primary" /> Semua fitur Trial</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="size-4 text-primary" /> Multi cabang</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="size-4 text-primary" /> Sinkron cloud tanpa batas</li>
-              </ul>
-            </CardContent>
-            <CardFooter>
-              <Button variant="outline" className="w-full" onClick={() => handleSelectPlan('pro')}>Pilih Pro</Button>
-            </CardFooter>
-          </Card>
-        </div>
+              return (
+                <Card key={plan.id} className={isCurrent ? 'border-2 border-primary bg-primary/5' : ''}>
+                  <CardHeader>
+                    <CardTitle className="text-2xl">{plan.name}</CardTitle>
+                    <CardDescription>
+                      {formatPeriod(plan.billingPeriod)} • {plan.trialDays > 0 ? `Trial ${plan.trialDays} hari` : 'Langsung aktif'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="text-3xl font-bold">
+                      {formatRupiah(price)}
+                      <span className="text-sm font-normal text-muted-foreground">/{plan.billingPeriod === 'yearly' ? 'tahun' : 'bulan'}</span>
+                    </div>
+                    <ul className="text-sm space-y-2 text-muted-foreground">
+                      <li className="flex items-center gap-2"><CheckCircle2 className="size-4 text-primary" /> Storage {Math.round((plan.storageLimitMb / 1024) * 10) / 10} GB</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="size-4 text-primary" /> Hingga {plan.maxBranches} cabang</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="size-4 text-primary" /> Hingga {plan.maxUsers} pengguna</li>
+                    </ul>
+                  </CardContent>
+                  <CardFooter>
+                    <Button className="w-full" variant={isCurrent ? 'outline' : 'default'} onClick={() => handleSelectPlan(plan)}>
+                      {isCurrent ? 'Paket Terpilih' : 'Pilih Paket'}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              )
+            })}
+          </div>
+        )}
       </div>
     </main>
   )

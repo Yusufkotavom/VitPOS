@@ -69,7 +69,7 @@ export function UserMenu() {
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link to="/settings/subscription" className="cursor-pointer">
+          <Link to="/settings/billing" className="cursor-pointer">
             <CreditCard className="mr-2 size-4" />
             Langganan
           </Link>

@@ -16,25 +16,73 @@ const ADMIN_NAME = process.env.PLATFORM_ADMIN_NAME ?? 'Kotacom Admin'
 
 const plans = [
   {
-    code: 'free',
+    code: 'free-monthly',
     name: 'Free',
+    billingPeriod: 'monthly',
+    durationDays: 3650,
+    trialDays: 0,
     monthlyPrice: '0',
+    yearlyPrice: null,
     storageLimitMb: 512,
     maxBranches: 1,
     maxUsers: 1,
   },
   {
-    code: 'starter',
-    name: 'Starter',
-    monthlyPrice: '149000',
+    code: 'trial-monthly',
+    name: 'Free Trial 14 Hari',
+    billingPeriod: 'monthly',
+    durationDays: 14,
+    trialDays: 14,
+    monthlyPrice: '0',
+    yearlyPrice: null,
     storageLimitMb: 2048,
     maxBranches: 3,
     maxUsers: 5,
   },
   {
-    code: 'enterprise',
-    name: 'Enterprise',
+    code: 'starter-monthly',
+    name: 'Starter Bulanan',
+    billingPeriod: 'monthly',
+    durationDays: 30,
+    trialDays: 14,
+    monthlyPrice: '149000',
+    yearlyPrice: null,
+    storageLimitMb: 2048,
+    maxBranches: 3,
+    maxUsers: 5,
+  },
+  {
+    code: 'starter-yearly',
+    name: 'Starter Tahunan',
+    billingPeriod: 'yearly',
+    durationDays: 365,
+    trialDays: 14,
+    monthlyPrice: '149000',
+    yearlyPrice: '1490000',
+    storageLimitMb: 2048,
+    maxBranches: 3,
+    maxUsers: 5,
+  },
+  {
+    code: 'enterprise-monthly',
+    name: 'Enterprise Bulanan',
+    billingPeriod: 'monthly',
+    durationDays: 30,
+    trialDays: 14,
     monthlyPrice: '1499000',
+    yearlyPrice: null,
+    storageLimitMb: 10240,
+    maxBranches: 99,
+    maxUsers: 99,
+  },
+  {
+    code: 'enterprise-yearly',
+    name: 'Enterprise Tahunan',
+    billingPeriod: 'yearly',
+    durationDays: 365,
+    trialDays: 14,
+    monthlyPrice: '1499000',
+    yearlyPrice: '14990000',
     storageLimitMb: 10240,
     maxBranches: 99,
     maxUsers: 99,
@@ -65,19 +113,23 @@ try {
 
     for (const plan of plans) {
       const [inserted] = await tx`
-        INSERT INTO subscription_plans (code, name, monthly_price, storage_limit_mb, max_branches, max_users, features, is_active, created_at, updated_at)
-        VALUES (${plan.code}, ${plan.name}, ${plan.monthlyPrice}, ${plan.storageLimitMb}, ${plan.maxBranches}, ${plan.maxUsers}, '{}', true, ${now}, ${now})
+        INSERT INTO subscription_plans (code, name, billing_period, duration_days, trial_days, monthly_price, yearly_price, storage_limit_mb, max_branches, max_users, features, is_active, created_at, updated_at)
+        VALUES (${plan.code}, ${plan.name}, ${plan.billingPeriod}, ${plan.durationDays}, ${plan.trialDays}, ${plan.monthlyPrice}, ${plan.yearlyPrice}, ${plan.storageLimitMb}, ${plan.maxBranches}, ${plan.maxUsers}, '{}', true, ${now}, ${now})
         ON CONFLICT (code) DO UPDATE SET
           name = EXCLUDED.name,
+          billing_period = EXCLUDED.billing_period,
+          duration_days = EXCLUDED.duration_days,
+          trial_days = EXCLUDED.trial_days,
           monthly_price = EXCLUDED.monthly_price,
+          yearly_price = EXCLUDED.yearly_price,
           storage_limit_mb = EXCLUDED.storage_limit_mb,
           max_branches = EXCLUDED.max_branches,
           max_users = EXCLUDED.max_users,
           is_active = true,
           updated_at = EXCLUDED.updated_at
-        RETURNING code, name, monthly_price
+        RETURNING code, name, billing_period, monthly_price, yearly_price
       `
-      console.log(`✅ Plan ${inserted.code} (${inserted.name}) @ Rp ${inserted.monthly_price}/mo`)
+      console.log(`✅ Plan ${inserted.code} (${inserted.name}) ${inserted.billing_period} Rp ${inserted.monthly_price}/mo${inserted.yearly_price ? ` / Rp ${inserted.yearly_price}/yr` : ''}`)
     }
 
     const [existingTenant] = await tx`
@@ -86,15 +138,15 @@ try {
     let platformTenant
     if (existingTenant) {
       await tx`
-        UPDATE tenants SET email = ${ADMIN_EMAIL}, plan_code = 'enterprise', subscription_status = 'active',
-          storage_limit_mb = 10240, max_branches = 99, is_active = true, updated_at = ${now}
+        UPDATE tenants SET email = ${ADMIN_EMAIL}, plan_code = 'enterprise-monthly', billing_period = 'monthly',
+          subscription_status = 'active', storage_limit_mb = 10240, max_branches = 99, is_active = true, updated_at = ${now}
         WHERE id = ${existingTenant.id}
       `
       platformTenant = existingTenant
     } else {
       ;[platformTenant] = await tx`
-        INSERT INTO tenants (id, name, email, plan_code, subscription_status, storage_limit_mb, max_branches, is_active, created_at, updated_at)
-        VALUES (gen_random_uuid(), 'Kotacom HQ', ${ADMIN_EMAIL}, 'enterprise', 'active', 10240, 99, true, ${now}, ${now})
+        INSERT INTO tenants (id, name, email, plan_code, billing_period, subscription_status, storage_limit_mb, max_branches, is_active, created_at, updated_at)
+        VALUES (gen_random_uuid(), 'Kotacom HQ', ${ADMIN_EMAIL}, 'enterprise-monthly', 'monthly', 'active', 10240, 99, true, ${now}, ${now})
         RETURNING id, name
       `
     }

@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom'
-import { Building2, MessageSquare, User } from 'lucide-react'
+import { Building2, CreditCard, MessageSquare, User } from 'lucide-react'
 
 const settingTabs = [
   { to: '/settings', label: 'Usaha', icon: Building2 },
   { to: '/settings/profile', label: 'Profil', icon: User },
+  { to: '/settings/billing', label: 'Langganan', icon: CreditCard },
   { to: '/settings/templates', label: 'Template WA', icon: MessageSquare },
 ] as const
 
