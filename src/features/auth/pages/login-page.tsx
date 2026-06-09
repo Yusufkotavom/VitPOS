@@ -42,7 +42,7 @@ type AuthApiResponse = {
 
 export function LoginPage() {
   const navigate = useNavigate()
-  const { setAuth } = useAuthStore()
+  const { setAuth, setActiveTenant } = useAuthStore()
   const [error, setError] = useState<string | null>(null)
   const [resetOpen, setResetOpen] = useState(false)
   const [resetStep, setResetStep] = useState<'email' | 'password'>('email')
@@ -100,7 +100,21 @@ export function LoginPage() {
       }
 
       setAuth(user)
-      if (user.role === 'platform_admin') {
+      if (user.role === 'platform_admin' && response.memberships.length > 0) {
+        const membership = response.memberships[0]
+        setActiveTenant(
+          {
+            id: membership.tenantId,
+            name: membership.tenantName,
+            type: 'Usaha',
+            phone: '',
+            planCode: membership.tenantPlan,
+            isActive: true,
+            createdAt: now,
+            updatedAt: now,
+          },
+          membership.role,
+        )
         navigate('/platform-admin')
         return
       }

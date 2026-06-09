@@ -55,7 +55,7 @@ describe('PlatformAdminGuard', () => {
     expect(screen.queryByText('Platform Admin Content')).not.toBeInTheDocument()
   })
 
-  it('renders children when user is platform_admin', () => {
+  it('renders children when user is platform_admin with active tenant', () => {
     useAuthStore.getState().setAuth({
       id: 'a1',
       email: 'admin@kotacom.id',
@@ -65,6 +65,19 @@ describe('PlatformAdminGuard', () => {
       createdAt: '',
       updatedAt: '',
     })
+    useAuthStore.getState().setActiveTenant(
+      {
+        id: 't-hq',
+        name: 'Kotacom HQ',
+        type: 'Usaha',
+        phone: '',
+        planCode: 'enterprise',
+        isActive: true,
+        createdAt: '',
+        updatedAt: '',
+      },
+      'owner',
+    )
 
     render(
       createElement(MemoryRouter, { initialEntries: ['/platform-admin'] },

@@ -93,7 +93,16 @@ export const router = createBrowserRouter([
       { path: 'settings/templates', element: routeElement(MessageTemplatesPage) },
       { path: 'sync', element: routeElement(SyncPage) },
       { path: 'shift', element: routeElement(ShiftPage) },
-      { path: 'platform-admin', element: <PlatformAdminGuard>{routeElement(PlatformAdminPage)}</PlatformAdminGuard> },
     ],
+  },
+  {
+    path: '/platform-admin',
+    element: (
+      <PlatformAdminGuard>
+        <Suspense fallback={<LoadingState label="Memuat halaman..." />}>
+          <PlatformAdminPage />
+        </Suspense>
+      </PlatformAdminGuard>
+    ),
   },
 ])
