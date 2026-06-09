@@ -15,7 +15,6 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { localDb } from '@/services/local-db/client'
-import { apiPost } from '@/services/api/client'
 
 export function RegisterPage() {
   const navigate = useNavigate()
@@ -59,8 +58,6 @@ export function RegisterPage() {
 
       await localDb.users.add(newUser)
       setAuth(newUser)
-
-      apiPost('/auth/register', { name, email, password, tenantName: '' }).catch(() => {})
 
       navigate('/onboarding')
     } catch (err) {

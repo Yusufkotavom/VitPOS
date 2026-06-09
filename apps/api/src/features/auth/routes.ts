@@ -136,6 +136,8 @@ authRoutes.post('/register', async (c) => {
     ok: true,
     accessToken: `dev-${userId}`,
     user: { id: userId, email, name },
+    defaultBranchId: branchId,
+    defaultWarehouseId: warehouseId,
     memberships,
   })
 })

@@ -52,6 +52,8 @@ export function SyncPage() {
     markSynced()
   }
 
+  const baseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3010'
+
   return (
     <PageShell
       title="Sinkron Offline"
@@ -84,6 +86,7 @@ export function SyncPage() {
           <div className="mt-3 flex flex-col gap-2">
             <StatusBadge label={isOnline ? 'Online' : 'Offline Mode'} tone={isOnline ? 'success' : 'warning'} />
             <StatusBadge label={useSyncStore((s) => s.isApiConnected) ? 'API Terhubung' : 'API Terputus'} tone={useSyncStore((s) => s.isApiConnected) ? 'success' : 'danger'} />
+            <p className="mt-1 truncate text-xs text-muted-foreground" title={baseUrl}>{baseUrl}</p>
           </div>
         </div>
       </div>

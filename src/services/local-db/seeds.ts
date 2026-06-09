@@ -17,7 +17,7 @@ function now() {
   return new Date().toISOString()
 }
 
-export const DEMO_TENANT_ID = 'demo-tenant-1'
+export const DEMO_TENANT_ID = baimRuntime.tenantId
 
 export const demoProducts: LocalProduct[] = [
   { id: baimRuntime.productId, tenantId: DEMO_TENANT_ID, name: 'Kabel Type-C Fast Charging', category: 'Aksesoris', type: 'Produk Fisik', price: 45000, stock: 24, status: 'Aktif', syncStatus: 'synced', version: 1, updatedAt: now() },
@@ -197,6 +197,24 @@ export const demoConflicts: SyncConflict[] = [
     createdAt: now(),
   },
 ]
+
+export async function clearLocalDemoData() {
+  await Promise.all([
+    localDb.products.where('tenantId').equals(DEMO_TENANT_ID).delete(),
+    localDb.customers.where('tenantId').equals(DEMO_TENANT_ID).delete(),
+    localDb.salesOrders.where('tenantId').equals(DEMO_TENANT_ID).delete(),
+    localDb.salesOrderItems.where('tenantId').equals(DEMO_TENANT_ID).delete(),
+    localDb.payments.where('tenantId').equals(DEMO_TENANT_ID).delete(),
+    localDb.stockMovements.where('tenantId').equals(DEMO_TENANT_ID).delete(),
+    localDb.inventory.where('tenantId').equals(DEMO_TENANT_ID).delete(),
+    localDb.cash.where('tenantId').equals(DEMO_TENANT_ID).delete(),
+    localDb.productCategories.where('tenantId').equals(DEMO_TENANT_ID).delete(),
+    localDb.cashCategories.where('tenantId').equals(DEMO_TENANT_ID).delete(),
+    localDb.settings.where('tenantId').equals(DEMO_TENANT_ID).delete(),
+    localDb.outbox.where('tenantId').equals(DEMO_TENANT_ID).delete(),
+    localDb.syncConflicts.where('tenantId').equals(DEMO_TENANT_ID).delete(),
+  ])
+}
 
 export async function seedLocalDemoData() {
   const existingProducts = await localDb.products.count()

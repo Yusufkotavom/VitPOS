@@ -31,9 +31,27 @@ import {
 import { Badge } from '@/components/ui/badge'
 
 import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { apiPost } from '@/services/api/client'
 import { localDb } from '@/services/local-db/client'
 import { enqueueOutboxItem } from '@/services/sync/outbox-service'
 import { TEMPLATE_PRESETS, type TemplatePreset } from '@/features/auth/data/template-data'
+
+type RegisterResponse = {
+  ok: boolean
+  defaultBranchId?: string
+  defaultWarehouseId?: string
+  user: {
+    id: string
+    email: string
+    name: string
+  }
+  memberships: Array<{
+    tenantId: string
+    role: string
+    tenantName: string
+    tenantPlan: string
+  }>
+}
 
 const steps = [
   { id: 1, title: 'Informasi Perusahaan', icon: Store },
@@ -138,30 +156,67 @@ export function OnboardingPage() {
     setError(null)
     const now = new Date().toISOString()
     let userId = currentUser?.id
+    let tenantRole = 'owner'
+    let defaultBranchId: string | undefined
+    let defaultWarehouseId: string | undefined
 
     try {
+      const normalizedName = (currentUser?.name ?? ownerData.name).trim()
+      const normalizedEmail = (currentUser?.email ?? ownerData.email).trim().toLowerCase()
+      const normalizedPassword = currentUser?.passwordHash ?? ownerData.password
+
       if (!currentUser) {
-        const existingUser = await localDb.users.where('email').equals(ownerData.email.toLowerCase()).first()
+        const existingUser = await localDb.users.where('email').equals(normalizedEmail).first()
         if (existingUser) {
           setError('Email sudah terdaftar. Silakan login dulu.')
           setStep(1)
           return
         }
-
-        userId = crypto.randomUUID()
-        const newUser = {
-          id: userId,
-          name: ownerData.name,
-          email: ownerData.email.toLowerCase(),
-          passwordHash: ownerData.password,
-          createdAt: now,
-          updatedAt: now,
-        }
-        await localDb.users.add(newUser)
-        setAuth(newUser)
       }
 
-      const tenantId = crypto.randomUUID()
+      const membershipCount = currentUser
+        ? await localDb.tenantMembers.where('userId').equals(currentUser.id).count()
+        : 0
+
+      const shouldProvisionCloudTenant = membershipCount === 0
+
+      let tenantId = crypto.randomUUID()
+      if (shouldProvisionCloudTenant) {
+        const registerResponse = await apiPost<RegisterResponse>('/auth/register', {
+          name: normalizedName,
+          email: normalizedEmail,
+          password: normalizedPassword,
+          tenantName: tenantName.trim(),
+        })
+
+        const primaryMembership = registerResponse.memberships[0]
+        if (!primaryMembership) {
+          throw new Error('Membership cloud tidak ditemukan setelah registrasi')
+        }
+
+        userId = registerResponse.user.id
+        tenantId = primaryMembership.tenantId as `${string}-${string}-${string}-${string}-${string}`
+        tenantRole = primaryMembership.role
+        defaultBranchId = registerResponse.defaultBranchId
+        defaultWarehouseId = registerResponse.defaultWarehouseId
+      } else if (!userId) {
+        userId = crypto.randomUUID()
+      }
+
+      const nextUser = {
+        id: userId,
+        name: normalizedName,
+        email: normalizedEmail,
+        passwordHash: normalizedPassword,
+        createdAt: currentUser?.createdAt ?? now,
+        updatedAt: now,
+      }
+
+      await localDb.users.put(nextUser)
+      if (currentUser && currentUser.id !== userId) {
+        await localDb.users.delete(currentUser.id)
+      }
+      setAuth(nextUser)
 
       const newTenant = {
         id: tenantId,
@@ -187,7 +242,7 @@ export function OnboardingPage() {
       await localDb.tenants.put(newTenant)
       await localDb.tenantMembers.put(newMember)
 
-      setActiveTenant(newTenant, 'owner')
+      setActiveTenant(newTenant, tenantRole)
 
       for (const cat of editableCategories) {
         const catId = crypto.randomUUID()
@@ -295,6 +350,14 @@ export function OnboardingPage() {
         { id: 'receipt-footer', area: 'Struk', setting: 'Footer Struk (POS)', value: 'Terima kasih atas kunjungan Anda.' },
         { id: 'invoice-term', area: 'Invoice', setting: 'Catatan / Term Invoice', value: 'Syarat & Ketentuan berlaku.' },
       ]
+
+      if (defaultBranchId) {
+        printSettings.push({ id: `${tenantId}:default-branch-id`, area: 'System', setting: 'default_branch_id', value: defaultBranchId })
+      }
+      if (defaultWarehouseId) {
+        printSettings.push({ id: `${tenantId}:default-warehouse-id`, area: 'System', setting: 'default_warehouse_id', value: defaultWarehouseId })
+      }
+
       for (const s of printSettings) {
         await localDb.settings.put({ ...s, status: 'Lengkap', updatedAt: now, tenantId })
       }

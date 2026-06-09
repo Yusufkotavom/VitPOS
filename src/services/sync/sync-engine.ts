@@ -1,6 +1,8 @@
 import { localDb } from '@/services/local-db/client'
-import { buildBaimTenantQuery, baimRuntime } from '@/lib/baim-runtime'
+import { DEMO_TENANT_ID } from '@/services/local-db/seeds'
+import { baimRuntime } from '@/lib/baim-runtime'
 import { apiGet, apiPost, buildTenantQuery } from '@/services/api/client'
+import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { listOutboxItems, updateOutboxStatus } from '@/services/sync/outbox-service'
 import { indexPushResults, partitionSyncMutations, toLocalOutboxStatus } from '@/services/sync/sync-transport'
 import type {
@@ -42,8 +44,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-async function applyPullItem(item: SyncPullItem) {
-  const tenantId = baimRuntime.tenantId
+async function resolveSyncContext() {
+  const tenantId = requireActiveTenantId()
+  const branchSetting = await localDb.settings
+    .where('tenantId')
+    .equals(tenantId)
+    .filter((item) => item.setting === 'default_branch_id')
+    .first()
+
+  const branchId = branchSetting?.value || (tenantId === DEMO_TENANT_ID ? baimRuntime.branchId : undefined)
+
+  return { tenantId, branchId }
+}
+
+async function applyPullItem(item: SyncPullItem, tenantId: string) {
   if (item.mutationType === 'delete') {
     if (item.entityType === 'product') await localDb.products.delete(item.entityId)
     else if (item.entityType === 'sale') await localDb.salesOrders.delete(item.entityId)
@@ -300,7 +314,7 @@ async function applyPullItem(item: SyncPullItem) {
     }
   }
 
-export async function applyPullItems(items: SyncPullItem[]) {
+export async function applyPullItems(items: SyncPullItem[], tenantId: string) {
   await localDb.transaction(
     'rw',
     [
@@ -311,19 +325,21 @@ export async function applyPullItems(items: SyncPullItem[]) {
     ],
     async () => {
       for (const item of items) {
-        await applyPullItem(item)
+        await applyPullItem(item, tenantId)
       }
     },
   )
 }
 
 export async function runSync() {
+  const syncContext = await resolveSyncContext()
+  const tenantId = syncContext.tenantId
   const runId = createId('run')
   const startedAt = new Date().toISOString()
 
   await localDb.syncRuns.put({
     id: runId,
-    tenantId: baimRuntime.tenantId,
+    tenantId,
     startedAt,
     status: 'running',
     processed: 0,
@@ -331,7 +347,7 @@ export async function runSync() {
   })
 
   const items = await listOutboxItems()
-  const pendingItems = items.filter((item) => item.status === 'queued' || item.status === 'failed')
+  const pendingItems = items.filter((item) => item.status === 'queued' || item.status === 'failed' || item.status === 'syncing')
   const { accepted, rejected } = partitionSyncMutations(pendingItems)
   let processed = 0
   let failed = rejected.length
@@ -341,8 +357,8 @@ export async function runSync() {
   }
 
   if (accepted.length === 0) {
-    const pullResponse = await apiGet<SyncPullResponse>('/sync/pull', buildTenantQuery(buildBaimTenantQuery())).catch(() => ({ ok: true as const, cursor: null, items: [] }))
-    await applyPullItems(pullResponse.items)
+    const pullResponse = await apiGet<SyncPullResponse>('/sync/pull', buildTenantQuery(syncContext)).catch(() => ({ ok: true as const, cursor: null, items: [] }))
+    await applyPullItems(pullResponse.items, tenantId)
 
     await localDb.syncRuns.update(runId, {
       finishedAt: new Date().toISOString(),
@@ -359,18 +375,35 @@ export async function runSync() {
     await updateOutboxStatus(item.id, 'syncing')
   }
 
-  const pushResponse = await apiPost<SyncPushResponse>('/sync/push', {
-    ...buildBaimTenantQuery(),
-    deviceId: baimRuntime.deviceId,
-    mutations: accepted.map((item) => ({
-      clientMutationId: item.id,
-      entityType: item.entityType,
-      entityId: item.entityId,
-      mutationType: item.mutationType,
-      payload: item.payload,
-      status: item.status,
-    })),
-  })
+  let pushResponse!: SyncPushResponse
+  try {
+    pushResponse = await apiPost<SyncPushResponse>('/sync/push', {
+      ...syncContext,
+      deviceId: 'web-client',
+      mutations: accepted.map((item) => ({
+        clientMutationId: item.id,
+        entityType: item.entityType,
+        entityId: item.entityId,
+        mutationType: item.mutationType,
+        payload: item.payload,
+        status: item.status,
+      })),
+    })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Gagal terhubung ke server'
+    failed += accepted.length
+    for (const item of accepted) {
+      await updateOutboxStatus(item.id, 'failed', message)
+    }
+    await localDb.syncRuns.update(runId, {
+      finishedAt: new Date().toISOString(),
+      status: 'failed',
+      processed,
+      failed,
+      pulled: 0,
+    })
+    return { processed, failed, pulled: 0 }
+  }
 
   const indexedResults = indexPushResults(pushResponse.items)
 
@@ -389,8 +422,8 @@ export async function runSync() {
     await updateOutboxStatus(item.id, nextStatus, result.message)
   }
 
-  const pullResponse = await apiGet<SyncPullResponse>('/sync/pull', buildTenantQuery(buildBaimTenantQuery())).catch(() => ({ ok: true as const, cursor: null, items: [] }))
-  await applyPullItems(pullResponse.items)
+  const pullResponse = await apiGet<SyncPullResponse>('/sync/pull', buildTenantQuery(syncContext)).catch(() => ({ ok: true as const, cursor: null, items: [] }))
+  await applyPullItems(pullResponse.items, tenantId)
 
   await localDb.syncRuns.update(runId, {
     finishedAt: new Date().toISOString(),

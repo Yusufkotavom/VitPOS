@@ -3,7 +3,30 @@ import 'fake-indexeddb/auto'
 import { createElement } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+const { apiPostMock } = vi.hoisted(() => ({
+  apiPostMock: vi.fn(async () => ({
+  ok: true,
+  user: {
+    id: '11111111-1111-4111-8111-111111111111',
+    email: 'owner',
+    name: 'Owner',
+  },
+  defaultBranchId: '33333333-3333-4333-8333-333333333333',
+  defaultWarehouseId: '44444444-4444-4444-8444-444444444444',
+  memberships: [{
+    tenantId: '22222222-2222-4222-8222-222222222222',
+    role: 'owner',
+    tenantName: 'Toko Baru',
+    tenantPlan: 'trial',
+  }],
+  })),
+}))
+
+vi.mock('@/services/api/client', () => ({
+  apiPost: apiPostMock,
+}))
 
 import { OnboardingPage } from '@/features/auth/pages/onboarding-page'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
@@ -54,6 +77,7 @@ describe('onboarding page data logic', () => {
     fireEvent.click(screen.getByRole('button', { name: /Lanjut ke Tagihan/ }))
 
     expect(await screen.findByText('Billing Route')).toBeInTheDocument()
+    expect(apiPostMock).toHaveBeenCalledWith('/auth/register', expect.objectContaining({ tenantName: 'Toko Baru' }))
 
     const state = useAuthStore.getState()
     expect(state.activeTenant?.name).toBe('Toko Baru')

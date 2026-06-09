@@ -5,7 +5,7 @@ var __export = (target, all) => {
 };
 
 // src/app.ts
-import { Hono as Hono5 } from "hono";
+import { Hono as Hono6 } from "hono";
 import { cors } from "hono/cors";
 
 // src/features/auth/routes.ts
@@ -21,21 +21,49 @@ var schema_exports = {};
 __export(schema_exports, {
   branches: () => branches,
   branchesRelations: () => branchesRelations,
+  cash: () => cash,
+  cashCategories: () => cashCategories,
+  cashCategoryTypeEnum: () => cashCategoryTypeEnum,
+  cashRelations: () => cashRelations,
   customers: () => customers,
   memberRoleEnum: () => memberRoleEnum,
   orderStatusEnum: () => orderStatusEnum,
   outboxLogs: () => outboxLogs,
   paymentMethodEnum: () => paymentMethodEnum,
+  paymentMethods: () => paymentMethods,
   paymentStatusEnum: () => paymentStatusEnum,
   payments: () => payments,
   productCategories: () => productCategories,
   productTypeEnum: () => productTypeEnum,
+  productionBatches: () => productionBatches,
   products: () => products,
+  purchaseItems: () => purchaseItems,
+  purchaseStatusEnum: () => purchaseStatusEnum,
+  purchases: () => purchases,
+  purchasesRelations: () => purchasesRelations,
+  recipeStatusEnum: () => recipeStatusEnum,
+  recipes: () => recipes,
+  returnItems: () => returnItems,
+  returnStatusEnum: () => returnStatusEnum,
+  returnTypeEnum: () => returnTypeEnum,
+  returns: () => returns,
+  returnsRelations: () => returnsRelations,
   salesOrderItems: () => salesOrderItems,
   salesOrders: () => salesOrders,
   salesOrdersRelations: () => salesOrdersRelations,
+  serviceOrderStatusEnum: () => serviceOrderStatusEnum,
+  serviceOrders: () => serviceOrders,
+  serviceOrdersRelations: () => serviceOrdersRelations,
+  settings: () => settings,
+  settingsRelations: () => settingsRelations,
+  shiftStatusEnum: () => shiftStatusEnum,
+  shifts: () => shifts,
+  shiftsRelations: () => shiftsRelations,
   stockMovementTypeEnum: () => stockMovementTypeEnum,
   stockMovements: () => stockMovements,
+  subscriptionStatusEnum: () => subscriptionStatusEnum,
+  suppliers: () => suppliers,
+  suppliersRelations: () => suppliersRelations,
   syncStatusEnum: () => syncStatusEnum,
   tenantMembers: () => tenantMembers,
   tenants: () => tenants,
@@ -52,13 +80,21 @@ var orderStatusEnum = pgEnum("order_status", ["draft", "confirmed", "unpaid", "p
 var paymentMethodEnum = pgEnum("payment_method", ["cash", "qris", "card", "transfer", "ewallet", "receivable"]);
 var paymentStatusEnum = pgEnum("payment_status", ["success", "pending", "failed", "refunded", "partial_refund"]);
 var productTypeEnum = pgEnum("product_type", ["physical", "service"]);
-var stockMovementTypeEnum = pgEnum("stock_movement_type", ["sale", "purchase", "return", "adjustment", "transfer_in", "transfer_out", "damage_lost"]);
+var stockMovementTypeEnum = pgEnum("stock_movement_type", ["sale", "purchase", "return", "adjustment", "transfer_in", "transfer_out", "damage_lost", "production"]);
 var syncStatusEnum = pgEnum("sync_status", ["synced", "pending", "failed", "conflict"]);
+var cashCategoryTypeEnum = pgEnum("cash_category_type", ["income", "expense"]);
+var shiftStatusEnum = pgEnum("shift_status", ["open", "closed"]);
+var purchaseStatusEnum = pgEnum("purchase_status", ["draft", "shipped", "received", "cancelled"]);
+var returnTypeEnum = pgEnum("return_type", ["sale", "purchase"]);
+var returnStatusEnum = pgEnum("return_status", ["draft", "processing", "completed", "cancelled"]);
+var serviceOrderStatusEnum = pgEnum("service_order_status", ["received", "in_progress", "completed", "picked_up", "cancelled"]);
+var recipeStatusEnum = pgEnum("recipe_status", ["draft", "active"]);
 var timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { withTimezone: true })
 };
+var subscriptionStatusEnum = pgEnum("subscription_status", ["trial", "active", "past_due", "suspended", "cancelled"]);
 var tenants = pgTable("tenants", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 160 }).notNull(),
@@ -69,6 +105,10 @@ var tenants = pgTable("tenants", {
   email: varchar("email", { length: 160 }),
   address: text("address"),
   planCode: varchar("plan_code", { length: 40 }).default("free").notNull(),
+  subscriptionStatus: subscriptionStatusEnum("subscription_status").default("trial").notNull(),
+  planValidUntil: timestamp("plan_valid_until", { withTimezone: true }),
+  storageLimitMb: integer("storage_limit_mb").default(512).notNull(),
+  maxBranches: integer("max_branches").default(1).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   ...timestamps
 });
@@ -111,6 +151,8 @@ var productCategories = pgTable("product_categories", {
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   name: varchar("name", { length: 120 }).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
+  syncStatus: syncStatusEnum("sync_status").default("synced").notNull(),
+  version: integer("version").default(1).notNull(),
   ...timestamps
 }, (table) => [index("product_categories_tenant_id_idx").on(table.tenantId)]);
 var products = pgTable("products", {
@@ -202,6 +244,166 @@ var stockMovements = pgTable("stock_movements", {
   syncStatus: syncStatusEnum("sync_status").default("pending").notNull(),
   ...timestamps
 }, (table) => [index("stock_movements_tenant_id_idx").on(table.tenantId), index("stock_movements_warehouse_id_idx").on(table.warehouseId), index("stock_movements_product_id_idx").on(table.productId)]);
+var cashCategories = pgTable("cash_categories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  name: varchar("name", { length: 120 }).notNull(),
+  type: cashCategoryTypeEnum("type").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  syncStatus: syncStatusEnum("sync_status").default("synced").notNull(),
+  version: integer("version").default(1).notNull(),
+  ...timestamps
+}, (table) => [index("cash_categories_tenant_id_idx").on(table.tenantId)]);
+var cash = pgTable("cash", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  branchId: uuid("branch_id").references(() => branches.id),
+  ref: varchar("ref", { length: 80 }).notNull(),
+  date: timestamp("date", { withTimezone: true }).defaultNow().notNull(),
+  categoryId: uuid("category_id").references(() => cashCategories.id),
+  income: numeric("income", { precision: 14, scale: 2 }).default("0").notNull(),
+  expense: numeric("expense", { precision: 14, scale: 2 }).default("0").notNull(),
+  status: varchar("status", { length: 40 }).default("posted").notNull(),
+  syncStatus: syncStatusEnum("sync_status").default("synced").notNull(),
+  ...timestamps
+}, (table) => [index("cash_tenant_id_idx").on(table.tenantId), index("cash_branch_id_idx").on(table.branchId)]);
+var settings = pgTable("settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  key: varchar("key", { length: 120 }).notNull(),
+  area: varchar("area", { length: 80 }).notNull(),
+  value: text("value").notNull(),
+  status: varchar("status", { length: 40 }).default("active").notNull(),
+  syncStatus: syncStatusEnum("sync_status").default("synced").notNull(),
+  ...timestamps
+}, (table) => [index("settings_tenant_id_idx").on(table.tenantId), index("settings_tenant_key_idx").on(table.tenantId, table.key)]);
+var shifts = pgTable("shifts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  branchId: uuid("branch_id").references(() => branches.id),
+  cashierName: varchar("cashier_name", { length: 120 }).notNull(),
+  startTime: timestamp("start_time", { withTimezone: true }).defaultNow().notNull(),
+  endTime: timestamp("end_time", { withTimezone: true }),
+  startCash: numeric("start_cash", { precision: 14, scale: 2 }).default("0").notNull(),
+  expectedCash: numeric("expected_cash", { precision: 14, scale: 2 }),
+  actualCash: numeric("actual_cash", { precision: 14, scale: 2 }),
+  difference: numeric("difference", { precision: 14, scale: 2 }),
+  status: shiftStatusEnum("status").default("open").notNull(),
+  syncStatus: syncStatusEnum("sync_status").default("synced").notNull(),
+  ...timestamps
+}, (table) => [index("shifts_tenant_id_idx").on(table.tenantId), index("shifts_branch_id_idx").on(table.branchId)]);
+var suppliers = pgTable("suppliers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  name: varchar("name", { length: 160 }).notNull(),
+  phone: varchar("phone", { length: 40 }),
+  city: varchar("city", { length: 80 }),
+  payable: numeric("payable", { precision: 14, scale: 2 }).default("0").notNull(),
+  orders: integer("orders").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  syncStatus: syncStatusEnum("sync_status").default("synced").notNull(),
+  version: integer("version").default(1).notNull(),
+  ...timestamps
+}, (table) => [index("suppliers_tenant_id_idx").on(table.tenantId)]);
+var purchases = pgTable("purchases", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  branchId: uuid("branch_id").references(() => branches.id),
+  supplierId: uuid("supplier_id").references(() => suppliers.id),
+  code: varchar("code", { length: 80 }).notNull(),
+  date: timestamp("date", { withTimezone: true }).defaultNow().notNull(),
+  subtotal: numeric("subtotal", { precision: 14, scale: 2 }).default("0").notNull(),
+  grandTotal: numeric("grand_total", { precision: 14, scale: 2 }).default("0").notNull(),
+  status: purchaseStatusEnum("status").default("draft").notNull(),
+  syncStatus: syncStatusEnum("sync_status").default("synced").notNull(),
+  version: integer("version").default(1).notNull(),
+  ...timestamps
+}, (table) => [index("purchases_tenant_id_idx").on(table.tenantId), index("purchases_branch_id_idx").on(table.branchId), index("purchases_supplier_id_idx").on(table.supplierId)]);
+var purchaseItems = pgTable("purchase_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  purchaseId: uuid("purchase_id").notNull().references(() => purchases.id),
+  productId: uuid("product_id").references(() => products.id),
+  name: varchar("name", { length: 180 }).notNull(),
+  qty: numeric("qty", { precision: 14, scale: 3 }).notNull(),
+  unitPrice: numeric("unit_price", { precision: 14, scale: 2 }).notNull(),
+  subtotal: numeric("subtotal", { precision: 14, scale: 2 }).notNull(),
+  ...timestamps
+}, (table) => [index("purchase_items_tenant_id_idx").on(table.tenantId), index("purchase_items_purchase_id_idx").on(table.purchaseId), index("purchase_items_product_id_idx").on(table.productId)]);
+var returns = pgTable("returns", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  branchId: uuid("branch_id").references(() => branches.id),
+  code: varchar("code", { length: 80 }).notNull(),
+  type: returnTypeEnum("type").notNull(),
+  referenceCode: varchar("reference_code", { length: 80 }).notNull(),
+  date: timestamp("date", { withTimezone: true }).defaultNow().notNull(),
+  total: numeric("total", { precision: 14, scale: 2 }).default("0").notNull(),
+  status: returnStatusEnum("status").default("draft").notNull(),
+  syncStatus: syncStatusEnum("sync_status").default("synced").notNull(),
+  version: integer("version").default(1).notNull(),
+  ...timestamps
+}, (table) => [index("returns_tenant_id_idx").on(table.tenantId), index("returns_branch_id_idx").on(table.branchId)]);
+var returnItems = pgTable("return_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  returnId: uuid("return_id").notNull().references(() => returns.id),
+  productId: uuid("product_id").references(() => products.id),
+  name: varchar("name", { length: 180 }).notNull(),
+  qty: numeric("qty", { precision: 14, scale: 3 }).notNull(),
+  unitPrice: numeric("unit_price", { precision: 14, scale: 2 }).notNull(),
+  subtotal: numeric("subtotal", { precision: 14, scale: 2 }).notNull(),
+  ...timestamps
+}, (table) => [index("return_items_tenant_id_idx").on(table.tenantId), index("return_items_return_id_idx").on(table.returnId), index("return_items_product_id_idx").on(table.productId)]);
+var serviceOrders = pgTable("service_orders", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  branchId: uuid("branch_id").references(() => branches.id),
+  customerId: uuid("customer_id").references(() => customers.id),
+  code: varchar("code", { length: 80 }).notNull(),
+  customerName: varchar("customer_name", { length: 160 }).notNull(),
+  description: text("description"),
+  date: timestamp("date", { withTimezone: true }).defaultNow().notNull(),
+  cost: numeric("cost", { precision: 14, scale: 2 }).default("0").notNull(),
+  status: serviceOrderStatusEnum("status").default("received").notNull(),
+  syncStatus: syncStatusEnum("sync_status").default("synced").notNull(),
+  version: integer("version").default(1).notNull(),
+  ...timestamps
+}, (table) => [index("service_orders_tenant_id_idx").on(table.tenantId), index("service_orders_branch_id_idx").on(table.branchId), index("service_orders_customer_id_idx").on(table.customerId)]);
+var paymentMethods = pgTable("payment_methods", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  name: varchar("name", { length: 120 }).notNull(),
+  provider: varchar("provider", { length: 80 }).notNull(),
+  type: varchar("type", { length: 80 }).notNull(),
+  accountNumber: varchar("account_number", { length: 80 }),
+  accountName: varchar("account_name", { length: 160 }),
+  status: varchar("status", { length: 40 }).default("active").notNull(),
+  ...timestamps
+}, (table) => [index("payment_methods_tenant_id_idx").on(table.tenantId)]);
+var recipes = pgTable("recipes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  productId: uuid("product_id").notNull().references(() => products.id),
+  productName: varchar("product_name", { length: 180 }).notNull(),
+  name: varchar("name", { length: 180 }).notNull(),
+  batchYield: integer("batch_yield").default(1).notNull(),
+  items: jsonb("items").default([]).notNull(),
+  status: recipeStatusEnum("status").default("draft").notNull(),
+  ...timestamps
+}, (table) => [index("recipes_tenant_id_idx").on(table.tenantId), index("recipes_product_id_idx").on(table.productId)]);
+var productionBatches = pgTable("production_batches", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  branchId: uuid("branch_id").references(() => branches.id),
+  recipeId: uuid("recipe_id").notNull().references(() => recipes.id),
+  productId: uuid("product_id").notNull().references(() => products.id),
+  batchQty: integer("batch_qty").default(1).notNull(),
+  date: timestamp("date", { withTimezone: true }).defaultNow().notNull(),
+  syncStatus: syncStatusEnum("sync_status").default("synced").notNull(),
+  version: integer("version").default(1).notNull(),
+  ...timestamps
+}, (table) => [index("production_batches_tenant_id_idx").on(table.tenantId), index("production_batches_branch_id_idx").on(table.branchId), index("production_batches_recipe_id_idx").on(table.recipeId), index("production_batches_product_id_idx").on(table.productId)]);
 var outboxLogs = pgTable("outbox_logs", {
   id: uuid("id").primaryKey().defaultRandom(),
   tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
@@ -233,6 +435,37 @@ var salesOrdersRelations = relations(salesOrders, ({ one, many }) => ({
   customer: one(customers, { fields: [salesOrders.customerId], references: [customers.id] }),
   items: many(salesOrderItems),
   payments: many(payments)
+}));
+var cashRelations = relations(cash, ({ one }) => ({
+  tenant: one(tenants, { fields: [cash.tenantId], references: [tenants.id] }),
+  branch: one(branches, { fields: [cash.branchId], references: [branches.id] }),
+  category: one(cashCategories, { fields: [cash.categoryId], references: [cashCategories.id] })
+}));
+var settingsRelations = relations(settings, ({ one }) => ({
+  tenant: one(tenants, { fields: [settings.tenantId], references: [tenants.id] })
+}));
+var shiftsRelations = relations(shifts, ({ one }) => ({
+  tenant: one(tenants, { fields: [shifts.tenantId], references: [tenants.id] }),
+  branch: one(branches, { fields: [shifts.branchId], references: [branches.id] })
+}));
+var suppliersRelations = relations(suppliers, ({ one }) => ({
+  tenant: one(tenants, { fields: [suppliers.tenantId], references: [tenants.id] })
+}));
+var purchasesRelations = relations(purchases, ({ one, many }) => ({
+  tenant: one(tenants, { fields: [purchases.tenantId], references: [tenants.id] }),
+  branch: one(branches, { fields: [purchases.branchId], references: [branches.id] }),
+  supplier: one(suppliers, { fields: [purchases.supplierId], references: [suppliers.id] }),
+  items: many(purchaseItems)
+}));
+var returnsRelations = relations(returns, ({ one, many }) => ({
+  tenant: one(tenants, { fields: [returns.tenantId], references: [tenants.id] }),
+  branch: one(branches, { fields: [returns.branchId], references: [branches.id] }),
+  items: many(returnItems)
+}));
+var serviceOrdersRelations = relations(serviceOrders, ({ one }) => ({
+  tenant: one(tenants, { fields: [serviceOrders.tenantId], references: [tenants.id] }),
+  branch: one(branches, { fields: [serviceOrders.branchId], references: [branches.id] }),
+  customer: one(customers, { fields: [serviceOrders.customerId], references: [customers.id] })
 }));
 
 // src/lib/env.ts
@@ -298,6 +531,84 @@ function userResponse(user) {
     avatarUrl: user.avatarUrl
   };
 }
+authRoutes.post("/register", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const name = body?.name?.trim();
+  const email = body?.email?.trim().toLowerCase();
+  const tenantName = body?.tenantName?.trim();
+  if (!name || !email || !tenantName) {
+    return c.json({ ok: false, message: "name, email, and tenantName required" }, 400);
+  }
+  const existingUser = await findUserByEmail(db, email);
+  if (existingUser) {
+    return c.json({ ok: false, message: "Email already registered" }, 409);
+  }
+  const userId = crypto.randomUUID();
+  const tenantId = crypto.randomUUID();
+  const branchId = crypto.randomUUID();
+  const warehouseId = crypto.randomUUID();
+  const now = /* @__PURE__ */ new Date();
+  await db.transaction(async (tx) => {
+    await tx.insert(users).values({
+      id: userId,
+      email,
+      name,
+      createdAt: now,
+      updatedAt: now
+    });
+    const planValidUntil = new Date(now);
+    planValidUntil.setDate(planValidUntil.getDate() + 14);
+    await tx.insert(tenants).values({
+      id: tenantId,
+      name: tenantName,
+      planCode: "trial",
+      subscriptionStatus: "trial",
+      planValidUntil,
+      storageLimitMb: 1024,
+      maxBranches: 1,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
+    });
+    await tx.insert(branches).values({
+      id: branchId,
+      tenantId,
+      name: "Cabang Utama",
+      isDefault: true,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
+    });
+    await tx.insert(warehouses).values({
+      id: warehouseId,
+      tenantId,
+      branchId,
+      name: "Gudang Utama",
+      isDefault: true,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
+    });
+    await tx.insert(tenantMembers).values({
+      id: crypto.randomUUID(),
+      tenantId,
+      userId,
+      role: "owner",
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
+    });
+  });
+  const memberships = await listActiveMemberships(db, userId);
+  return c.json({
+    ok: true,
+    accessToken: `dev-${userId}`,
+    user: { id: userId, email, name },
+    defaultBranchId: branchId,
+    defaultWarehouseId: warehouseId,
+    memberships
+  });
+});
 authRoutes.get("/me", async (c) => {
   const userId = readUserId(c.req.raw);
   if (!userId) {
@@ -448,8 +759,18 @@ reportRoutes.get("/inventory/movements", async (c) => {
 });
 
 // src/features/sync/routes.ts
-import { and as and3, desc, eq as eq4, gte as gte2, isNull } from "drizzle-orm";
+import { and as and4, desc, eq as eq4, gte as gte2, isNull } from "drizzle-orm";
 import { Hono as Hono4 } from "hono";
+
+// src/features/auth/middleware.ts
+async function authMiddleware(c, next) {
+  const userId = readUserId(c.req.raw);
+  if (!userId) {
+    return c.json({ ok: false, message: "Authentication required" }, 401);
+  }
+  c.set("userId", userId);
+  await next();
+}
 
 // ../../packages/shared-contracts/src/sync/api.ts
 function buildSyncPushResponse(items) {
@@ -474,7 +795,7 @@ function serverSyncStatusToApiItemStatus(status) {
 }
 
 // ../../packages/shared-contracts/src/sync/validation.ts
-var syncEntityTypes = /* @__PURE__ */ new Set(["product", "customer", "sale", "payment", "stock_movement", "cash", "setting", "shift", "product_category", "supplier", "purchase", "return", "service_order"]);
+var syncEntityTypes = /* @__PURE__ */ new Set(["product", "customer", "sale", "payment", "stock_movement", "cash", "cash_category", "setting", "shift", "product_category", "supplier", "purchase", "return", "service_order", "payment_method", "recipe"]);
 var syncMutationTypes = /* @__PURE__ */ new Set(["create", "update", "delete"]);
 var uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function isUuid(value) {
@@ -571,7 +892,7 @@ function parseSyncPushBody(input) {
 }
 
 // src/features/sync/apply.ts
-import { eq as eq3 } from "drizzle-orm";
+import { and as and3, eq as eq3 } from "drizzle-orm";
 function toNumeric(value) {
   if (value === void 0 || value === null) return "0";
   if (typeof value === "number") return String(value);
@@ -782,6 +1103,458 @@ async function applyStockMovement(db2, ctx, entityId, mutationType, payload) {
     }
   });
 }
+function mapClientCustomerStatus(value) {
+  if (value === "Nonaktif" || value === false) return false;
+  return true;
+}
+function mapClientCategoryStatus(value) {
+  if (value === "Arsip" || value === "Nonaktif" || value === false) return false;
+  return true;
+}
+function mapClientCashCategoryType(value) {
+  if (value === "Pemasukan" || value === "income") return "income";
+  return "expense";
+}
+function mapClientShiftStatus(value) {
+  if (value === "closed" || value === "tutup") return "closed";
+  return "open";
+}
+function mapClientPurchaseStatus(value) {
+  if (value === "Draft" || value === "draft") return "draft";
+  if (value === "Dikirim" || value === "shipped") return "shipped";
+  if (value === "Diterima" || value === "received") return "received";
+  if (value === "Batal" || value === "cancelled") return "cancelled";
+  return "draft";
+}
+function mapClientReturnType(value) {
+  if (value === "Pembelian" || value === "purchase") return "purchase";
+  return "sale";
+}
+function mapClientReturnStatus(value) {
+  if (value === "Draft" || value === "draft") return "draft";
+  if (value === "Diproses" || value === "processing") return "processing";
+  if (value === "Selesai" || value === "completed") return "completed";
+  if (value === "Batal" || value === "cancelled") return "cancelled";
+  return "draft";
+}
+function mapClientServiceOrderStatus(value) {
+  if (value === "Diterima" || value === "received") return "received";
+  if (value === "Dikerjakan" || value === "in_progress") return "in_progress";
+  if (value === "Selesai" || value === "completed") return "completed";
+  if (value === "Diambil" || value === "picked_up") return "picked_up";
+  if (value === "Batal" || value === "cancelled") return "cancelled";
+  return "received";
+}
+async function applyCustomer(db2, ctx, entityId, mutationType, payload) {
+  if (mutationType === "delete") {
+    await db2.update(customers).set({ deletedAt: /* @__PURE__ */ new Date() }).where(eq3(customers.id, entityId));
+    return;
+  }
+  const now = /* @__PURE__ */ new Date();
+  await db2.insert(customers).values({
+    id: entityId,
+    tenantId: ctx.tenantId,
+    branchId: toNullableUuid(ctx.branchId),
+    name: payload.name ?? "",
+    phone: payload.phone ?? null,
+    email: payload.email ?? null,
+    address: payload.city ?? null,
+    notes: null,
+    isActive: mapClientCustomerStatus(payload.status ?? payload.isActive),
+    syncStatus: "synced",
+    version: 1,
+    createdAt: now,
+    updatedAt: now
+  }).onConflictDoUpdate({
+    target: customers.id,
+    set: {
+      name: payload.name ?? "",
+      phone: payload.phone ?? null,
+      email: payload.email ?? null,
+      address: payload.city ?? null,
+      isActive: mapClientCustomerStatus(payload.status ?? payload.isActive),
+      syncStatus: "synced",
+      updatedAt: now
+    }
+  });
+}
+async function applyProductCategory(db2, ctx, entityId, mutationType, payload) {
+  if (mutationType === "delete") {
+    await db2.update(productCategories).set({ deletedAt: /* @__PURE__ */ new Date() }).where(eq3(productCategories.id, entityId));
+    return;
+  }
+  const now = /* @__PURE__ */ new Date();
+  await db2.insert(productCategories).values({
+    id: entityId,
+    tenantId: ctx.tenantId,
+    name: payload.name ?? "",
+    isActive: mapClientCategoryStatus(payload.status ?? payload.isActive),
+    syncStatus: "synced",
+    version: 1,
+    createdAt: now,
+    updatedAt: now
+  }).onConflictDoUpdate({
+    target: productCategories.id,
+    set: {
+      name: payload.name ?? "",
+      isActive: mapClientCategoryStatus(payload.status ?? payload.isActive),
+      syncStatus: "synced",
+      updatedAt: now
+    }
+  });
+}
+async function applyCashCategory(db2, ctx, entityId, mutationType, payload) {
+  if (mutationType === "delete") {
+    await db2.update(cashCategories).set({ deletedAt: /* @__PURE__ */ new Date() }).where(eq3(cashCategories.id, entityId));
+    return;
+  }
+  const now = /* @__PURE__ */ new Date();
+  await db2.insert(cashCategories).values({
+    id: entityId,
+    tenantId: ctx.tenantId,
+    name: payload.name ?? "",
+    type: mapClientCashCategoryType(payload.type),
+    isActive: mapClientCategoryStatus(payload.status ?? payload.isActive),
+    syncStatus: "synced",
+    version: 1,
+    createdAt: now,
+    updatedAt: now
+  }).onConflictDoUpdate({
+    target: cashCategories.id,
+    set: {
+      name: payload.name ?? "",
+      type: mapClientCashCategoryType(payload.type),
+      isActive: mapClientCategoryStatus(payload.status ?? payload.isActive),
+      syncStatus: "synced",
+      updatedAt: now
+    }
+  });
+}
+async function applyCash(db2, ctx, entityId, mutationType, payload) {
+  if (mutationType === "delete") {
+    await db2.delete(cash).where(eq3(cash.id, entityId));
+    return;
+  }
+  const now = /* @__PURE__ */ new Date();
+  await db2.insert(cash).values({
+    id: entityId,
+    tenantId: ctx.tenantId,
+    branchId: toNullableUuid(ctx.branchId),
+    ref: payload.ref ?? payload.id ?? entityId,
+    date: payload.date ? new Date(payload.date) : now,
+    categoryId: toNullableUuid(payload.categoryId ?? payload.category),
+    income: toNumeric(payload.income),
+    expense: toNumeric(payload.expense),
+    status: payload.status ?? "posted",
+    syncStatus: "synced",
+    createdAt: now,
+    updatedAt: now
+  }).onConflictDoUpdate({
+    target: cash.id,
+    set: {
+      income: toNumeric(payload.income),
+      expense: toNumeric(payload.expense),
+      status: payload.status ?? "posted",
+      syncStatus: "synced",
+      updatedAt: now
+    }
+  });
+}
+async function applySetting(db2, ctx, entityId, mutationType, payload) {
+  if (mutationType === "delete") {
+    await db2.delete(settings).where(eq3(settings.id, entityId));
+    return;
+  }
+  const now = /* @__PURE__ */ new Date();
+  const settingKey = payload.key ?? payload.setting ?? entityId;
+  const area = payload.area ?? "general";
+  const existing = await db2.query.settings.findFirst({
+    where: and3(eq3(settings.tenantId, ctx.tenantId), eq3(settings.key, settingKey))
+  });
+  if (existing) {
+    await db2.update(settings).set({
+      value: payload.value ?? "",
+      area,
+      status: payload.status ?? "active",
+      syncStatus: "synced",
+      updatedAt: now
+    }).where(eq3(settings.id, existing.id));
+  } else {
+    const uuid2 = /^[0-9a-f]{8}-/i.test(entityId) ? entityId : crypto.randomUUID();
+    await db2.insert(settings).values({
+      id: uuid2,
+      tenantId: ctx.tenantId,
+      key: settingKey,
+      area,
+      value: payload.value ?? "",
+      status: payload.status ?? "active",
+      syncStatus: "synced",
+      createdAt: now,
+      updatedAt: now
+    });
+  }
+}
+async function applyShift(db2, ctx, entityId, mutationType, payload) {
+  if (mutationType === "delete") {
+    await db2.delete(shifts).where(eq3(shifts.id, entityId));
+    return;
+  }
+  const now = /* @__PURE__ */ new Date();
+  await db2.insert(shifts).values({
+    id: entityId,
+    tenantId: ctx.tenantId,
+    branchId: toNullableUuid(ctx.branchId),
+    cashierName: payload.cashierName ?? "",
+    startTime: payload.startTime ? new Date(payload.startTime) : now,
+    endTime: payload.endTime ? new Date(payload.endTime) : null,
+    startCash: toNumeric(payload.startCash),
+    expectedCash: payload.expectedCash !== void 0 ? toNumeric(payload.expectedCash) : null,
+    actualCash: payload.actualCash !== void 0 ? toNumeric(payload.actualCash) : null,
+    difference: payload.difference !== void 0 ? toNumeric(payload.difference) : null,
+    status: mapClientShiftStatus(payload.status),
+    syncStatus: "synced",
+    createdAt: now,
+    updatedAt: now
+  }).onConflictDoUpdate({
+    target: shifts.id,
+    set: {
+      endTime: payload.endTime ? new Date(payload.endTime) : null,
+      expectedCash: payload.expectedCash !== void 0 ? toNumeric(payload.expectedCash) : void 0,
+      actualCash: payload.actualCash !== void 0 ? toNumeric(payload.actualCash) : void 0,
+      difference: payload.difference !== void 0 ? toNumeric(payload.difference) : void 0,
+      status: mapClientShiftStatus(payload.status),
+      syncStatus: "synced",
+      updatedAt: now
+    }
+  });
+}
+async function applySupplier(db2, ctx, entityId, mutationType, payload) {
+  if (mutationType === "delete") {
+    await db2.update(suppliers).set({ deletedAt: /* @__PURE__ */ new Date() }).where(eq3(suppliers.id, entityId));
+    return;
+  }
+  const now = /* @__PURE__ */ new Date();
+  await db2.insert(suppliers).values({
+    id: entityId,
+    tenantId: ctx.tenantId,
+    name: payload.name ?? "",
+    phone: payload.phone ?? null,
+    city: payload.city ?? null,
+    payable: toNumeric(payload.payable),
+    orders: payload.orders ?? 0,
+    isActive: mapClientCustomerStatus(payload.status ?? payload.isActive),
+    syncStatus: "synced",
+    version: 1,
+    createdAt: now,
+    updatedAt: now
+  }).onConflictDoUpdate({
+    target: suppliers.id,
+    set: {
+      name: payload.name ?? "",
+      phone: payload.phone ?? null,
+      city: payload.city ?? null,
+      payable: toNumeric(payload.payable),
+      orders: payload.orders ?? 0,
+      isActive: mapClientCustomerStatus(payload.status ?? payload.isActive),
+      syncStatus: "synced",
+      updatedAt: now
+    }
+  });
+}
+async function applyPurchase(db2, ctx, entityId, mutationType, payload) {
+  if (mutationType === "delete") {
+    await db2.delete(purchaseItems).where(eq3(purchaseItems.purchaseId, entityId));
+    await db2.delete(purchases).where(eq3(purchases.id, entityId));
+    return;
+  }
+  const now = /* @__PURE__ */ new Date();
+  await db2.insert(purchases).values({
+    id: entityId,
+    tenantId: ctx.tenantId,
+    branchId: toNullableUuid(ctx.branchId),
+    supplierId: toNullableUuid(payload.supplierId),
+    code: payload.code ?? entityId,
+    date: payload.date ? new Date(payload.date) : now,
+    subtotal: toNumeric(payload.subtotal),
+    grandTotal: toNumeric(payload.grandTotal),
+    status: mapClientPurchaseStatus(payload.status),
+    syncStatus: "synced",
+    version: 1,
+    createdAt: now,
+    updatedAt: now
+  }).onConflictDoUpdate({
+    target: purchases.id,
+    set: {
+      subtotal: toNumeric(payload.subtotal),
+      grandTotal: toNumeric(payload.grandTotal),
+      status: mapClientPurchaseStatus(payload.status),
+      syncStatus: "synced",
+      updatedAt: now
+    }
+  });
+  if (Array.isArray(payload.items)) {
+    await db2.delete(purchaseItems).where(eq3(purchaseItems.purchaseId, entityId));
+    if (payload.items.length > 0) {
+      await db2.insert(purchaseItems).values(
+        payload.items.map((item) => ({
+          id: item.id ?? crypto.randomUUID(),
+          tenantId: ctx.tenantId,
+          purchaseId: entityId,
+          productId: toNullableUuid(item.productId),
+          name: item.name ?? "",
+          qty: toNumeric(item.qty),
+          unitPrice: toNumeric(item.unitPrice),
+          subtotal: toNumeric(item.subtotal),
+          createdAt: now,
+          updatedAt: now
+        }))
+      );
+    }
+  }
+}
+async function applyReturn(db2, ctx, entityId, mutationType, payload) {
+  if (mutationType === "delete") {
+    await db2.delete(returnItems).where(eq3(returnItems.returnId, entityId));
+    await db2.delete(returns).where(eq3(returns.id, entityId));
+    return;
+  }
+  const now = /* @__PURE__ */ new Date();
+  await db2.insert(returns).values({
+    id: entityId,
+    tenantId: ctx.tenantId,
+    branchId: toNullableUuid(ctx.branchId),
+    code: payload.code ?? entityId,
+    type: mapClientReturnType(payload.type),
+    referenceCode: payload.referenceCode ?? "",
+    date: payload.date ? new Date(payload.date) : now,
+    total: toNumeric(payload.total),
+    status: mapClientReturnStatus(payload.status),
+    syncStatus: "synced",
+    version: 1,
+    createdAt: now,
+    updatedAt: now
+  }).onConflictDoUpdate({
+    target: returns.id,
+    set: {
+      total: toNumeric(payload.total),
+      status: mapClientReturnStatus(payload.status),
+      syncStatus: "synced",
+      updatedAt: now
+    }
+  });
+  if (Array.isArray(payload.items)) {
+    await db2.delete(returnItems).where(eq3(returnItems.returnId, entityId));
+    if (payload.items.length > 0) {
+      await db2.insert(returnItems).values(
+        payload.items.map((item) => ({
+          id: item.id ?? crypto.randomUUID(),
+          tenantId: ctx.tenantId,
+          returnId: entityId,
+          productId: toNullableUuid(item.productId),
+          name: item.name ?? "",
+          qty: toNumeric(item.qty),
+          unitPrice: toNumeric(item.unitPrice),
+          subtotal: toNumeric(item.subtotal),
+          createdAt: now,
+          updatedAt: now
+        }))
+      );
+    }
+  }
+}
+async function applyServiceOrder(db2, ctx, entityId, mutationType, payload) {
+  if (mutationType === "delete") {
+    await db2.delete(serviceOrders).where(eq3(serviceOrders.id, entityId));
+    return;
+  }
+  const now = /* @__PURE__ */ new Date();
+  await db2.insert(serviceOrders).values({
+    id: entityId,
+    tenantId: ctx.tenantId,
+    branchId: toNullableUuid(ctx.branchId),
+    customerId: toNullableUuid(payload.customerId),
+    code: payload.code ?? entityId,
+    customerName: payload.customerName ?? "",
+    description: payload.description ?? null,
+    date: payload.date ? new Date(payload.date) : now,
+    cost: toNumeric(payload.cost),
+    status: mapClientServiceOrderStatus(payload.status),
+    syncStatus: "synced",
+    version: 1,
+    createdAt: now,
+    updatedAt: now
+  }).onConflictDoUpdate({
+    target: serviceOrders.id,
+    set: {
+      customerName: payload.customerName ?? "",
+      description: payload.description ?? null,
+      cost: toNumeric(payload.cost),
+      status: mapClientServiceOrderStatus(payload.status),
+      syncStatus: "synced",
+      updatedAt: now
+    }
+  });
+}
+async function applyPaymentMethod(db2, ctx, entityId, mutationType, payload) {
+  if (mutationType === "delete") {
+    await db2.delete(paymentMethods).where(eq3(paymentMethods.id, entityId));
+    return;
+  }
+  const now = /* @__PURE__ */ new Date();
+  await db2.insert(paymentMethods).values({
+    id: entityId,
+    tenantId: ctx.tenantId,
+    name: payload.name ?? "",
+    provider: payload.provider ?? "",
+    type: payload.type ?? "",
+    accountNumber: payload.accountNumber ?? null,
+    accountName: payload.accountName ?? null,
+    status: payload.status === "Tidak Aktif" ? "inactive" : "active",
+    createdAt: now,
+    updatedAt: now
+  }).onConflictDoUpdate({
+    target: paymentMethods.id,
+    set: {
+      name: payload.name ?? "",
+      provider: payload.provider ?? "",
+      type: payload.type ?? "",
+      accountNumber: payload.accountNumber ?? null,
+      accountName: payload.accountName ?? null,
+      status: payload.status === "Tidak Aktif" ? "inactive" : "active",
+      updatedAt: now
+    }
+  });
+}
+async function applyRecipe(db2, ctx, entityId, mutationType, payload) {
+  if (mutationType === "delete") {
+    await db2.delete(recipes).where(eq3(recipes.id, entityId));
+    return;
+  }
+  const now = /* @__PURE__ */ new Date();
+  await db2.insert(recipes).values({
+    id: entityId,
+    tenantId: ctx.tenantId,
+    productId: payload.productId ?? entityId,
+    productName: payload.productName ?? "",
+    name: payload.name ?? "",
+    batchYield: payload.batchYield ?? 1,
+    items: payload.items ?? [],
+    status: payload.status === "Aktif" ? "active" : "draft",
+    createdAt: now,
+    updatedAt: now
+  }).onConflictDoUpdate({
+    target: recipes.id,
+    set: {
+      productId: payload.productId ?? entityId,
+      productName: payload.productName ?? "",
+      name: payload.name ?? "",
+      batchYield: payload.batchYield ?? 1,
+      items: payload.items ?? [],
+      status: payload.status === "Aktif" ? "active" : "draft",
+      updatedAt: now
+    }
+  });
+}
 async function applyMutation(db2, ctx, entityType, entityId, mutationType, payload) {
   if (entityType === "product") {
     await applyProduct(db2, ctx, entityId, mutationType, payload ?? {});
@@ -799,10 +1572,59 @@ async function applyMutation(db2, ctx, entityType, entityId, mutationType, paylo
     await applyStockMovement(db2, ctx, entityId, mutationType, payload ?? {});
     return;
   }
+  if (entityType === "customer") {
+    await applyCustomer(db2, ctx, entityId, mutationType, payload ?? {});
+    return;
+  }
+  if (entityType === "product_category") {
+    await applyProductCategory(db2, ctx, entityId, mutationType, payload ?? {});
+    return;
+  }
+  if (entityType === "cash_category") {
+    await applyCashCategory(db2, ctx, entityId, mutationType, payload ?? {});
+    return;
+  }
+  if (entityType === "cash") {
+    await applyCash(db2, ctx, entityId, mutationType, payload ?? {});
+    return;
+  }
+  if (entityType === "setting") {
+    await applySetting(db2, ctx, entityId, mutationType, payload ?? {});
+    return;
+  }
+  if (entityType === "shift") {
+    await applyShift(db2, ctx, entityId, mutationType, payload ?? {});
+    return;
+  }
+  if (entityType === "supplier") {
+    await applySupplier(db2, ctx, entityId, mutationType, payload ?? {});
+    return;
+  }
+  if (entityType === "purchase") {
+    await applyPurchase(db2, ctx, entityId, mutationType, payload ?? {});
+    return;
+  }
+  if (entityType === "return") {
+    await applyReturn(db2, ctx, entityId, mutationType, payload ?? {});
+    return;
+  }
+  if (entityType === "service_order") {
+    await applyServiceOrder(db2, ctx, entityId, mutationType, payload ?? {});
+    return;
+  }
+  if (entityType === "payment_method") {
+    await applyPaymentMethod(db2, ctx, entityId, mutationType, payload ?? {});
+    return;
+  }
+  if (entityType === "recipe") {
+    await applyRecipe(db2, ctx, entityId, mutationType, payload ?? {});
+    return;
+  }
 }
 
 // src/features/sync/routes.ts
 var syncRoutes = new Hono4();
+syncRoutes.use("*", authMiddleware);
 syncRoutes.get("/pull", async (c) => {
   const parsed = parseSyncPullQuery({
     tenantId: c.req.query("tenantId"),
@@ -815,35 +1637,106 @@ syncRoutes.get("/pull", async (c) => {
   const branchFilter = parsed.value.branchId ? eq4(products.branchId, parsed.value.branchId) : void 0;
   const sinceFilter = parsed.value.since ? gte2(products.updatedAt, parsed.value.since) : void 0;
   const productRows = await db.query.products.findMany({
-    where: and3(eq4(products.tenantId, parsed.value.tenantId), isNull(products.deletedAt), branchFilter, sinceFilter),
+    where: and4(eq4(products.tenantId, parsed.value.tenantId), isNull(products.deletedAt), branchFilter, sinceFilter),
     orderBy: [desc(products.updatedAt)],
     limit: 100
   });
   const saleBranchFilter = parsed.value.branchId ? eq4(salesOrders.branchId, parsed.value.branchId) : void 0;
   const saleSinceFilter = parsed.value.since ? gte2(salesOrders.updatedAt, parsed.value.since) : void 0;
   const saleRows = await db.query.salesOrders.findMany({
-    where: and3(eq4(salesOrders.tenantId, parsed.value.tenantId), isNull(salesOrders.deletedAt), saleBranchFilter, saleSinceFilter),
+    where: and4(eq4(salesOrders.tenantId, parsed.value.tenantId), isNull(salesOrders.deletedAt), saleBranchFilter, saleSinceFilter),
     orderBy: [desc(salesOrders.updatedAt)],
     limit: 100
   });
   const paymentBranchFilter = parsed.value.branchId ? eq4(payments.branchId, parsed.value.branchId) : void 0;
   const paymentSinceFilter = parsed.value.since ? gte2(payments.updatedAt, parsed.value.since) : void 0;
   const paymentRows = await db.query.payments.findMany({
-    where: and3(eq4(payments.tenantId, parsed.value.tenantId), isNull(payments.deletedAt), paymentBranchFilter, paymentSinceFilter),
+    where: and4(eq4(payments.tenantId, parsed.value.tenantId), isNull(payments.deletedAt), paymentBranchFilter, paymentSinceFilter),
     orderBy: [desc(payments.updatedAt)],
     limit: 100
   });
   const stockBranchFilter = parsed.value.branchId ? eq4(stockMovements.branchId, parsed.value.branchId) : void 0;
   const stockSinceFilter = parsed.value.since ? gte2(stockMovements.updatedAt, parsed.value.since) : void 0;
   const stockRows = await db.query.stockMovements.findMany({
-    where: and3(eq4(stockMovements.tenantId, parsed.value.tenantId), isNull(stockMovements.deletedAt), stockBranchFilter, stockSinceFilter),
+    where: and4(eq4(stockMovements.tenantId, parsed.value.tenantId), isNull(stockMovements.deletedAt), stockBranchFilter, stockSinceFilter),
     orderBy: [desc(stockMovements.updatedAt)],
     limit: 100
   });
   const customerSinceFilter = parsed.value.since ? gte2(customers.updatedAt, parsed.value.since) : void 0;
   const customerRows = await db.query.customers.findMany({
-    where: and3(eq4(customers.tenantId, parsed.value.tenantId), isNull(customers.deletedAt), customerSinceFilter),
+    where: and4(eq4(customers.tenantId, parsed.value.tenantId), isNull(customers.deletedAt), customerSinceFilter),
     orderBy: [desc(customers.updatedAt)],
+    limit: 100
+  });
+  const categoriesSinceFilter = parsed.value.since ? gte2(productCategories.updatedAt, parsed.value.since) : void 0;
+  const categoryRows = await db.query.productCategories.findMany({
+    where: and4(eq4(productCategories.tenantId, parsed.value.tenantId), isNull(productCategories.deletedAt), categoriesSinceFilter),
+    orderBy: [desc(productCategories.updatedAt)],
+    limit: 100
+  });
+  const cashCategoriesSinceFilter = parsed.value.since ? gte2(cashCategories.updatedAt, parsed.value.since) : void 0;
+  const cashCategoryRows = await db.query.cashCategories.findMany({
+    where: and4(eq4(cashCategories.tenantId, parsed.value.tenantId), isNull(cashCategories.deletedAt), cashCategoriesSinceFilter),
+    orderBy: [desc(cashCategories.updatedAt)],
+    limit: 100
+  });
+  const cashBranchFilter = parsed.value.branchId ? eq4(cash.branchId, parsed.value.branchId) : void 0;
+  const cashSinceFilter = parsed.value.since ? gte2(cash.updatedAt, parsed.value.since) : void 0;
+  const cashRows = await db.query.cash.findMany({
+    where: and4(eq4(cash.tenantId, parsed.value.tenantId), cashBranchFilter, cashSinceFilter),
+    orderBy: [desc(cash.updatedAt)],
+    limit: 100
+  });
+  const settingsSinceFilter = parsed.value.since ? gte2(settings.updatedAt, parsed.value.since) : void 0;
+  const settingRows = await db.query.settings.findMany({
+    where: and4(eq4(settings.tenantId, parsed.value.tenantId), settingsSinceFilter),
+    orderBy: [desc(settings.updatedAt)],
+    limit: 100
+  });
+  const shiftsBranchFilter = parsed.value.branchId ? eq4(shifts.branchId, parsed.value.branchId) : void 0;
+  const shiftsSinceFilter = parsed.value.since ? gte2(shifts.updatedAt, parsed.value.since) : void 0;
+  const shiftRows = await db.query.shifts.findMany({
+    where: and4(eq4(shifts.tenantId, parsed.value.tenantId), shiftsBranchFilter, shiftsSinceFilter),
+    orderBy: [desc(shifts.updatedAt)],
+    limit: 100
+  });
+  const supplierSinceFilter = parsed.value.since ? gte2(suppliers.updatedAt, parsed.value.since) : void 0;
+  const supplierRows = await db.query.suppliers.findMany({
+    where: and4(eq4(suppliers.tenantId, parsed.value.tenantId), isNull(suppliers.deletedAt), supplierSinceFilter),
+    orderBy: [desc(suppliers.updatedAt)],
+    limit: 100
+  });
+  const purchaseBranchFilter = parsed.value.branchId ? eq4(purchases.branchId, parsed.value.branchId) : void 0;
+  const purchaseSinceFilter = parsed.value.since ? gte2(purchases.updatedAt, parsed.value.since) : void 0;
+  const purchaseRows = await db.query.purchases.findMany({
+    where: and4(eq4(purchases.tenantId, parsed.value.tenantId), purchaseBranchFilter, purchaseSinceFilter),
+    orderBy: [desc(purchases.updatedAt)],
+    limit: 100
+  });
+  const returnBranchFilter = parsed.value.branchId ? eq4(returns.branchId, parsed.value.branchId) : void 0;
+  const returnSinceFilter = parsed.value.since ? gte2(returns.updatedAt, parsed.value.since) : void 0;
+  const returnRows = await db.query.returns.findMany({
+    where: and4(eq4(returns.tenantId, parsed.value.tenantId), returnBranchFilter, returnSinceFilter),
+    orderBy: [desc(returns.updatedAt)],
+    limit: 100
+  });
+  const serviceOrderBranchFilter = parsed.value.branchId ? eq4(serviceOrders.branchId, parsed.value.branchId) : void 0;
+  const serviceOrderSinceFilter = parsed.value.since ? gte2(serviceOrders.updatedAt, parsed.value.since) : void 0;
+  const serviceOrderRows = await db.query.serviceOrders.findMany({
+    where: and4(eq4(serviceOrders.tenantId, parsed.value.tenantId), serviceOrderBranchFilter, serviceOrderSinceFilter),
+    orderBy: [desc(serviceOrders.updatedAt)],
+    limit: 100
+  });
+  const paymentMethodsSinceFilter = parsed.value.since ? gte2(paymentMethods.updatedAt, parsed.value.since) : void 0;
+  const paymentMethodsRows = await db.query.paymentMethods.findMany({
+    where: and4(eq4(paymentMethods.tenantId, parsed.value.tenantId), paymentMethodsSinceFilter),
+    orderBy: [desc(paymentMethods.updatedAt)],
+    limit: 100
+  });
+  const recipeSinceFilter = parsed.value.since ? gte2(recipes.updatedAt, parsed.value.since) : void 0;
+  const recipeRows = await db.query.recipes.findMany({
+    where: and4(eq4(recipes.tenantId, parsed.value.tenantId), recipeSinceFilter),
+    orderBy: [desc(recipes.updatedAt)],
     limit: 100
   });
   const items = [
@@ -941,10 +1834,208 @@ syncRoutes.get("/pull", async (c) => {
         city: null,
         receivable: 0,
         orders: 0,
+        status: row.isActive ? "Aktif" : "Nonaktif",
+        version: row.version
+      },
+      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
+      serverSyncStatus: row.syncStatus,
+      updatedAt: row.updatedAt.toISOString()
+    })),
+    ...categoryRows.map((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: "product_category",
+      mutationType: "update",
+      payload: {
+        id: row.id,
+        name: row.name,
+        status: row.isActive ? "Aktif" : "Arsip"
+      },
+      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus ?? "synced"),
+      serverSyncStatus: row.syncStatus ?? "synced",
+      updatedAt: row.updatedAt.toISOString()
+    })),
+    ...cashCategoryRows.map((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: "cash_category",
+      mutationType: "update",
+      payload: {
+        id: row.id,
+        name: row.name,
+        type: row.type === "income" ? "Pemasukan" : "Pengeluaran",
         status: row.isActive ? "Aktif" : "Nonaktif"
       },
       transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
       serverSyncStatus: row.syncStatus,
+      updatedAt: row.updatedAt.toISOString()
+    })),
+    ...cashRows.map((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: "cash",
+      mutationType: "update",
+      payload: {
+        id: row.id,
+        ref: row.ref,
+        date: row.date.toISOString(),
+        account: "",
+        category: row.categoryId ?? "",
+        income: Number(row.income),
+        expense: Number(row.expense),
+        status: row.status
+      },
+      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
+      serverSyncStatus: row.syncStatus,
+      updatedAt: row.updatedAt.toISOString()
+    })),
+    ...settingRows.map((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: "setting",
+      mutationType: "update",
+      payload: {
+        id: row.key,
+        key: row.key,
+        area: row.area,
+        value: row.value,
+        status: row.status
+      },
+      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
+      serverSyncStatus: row.syncStatus,
+      updatedAt: row.updatedAt.toISOString()
+    })),
+    ...shiftRows.map((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: "shift",
+      mutationType: "update",
+      payload: {
+        id: row.id,
+        cashierName: row.cashierName,
+        startTime: row.startTime.toISOString(),
+        endTime: row.endTime?.toISOString() ?? null,
+        startCash: Number(row.startCash),
+        expectedCash: row.expectedCash ? Number(row.expectedCash) : void 0,
+        actualCash: row.actualCash ? Number(row.actualCash) : void 0,
+        difference: row.difference ? Number(row.difference) : void 0,
+        status: row.status
+      },
+      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
+      serverSyncStatus: row.syncStatus,
+      updatedAt: row.updatedAt.toISOString()
+    })),
+    ...supplierRows.map((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: "supplier",
+      mutationType: "update",
+      payload: {
+        id: row.id,
+        name: row.name,
+        phone: row.phone ?? "",
+        city: row.city ?? "",
+        payable: Number(row.payable),
+        orders: row.orders,
+        status: row.isActive ? "Aktif" : "Nonaktif",
+        version: row.version
+      },
+      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
+      serverSyncStatus: row.syncStatus,
+      updatedAt: row.updatedAt.toISOString()
+    })),
+    ...purchaseRows.map((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: "purchase",
+      mutationType: "update",
+      payload: {
+        id: row.id,
+        code: row.code,
+        supplierId: row.supplierId,
+        date: row.date.toISOString(),
+        subtotal: Number(row.subtotal),
+        grandTotal: Number(row.grandTotal),
+        status: row.status,
+        version: row.version
+      },
+      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
+      serverSyncStatus: row.syncStatus,
+      updatedAt: row.updatedAt.toISOString()
+    })),
+    ...returnRows.map((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: "return",
+      mutationType: "update",
+      payload: {
+        id: row.id,
+        code: row.code,
+        type: row.type === "sale" ? "Penjualan" : "Pembelian",
+        referenceCode: row.referenceCode,
+        date: row.date.toISOString(),
+        total: Number(row.total),
+        status: row.status,
+        version: row.version
+      },
+      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
+      serverSyncStatus: row.syncStatus,
+      updatedAt: row.updatedAt.toISOString()
+    })),
+    ...serviceOrderRows.map((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: "service_order",
+      mutationType: "update",
+      payload: {
+        id: row.id,
+        code: row.code,
+        customerId: row.customerId,
+        customerName: row.customerName,
+        description: row.description,
+        date: row.date.toISOString(),
+        cost: Number(row.cost),
+        status: row.status,
+        version: row.version
+      },
+      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
+      serverSyncStatus: row.syncStatus,
+      updatedAt: row.updatedAt.toISOString()
+    })),
+    ...paymentMethodsRows.map((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: "payment_method",
+      mutationType: "update",
+      payload: {
+        id: row.id,
+        name: row.name,
+        provider: row.provider,
+        type: row.type,
+        accountNumber: row.accountNumber,
+        accountName: row.accountName,
+        status: row.status === "inactive" ? "Tidak Aktif" : "Aktif"
+      },
+      transportStatus: "applied",
+      serverSyncStatus: "synced",
+      updatedAt: row.updatedAt.toISOString()
+    })),
+    ...recipeRows.map((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: "recipe",
+      mutationType: "update",
+      payload: {
+        id: row.id,
+        productId: row.productId,
+        productName: row.productName,
+        name: row.name,
+        batchYield: row.batchYield,
+        items: row.items,
+        status: row.status === "active" ? "Aktif" : "Draft"
+      },
+      transportStatus: "applied",
+      serverSyncStatus: "synced",
       updatedAt: row.updatedAt.toISOString()
     }))
   ];
@@ -1025,9 +2116,28 @@ syncRoutes.post("/push", async (c) => {
   return c.json(buildSyncPushResponse(items));
 });
 
+// src/features/platform/routes.ts
+import { eq as eq5, sql } from "drizzle-orm";
+import { Hono as Hono5 } from "hono";
+var platformRoutes = new Hono5();
+platformRoutes.get("/tenants", async (c) => {
+  const result = await db.select({
+    id: tenants.id,
+    tenantName: tenants.name,
+    ownerName: users.name,
+    city: tenants.address,
+    packageName: tenants.planCode,
+    subscriptionStatus: tenants.subscriptionStatus,
+    planValidUntil: tenants.planValidUntil,
+    storageLimitGb: sql`${tenants.storageLimitMb} / 1024.0`,
+    isActive: tenants.isActive
+  }).from(tenants).leftJoin(tenantMembers, eq5(tenants.id, tenantMembers.tenantId)).leftJoin(users, eq5(tenantMembers.userId, users.id)).where(eq5(tenantMembers.role, "owner"));
+  return c.json({ ok: true, items: result });
+});
+
 // src/app.ts
 function createApp() {
-  const app2 = new Hono5();
+  const app2 = new Hono6();
   app2.use("*", cors());
   app2.get("/", (c) => c.json({ message: "VitPOS API is running!" }));
   app2.route("/health", healthRoutes);
@@ -1035,6 +2145,7 @@ function createApp() {
   app2.route("/api/v1/auth", authRoutes);
   app2.route("/api/v1/sync", syncRoutes);
   app2.route("/api/v1/reports", reportRoutes);
+  app2.route("/api/v1/platform", platformRoutes);
   app2.onError((error, c) => {
     return c.json({ ok: false, message: error.message }, 500);
   });
