@@ -312,6 +312,35 @@ export class VitposLocalDb extends Dexie {
       syncConflicts: 'id, tenantId, [tenantId+entityType+entityId], status, createdAt, resolvedAt',
       syncRuns: 'id, tenantId, status, startedAt, finishedAt',
     })
+    this.version(15).stores({
+      users: 'id, email',
+      tenants: 'id',
+      tenantMembers: 'id, [userId+tenantId], userId',
+      products: 'id, tenantId, [tenantId+name], [tenantId+category], [tenantId+status], syncStatus, updatedAt',
+      productCategories: 'id, tenantId, [tenantId+name], [tenantId+status], syncStatus, updatedAt',
+      customers: 'id, tenantId, [tenantId+name], [tenantId+phone], [tenantId+status], syncStatus, updatedAt',
+      salesOrders: 'id, tenantId, [tenantId+code], [tenantId+customerName], [tenantId+date], [tenantId+status], syncStatus, updatedAt',
+      salesOrderItems: 'id, tenantId, salesOrderId, productId',
+      payments: 'id, tenantId, salesOrderId, serviceOrderId, purchaseId, [tenantId+salesOrderId], [tenantId+serviceOrderId], [tenantId+purchaseId], ref, source, method, date, status, syncStatus, updatedAt',
+      stockMovements: 'id, tenantId, [tenantId+productId], type, referenceId, syncStatus, updatedAt',
+      inventory: 'id, tenantId, [tenantId+product], [tenantId+warehouse], status',
+      cash: 'id, tenantId, [tenantId+ref], [tenantId+date], [tenantId+account], category, status',
+      cashCategories: 'id, tenantId, [tenantId+name], type, status, syncStatus, updatedAt',
+      settings: 'id, tenantId, [tenantId+area], [tenantId+setting], status',
+      paymentMethods: 'id, tenantId, [tenantId+name], provider, type, status, updatedAt',
+      shifts: 'id, tenantId, cashierName, startTime, status',
+      suppliers: 'id, tenantId, [tenantId+name], [tenantId+phone], status, syncStatus, updatedAt',
+      purchases: 'id, tenantId, [tenantId+code], [tenantId+supplierName], [tenantId+date], status, syncStatus, updatedAt',
+      purchaseItems: 'id, tenantId, purchaseId, productId',
+      returns: 'id, tenantId, [tenantId+code], type, referenceCode, date, status, syncStatus, updatedAt',
+      returnItems: 'id, tenantId, returnId, productId',
+      serviceOrders: 'id, tenantId, [tenantId+code], [tenantId+customerName], [tenantId+date], status, syncStatus, updatedAt',
+      recipes: 'id, tenantId, [tenantId+name], [tenantId+productName], status, updatedAt',
+      productionBatches: 'id, tenantId, [tenantId+recipeId], [tenantId+productId], date, syncStatus, updatedAt',
+      outbox: 'id, tenantId, [tenantId+entityType+entityId], mutationType, status, createdAt, updatedAt, syncedAt',
+      syncConflicts: 'id, tenantId, [tenantId+entityType+entityId], status, createdAt, resolvedAt',
+      syncRuns: 'id, tenantId, status, startedAt, finishedAt',
+    })
   }
 }
 
