@@ -3,6 +3,7 @@ import { type PropsWithChildren, useEffect } from 'react'
 import { Toaster } from 'sonner'
 
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { UpdateAnnouncer } from '@/features/updates/components/update-announcer'
 import { bootstrapLocalDb } from '@/services/local-db/bootstrap'
 
 const queryClient = new QueryClient({
@@ -23,6 +24,7 @@ export function AppProviders({ children }: PropsWithChildren) {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         {children}
+        <UpdateAnnouncer />
         <Toaster richColors position="top-right" />
       </TooltipProvider>
     </QueryClientProvider>

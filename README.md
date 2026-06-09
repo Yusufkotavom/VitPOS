@@ -127,6 +127,14 @@ We utilize **GitHub Actions** (`.github/workflows/release.yml`) for automated cr
 3. **Desktop Pipeline:** Bootstraps Rust toolchain, fetches `libwebkit2gtk`, and compiles `.exe`, `.deb`, and `.AppImage` via `tauri-action`.
 4. Artifacts are automatically attached to the GitHub Release.
 
+### App Update Behavior
+
+1. **Web update path:** App can always open the latest deployed web build at `https://vit-pos-8vle.vercel.app`.
+2. **Android non-Play-Store path:** The app checks GitHub Releases and offers the latest APK download.
+3. **Tauri desktop path:** The app checks GitHub Releases and offers the latest installer for the current OS.
+4. **Version sync in CI:** Tagged releases automatically sync version numbers into Android and Tauri build files before artifacts are built.
+5. **Important limitation:** Android sideload updates cannot install silently; the user must still confirm APK installation.
+
 To trigger a release manually:
 ```bash
 git tag -a v1.0.0 -m "Release v1.0.0"
