@@ -1,5 +1,10 @@
 apply plugin: 'com.android.application'
 
+def releaseStoreFile = System.getenv('KOTACOM_RELEASE_STORE_FILE') ?: 'release.keystore'
+def releaseStorePassword = System.getenv('KOTACOM_RELEASE_STORE_PASSWORD') ?: 'kotacom123'
+def releaseKeyAlias = System.getenv('KOTACOM_RELEASE_KEY_ALIAS') ?: 'kotacom'
+def releaseKeyPassword = System.getenv('KOTACOM_RELEASE_KEY_PASSWORD') ?: 'kotacom123'
+
 android {
     namespace = "com.kotacom.vitpos"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -18,10 +23,10 @@ android {
     }
     signingConfigs {
         release {
-            storeFile file("release.keystore")
-            storePassword "kotacom123"
-            keyAlias "kotacom"
-            keyPassword "kotacom123"
+            storeFile file(releaseStoreFile)
+            storePassword releaseStorePassword
+            keyAlias releaseKeyAlias
+            keyPassword releaseKeyPassword
         }
     }
     buildTypes {

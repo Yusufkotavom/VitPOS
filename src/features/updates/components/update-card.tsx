@@ -1,12 +1,14 @@
 import { RefreshCw, Rocket, Smartphone, Monitor, Globe } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { id } from 'date-fns/locale'
+import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAppUpdate } from '@/features/updates/hooks/use-app-update'
 import { detectRuntimePlatform, openExternalUrl } from '@/features/updates/lib/update-runtime'
+import { installNativeTauriUpdate } from '@/features/updates/lib/tauri-native-updater'
 
 const PLATFORM_LABEL: Record<ReturnType<typeof detectRuntimePlatform>, string> = {
   web: 'Browser / Web',
@@ -26,6 +28,23 @@ export function UpdateCard() {
     : latest?.preferredChannel === 'desktop'
       ? 'Unduh installer terbaru'
       : 'Buka versi web terbaru'
+
+  async function handlePrimaryAction() {
+    if (!latest?.preferredUrl) return
+
+    if (platform.startsWith('tauri-') && update.hasUpdate) {
+      try {
+        const installed = await installNativeTauriUpdate()
+        if (installed) {
+          return
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Gagal memasang update desktop otomatis')
+      }
+    }
+
+    await openExternalUrl(latest.preferredUrl)
+  }
 
   return (
     <Card>
@@ -84,11 +103,11 @@ export function UpdateCard() {
             </div>
             <div className="flex items-start gap-2">
               <Smartphone className="mt-0.5 size-4" />
-              <span>Android non-Play Store akan diarahkan ke APK terbaru dari GitHub Release.</span>
+              <span>Android non-Play Store akan diarahkan ke APK terbaru. APK tetap signed, tetapi install tetap perlu konfirmasi user.</span>
             </div>
             <div className="flex items-start gap-2">
               <Monitor className="mt-0.5 size-4" />
-              <span>Tauri desktop akan diarahkan ke installer terbaru sesuai OS.</span>
+              <span>Tauri desktop akan mencoba update native otomatis. Jika gagal, app fallback ke installer terbaru sesuai OS.</span>
             </div>
           </div>
         </div>
@@ -99,9 +118,9 @@ export function UpdateCard() {
             {update.loading ? 'Memeriksa...' : 'Cek ulang'}
           </Button>
           {latest?.preferredUrl ? (
-            <Button onClick={() => void openExternalUrl(latest.preferredUrl!)}>
+            <Button onClick={() => void handlePrimaryAction()}>
               <Rocket className="size-4" />
-              {preferredLabel}
+              {platform.startsWith('tauri-') && update.hasUpdate ? 'Pasang update desktop' : preferredLabel}
             </Button>
           ) : null}
           {latest?.webUrl ? (

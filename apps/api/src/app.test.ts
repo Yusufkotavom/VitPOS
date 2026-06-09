@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createApp } from './app'
+
+const originalFetch = global.fetch
+
+afterEach(() => {
+  global.fetch = originalFetch
+  vi.restoreAllMocks()
+})
 
 describe('createApp', () => {
   it('serves health route without database env', async () => {
@@ -154,6 +161,107 @@ describe('createApp', () => {
 
       expect(response.status).toBe(400)
       expect(body).toEqual({ ok: false, message: 'tenantId required' })
+    })
+  })
+
+  describe('update endpoints', () => {
+    it('returns 400 when update platform or version is missing', async () => {
+      const app = createApp()
+      const response = await app.request('/api/v1/updates/latest')
+      const body = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(body).toEqual({ ok: false, message: 'platform and currentVersion required' })
+    })
+
+    it('returns signed desktop update payload for tauri updater route', async () => {
+      global.fetch = vi.fn(async (input) => {
+        const url = String(input)
+        if (url.endsWith('.sig')) {
+          return new Response('desktop-signature', { status: 200 })
+        }
+
+        return new Response(JSON.stringify({
+          tag_name: 'v1.2.3',
+          html_url: 'https://github.com/Yusufkotavom/VitPOS/releases/tag/v1.2.3',
+          body: 'Desktop updater ready',
+          published_at: '2026-06-10T00:00:00Z',
+          assets: [
+            {
+              name: 'vitpos_1.2.3_x64-setup.exe',
+              browser_download_url: 'https://example.com/vitpos_1.2.3_x64-setup.exe',
+            },
+            {
+              name: 'vitpos_1.2.3_x64-setup.exe.sig',
+              browser_download_url: 'https://example.com/vitpos_1.2.3_x64-setup.exe.sig',
+            },
+          ],
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      }) as typeof fetch
+
+      const app = createApp()
+      const response = await app.request('/api/v1/updates/desktop/windows/x86_64/1.0.0')
+      const body = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(body).toEqual({
+        version: '1.2.3',
+        notes: 'Desktop updater ready',
+        pub_date: '2026-06-10T00:00:00Z',
+        url: 'https://example.com/vitpos_1.2.3_x64-setup.exe',
+        signature: 'desktop-signature',
+      })
+    })
+
+    it('returns unified android update metadata when a newer apk release exists', async () => {
+      global.fetch = vi.fn(async (input) => {
+        const url = String(input)
+        if (url.endsWith('.sha256')) {
+          return new Response('apk-checksum', { status: 200 })
+        }
+
+        return new Response(JSON.stringify({
+          tag_name: 'v1.2.3',
+          html_url: 'https://github.com/Yusufkotavom/VitPOS/releases/tag/v1.2.3',
+          body: 'Android release ready',
+          published_at: '2026-06-10T00:00:00Z',
+          assets: [
+            {
+              name: 'app-release.apk',
+              browser_download_url: 'https://example.com/app-release.apk',
+            },
+            {
+              name: 'app-release.apk.sha256',
+              browser_download_url: 'https://example.com/app-release.apk.sha256',
+            },
+          ],
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      }) as typeof fetch
+
+      const app = createApp()
+      const response = await app.request('/api/v1/updates/latest?platform=android-apk&currentVersion=1.0.0')
+      const body = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(body).toEqual({
+        ok: true,
+        available: true,
+        version: '1.2.3',
+        notes: 'Android release ready',
+        publishedAt: '2026-06-10T00:00:00Z',
+        releaseUrl: 'https://github.com/Yusufkotavom/VitPOS/releases/tag/v1.2.3',
+        webUrl: 'https://vit-pos-8vle.vercel.app',
+        apkUrl: 'https://example.com/app-release.apk',
+        checksum: 'apk-checksum',
+        preferredChannel: 'apk',
+        preferredUrl: 'https://example.com/app-release.apk',
+      })
     })
   })
 })

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
-import { fetchLatestUpdate, isVersionNewer, type AvailableUpdate } from '@/features/updates/lib/github-release'
-import { getRuntimeVersion } from '@/features/updates/lib/update-runtime'
+import { fetchLatestUpdate, type AvailableUpdate } from '@/features/updates/lib/github-release'
+import { detectRuntimePlatform, getRuntimeVersion } from '@/features/updates/lib/update-runtime'
 
 type UpdateState = {
   currentVersion: string
@@ -26,14 +26,12 @@ export function useAppUpdate(): UpdateState {
     setError(null)
 
     try {
-      const [runtimeVersion, latestRelease] = await Promise.all([
-        getRuntimeVersion(),
-        fetchLatestUpdate(),
-      ])
+      const runtimeVersion = await getRuntimeVersion()
+      const latestRelease = await fetchLatestUpdate(runtimeVersion, detectRuntimePlatform())
 
       setCurrentVersion(runtimeVersion)
       setLatest(latestRelease)
-      setHasUpdate(isVersionNewer(runtimeVersion, latestRelease.version))
+      setHasUpdate(latestRelease.available)
       setCheckedAt(new Date().toISOString())
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Gagal memeriksa update')
