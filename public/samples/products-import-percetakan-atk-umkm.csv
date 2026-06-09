@@ -1,0 +1,44 @@
+,Nama Produk,Kategori,Jenis,HPP,Harga Jual,Harga Grosir,Stok,Kelola Stok,SKU,Barcode,Status
+,Print BW A4 HVS 70gsm,Print & Fotokopi,Jasa,120,250,,0,false,SRV-PRINT-BW-A4-70,,Aktif
+,Print BW A4 HVS 80gsm,Print & Fotokopi,Jasa,150,300,,0,false,SRV-PRINT-BW-A4-80,,Aktif
+,Print BW A3 HVS 70gsm,Print & Fotokopi,Jasa,250,500,,0,false,SRV-PRINT-BW-A3-70,,Aktif
+,Print BW A3 HVS 80gsm,Print & Fotokopi,Jasa,275,550,,0,false,SRV-PRINT-BW-A3-80,,Aktif
+,Print Warna A4 HVS 80gsm,Print & Fotokopi,Jasa,1000,2000,,0,false,SRV-PRINT-COLOR-A4-HVS,,Aktif
+,Print Warna A3 HVS 80gsm,Print & Fotokopi,Jasa,1750,3500,,0,false,SRV-PRINT-COLOR-A3-HVS,,Aktif
+,Print Warna A4 Art Paper 150 1 Muka,Digital Printing,Jasa,2500,5000,,0,false,SRV-PRINT-A4-AP150-1S,,Aktif
+,Print Warna A4 Art Carton 260 1 Muka,Digital Printing,Jasa,2500,5000,,0,false,SRV-PRINT-A4-AC260-1S,,Aktif
+,Laminating KTP,Finishing,Jasa,1000,2000,,0,false,SRV-LAM-KTP,,Aktif
+,Laminating A4 / Sertifikat,Finishing,Jasa,2500,5000,,0,false,SRV-LAM-A4,,Aktif
+,Laminating F4,Finishing,Jasa,2500,5000,,0,false,SRV-LAM-F4,,Aktif
+,Laminating A3 / Poster,Finishing,Jasa,5000,10000,,0,false,SRV-LAM-A3,,Aktif
+,Spanduk Flexi China per m2,Large Format,Jasa,8500,17000,,0,false,SRV-SPANDUK-FLEXI,,Aktif
+,X Banner 60x160 + Kaki,Display Promosi,Jasa,35000,61500,,0,false,SRV-XBANNER-60160,,Aktif
+,Kartu Nama 1 Box 100 pcs AC260 1 Sisi,Kartu Nama,Jasa,12000,25000,,0,false,SRV-NAMECARD-AC260,,Aktif
+,Kartu Nama 1 Box 100 pcs Standard,Kartu Nama,Jasa,15000,30000,,0,false,SRV-NAMECARD-STD,,Aktif
+,Sticker Kromo A3,Stiker Label,Jasa,2500,5000,,0,false,SRV-STICKER-KROMO-A3,,Aktif
+,Sticker HVS A3,Stiker Label,Jasa,2250,4500,,0,false,SRV-STICKER-HVS-A3,,Aktif
+,Sticker Vinyl A3,Stiker Label,Jasa,4300,8625,,0,false,SRV-STICKER-VINYL-A3,,Aktif
+,Sticker Transparan A3,Stiker Label,Jasa,3125,6250,,0,false,SRV-STICKER-TRANS-A3,,Aktif
+,Sticker Hologram A3,Stiker Label,Jasa,4875,9750,,0,false,SRV-STICKER-HOLO-A3,,Aktif
+,Sticker Vinyl Meteran Latex per m2,Stiker Meteran,Jasa,30000,60000,,0,false,SRV-STICKER-VINYL-LTX,,Aktif
+,Sticker Vinyl Meteran UV per m2,Stiker Meteran,Jasa,32500,65000,,0,false,SRV-STICKER-VINYL-UV,,Aktif
+,Sticker OneWay Vision per m2,Stiker Meteran,Jasa,33000,66000,,0,false,SRV-STICKER-ONEWAY,,Aktif
+,Sticker Label Yasin Bulat per pcs,Stiker Label,Jasa,44,88,,0,false,SRV-STICKER-YASIN-BULAT,,Aktif
+,Sticker Label Yasin Kotak per pcs,Stiker Label,Jasa,44,88,,0,false,SRV-STICKER-YASIN-KOTAK,,Aktif
+,Cetak Yasin Softcover 64 Halaman,Yasin & Tahlil,Jasa,3050,6100,,0,false,SRV-YASIN-SC-64,,Aktif
+,Cetak Yasin Softcover 128 Halaman HVS,Yasin & Tahlil,Jasa,11000,22000,,0,false,SRV-YASIN-SC-128-HVS,,Aktif
+,Cetak Yasin Softcover 128 Halaman Art Paper,Yasin & Tahlil,Jasa,4850,9700,,0,false,SRV-YASIN-SC-128-AP,,Aktif
+,Cetak Yasin Hardcover 128 Halaman,Yasin & Tahlil,Jasa,12500,25000,,0,false,SRV-YASIN-HC-128,,Aktif
+,Cetak Yasin Hardcover 176 Halaman,Yasin & Tahlil,Jasa,13500,27000,,0,false,SRV-YASIN-HC-176,,Aktif
+,Cetak Yasin Softcover 192 Halaman,Yasin & Tahlil,Jasa,7500,15000,,0,false,SRV-YASIN-SC-192,,Aktif
+,Pensil 2B Joyko P-88,ATK Sekolah,Produk Fisik,900,1500,12000,96,true,ATK-PENSIL-2B-P88,8991000000011,Aktif
+,Pensil 2B Joyko P-92 1 Lusin,ATK Sekolah,Produk Fisik,11000,13700,12000,24,true,ATK-PENSIL-2B-P92-12,8991000000012,Aktif
+,Pulpen Joyko BP-56PTL 0.7 mm,ATK Sekolah,Produk Fisik,1800,2600,23000,72,true,ATK-PULPEN-BP56,8991000000013,Aktif
+,Gel Pen Joyko GP-371 0.5 mm,ATK Sekolah,Produk Fisik,2800,4000,36000,72,true,ATK-GELPEN-GP371,8991000000014,Aktif
+,Penghapus Joyko Putih Kecil,ATK Sekolah,Produk Fisik,1200,1999,27500,120,true,ATK-ERASER-SMALL,8991000000015,Aktif
+,Penghapus Joyko ER-20BL Besar,ATK Sekolah,Produk Fisik,1700,2800,42500,60,true,ATK-ERASER-LARGE,8991000000016,Aktif
+,Penggaris Joyko RL-P30 30 cm,ATK Sekolah,Produk Fisik,2200,4000,36000,48,true,ATK-RULER-RLP30,8991000000017,Aktif
+,Penggaris Joyko RL-AC30 30 cm,ATK Sekolah,Produk Fisik,3000,6000,54000,48,true,ATK-RULER-RLAC30,8991000000018,Aktif
+,Notebook Joyko NB-718 A5,ATK Sekolah,Produk Fisik,4000,6600,60000,40,true,ATK-NOTEBOOK-NB718,8991000000019,Aktif
+,Notebook Joyko NB-707 A5,ATK Sekolah,Produk Fisik,5000,8300,72000,40,true,ATK-NOTEBOOK-NB707,8991000000020,Aktif
+,Correction Fluid Joyko JK-01 Metallic,ATK Sekolah,Produk Fisik,2500,4700,42000,36,true,ATK-CORRECTION-JK01,8991000000021,Aktif

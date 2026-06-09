@@ -4,6 +4,7 @@ import { useForm, useWatch } from 'react-hook-form'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { CurrencyInput } from '@/shared/components/forms/currency-input'
 import {
   cashAccountOptions,
   cashFormSchema,
@@ -71,7 +72,7 @@ export function CashForm({
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           {type === 'Pemasukan' ? 'Nominal masuk' : 'Nominal keluar'}
-          <Input aria-invalid={Boolean(errors.amount)} inputMode="numeric" {...form.register('amount')} placeholder="0" />
+          <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.amount)} {...form.register('amount')} placeholder="0" />
           {errors.amount ? <span className="text-xs text-destructive">{errors.amount.message}</span> : null}
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">

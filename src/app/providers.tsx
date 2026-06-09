@@ -6,6 +6,8 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { UpdateAnnouncer } from '@/features/updates/components/update-announcer'
 import { bootstrapLocalDb } from '@/services/local-db/bootstrap'
 
+import { ThemeProvider } from '@/components/theme-provider'
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -21,12 +23,14 @@ export function AppProviders({ children }: PropsWithChildren) {
   }, [])
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        {children}
-        <UpdateAnnouncer />
-        <Toaster richColors position="top-right" />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider defaultTheme="system" storageKey="vitpos-theme">
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          {children}
+          <UpdateAnnouncer />
+          <Toaster richColors position="top-right" />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   )
 }

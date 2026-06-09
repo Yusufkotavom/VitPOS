@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { CurrencyInput } from '@/shared/components/forms/currency-input'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -823,7 +824,7 @@ export function OnboardingPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Harga</Label>
-                    <Input type="number" value={productForm.price} onChange={e => setProductForm({...productForm, price: e.target.value})} placeholder="10000" />
+                    <CurrencyInput prefix="Rp" value={productForm.price} onValueChange={(val) => setProductForm({...productForm, price: String(val)})} placeholder="10000" />
                   </div>
                 </div>
                 <DialogFooter>
