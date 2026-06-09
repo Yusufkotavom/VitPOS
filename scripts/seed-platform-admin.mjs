@@ -79,6 +79,42 @@ try {
       `
       console.log(`✅ Plan ${inserted.code} (${inserted.name}) @ Rp ${inserted.monthly_price}/mo`)
     }
+
+    const [existingTenant] = await tx`
+      SELECT id, name FROM tenants WHERE name = 'Kotacom HQ' LIMIT 1
+    `
+    let platformTenant
+    if (existingTenant) {
+      await tx`
+        UPDATE tenants SET email = ${ADMIN_EMAIL}, plan_code = 'enterprise', subscription_status = 'active',
+          storage_limit_mb = 10240, max_branches = 99, is_active = true, updated_at = ${now}
+        WHERE id = ${existingTenant.id}
+      `
+      platformTenant = existingTenant
+    } else {
+      ;[platformTenant] = await tx`
+        INSERT INTO tenants (id, name, email, plan_code, subscription_status, storage_limit_mb, max_branches, is_active, created_at, updated_at)
+        VALUES (gen_random_uuid(), 'Kotacom HQ', ${ADMIN_EMAIL}, 'enterprise', 'active', 10240, 99, true, ${now}, ${now})
+        RETURNING id, name
+      `
+    }
+    console.log('✅ Platform tenant ready:', platformTenant.name, '(' + platformTenant.id + ')')
+
+    const [existingMember] = await tx`
+      SELECT id FROM tenant_members WHERE tenant_id = ${platformTenant.id} AND user_id = ${admin.id} LIMIT 1
+    `
+    if (existingMember) {
+      await tx`
+        UPDATE tenant_members SET role = 'owner', is_active = true, updated_at = ${now}
+        WHERE id = ${existingMember.id}
+      `
+    } else {
+      await tx`
+        INSERT INTO tenant_members (tenant_id, user_id, role, is_active, created_at, updated_at)
+        VALUES (${platformTenant.id}, ${admin.id}, 'owner', true, ${now}, ${now})
+      `
+    }
+    console.log('✅ Admin linked to', platformTenant.name, 'as owner')
   })
 
   console.log(`\n🔑 Login as: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`)
