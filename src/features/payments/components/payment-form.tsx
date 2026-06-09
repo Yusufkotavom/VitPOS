@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { CurrencyInput } from '@/shared/components/forms/currency-input'
 import { paymentFormSchema, paymentInitialValues, paymentMethodOptions, paymentStatusOptions, type PaymentFormValues } from '@/features/payments/schemas/payment-form-schema'
 import { FormSection } from '@/shared/components/forms/form-section'
 
@@ -47,7 +48,7 @@ export function PaymentForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
       <FormSection title="Nominal & status" description="Jumlah pembayaran dan status transaksi.">
         <label className="flex flex-col gap-1 text-sm font-medium">
           Nominal
-          <Input inputMode="numeric" aria-invalid={Boolean(errors.amount)} {...form.register('amount')} placeholder="0" />
+          <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.amount)} {...form.register('amount')} placeholder="0" />
           {errors.amount ? <span className="text-xs text-destructive">{errors.amount.message}</span> : null}
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">

@@ -4,6 +4,7 @@ import { Controller, useForm, useWatch } from 'react-hook-form'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { CurrencyInput } from '@/shared/components/forms/currency-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCategories } from '@/features/products/hooks/use-categories'
 import { productFormSchema, productInitialValues, productStatusOptions, productTypeOptions, type ProductFormValues } from '@/features/products/schemas/product-form-schema'
@@ -17,7 +18,14 @@ const iconOptions = [
   { id: 'MonitorSmartphone', icon: <MonitorSmartphone className="size-6" /> },
 ]
 
-export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: { defaultValues?: ProductFormValues; submitLabel: string; onCancel: () => void; onSubmit: (values: ProductFormValues) => Promise<void> }) {
+type ProductFormProps = {
+  defaultValues?: ProductFormValues
+  submitLabel: string
+  onCancel: () => void
+  onSubmit: (values: ProductFormValues) => Promise<void>
+}
+
+export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: ProductFormProps) {
   const categoryRows = useCategories()
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
@@ -153,18 +161,18 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
           <label className="text-sm font-medium">Harga Jual</label>
-          <Input aria-invalid={Boolean(errors.price)} inputMode="numeric" {...form.register('price')} placeholder="18000" />
+          <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.price)} {...form.register('price')} placeholder="18000" />
           {errors.price ? <span className="text-xs text-destructive">{errors.price.message}</span> : null}
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">Modal / HPP</label>
-          <Input aria-invalid={Boolean(errors.costPrice)} inputMode="numeric" {...form.register('costPrice')} placeholder="12000" />
+          <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.costPrice)} {...form.register('costPrice')} placeholder="12000" />
         </div>
       </div>
 
       <div className="space-y-2">
         <label className="text-sm font-medium">Harga Grosir (Opsional)</label>
-        <Input aria-invalid={Boolean(errors.wholesalePrice)} inputMode="numeric" {...form.register('wholesalePrice')} placeholder="15000" />
+        <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.wholesalePrice)} {...form.register('wholesalePrice')} placeholder="15000" />
       </div>
 
       <div className="grid grid-cols-2 gap-3 items-end">

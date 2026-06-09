@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { CurrencyInput } from '@/shared/components/forms/currency-input'
 import { customerFormSchema, customerInitialValues, customerStatusOptions, type CustomerFormValues } from '@/features/customers/schemas/customer-form-schema'
 import { FormSection } from '@/shared/components/forms/form-section'
 
@@ -47,7 +48,7 @@ export function CustomerForm({ defaultValues, submitLabel, onCancel, onSubmit }:
       <FormSection title="Ringkasan transaksi" description="Piutang berjalan dan total order pelanggan.">
         <label className="flex flex-col gap-1 text-sm font-medium">
           Piutang
-          <Input aria-invalid={Boolean(errors.receivable)} inputMode="numeric" {...form.register('receivable')} placeholder="0" />
+          <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.receivable)} {...form.register('receivable')} placeholder="0" />
           {errors.receivable ? <span className="text-xs text-destructive">{errors.receivable.message}</span> : null}
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
