@@ -20,7 +20,7 @@ describe('onboarding page data logic', () => {
       createElement(MemoryRouter, { initialEntries: ['/onboarding'] },
         createElement(Routes, null,
           createElement(Route, { path: '/onboarding', element: createElement(OnboardingPage) }),
-          createElement(Route, { path: '/', element: createElement('div', null, 'Dashboard Route') }),
+          createElement(Route, { path: '/billing', element: createElement('div', null, 'Billing Route') }),
         ),
       ),
     )
@@ -42,13 +42,9 @@ describe('onboarding page data logic', () => {
     // Step 4: Payment config
     expect(screen.getAllByText(/Metode Pembayaran/)[1]).toBeInTheDocument()
     fireEvent.click(screen.getByLabelText(/QRIS/))
-    fireEvent.click(screen.getByRole('button', { name: 'Lanjut' }))
+    fireEvent.click(screen.getByRole('button', { name: /Lanjut ke Tagihan/ }))
 
-    // Step 5: Subscription
-    expect(screen.getAllByText(/Pilih Paket Langganan/)[1]).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Selesai & Mulai Jualan' }))
-
-    expect(await screen.findByText('Dashboard Route')).toBeInTheDocument()
+    expect(await screen.findByText('Billing Route')).toBeInTheDocument()
 
     const state = useAuthStore.getState()
     expect(state.activeTenant?.name).toBe('Toko Baru')

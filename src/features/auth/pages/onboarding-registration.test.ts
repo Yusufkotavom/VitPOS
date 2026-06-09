@@ -20,7 +20,7 @@ describe('onboarding registration flow', () => {
       createElement(MemoryRouter, { initialEntries: ['/onboarding'] },
         createElement(Routes, null,
           createElement(Route, { path: '/onboarding', element: createElement(OnboardingPage) }),
-          createElement(Route, { path: '/', element: createElement('div', null, 'Dashboard Route') }),
+          createElement(Route, { path: '/billing', element: createElement('div', null, 'Billing Route') }),
         ),
       ),
     )
@@ -33,12 +33,11 @@ describe('onboarding registration flow', () => {
     
     // Quick skip through wizard for registration test
     fireEvent.click(screen.getByRole('button', { name: 'Lanjut' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Lanjut' })) // temp
-    fireEvent.click(screen.getByRole('button', { name: 'Lanjut' })) // prod
-    fireEvent.click(screen.getByRole('button', { name: 'Lanjut' })) // pay
-    fireEvent.click(screen.getByRole('button', { name: 'Selesai & Mulai Jualan' })) // sub
+    fireEvent.click(screen.getByRole('button', { name: /Lanjut/ })) // temp
+    fireEvent.click(screen.getByRole('button', { name: /Lanjut/ })) // prod
+    fireEvent.click(screen.getByRole('button', { name: /Lanjut ke Tagihan/ })) // finish wizard
 
-    expect(await screen.findByText('Dashboard Route')).toBeInTheDocument()
+    expect(await screen.findByText('Billing Route')).toBeInTheDocument()
     expect(useAuthStore.getState().currentUser?.email).toBe('budi@toko.id')
     expect(await localDb.users.count()).toBe(1)
     expect(await localDb.tenants.count()).toBe(1)

@@ -1,0 +1,8 @@
+{
+  "appId": "com.kotacom.vitpos",
+  "appName": "VitPOS",
+  "webDir": "../../dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
