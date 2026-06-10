@@ -4,6 +4,7 @@ import { TrendingUp, CreditCard, Boxes, Scale, ReceiptText } from 'lucide-react'
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { ReportsSummaryCards } from '@/features/reports/components/reports-summary-cards'
 import { useReportRows } from '@/features/reports/hooks/use-report-rows'
+import { Button } from '@/components/ui/button'
 
 const REPORT_CARDS = [
   {
@@ -51,7 +52,7 @@ export function ReportsPage() {
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {REPORT_CARDS.map((card) => (
-          <button
+          <Button
             key={card.to}
             onClick={() => navigate(card.to)}
             className="flex items-start gap-3 rounded-xl border bg-card p-4 text-left shadow-sm transition-colors hover:bg-accent/50"
@@ -63,7 +64,7 @@ export function ReportsPage() {
               <p className="font-semibold">{card.title}</p>
               <p className="text-sm text-muted-foreground">{card.description}</p>
             </div>
-          </button>
+          </Button>
         ))}
       </div>
     </PageShell>

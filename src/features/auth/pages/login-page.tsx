@@ -217,9 +217,9 @@ export function LoginPage() {
                 <Input id="password" name="password" type="password" placeholder="Masukkan kata sandi" autoComplete="current-password" />
               </label>
               <div className="flex items-center justify-between gap-3 text-sm">
-                <button type="button" onClick={openReset} className="text-sm font-medium text-primary hover:underline">
+                <Button type="button" onClick={openReset} variant="ghost" size="icon" className="text-sm font-medium text-primary hover:underline p-0 h-auto">
                   Lupa password?
-                </button>
+                </Button>
                 <Link className="font-medium text-primary hover:underline" to="/register">
                   Daftar di sini
                 </Link>

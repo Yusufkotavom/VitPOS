@@ -78,7 +78,7 @@ export function DashboardCarousel() {
       {/* Dots */}
       <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
         {BANNERS.map((_, idx) => (
-          <button
+          <Button
             key={idx}
             className={`h-1.5 rounded-full transition-all ${current === idx ? 'w-4 bg-white' : 'w-1.5 bg-white/50 hover:bg-white/80'}`}
             onClick={() => setCurrent(idx)}

@@ -18,6 +18,7 @@ import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { DataTable } from '@/shared/components/data-table/data-table'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 function tone(status: string) {
   if (status === 'Lunas' || status === 'Selesai' || status === 'Diambil') return 'success'
@@ -227,15 +228,18 @@ export function CustomerDetailPage() {
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Status</p>
                   {editing ? (
-                    <select
-                      value={editStatus}
-                      onChange={e => setEditStatus(e.target.value)}
-                      className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring"
-                    >
+                    <Select value={editStatus} onValueChange={setEditStatus}>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Pilih..." />
+      </SelectTrigger>
+      <SelectContent>
+        
                       {customerStatusOptions.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
+                        <SelectItem key={opt} value={opt}>{opt}</SelectItem>
                       ))}
-                    </select>
+                    
+      </SelectContent>
+    </Select>
                   ) : (
                     <StatusBadge label={customer.status} tone={customer.status === 'Aktif' ? 'success' : customer.status === 'Piutang' ? 'warning' : 'neutral'} />
                   )}

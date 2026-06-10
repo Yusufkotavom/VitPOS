@@ -20,6 +20,8 @@ import { messageTemplateService } from '@/services/message-template.service'
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { DataTable } from '@/shared/components/data-table/data-table'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 function tone(status: string) {
   if (status === 'Lunas') return 'success'
@@ -259,40 +261,40 @@ export function SalesOrderDetailPage() {
             {editing ? (
               <div className="flex flex-col gap-3">
                 <div className="hidden sm:block rounded-lg border overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/40">
-                        <th className="text-left py-2 px-3 font-medium">Nama</th>
-                        <th className="text-right py-2 px-3 font-medium w-20">Qty</th>
-                        <th className="text-right py-2 px-3 font-medium w-28">Harga</th>
-                        <th className="text-right py-2 px-3 font-medium w-28">Subtotal</th>
-                        <th className="w-10"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                  <Table className="w-full text-sm">
+                    <TableHeader>
+                      <TableRow className="border-b bg-muted/40">
+                        <TableHead className="text-left py-2 px-3 font-medium">Nama</TableHead>
+                        <TableHead className="text-right py-2 px-3 font-medium w-20">Qty</TableHead>
+                        <TableHead className="text-right py-2 px-3 font-medium w-28">Harga</TableHead>
+                        <TableHead className="text-right py-2 px-3 font-medium w-28">Subtotal</TableHead>
+                        <TableHead className="w-10"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {editItems.map((item, idx) => (
-                        <tr key={item.id} className="border-b last:border-0">
-                          <td className="py-1.5 px-2">
+                        <TableRow key={item.id} className="border-b last:border-0">
+                          <TableCell className="py-1.5 px-2">
                             <Input value={item.name} onChange={e => updateItem(idx, 'name', e.target.value)} placeholder="Nama produk" className="h-8 text-sm" />
-                          </td>
-                          <td className="py-1.5 px-2">
+                          </TableCell>
+                          <TableCell className="py-1.5 px-2">
                             <Input value={item.qty} onChange={e => updateItem(idx, 'qty', e.target.value)} inputMode="numeric" className="h-8 text-sm text-right" />
-                          </td>
-                          <td className="py-1.5 px-2">
+                          </TableCell>
+                          <TableCell className="py-1.5 px-2">
                             <Input value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)} inputMode="numeric" className="h-8 text-sm text-right" />
-                          </td>
-                          <td className="py-1.5 px-3 text-right font-medium">{(Number(item.qty) || 0) * (Number(item.unitPrice) || 0) > 0 ? formatCurrency((Number(item.qty) || 0) * (Number(item.unitPrice) || 0)) : '-'}</td>
-                          <td className="py-1.5 px-2">
+                          </TableCell>
+                          <TableCell className="py-1.5 px-3 text-right font-medium">{(Number(item.qty) || 0) * (Number(item.unitPrice) || 0) > 0 ? formatCurrency((Number(item.qty) || 0) * (Number(item.unitPrice) || 0)) : '-'}</TableCell>
+                          <TableCell className="py-1.5 px-2">
                             {editItems.length > 1 && (
                               <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeItem(idx)}>
                                 <Trash2Icon className="h-3.5 w-3.5 text-destructive" />
                               </Button>
                             )}
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </Table>
                 </div>
                 <div className="flex flex-col gap-3 sm:hidden">
                   {editItems.map((item, idx) => {
@@ -416,17 +418,20 @@ export function SalesOrderDetailPage() {
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium">Metode</label>
-              <select
-                value={payMethod}
-                onChange={e => setPayMethod(e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <option value="tunai">Tunai</option>
-                <option value="qris">QRIS</option>
-                <option value="kartu">Kartu</option>
-                <option value="transfer">Transfer</option>
-                <option value="e-wallet">E-Wallet</option>
-              </select>
+              <Select value={payMethod} onValueChange={setPayMethod}>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Pilih..." />
+      </SelectTrigger>
+      <SelectContent>
+        
+                <SelectItem value="tunai">Tunai</SelectItem>
+                <SelectItem value="qris">QRIS</SelectItem>
+                <SelectItem value="kartu">Kartu</SelectItem>
+                <SelectItem value="transfer">Transfer</SelectItem>
+                <SelectItem value="e-wallet">E-Wallet</SelectItem>
+              
+      </SelectContent>
+    </Select>
             </div>
             <div>
               <label className="text-sm font-medium">Nominal</label>

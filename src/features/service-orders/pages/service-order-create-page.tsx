@@ -291,18 +291,18 @@ export function ServiceOrderCreatePage() {
                   <p className="text-xs text-muted-foreground">{formatCurrency(item.price)}</p>
                 </div>
                 <div className="flex items-center rounded-lg border bg-background">
-                  <button className="flex h-7 w-7 items-center justify-center rounded-l-lg text-muted-foreground hover:bg-muted" onClick={() => item.qty > 1 ? store.updateItemQty(item.productId, item.qty - 1) : store.removeItem(item.productId)}>
+                  <Button variant="secondary" className="flex h-7 w-7 items-center justify-center rounded-l-lg text-muted-foreground hover:bg-muted" onClick={() => item.qty > 1 ? store.updateItemQty(item.productId, item.qty - 1) : store.removeItem(item.productId)}>
                     <Minus className="h-3 w-3" />
-                  </button>
+                  </Button>
                   <span className="w-7 text-center text-sm font-medium">{item.qty}</span>
-                  <button className="flex h-7 w-7 items-center justify-center rounded-r-lg text-muted-foreground hover:bg-muted" onClick={() => store.updateItemQty(item.productId, item.qty + 1)}>
+                  <Button variant="secondary" className="flex h-7 w-7 items-center justify-center rounded-r-lg text-muted-foreground hover:bg-muted" onClick={() => store.updateItemQty(item.productId, item.qty + 1)}>
                     <Plus className="h-3 w-3" />
-                  </button>
+                  </Button>
                 </div>
                 <span className="text-sm font-semibold w-24 text-right">{formatCurrency(item.subtotal)}</span>
-                <button onClick={() => store.removeItem(item.productId)} className="text-muted-foreground hover:text-destructive shrink-0">
+                <Button onClick={() => store.removeItem(item.productId)} className="text-muted-foreground hover:text-destructive shrink-0">
                   <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               </div>
             ))
           )}

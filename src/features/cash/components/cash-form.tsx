@@ -14,6 +14,7 @@ import {
   type CashFormValues,
 } from '@/features/cash/schemas/cash-form-schema'
 import { FormSection } from '@/shared/components/forms/form-section'
+import { FormSelect } from '@/shared/components/form/form-select'
 
 export function CashForm({
   defaultValues,
@@ -53,9 +54,7 @@ export function CashForm({
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Akun kas
-          <select className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" {...form.register('account')}>
-            {cashAccountOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
+          <FormSelect control={form.control} name="account" options={cashAccountOptions.map(o => ({ label: o, value: o }))} />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Kategori
@@ -66,9 +65,7 @@ export function CashForm({
       <FormSection title="Nilai" description="Jenis arus kas dan nominal.">
         <label className="flex flex-col gap-1 text-sm font-medium">
           Jenis
-          <select className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" {...form.register('type')}>
-            {cashTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
+          <FormSelect control={form.control} name="type" options={cashTypeOptions.map(o => ({ label: o, value: o }))} />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           {type === 'Pemasukan' ? 'Nominal masuk' : 'Nominal keluar'}
@@ -77,9 +74,7 @@ export function CashForm({
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Status
-          <select className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" {...form.register('status')}>
-            {cashStatusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
+          <FormSelect control={form.control} name="status" options={cashStatusOptions.map(o => ({ label: o, value: o }))} />
         </label>
       </FormSection>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

@@ -1,3 +1,4 @@
+import { Input } from '@/components/ui/input'
 import { useState } from 'react'
 import { LayoutGrid, List, Filter, Image as ImageIcon, Package, Coffee, Shirt, MonitorSmartphone, Download, Upload } from 'lucide-react'
 import { toast } from 'sonner'
@@ -13,6 +14,7 @@ import { ContentCard } from '@/shared/components/display/content-card'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { EmptyState } from '@/shared/components/feedback/empty-state'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 const iconMap: Record<string, React.ReactNode> = {
   Package: <Package className="size-6 text-muted-foreground" />,
@@ -76,7 +78,7 @@ export function ProductsPage() {
     <PageShell title="Barang & Jasa" description="Kelola produk fisik, jasa, harga grosir, gambar, dan stok." actions={<ProductCrudActions />}>
       <ContentCard>
         <div className="mb-4 flex flex-col gap-2 border-b pb-4 sm:flex-row sm:items-center">
-          <input type="text" placeholder="Cari barang..." value={search} onChange={e => setSearch(e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring sm:flex-1" />
+          <Input placeholder="Cari barang..." value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-64" />
 
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto sm:flex-nowrap">
             <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
@@ -91,28 +93,34 @@ export function ProductsPage() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Jenis</label>
-                    <select
-                      value={filterType}
-                      onChange={e => setFilterType(e.target.value)}
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    >
-                      <option value="">Semua</option>
-                      <option value="Produk Fisik">Barang</option>
-                      <option value="Jasa">Jasa</option>
-                    </select>
+                    <Select value={filterType} onValueChange={setFilterType}>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Pilih..." />
+      </SelectTrigger>
+      <SelectContent>
+        
+                      <SelectItem value="">Semua</SelectItem>
+                      <SelectItem value="Produk Fisik">Barang</SelectItem>
+                      <SelectItem value="Jasa">Jasa</SelectItem>
+                    
+      </SelectContent>
+    </Select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Status</label>
-                    <select
-                      value={filterStatus}
-                      onChange={e => setFilterStatus(e.target.value)}
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    >
-                      <option value="">Semua</option>
-                      <option value="Aktif">Aktif</option>
-                      <option value="Draft">Draft</option>
-                      <option value="Arsip">Arsip</option>
-                    </select>
+                    <Select value={filterStatus} onValueChange={setFilterStatus}>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Pilih..." />
+      </SelectTrigger>
+      <SelectContent>
+        
+                      <SelectItem value="">Semua</SelectItem>
+                      <SelectItem value="Aktif">Aktif</SelectItem>
+                      <SelectItem value="Draft">Draft</SelectItem>
+                      <SelectItem value="Arsip">Arsip</SelectItem>
+                    
+      </SelectContent>
+    </Select>
                   </div>
                   <div className="flex gap-2 pt-2">
                     {hasActiveFilter && (

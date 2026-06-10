@@ -120,14 +120,14 @@ export function CompanySettingsForm() {
                 <label>{field.label}</label>
                 <div className="flex flex-wrap gap-2">
                   {ICONS.map(({ id, component: IconComponent }) => (
-                    <button
+                    <Button
                       key={id}
                       type="button"
                       onClick={() => setField('company-icon', id)}
                       className={`flex h-10 w-10 items-center justify-center rounded-md border transition-all ${values['company-icon'] === id ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary' : 'text-muted-foreground hover:border-primary/50'}`}
                     >
                       <IconComponent className="size-5" />
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>

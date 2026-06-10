@@ -11,6 +11,7 @@ import { inventoryAdjustmentService } from '@/features/inventory/services/invent
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { ContentCard } from '@/shared/components/display/content-card'
 import type { LocalStockMovement, StockMovementType } from '@/services/local-db/schema'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 type AdjustmentItem = {
   id: string // temporary random id for list
@@ -130,18 +131,21 @@ export function InventoryAdjustmentPage() {
             <div className="space-y-4">
               <label className="flex flex-col gap-1.5 text-sm font-medium">
                 Tipe Pergerakan
-                <select 
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  value={type}
-                  onChange={e => setType(e.target.value as StockMovementType)}
-                >
-                  <option value="adjustment">Adjustment (Penyesuaian)</option>
-                  <option value="purchase">Purchase (Pembelian / Masuk)</option>
-                  <option value="return">Return (Retur / Masuk)</option>
-                  <option value="transfer_in">Transfer In (Masuk)</option>
-                  <option value="transfer_out">Transfer Out (Keluar)</option>
-                  <option value="damage_lost">Rusak / Hilang (Keluar)</option>
-                </select>
+                <Select value={type} onValueChange={(v) => setType(v as StockMovementType)}>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Pilih..." />
+      </SelectTrigger>
+      <SelectContent>
+        
+                  <SelectItem value="adjustment">Adjustment (Penyesuaian)</SelectItem>
+                  <SelectItem value="purchase">Purchase (Pembelian / Masuk)</SelectItem>
+                  <SelectItem value="return">Return (Retur / Masuk)</SelectItem>
+                  <SelectItem value="transfer_in">Transfer In (Masuk)</SelectItem>
+                  <SelectItem value="transfer_out">Transfer Out (Keluar)</SelectItem>
+                  <SelectItem value="damage_lost">Rusak / Hilang (Keluar)</SelectItem>
+                
+      </SelectContent>
+    </Select>
               </label>
               <label className="flex flex-col gap-1.5 text-sm font-medium">
                 Gudang Tujuan / Asal
@@ -158,16 +162,19 @@ export function InventoryAdjustmentPage() {
         <div className="md:col-span-2 space-y-6">
           <ContentCard title="Daftar Barang" description="Pilih barang yang akan disesuaikan stoknya.">
             <div className="flex gap-2 mb-6">
-              <select 
-                className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                value={selectedProductId}
-                onChange={e => setSelectedProductId(e.target.value)}
-              >
-                <option value="">-- Cari atau pilih produk --</option>
+              <Select value={selectedProductId} onValueChange={setSelectedProductId}>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Pilih..." />
+      </SelectTrigger>
+      <SelectContent>
+        
+                <SelectItem value="">-- Cari atau pilih produk --</SelectItem>
                 {products.map(p => (
-                  <option key={p.id} value={p.id}>{p.name} (Sisa: {p.stock})</option>
+                  <SelectItem key={p.id} value={p.id}>{p.name} (Sisa: {p.stock})</SelectItem>
                 ))}
-              </select>
+              
+      </SelectContent>
+    </Select>
               <Button onClick={handleAddProduct} variant="secondary" className="shrink-0"><Plus className="mr-2 size-4" /> Tambah</Button>
             </div>
 

@@ -8,6 +8,7 @@ import { useSalesReport } from '@/features/reports/hooks/use-sales-report'
 import { formatCurrency } from '@/lib/format-currency'
 import { exportToCsv } from '@/shared/utils/export-csv'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 export function SalesReportPage() {
   const navigate = useNavigate()
@@ -95,26 +96,26 @@ export function SalesReportPage() {
           {data.topProducts.length > 0 && (
             <ReportSection title="Top 20 Produk">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-muted-foreground">
-                      <th className="pb-2 font-medium">#</th>
-                      <th className="pb-2 font-medium">Produk</th>
-                      <th className="pb-2 font-medium text-right">Qty</th>
-                      <th className="pb-2 font-medium text-right">Pendapatan</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table className="w-full text-sm">
+                  <TableHeader>
+                    <TableRow className="border-b text-left text-muted-foreground">
+                      <TableHead className="pb-2 font-medium">#</TableHead>
+                      <TableHead className="pb-2 font-medium">Produk</TableHead>
+                      <TableHead className="pb-2 font-medium text-right">Qty</TableHead>
+                      <TableHead className="pb-2 font-medium text-right">Pendapatan</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {data.topProducts.map((p, i) => (
-                      <tr key={p.productId ?? i} className="border-b last:border-0">
-                        <td className="py-2 text-muted-foreground">{i + 1}</td>
-                        <td className="py-2 font-medium">{p.name}</td>
-                        <td className="py-2 text-right">{p.totalQty}</td>
-                        <td className="py-2 text-right font-semibold">{formatCurrency(p.totalRevenue)}</td>
-                      </tr>
+                      <TableRow key={p.productId ?? i} className="border-b last:border-0">
+                        <TableCell className="py-2 text-muted-foreground">{i + 1}</TableCell>
+                        <TableCell className="py-2 font-medium">{p.name}</TableCell>
+                        <TableCell className="py-2 text-right">{p.totalQty}</TableCell>
+                        <TableCell className="py-2 text-right font-semibold">{formatCurrency(p.totalRevenue)}</TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             </ReportSection>
           )}

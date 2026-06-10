@@ -9,6 +9,7 @@ import { DataTable } from '@/shared/components/data-table/data-table'
 import { ContentCard } from '@/shared/components/display/content-card'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { PageShell } from '@/shared/components/layout/page-shell'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 function tone(status: string) {
   if (status === 'Berhasil') return 'success'
@@ -42,13 +43,20 @@ export function PaymentsPage() {
               <Filter className="h-4 w-4" />
             </Button>
             <div className="absolute top-full right-0 mt-2 hidden group-hover:flex flex-col gap-2 rounded-md border bg-popover p-2 shadow-md z-10 w-48">
-              <select className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-                <option value="">Status</option>
-                <option value="Berhasil">Berhasil</option>
-                <option value="Pending">Pending</option>
-                <option value="Gagal">Gagal</option>
-                <option value="Refund">Refund</option>
-              </select>
+              <Select>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Pilih..." />
+      </SelectTrigger>
+      <SelectContent>
+        
+                <SelectItem value="">Status</SelectItem>
+                <SelectItem value="Berhasil">Berhasil</SelectItem>
+                <SelectItem value="Pending">Pending</SelectItem>
+                <SelectItem value="Gagal">Gagal</SelectItem>
+                <SelectItem value="Refund">Refund</SelectItem>
+              
+      </SelectContent>
+    </Select>
             </div>
           </div>
           <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-1 shrink-0">

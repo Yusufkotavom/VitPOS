@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 
 import { SalesOrdersPage } from '@/features/sales-orders/pages/sales-orders-page'
 import type { LocalSalesOrder } from '@/services/local-db/schema'
+import { Button } from '@/components/ui/button'
 
 const mockUseSalesOrders = vi.fn<() => LocalSalesOrder[]>()
 
@@ -13,7 +14,7 @@ vi.mock('@/features/sales-orders/hooks/use-sales-orders', () => ({
 
 vi.mock('@/features/sales-orders/components/sales-order-crud-actions', () => ({
   SalesOrderCrudActions: ({ order }: { order?: LocalSalesOrder }) => (
-    <button type="button">{order ? `Aksi ${order.code}` : 'Buat Invoice'}</button>
+    <Button type="button">{order ? `Aksi ${order.code}` : 'Buat Invoice'}</Button>
   ),
 }))
 

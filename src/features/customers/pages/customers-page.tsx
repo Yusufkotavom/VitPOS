@@ -1,3 +1,4 @@
+import { Input } from '@/components/ui/input'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { LayoutGrid, List, Filter } from 'lucide-react'
@@ -9,6 +10,7 @@ import { DataTable } from '@/shared/components/data-table/data-table'
 import { ContentCard } from '@/shared/components/display/content-card'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { PageShell } from '@/shared/components/layout/page-shell'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 function tone(status: string) {
   if (status === 'Piutang') return 'warning'
@@ -29,7 +31,7 @@ export function CustomersPage() {
     <PageShell title="Pelanggan" description="Kelola pelanggan aktif, histori belanja, dan piutang." actions={<CustomerCrudActions />}>
       <ContentCard>
         <div className="mb-4 flex flex-row items-center gap-2 border-b pb-4">
-          <input type="text" placeholder="Cari pelanggan..." value={search} onChange={e => setSearch(e.target.value)} className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+          <Input placeholder="Cari pelanggan..." value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-64" />
           
           <div className="relative flex items-center group shrink-0">
             <Button variant="outline" size="icon" className="h-9 w-9">
@@ -37,16 +39,30 @@ export function CustomersPage() {
             </Button>
             
             <div className="absolute top-full right-0 mt-2 hidden group-hover:flex flex-col gap-2 rounded-md border bg-popover p-2 shadow-md z-10 w-48">
-              <select className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-                <option value="">Status</option>
-                <option value="Aktif">Aktif</option>
-                <option value="Piutang">Piutang</option>
-              </select>
-              <select className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-                <option value="20">20 / halaman</option>
-                <option value="50">50 / halaman</option>
-                <option value="100">100 / halaman</option>
-              </select>
+              <Select>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Pilih..." />
+      </SelectTrigger>
+      <SelectContent>
+        
+                <SelectItem value="">Status</SelectItem>
+                <SelectItem value="Aktif">Aktif</SelectItem>
+                <SelectItem value="Piutang">Piutang</SelectItem>
+              
+      </SelectContent>
+    </Select>
+              <Select>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Pilih..." />
+      </SelectTrigger>
+      <SelectContent>
+        
+                <SelectItem value="20">20 / halaman</SelectItem>
+                <SelectItem value="50">50 / halaman</SelectItem>
+                <SelectItem value="100">100 / halaman</SelectItem>
+              
+      </SelectContent>
+    </Select>
             </div>
           </div>
 

@@ -112,14 +112,14 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
         {!previewImage && (
           <div className="flex gap-2 pt-1">
             {iconOptions.map(opt => (
-              <button
+              <Button
                 key={opt.id}
                 type="button"
                 onClick={() => form.setValue('icon', opt.id, { shouldDirty: true })}
                 className={`flex size-10 items-center justify-center rounded-lg border ${selectedIcon === opt.id ? 'border-primary bg-primary/10 text-primary' : 'bg-background hover:bg-muted'}`}
               >
                 {opt.icon}
-              </button>
+              </Button>
             ))}
           </div>
         )}

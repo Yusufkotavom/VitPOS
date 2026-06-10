@@ -9,6 +9,7 @@ import { DataTable } from '@/shared/components/data-table/data-table'
 import { ContentCard } from '@/shared/components/display/content-card'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { PageShell } from '@/shared/components/layout/page-shell'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 function tone(status: string) {
   if (status === 'Tercatat') return 'success'
@@ -59,20 +60,41 @@ export function CashPage() {
               <Filter className="h-4 w-4" />
             </Button>
             <div className="absolute top-full right-0 mt-2 hidden group-hover:flex flex-col gap-2 rounded-md border bg-popover p-2 shadow-md z-10 w-48">
-              <select className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-                <option value="">Semua Akun</option>
+              <Select>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Pilih..." />
+      </SelectTrigger>
+      <SelectContent>
+        
+                <SelectItem value="">Semua Akun</SelectItem>
                 {Array.from(new Set(cash.map(c => c.account))).map(acc => (
-                  <option key={acc} value={acc}>{acc}</option>
+                  <SelectItem key={acc} value={acc}>{acc}</SelectItem>
                 ))}
-              </select>
-              <select className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-                <option value="">Kategori</option>
-              </select>
-              <select className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-                <option value="20">20 / halaman</option>
-                <option value="50">50 / halaman</option>
-                <option value="100">100 / halaman</option>
-              </select>
+              
+      </SelectContent>
+    </Select>
+              <Select>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Pilih..." />
+      </SelectTrigger>
+      <SelectContent>
+        
+                <SelectItem value="">Kategori</SelectItem>
+              
+      </SelectContent>
+    </Select>
+              <Select>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Pilih..." />
+      </SelectTrigger>
+      <SelectContent>
+        
+                <SelectItem value="20">20 / halaman</SelectItem>
+                <SelectItem value="50">50 / halaman</SelectItem>
+                <SelectItem value="100">100 / halaman</SelectItem>
+              
+      </SelectContent>
+    </Select>
             </div>
           </div>
           <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-1 shrink-0">

@@ -3,10 +3,12 @@ import { ArrowLeft } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { ReportDateFilter, useReportDateParams } from '@/features/reports/components/report-date-filter'
-import { ReportSection, ReportMetricCard } from '@/features/reports/components/report-section'
+import { ReportMetricCard } from '@/features/reports/components/report-section'
 import { useBalanceSheet } from '@/features/reports/hooks/use-balance-sheet'
 import { formatCurrency } from '@/lib/format-currency'
 import { exportToCsv } from '@/shared/utils/export-csv'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Card, CardContent } from '@/components/ui/card'
 
 export function BalanceSheetPage() {
   const navigate = useNavigate()
@@ -45,7 +47,7 @@ export function BalanceSheetPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-xl font-semibold">Neraca</h1>
+          <h1 className="text-xl font-semibold">Neraca (Balance Sheet)</h1>
           <p className="text-sm text-muted-foreground">Posisi keuangan: aset, liabilitas, dan ekuitas</p>
         </div>
         <div className="ml-auto">
@@ -65,65 +67,74 @@ export function BalanceSheetPage() {
             <ReportMetricCard label="Total Ekuitas" value={formatCurrency(data.equity.totalEquity)} />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-4">
-              <ReportSection title="Aset">
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between py-1">
-                    <span>Kas</span>
-                    <span className="font-semibold">{formatCurrency(data.assets.cashOnHand)}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b">
-                    <span>Piutang Usaha</span>
-                    <span className="font-semibold">{formatCurrency(data.assets.accountsReceivable)}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b">
-                    <span>Persediaan</span>
-                    <span className="font-semibold">{formatCurrency(data.assets.inventoryValue)}</span>
-                  </div>
-                  <div className="flex justify-between py-2 font-bold text-base border-t">
-                    <span>Total Aset</span>
-                    <span className="text-green-600">{formatCurrency(data.assets.totalAssets)}</span>
-                  </div>
-                </div>
-              </ReportSection>
-            </div>
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="font-semibold text-foreground">Akun</TableHead>
+                      <TableHead className="text-right font-semibold text-foreground">Nilai</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {/* ASET */}
+                    <TableRow className="bg-muted/10 hover:bg-muted/10">
+                      <TableCell colSpan={2} className="font-bold">ASET</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-8">Kas dan Bank</TableCell>
+                      <TableCell className="text-right">{formatCurrency(data.assets.cashOnHand)}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-8">Piutang Usaha</TableCell>
+                      <TableCell className="text-right">{formatCurrency(data.assets.accountsReceivable)}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-8">Persediaan Barang</TableCell>
+                      <TableCell className="text-right">{formatCurrency(data.assets.inventoryValue)}</TableCell>
+                    </TableRow>
+                    <TableRow className="bg-emerald-50/50 hover:bg-emerald-50/50">
+                      <TableCell className="font-bold text-emerald-700">Total Aset</TableCell>
+                      <TableCell className="text-right font-bold text-emerald-700">{formatCurrency(data.assets.totalAssets)}</TableCell>
+                    </TableRow>
 
-            <div className="space-y-4">
-              <ReportSection title="Liabilitas">
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between py-1">
-                    <span>Hutang Usaha</span>
-                    <span className="font-semibold text-red-600">{formatCurrency(data.liabilities.accountsPayable)}</span>
-                  </div>
-                  <div className="flex justify-between py-2 font-bold text-base border-t">
-                    <span>Total Liabilitas</span>
-                    <span className="text-red-600">{formatCurrency(data.liabilities.totalLiabilities)}</span>
-                  </div>
-                </div>
-              </ReportSection>
+                    {/* LIABILITAS */}
+                    <TableRow className="bg-muted/10 hover:bg-muted/10">
+                      <TableCell colSpan={2} className="font-bold mt-4">LIABILITAS</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-8">Hutang Usaha</TableCell>
+                      <TableCell className="text-right text-rose-600">{formatCurrency(data.liabilities.accountsPayable)}</TableCell>
+                    </TableRow>
+                    <TableRow className="bg-rose-50/50 hover:bg-rose-50/50">
+                      <TableCell className="font-bold text-rose-700">Total Liabilitas</TableCell>
+                      <TableCell className="text-right font-bold text-rose-700">{formatCurrency(data.liabilities.totalLiabilities)}</TableCell>
+                    </TableRow>
 
-              <ReportSection title="Ekuitas">
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between py-1">
-                    <span>Laba Ditahan</span>
-                    <span className="font-semibold">{formatCurrency(data.equity.retainedEarnings)}</span>
-                  </div>
-                  <div className="flex justify-between py-2 font-bold text-base border-t">
-                    <span>Total Ekuitas</span>
-                    <span>{formatCurrency(data.equity.totalEquity)}</span>
-                  </div>
-                </div>
-              </ReportSection>
+                    {/* EKUITAS */}
+                    <TableRow className="bg-muted/10 hover:bg-muted/10">
+                      <TableCell colSpan={2} className="font-bold">EKUITAS (MODAL)</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-8">Laba Ditahan</TableCell>
+                      <TableCell className="text-right">{formatCurrency(data.equity.retainedEarnings)}</TableCell>
+                    </TableRow>
+                    <TableRow className="bg-blue-50/50 hover:bg-blue-50/50">
+                      <TableCell className="font-bold text-blue-700">Total Ekuitas</TableCell>
+                      <TableCell className="text-right font-bold text-blue-700">{formatCurrency(data.equity.totalEquity)}</TableCell>
+                    </TableRow>
 
-              <div className="rounded-xl border bg-muted/30 p-4">
-                <div className="flex justify-between font-bold text-base">
-                  <span>Liabilitas + Ekuitas</span>
-                  <span>{formatCurrency(data.totalLiabilitiesAndEquity)}</span>
-                </div>
+                    {/* TOTAL */}
+                    <TableRow className="border-t-2 border-primary/20 bg-primary/5 hover:bg-primary/5">
+                      <TableCell className="font-extrabold">Total Liabilitas & Ekuitas</TableCell>
+                      <TableCell className="text-right font-extrabold">{formatCurrency(data.totalLiabilitiesAndEquity)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </>
       ) : null}
     </div>

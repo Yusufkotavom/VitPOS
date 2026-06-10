@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Printer, MessageSquare, Download, PencilIcon, XIcon, CheckIcon, Trash2Icon, CreditCard } from 'lucide-react'
+import { ArrowLeft, Printer, MessageSquare, Download, PencilIcon, XIcon, CheckIcon, Trash2Icon, CreditCard, ShieldCheck, ShieldX, Clock } from 'lucide-react'
 import { useState } from 'react'
 import { useLiveQuery } from '@/services/local-db/reactivity'
 import { usePdf } from '@/shared/components/pdf/use-pdf'
@@ -23,6 +23,7 @@ import { addWarrantyDuration, buildWarrantyTimelineNote, isWarrantyExpired } fro
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 function tone(status: string) {
   if (status === 'Selesai' || status === 'Diambil') return 'success'
@@ -351,24 +352,7 @@ export function ServiceOrderDetailPage() {
                     <p className="font-medium text-base">{new Date(order.estimatedCompletion).toLocaleDateString('id-ID', { dateStyle: 'long' })}</p>
                   </div>
                 )}
-                {editing ? (
-                  <div className="col-span-2 space-y-3 border-t pt-4">
-                    <label className="flex items-center gap-2 text-sm font-medium">
-                      <input type="checkbox" checked={editHasWarranty} onChange={e => setEditHasWarranty(e.target.checked)} className="size-4 rounded border-input" />
-                      Aktifkan Garansi
-                    </label>
-                    {editHasWarranty ? (
-                      <div className="grid grid-cols-[1fr_140px] gap-3">
-                        <Input inputMode="numeric" value={editWarrantyValue} onChange={e => setEditWarrantyValue(e.target.value.replace(/\D/g, ''))} placeholder="30" className="h-8 text-sm" />
-                        <select value={editWarrantyUnit} onChange={e => setEditWarrantyUnit(e.target.value as 'hari' | 'bulan' | 'tahun')} className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring">
-                          <option value="hari">Hari</option>
-                          <option value="bulan">Bulan</option>
-                          <option value="tahun">Tahun</option>
-                        </select>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
+
               </div>
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Kerusakan / Pekerjaan</p>
@@ -413,24 +397,85 @@ export function ServiceOrderDetailPage() {
             </div>
           </div>
 
-          {/* Timeline Status */}
+          {/* Garansi */}
           <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Garansi</h3>
-            <div className="rounded-2xl border p-5 shadow-sm bg-card">
+            <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4" />
+              Garansi
+            </h3>
+            <div className="rounded-2xl border p-5 shadow-sm bg-card space-y-4">
               {!order.hasWarranty ? (
-                <p className="text-sm text-muted-foreground">Tanpa garansi</p>
+                <div className="flex items-center gap-3">
+                  <ShieldX className="h-5 w-5 text-muted-foreground shrink-0" />
+                  <StatusBadge label="Tanpa garansi" tone="neutral" />
+                </div>
               ) : order.status !== 'Selesai' || !order.warrantyStartDate ? (
-                <div className="space-y-1">
-                  <p className="font-medium">Belum aktif</p>
-                  <p className="text-sm text-muted-foreground">Garansi {order.warrantyValue} {order.warrantyUnit} akan aktif saat service selesai.</p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-5 w-5 text-amber-500 shrink-0" />
+                    <StatusBadge label="Belum aktif" tone="warning" />
+                  </div>
+                  <p className="text-sm text-muted-foreground ml-8">
+                    Garansi {order.warrantyValue} {order.warrantyUnit} akan aktif saat status berubah menjadi <strong>Selesai</strong>.
+                  </p>
                 </div>
               ) : (
-                <div className="space-y-1">
-                  <p className="font-medium">{isWarrantyExpired(order.warrantyEndDate) ? 'Berakhir' : 'Aktif'}</p>
-                  <p className="text-sm text-muted-foreground">Mulai {new Date(order.warrantyStartDate).toLocaleDateString('id-ID', { dateStyle: 'long' })}</p>
-                  <p className="text-sm text-muted-foreground">Sampai {new Date(order.warrantyEndDate ?? '').toLocaleDateString('id-ID', { dateStyle: 'long' })}</p>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    {isWarrantyExpired(order.warrantyEndDate) ? (
+                      <ShieldX className="h-5 w-5 text-rose-500 shrink-0" />
+                    ) : (
+                      <ShieldCheck className="h-5 w-5 text-emerald-500 shrink-0" />
+                    )}
+                    <StatusBadge
+                      label={isWarrantyExpired(order.warrantyEndDate) ? 'Berakhir' : 'Aktif'}
+                      tone={isWarrantyExpired(order.warrantyEndDate) ? 'danger' : 'success'}
+                    />
+                  </div>
+                  <div className="ml-8 grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Mulai</p>
+                      <p className="font-medium">{new Date(order.warrantyStartDate).toLocaleDateString('id-ID', { dateStyle: 'long' })}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Berakhir</p>
+                      <p className="font-medium">{new Date(order.warrantyEndDate ?? '').toLocaleDateString('id-ID', { dateStyle: 'long' })}</p>
+                    </div>
+                    {order.warrantyValue && (
+                      <div className="col-span-2">
+                        <p className="text-xs text-muted-foreground">Durasi</p>
+                        <p className="font-medium">{order.warrantyValue} {order.warrantyUnit}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
+
+              {editing ? (
+                <div className="border-t pt-4 space-y-3">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input type="checkbox" checked={editHasWarranty} onChange={e => setEditHasWarranty(e.target.checked)} className="size-4 rounded border-input" />
+                    Aktifkan Garansi
+                  </label>
+                  {editHasWarranty ? (
+                    <div className="grid grid-cols-[1fr_140px] gap-3">
+                      <Input inputMode="numeric" value={editWarrantyValue} onChange={e => setEditWarrantyValue(e.target.value.replace(/\D/g, ''))} placeholder="30" className="h-8 text-sm" />
+                      <Select value={editWarrantyUnit} onValueChange={(v) => setEditWarrantyUnit(v as 'hari' | 'bulan' | 'tahun')}>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Pilih..." />
+      </SelectTrigger>
+      <SelectContent>
+        
+                        <SelectItem value="hari">Hari</SelectItem>
+                        <SelectItem value="bulan">Bulan</SelectItem>
+                        <SelectItem value="tahun">Tahun</SelectItem>
+                      
+      </SelectContent>
+    </Select>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -467,15 +512,18 @@ export function ServiceOrderDetailPage() {
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Status Pengerjaan</span>
               {editing ? (
-                <select
-                  value={editStatus}
-                  onChange={e => setEditStatus(e.target.value)}
-                  className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring"
-                >
+                <Select value={editStatus} onValueChange={setEditStatus}>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Pilih..." />
+      </SelectTrigger>
+      <SelectContent>
+        
                   {serviceOrderStatusOptions.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
                   ))}
-                </select>
+                
+      </SelectContent>
+    </Select>
               ) : (
                 <StatusBadge label={order.status} tone={tone(order.status)} />
               )}

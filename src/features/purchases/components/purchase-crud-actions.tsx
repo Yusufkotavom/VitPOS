@@ -15,6 +15,7 @@ import { localDb } from '@/services/local-db/client'
 import { purchaseRepository } from '@/services/local-db/repository'
 import { formatCurrency } from '@/lib/format-currency'
 import type { LocalPurchase } from '@/services/local-db/schema'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) {
   const [formOpen, setFormOpen] = useState(false)
@@ -113,16 +114,19 @@ export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) 
               <div className="space-y-4 py-2">
                 <div>
                   <label className="text-sm font-medium">Metode</label>
-                  <select
-                    value={payMethod}
-                    onChange={(e) => setPayMethod(e.target.value)}
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring mt-1"
-                  >
-                    <option value="tunai">Tunai</option>
-                    <option value="transfer">Transfer</option>
-                    <option value="kartu">Kartu</option>
-                    <option value="qris">QRIS</option>
-                  </select>
+                  <Select value={payMethod} onValueChange={setPayMethod}>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Pilih..." />
+      </SelectTrigger>
+      <SelectContent>
+        
+                    <SelectItem value="tunai">Tunai</SelectItem>
+                    <SelectItem value="transfer">Transfer</SelectItem>
+                    <SelectItem value="kartu">Kartu</SelectItem>
+                    <SelectItem value="qris">QRIS</SelectItem>
+                  
+      </SelectContent>
+    </Select>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Nominal</label>

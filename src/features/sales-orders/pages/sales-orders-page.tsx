@@ -1,3 +1,4 @@
+import { Input } from '@/components/ui/input'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { LayoutGrid, List, Filter } from 'lucide-react'
@@ -10,6 +11,7 @@ import { ContentCard } from '@/shared/components/display/content-card'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { EmptyState } from '@/shared/components/feedback/empty-state'
 import { PageShell } from '@/shared/components/layout/page-shell'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 function tone(status: string) {
   if (status === 'Lunas') return 'success'
@@ -90,7 +92,7 @@ export function SalesOrdersPage() {
     }>
       <ContentCard title="Daftar Invoice" description="Tampilkan invoice dalam bentuk table atau card.">
         <div className="mb-4 flex flex-row items-center gap-2 border-b pb-4">
-          <input type="text" placeholder="Cari invoice..." value={search} onChange={e => setSearch(e.target.value)} className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+          <Input placeholder="Cari invoice..." value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-64" />
           
           <div className="relative flex items-center group shrink-0">
             <Button variant="outline" size="icon" className="h-9 w-9">
@@ -98,17 +100,31 @@ export function SalesOrdersPage() {
             </Button>
             
             <div className="absolute top-full right-0 mt-2 hidden group-hover:flex flex-col gap-2 rounded-md border bg-popover p-2 shadow-md z-10 w-48">
-              <select className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
-                <option value="">Status</option>
-                <option value="Lunas">Lunas</option>
-                <option value="Sebagian">Sebagian</option>
-                <option value="Belum Bayar">Belum Bayar</option>
-              </select>
-              <select className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
-                <option value="20">20 / page</option>
-                <option value="50">50 / page</option>
-                <option value="100">100 / page</option>
-              </select>
+              <Select>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Pilih..." />
+      </SelectTrigger>
+      <SelectContent>
+        
+                <SelectItem value="">Status</SelectItem>
+                <SelectItem value="Lunas">Lunas</SelectItem>
+                <SelectItem value="Sebagian">Sebagian</SelectItem>
+                <SelectItem value="Belum Bayar">Belum Bayar</SelectItem>
+              
+      </SelectContent>
+    </Select>
+              <Select>
+      <SelectTrigger className="w-[180px]">
+        <SelectValue placeholder="Pilih..." />
+      </SelectTrigger>
+      <SelectContent>
+        
+                <SelectItem value="20">20 / page</SelectItem>
+                <SelectItem value="50">50 / page</SelectItem>
+                <SelectItem value="100">100 / page</SelectItem>
+              
+      </SelectContent>
+    </Select>
             </div>
           </div>
 

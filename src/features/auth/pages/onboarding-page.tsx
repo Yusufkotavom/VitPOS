@@ -36,6 +36,7 @@ import { apiPost } from '@/services/api/client'
 import { localDb } from '@/services/local-db/client'
 import { enqueueOutboxItem } from '@/services/sync/outbox-service'
 import { TEMPLATE_PRESETS, type TemplatePreset } from '@/features/auth/data/template-data'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 type RegisterResponse = {
   ok: boolean
@@ -642,31 +643,31 @@ export function OnboardingPage() {
                       <p className="text-sm text-muted-foreground">Belum ada produk.</p>
                     ) : (
                       <div className="border rounded-xl overflow-hidden text-sm">
-                        <table className="w-full">
-                          <thead className="bg-muted">
-                            <tr>
-                              <th className="text-left p-2 font-medium">Nama</th>
-                              <th className="text-left p-2 font-medium">Kategori</th>
-                              <th className="text-right p-2 font-medium">Harga</th>
-                              <th className="w-20 text-center p-2 font-medium">Aksi</th>
-                            </tr>
-                          </thead>
-                          <tbody>
+                        <Table className="w-full">
+                          <TableHeader className="bg-muted">
+                            <TableRow>
+                              <TableHead className="text-left p-2 font-medium">Nama</TableHead>
+                              <TableHead className="text-left p-2 font-medium">Kategori</TableHead>
+                              <TableHead className="text-right p-2 font-medium">Harga</TableHead>
+                              <TableHead className="w-20 text-center p-2 font-medium">Aksi</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
                             {editableProducts.map((p) => (
-                              <tr key={p.id} className="border-t">
-                                <td className="p-2">{p.name}</td>
-                                <td className="p-2 text-muted-foreground">{p.category}</td>
-                                <td className="p-2 text-right"><Rupiah amount={p.price} /></td>
-                                <td className="p-2 text-center">
+                              <TableRow key={p.id} className="border-t">
+                                <TableCell className="p-2">{p.name}</TableCell>
+                                <TableCell className="p-2 text-muted-foreground"><Badge variant="outline" className="capitalize">{p.category}</Badge></TableCell>
+                                <TableCell className="p-2 text-right"><Rupiah amount={p.price} /></TableCell>
+                                <TableCell className="p-2 text-center">
                                   <div className="flex items-center justify-center gap-1">
-                                    <button type="button" onClick={() => openEditProduct(p)} className="text-primary hover:underline"><Edit className="size-3.5" /></button>
-                                    <button type="button" onClick={() => deleteProduct(p.id)} className="text-destructive hover:underline"><Trash2 className="size-3.5" /></button>
+                                    <Button type="button" onClick={() => openEditProduct(p)} className="text-primary hover:underline"><Edit className="size-3.5" /></Button>
+                                    <Button type="button" onClick={() => deleteProduct(p.id)} className="text-destructive hover:underline"><Trash2 className="size-3.5" /></Button>
                                   </div>
-                                </td>
-                              </tr>
+                                </TableCell>
+                              </TableRow>
                             ))}
-                          </tbody>
-                        </table>
+                          </TableBody>
+                        </Table>
                       </div>
                     )}
                   </section>
@@ -681,7 +682,7 @@ export function OnboardingPage() {
                       {editableCategories.map((c) => (
                         <Badge key={c.id} variant="secondary" className="text-xs gap-1 pr-1">
                           {c.name}
-                          <button type="button" onClick={() => removeCategory(c.id)} className="text-muted-foreground hover:text-destructive ml-0.5">&times;</button>
+                          <Button type="button" onClick={() => removeCategory(c.id)} className="text-muted-foreground hover:text-destructive ml-0.5">&times;</Button>
                         </Badge>
                       ))}
                     </div>
@@ -697,31 +698,31 @@ export function OnboardingPage() {
                       <p className="text-sm text-muted-foreground">Belum ada metode pembayaran.</p>
                     ) : (
                       <div className="border rounded-xl overflow-hidden text-sm">
-                        <table className="w-full">
-                          <thead className="bg-muted">
-                            <tr>
-                              <th className="text-left p-2 font-medium">Nama</th>
-                              <th className="text-left p-2 font-medium">Provider</th>
-                              <th className="text-left p-2 font-medium">Tipe</th>
-                              <th className="w-20 text-center p-2 font-medium">Aksi</th>
-                            </tr>
-                          </thead>
-                          <tbody>
+                        <Table className="w-full">
+                          <TableHeader className="bg-muted">
+                            <TableRow>
+                              <TableHead className="text-left p-2 font-medium">Nama</TableHead>
+                              <TableHead className="text-left p-2 font-medium">Provider</TableHead>
+                              <TableHead className="text-left p-2 font-medium">Tipe</TableHead>
+                              <TableHead className="w-20 text-center p-2 font-medium">Aksi</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
                             {editablePaymentMethods.map((pm) => (
-                              <tr key={pm.id} className="border-t">
-                                <td className="p-2">{pm.name}</td>
-                                <td className="p-2 text-muted-foreground">{pm.provider}</td>
-                                <td className="p-2 text-muted-foreground">{pm.type}</td>
-                                <td className="p-2 text-center">
+                              <TableRow key={pm.id} className="border-t">
+                                <TableCell className="p-2">{pm.name}</TableCell>
+                                <TableCell className="p-2 text-muted-foreground">{pm.provider}</TableCell>
+                                <TableCell className="p-2 text-muted-foreground"><Badge variant="outline" className="capitalize">{pm.type}</Badge></TableCell>
+                                <TableCell className="p-2 text-center">
                                   <div className="flex items-center justify-center gap-1">
-                                    <button type="button" onClick={() => openEditPm(pm)} className="text-primary hover:underline"><Edit className="size-3.5" /></button>
-                                    <button type="button" onClick={() => deletePm(pm.id)} className="text-destructive hover:underline"><Trash2 className="size-3.5" /></button>
+                                    <Button type="button" onClick={() => openEditPm(pm)} className="text-primary hover:underline"><Edit className="size-3.5" /></Button>
+                                    <Button type="button" onClick={() => deletePm(pm.id)} className="text-destructive hover:underline"><Trash2 className="size-3.5" /></Button>
                                   </div>
-                                </td>
-                              </tr>
+                                </TableCell>
+                              </TableRow>
                             ))}
-                          </tbody>
-                        </table>
+                          </TableBody>
+                        </Table>
                       </div>
                     )}
                   </section>
@@ -737,7 +738,7 @@ export function OnboardingPage() {
                         <Badge key={cc.id} variant="secondary" className={`text-xs gap-1 pr-1 ${cc.type === 'Pemasukan' ? 'border-green-300' : 'border-red-300'}`}>
                           {cc.name}
                           <span className={cc.type === 'Pemasukan' ? 'text-green-600' : 'text-red-500'}>({cc.type})</span>
-                          <button type="button" onClick={() => removeCashCategory(cc.id)} className="text-muted-foreground hover:text-destructive ml-0.5">&times;</button>
+                          <Button type="button" onClick={() => removeCashCategory(cc.id)} className="text-muted-foreground hover:text-destructive ml-0.5">&times;</Button>
                         </Badge>
                       ))}
                     </div>
