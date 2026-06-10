@@ -18,27 +18,25 @@ export function InitialSyncScreen({ onDone }: { onDone: () => void }) {
   const triggerSync = useCallback(async () => {
     setPhase('syncing')
     try {
-      const result = await runSync()
+      const result = await Promise.race([
+        runSync(),
+        new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 8_000)),
+      ])
       if (!mountedRef.current) return
-      if (result.processed > 0 || result.failed === 0) {
-        localStorage.setItem('vitpos-initial-sync-done', 'true')
-        setPhase('done')
-        setTimeout(() => {
-          if (mountedRef.current) {
-            setFadeOut(true)
-            setTimeout(() => { mountedRef.current && onDone() }, FADE_OUT_MS)
-          }
-        }, DONE_DELAY_MS)
-      } else {
-        localStorage.setItem('vitpos-initial-sync-done', 'true')
-        setPhase('done')
-        setTimeout(() => {
-          if (mountedRef.current) {
-            setFadeOut(true)
-            setTimeout(() => { mountedRef.current && onDone() }, FADE_OUT_MS)
-          }
-        }, DONE_DELAY_MS)
+
+      if (result === 'timeout') {
+        handleSkip()
+        return
       }
+
+      localStorage.setItem('vitpos-initial-sync-done', 'true')
+      setPhase('done')
+      setTimeout(() => {
+        if (mountedRef.current) {
+          setFadeOut(true)
+          setTimeout(() => { mountedRef.current && onDone() }, FADE_OUT_MS)
+        }
+      }, DONE_DELAY_MS)
     } catch {
       if (mountedRef.current) setPhase('error')
     }
@@ -111,7 +109,7 @@ export function InitialSyncScreen({ onDone }: { onDone: () => void }) {
           <button
             type="button"
             onClick={handleSkip}
-            className="pt-2 text-xs text-muted-foreground/50 transition-colors hover:text-muted-foreground"
+            className="pt-2 text-xs text-muted-foreground/70 underline-offset-2 transition-colors hover:text-foreground hover:underline"
           >
             Lewati
           </button>
