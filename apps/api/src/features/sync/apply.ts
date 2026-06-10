@@ -21,6 +21,7 @@ import {
   shifts,
   stockMovements,
   suppliers,
+  warehouses,
 } from '../../../../../src/db/schema/index.js'
 
 type ApplyContext = {
@@ -307,6 +308,29 @@ async function applyStockMovement(db: AppDb, ctx: ApplyContext, entityId: string
     return
   }
 
+  let warehouseId = payload.warehouseId as string | undefined
+  if (!warehouseId && ctx.branchId) {
+    const defaultWarehouse = await db
+      .select({ id: warehouses.id })
+      .from(warehouses)
+      .where(and(eq(warehouses.tenantId, ctx.tenantId), eq(warehouses.branchId, ctx.branchId), eq(warehouses.isDefault, true)))
+      .limit(1)
+      .then((rows) => rows[0])
+    warehouseId = defaultWarehouse?.id
+  }
+  if (!warehouseId) {
+    const anyWarehouse = await db
+      .select({ id: warehouses.id })
+      .from(warehouses)
+      .where(eq(warehouses.tenantId, ctx.tenantId))
+      .limit(1)
+      .then((rows) => rows[0])
+    warehouseId = anyWarehouse?.id
+  }
+  if (!warehouseId) {
+    throw new Error('No warehouse found for stock_movement mutation')
+  }
+
   const now = new Date()
   await db
     .insert(stockMovements)
@@ -314,7 +338,7 @@ async function applyStockMovement(db: AppDb, ctx: ApplyContext, entityId: string
       id: entityId,
       tenantId: ctx.tenantId,
       branchId: toNullableUuid(ctx.branchId),
-      warehouseId: ctx.branchId ?? '',
+      warehouseId,
       productId: payload.productId,
       type: mapClientStockMovementType(payload.type),
       qty: toNumeric(payload.qty),

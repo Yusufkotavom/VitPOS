@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Building2, Store, ShoppingCart, Coffee, Monitor } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
@@ -10,6 +11,7 @@ import { SubscriptionGate } from '@/features/billing/components/subscription-gat
 import { cn } from '@/lib/utils'
 import { AppSidebar } from '@/shared/components/layout/app-sidebar'
 import { OfflineBanner } from '@/shared/components/sync/offline-banner'
+import { InitialSyncScreen } from '@/shared/components/sync/initial-sync-screen'
 import { SyncIndicator } from '@/shared/components/sync/sync-indicator'
 import { ThemeToggle } from '@/shared/components/nav/theme-toggle'
 import { UserMenu } from '@/shared/components/nav/user-menu'
@@ -22,10 +24,18 @@ const ICONS: Record<string, React.ElementType> = {
 }
 
 export function AppLayout() {
+  const [initialSyncDone, setInitialSyncDone] = useState(
+    () => localStorage.getItem('vitpos-initial-sync-done') === 'true',
+  )
+
   useAutoSync()
   const syncSummary = useSyncStore()
   const settings = useSettings()
   const location = useLocation()
+
+  if (!initialSyncDone) {
+    return <InitialSyncScreen onDone={() => setInitialSyncDone(true)} />
+  }
   const isPos = location.pathname === '/pos'
   const hideMobileNavigation = isPos || location.pathname === '/service-orders/create'
 

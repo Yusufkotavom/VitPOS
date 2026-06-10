@@ -13,18 +13,29 @@ export function toLocalOutboxStatus(status: ApiSyncItemStatus): LocalOutboxStatu
   return 'failed'
 }
 
+const prefixedIdPattern = /^[a-z]+-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export function extractEntityId(entityId: string): string {
+  const match = entityId.match(prefixedIdPattern)
+  return match ? entityId.slice(entityId.indexOf('-') + 1) : entityId
+}
+
 export function partitionSyncMutations(items: SyncMutationRecord[]) {
   const accepted: SyncMutationRecord[] = []
   const rejected: Array<{ item: SyncMutationRecord; message: string }> = []
 
   for (const item of items) {
-    // Settings use semantic keys (like 'company-name') as IDs - bypass UUID validation
-    if (!isSyncEntityId(item.entityId) && item.entityType !== 'setting') {
-      rejected.push({ item, message: 'ID lokal belum kompatibel sinkron. Simpan ulang data ini.' })
+    if (item.entityType === 'setting') {
+      accepted.push(item)
       continue
     }
 
-    accepted.push(item)
+    if (isSyncEntityId(item.entityId) || prefixedIdPattern.test(item.entityId)) {
+      accepted.push(item)
+      continue
+    }
+
+    rejected.push({ item, message: 'ID lokal belum kompatibel sinkron. Simpan ulang data ini.' })
   }
 
   return { accepted, rejected }

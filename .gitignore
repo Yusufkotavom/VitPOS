@@ -9,8 +9,8 @@ lerna-debug.log*
 
 node_modules
 dist
-package-lock.json
 .codegraph/
+apps/api/api/
 dist-ssr
 *.local
 

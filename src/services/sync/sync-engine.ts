@@ -4,7 +4,7 @@ import { baimRuntime } from '@/lib/baim-runtime'
 import { apiGet, apiPost, buildTenantQuery } from '@/services/api/client'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { listOutboxItems, updateOutboxStatus } from '@/services/sync/outbox-service'
-import { indexPushResults, partitionSyncMutations, toLocalOutboxStatus } from '@/services/sync/sync-transport'
+import { extractEntityId, indexPushResults, partitionSyncMutations, toLocalOutboxStatus } from '@/services/sync/sync-transport'
 import type {
   LocalCashCategory,
   LocalPayment,
@@ -383,7 +383,7 @@ export async function runSync() {
       mutations: accepted.map((item) => ({
         clientMutationId: item.id,
         entityType: item.entityType,
-        entityId: item.entityId,
+        entityId: extractEntityId(item.entityId),
         mutationType: item.mutationType,
         payload: item.payload,
         status: item.status,

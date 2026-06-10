@@ -82,6 +82,7 @@ export function TenantSelectorPage() {
   }, [currentUser])
 
   function handleSelect(tenant: LocalTenant, role: string) {
+    localStorage.removeItem('vitpos-initial-sync-done')
     setActiveTenant(tenant, role)
     navigate('/')
   }
