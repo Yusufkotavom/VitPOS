@@ -32,7 +32,7 @@ type RepositoryTable<T extends { id: string; tenantId: string }> = {
 }
 
 type OutboxTable = {
-  put: (row: OutboxItem & { tenantId?: string }) => Promise<unknown>
+  put: (row: OutboxItem) => Promise<unknown>
 }
 
 type RepositoryOptions<T extends { id: string; tenantId: string }> = {
@@ -47,7 +47,7 @@ function createId(prefix: string) {
 
 async function enqueueMutation<T extends { id: string; tenantId: string }>(outboxTable: OutboxTable, entityType: SyncEntityType, mutationType: SyncMutationType, row: T) {
   const now = new Date().toISOString()
-  const item: OutboxItem & { tenantId?: string } = {
+  const item: OutboxItem = {
     id: createId('outbox'),
     tenantId: row.tenantId,
     entityType,

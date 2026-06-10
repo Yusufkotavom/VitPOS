@@ -2,8 +2,6 @@ import { localDb } from '@/services/local-db/client'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { type OutboxItem, type OutboxStatus, type SyncEntityType, type SyncMutationType } from '@/services/local-db/schema'
 
-type TenantOutboxItem = OutboxItem & { tenantId: string }
-
 function createId(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`
 }
@@ -16,7 +14,7 @@ export async function enqueueOutboxItem(input: {
 }) {
   const now = new Date().toISOString()
   const tenantId = requireActiveTenantId()
-  const item: TenantOutboxItem = {
+  const item: OutboxItem = {
     id: createId('outbox'),
     tenantId,
     entityType: input.entityType,

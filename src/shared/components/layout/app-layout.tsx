@@ -3,7 +3,6 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
 import { mobileNavigation } from '@/app/navigation'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
-import { Button } from '@/components/ui/button'
 import { useAutoSync } from '@/features/sync/hooks/use-auto-sync'
 import { useSyncStore } from '@/features/sync/stores/sync-store'
 import { useSettings } from '@/features/settings/hooks/use-settings'
@@ -11,7 +10,7 @@ import { SubscriptionGate } from '@/features/billing/components/subscription-gat
 import { cn } from '@/lib/utils'
 import { AppSidebar } from '@/shared/components/layout/app-sidebar'
 import { OfflineBanner } from '@/shared/components/sync/offline-banner'
-import { SyncStatusBadge } from '@/shared/components/sync/sync-status-badge'
+import { SyncIndicator } from '@/shared/components/sync/sync-indicator'
 import { ThemeToggle } from '@/shared/components/nav/theme-toggle'
 import { UserMenu } from '@/shared/components/nav/user-menu'
 
@@ -61,13 +60,7 @@ export function AppLayout() {
               </div>
             </div>
             <div className="ml-auto flex items-center gap-2">
-              <div className="hidden items-center gap-2 md:flex">
-                <Button variant="outline">{companyName}</Button>
-                <Button variant="outline">Cabang Utama</Button>
-                <NavLink to="/sync">
-                  <SyncStatusBadge summary={syncSummary} />
-                </NavLink>
-              </div>
+              <SyncIndicator summary={syncSummary} />
               <ThemeToggle />
               <UserMenu />
             </div>

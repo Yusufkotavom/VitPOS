@@ -7,6 +7,7 @@ import { indexPushResults, isSyncEntityId, partitionSyncMutations, toLocalOutbox
 function createMutation(overrides: Partial<SyncMutationRecord> = {}): SyncMutationRecord {
   return {
     id: 'outbox-1',
+    tenantId: 'tenant-1',
     entityType: 'product',
     entityId: '66666666-6666-4666-8666-666666666666',
     mutationType: 'create',

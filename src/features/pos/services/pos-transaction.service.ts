@@ -77,6 +77,7 @@ export const posTransactionService = {
 
     const outboxItem: OutboxItem = {
       id: newId('outbox'),
+      tenantId,
       entityType: 'sale',
       entityId: draftId,
       mutationType: 'create',
@@ -196,6 +197,7 @@ export const posTransactionService = {
     const outboxPayload: OutboxItem[] = [
       {
         id: newId('outbox'),
+        tenantId,
         entityType: 'sale',
         entityId: salesOrderId,
         mutationType: 'create',
@@ -207,6 +209,7 @@ export const posTransactionService = {
       },
       {
         id: newId('outbox'),
+        tenantId,
         entityType: 'payment',
         entityId: paymentId,
         mutationType: 'create',
@@ -218,6 +221,7 @@ export const posTransactionService = {
       },
       ...stockMovements.map<OutboxItem>((movement) => ({
         id: newId('outbox'),
+        tenantId,
         entityType: 'stock_movement',
         entityId: movement.id,
         mutationType: 'create',

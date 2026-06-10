@@ -101,6 +101,7 @@ export const socTransactionService = {
     const outboxPayload: OutboxItem[] = [
       {
         id: newId('outbox'),
+        tenantId,
         entityType: 'service_order',
         entityId: serviceOrderId,
         mutationType: 'create',
@@ -130,6 +131,7 @@ export const socTransactionService = {
       }
       outboxPayload.push({
         id: newId('outbox'),
+        tenantId,
         entityType: 'payment',
         entityId: paymentId,
         mutationType: 'create',
@@ -161,6 +163,7 @@ export const socTransactionService = {
       stockMovements.forEach(m => {
         outboxPayload.push({
           id: newId('outbox'),
+          tenantId,
           entityType: 'stock_movement',
           entityId: m.id,
           mutationType: 'create',

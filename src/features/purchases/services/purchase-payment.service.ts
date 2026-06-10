@@ -55,6 +55,7 @@ export async function recordPurchasePayment(
   const outboxItems: OutboxItem[] = [
     {
       id: createId('outbox'),
+      tenantId,
       entityType: 'payment',
       entityId: payment.id,
       mutationType: 'create',
@@ -66,6 +67,7 @@ export async function recordPurchasePayment(
     },
     {
       id: createId('outbox'),
+      tenantId,
       entityType: 'purchase',
       entityId: updatedPurchase.id,
       mutationType: 'update',
@@ -106,6 +108,7 @@ export async function syncPurchasePaymentSummary(purchaseId: string, tenantId: s
 
   const outboxItem: OutboxItem = {
     id: createId('outbox'),
+    tenantId,
     entityType: 'purchase',
     entityId: nextPurchase.id,
     mutationType: 'update',

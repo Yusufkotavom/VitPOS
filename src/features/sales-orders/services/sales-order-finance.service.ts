@@ -99,6 +99,7 @@ export async function recordSalesOrderPayment(
   const outboxItems: OutboxItem[] = [
     {
       id: createId('outbox'),
+      tenantId,
       entityType: 'payment',
       entityId: payment.id,
       mutationType: 'create',
@@ -110,6 +111,7 @@ export async function recordSalesOrderPayment(
     },
     {
       id: createId('outbox'),
+      tenantId,
       entityType: 'sale',
       entityId: updatedOrder.id,
       mutationType: 'update',
@@ -151,6 +153,7 @@ export async function syncSalesOrderPaymentSummary(orderId: string, tenantId: st
 
   const outboxItem: OutboxItem = {
     id: createId('outbox'),
+    tenantId,
     entityType: 'sale',
     entityId: nextOrder.id,
     mutationType: 'update',

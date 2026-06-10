@@ -5,7 +5,6 @@ import { useProducts } from '@/features/products/hooks/use-products'
 import { EmptyState } from '@/shared/components/feedback/empty-state'
 
 import { Image as ImageIcon, Package, Coffee, Shirt, MonitorSmartphone } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -63,54 +62,54 @@ export function ProductGrid() {
     })
   }
 
+  if (viewMode === 'list') {
+    return (
+      <div className="flex flex-col gap-2">
+        {products.map((product) => (
+          <button
+            key={product.id}
+            type="button"
+            onClick={() => handleAddItem(product)}
+            className="flex w-full cursor-pointer items-center gap-4 overflow-hidden rounded-xl border bg-background p-3 text-left shadow-sm transition hover:border-primary hover:bg-muted/40 active:scale-[0.99]"
+          >
+            <ProductMedia imageUrl={product.imageUrl} iconName={product.icon} className="size-16 rounded-md border" />
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <p className="truncate font-medium leading-tight">{product.name}</p>
+              <Badge variant="secondary" className="w-fit font-normal text-[10px] px-1.5 py-0">{product.category}</Badge>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              <p className="font-semibold">{formatCurrency(product.price)}</p>
+              <p className="text-xs text-muted-foreground">Stok {product.type === 'Jasa' ? '-' : `${product.stock} pcs`}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+    )
+  }
+
   return (
-    <>
-      {viewMode === 'list' ? (
-        <div className="flex flex-col gap-2">
-          {products.map((product) => (
-            <Button
-              key={product.id}
-              type="button"
-              onClick={() => handleAddItem(product)}
-              className="rounded-xl border bg-background text-left shadow-sm transition hover:border-primary hover:bg-muted/40 active:scale-[0.99] flex flex-row overflow-hidden items-center p-3"
-            >
-              <ProductMedia imageUrl={product.imageUrl} iconName={product.icon} className="size-16 rounded-md mr-4 border-b-0 border" />
-              <div className="flex flex-1 flex-col justify-center gap-1.5 items-start">
-                <p className="font-medium leading-tight line-clamp-1">{product.name}</p>
-                <Badge variant="secondary" className="font-normal text-[10px] px-1.5 py-0">{product.category}</Badge>
-              </div>
-              <div className="flex flex-col items-end gap-1 shrink-0 ml-4">
-                <p className="font-semibold">{formatCurrency(product.price)}</p>
-                <p className="text-xs text-muted-foreground">Stok {product.type === 'Jasa' ? '-' : `${product.stock} pcs`}</p>
-              </div>
-            </Button>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-3 md:grid-cols-4 xl:grid-cols-5">
-          {products.map((product) => (
-            <Button
-              key={product.id}
-              type="button"
-              onClick={() => handleAddItem(product)}
-              className="group relative rounded-xl border bg-background text-left shadow-sm transition-all hover:border-primary hover:shadow-md active:scale-[0.98] flex flex-col overflow-hidden"
-            >
-              <div className="relative w-full overflow-hidden bg-muted">
-                <ProductMedia imageUrl={product.imageUrl} iconName={product.icon} className="w-full h-24 border-b transition-transform duration-300 group-hover:scale-110" />
-                {product.type !== 'Jasa' && (
-                  <span className="absolute right-1.5 top-1.5 rounded-md border bg-background/90 px-1.5 py-0.5 text-[10px] font-medium shadow-sm backdrop-blur-sm">
-                    {product.stock}
-                  </span>
-                )}
-              </div>
-              <div className="flex w-full flex-col gap-1 p-2.5">
-                <p className="line-clamp-2 text-xs font-medium leading-tight">{product.name}</p>
-                <p className="text-sm font-semibold">{formatCurrency(product.price)}</p>
-              </div>
-            </Button>
-          ))}
-        </div>
-      )}
-    </>
+    <div className="grid grid-cols-3 gap-3 md:grid-cols-4 xl:grid-cols-5">
+      {products.map((product) => (
+        <button
+          key={product.id}
+          type="button"
+          onClick={() => handleAddItem(product)}
+          className="group flex cursor-pointer flex-col overflow-hidden rounded-xl border bg-background text-left shadow-sm transition-all hover:border-primary hover:shadow-md active:scale-[0.98]"
+        >
+          <div className="relative w-full overflow-hidden bg-muted">
+            <ProductMedia imageUrl={product.imageUrl} iconName={product.icon} className="h-24 w-full border-b transition-transform duration-300 group-hover:scale-110" />
+            {product.type !== 'Jasa' && (
+              <span className="absolute right-1.5 top-1.5 rounded-md border bg-background/90 px-1.5 py-0.5 text-[10px] font-medium shadow-sm backdrop-blur-sm">
+                {product.stock}
+              </span>
+            )}
+          </div>
+          <div className="flex w-full flex-col gap-1 p-2.5">
+            <p className="line-clamp-2 text-xs font-medium leading-tight">{product.name}</p>
+            <p className="text-sm font-semibold">{formatCurrency(product.price)}</p>
+          </div>
+        </button>
+      ))}
+    </div>
   )
 }

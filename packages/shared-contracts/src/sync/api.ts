@@ -2,6 +2,7 @@ import type { ApiSyncItemStatus, LocalOutboxStatus, ServerSyncStatus, SyncEntity
 
 export type SyncMutationRecord = {
   id: string
+  tenantId: string
   entityType: SyncEntityType
   entityId: string
   mutationType: SyncMutationType

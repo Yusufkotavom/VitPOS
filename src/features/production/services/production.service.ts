@@ -111,6 +111,7 @@ export async function produceFromRecipe(
   for (const movement of stockMovements) {
     outboxItems.push({
       id: createId('outbox'),
+      tenantId,
       entityType: 'stock_movement',
       entityId: movement.id,
       mutationType: 'create',

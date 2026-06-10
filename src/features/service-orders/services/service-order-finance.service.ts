@@ -54,6 +54,7 @@ export async function recordServiceOrderPayment(
   const outboxItems: OutboxItem[] = [
     {
       id: createId('outbox'),
+      tenantId,
       entityType: 'payment',
       entityId: payment.id,
       mutationType: 'create',
@@ -65,6 +66,7 @@ export async function recordServiceOrderPayment(
     },
     {
       id: createId('outbox'),
+      tenantId,
       entityType: 'service_order',
       entityId: updatedOrder.id,
       mutationType: 'update',
@@ -103,6 +105,7 @@ export async function syncServiceOrderPaymentSummary(orderId: string, tenantId: 
 
   const outboxItem: OutboxItem = {
     id: createId('outbox'),
+    tenantId,
     entityType: 'service_order',
     entityId: nextOrder.id,
     mutationType: 'update',

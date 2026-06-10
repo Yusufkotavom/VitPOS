@@ -114,6 +114,7 @@ export const sidebarNavigation: SidebarNavigationGroup[] = [
         icon: Settings,
         items: [
           { to: '/settings/profile', label: 'Profil Pengguna', icon: Users },
+          { to: '/settings/invoice', label: 'Invoice & Struk', icon: ReceiptText },
           { to: '/settings/templates', label: 'Template WhatsApp', icon: MessageSquare },
         ],
       },

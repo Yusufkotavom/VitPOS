@@ -1,16 +1,12 @@
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { SettingsNav } from '@/features/settings/components/settings-nav'
 import { CompanySettingsForm } from '@/features/settings/components/company-settings-form'
-import { UpdateCard } from '@/features/updates/components/update-card'
 
 export function SettingsPage() {
   return (
-    <PageShell title="Pengaturan Usaha" description="Profil usaha, legal, struk, invoice, cabang, gudang, role, dan template.">
+    <PageShell title="Profil Usaha" description="Ikon, logo, nama, alamat, dan legalitas usaha.">
       <SettingsNav className="mb-6" />
-      <div className="space-y-6">
-        <UpdateCard />
-        <CompanySettingsForm />
-      </div>
+      <CompanySettingsForm />
     </PageShell>
   )
 }

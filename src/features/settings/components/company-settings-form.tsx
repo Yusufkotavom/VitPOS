@@ -23,10 +23,6 @@ const fields = [
   { id: 'company-phone', label: 'Nomor Telepon', placeholder: '08xxxxxxxxxx', type: 'input' },
   { id: 'company-address', label: 'Alamat Usaha', placeholder: 'Alamat lengkap toko', type: 'textarea' },
   { id: 'company-tax-number', label: 'NPWP / NIB', placeholder: 'Nomor legal usaha', type: 'input' },
-  { id: 'invoice-prefix', label: 'Prefix Invoice', placeholder: 'INV', type: 'input' },
-  { id: 'invoice-term', label: 'Catatan / Term Invoice (A4)', placeholder: 'Syarat & Ketentuan. Barang yang sudah dibeli tidak dapat ditukar.', type: 'textarea' },
-  { id: 'receipt-header', label: 'Header Struk (POS)', placeholder: 'Selamat Datang di Toko Kami', type: 'textarea' },
-  { id: 'receipt-footer', label: 'Footer Struk (POS)', placeholder: 'Terima kasih sudah berbelanja', type: 'textarea' },
 ] as const
 
 type FieldId = typeof fields[number]['id']
