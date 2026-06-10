@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '@/services/local-db/reactivity'
 
 import { purchaseRepository } from '@/services/local-db/repository'
 

@@ -318,10 +318,10 @@ export async function applyPullItems(items: SyncPullItem[], tenantId: string) {
   await localDb.transaction(
     'rw',
     [
-      localDb.products, localDb.customers, localDb.salesOrders, localDb.payments,
-      localDb.stockMovements, localDb.cash, localDb.productCategories, localDb.cashCategories,
-      localDb.settings, localDb.shifts, localDb.suppliers, localDb.purchases,
-      localDb.returns, localDb.serviceOrders, localDb.paymentMethods, localDb.recipes,
+      'products', 'customers', 'salesOrders', 'payments',
+      'stockMovements', 'cash', 'productCategories', 'cashCategories',
+      'settings', 'shifts', 'suppliers', 'purchases',
+      'returns', 'serviceOrders', 'paymentMethods', 'recipes',
     ],
     async () => {
       for (const item of items) {

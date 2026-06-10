@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect, useRef, useState } from 'react'
-import { Controller, useForm, useWatch } from 'react-hook-form'
+import { useEffect, useRef } from 'react'
+import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,7 +26,7 @@ type ProductFormProps = {
 }
 
 export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: ProductFormProps) {
-  const categoryRows = useCategories()
+  const categoryRows = useCategories() as Array<{ name: string; status: string }>
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
     defaultValues: defaultValues ?? productInitialValues,
@@ -39,13 +39,30 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
   const errors = form.formState.errors
   const type = useWatch({ control: form.control, name: 'type' })
   const manageStock = useWatch({ control: form.control, name: 'manageStock' })
+  const hasWholesalePricing = useWatch({ control: form.control, name: 'hasWholesalePricing' })
   const isService = type === 'Jasa'
   const isStockManaged = !isService && manageStock
+  const { fields: wholesaleTierFields, append, remove, replace } = useFieldArray({
+    control: form.control,
+    name: 'wholesaleTiers',
+  })
 
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [previewImage, setPreviewImage] = useState<string | null>(defaultValues?.imageUrl || null)
   const selectedIcon = useWatch({ control: form.control, name: 'icon' })
+  const previewImage = useWatch({ control: form.control, name: 'imageUrl' }) || null
   const categoryOptions = ['Umum', ...categoryRows.filter((category) => category.status === 'Aktif').map((category) => category.name)]
+
+  function handleWholesaleToggle(nextValue: boolean) {
+    form.setValue('hasWholesalePricing', nextValue, { shouldDirty: true })
+
+    if (nextValue && form.getValues('wholesaleTiers').length === 0) {
+      append({ minQty: '', price: '' })
+    }
+
+    if (!nextValue) {
+      replace([])
+    }
+  }
 
   function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -54,14 +71,12 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
     const reader = new FileReader()
     reader.onload = (event) => {
       const dataUrl = event.target?.result as string
-      setPreviewImage(dataUrl)
       form.setValue('imageUrl', dataUrl, { shouldDirty: true })
     }
     reader.readAsDataURL(file)
   }
 
   function clearImage() {
-    setPreviewImage(null)
     form.setValue('imageUrl', '', { shouldDirty: true })
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
@@ -161,18 +176,105 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
           <label className="text-sm font-medium">Harga Jual</label>
-          <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.price)} {...form.register('price')} placeholder="18000" />
+          <Controller
+            control={form.control}
+            name="price"
+            render={({ field }) => (
+              <CurrencyInput
+                prefix="Rp"
+                aria-invalid={Boolean(errors.price)}
+                value={field.value}
+                onValueChange={(value) => field.onChange(String(value))}
+                onBlur={field.onBlur}
+                name={field.name}
+                ref={field.ref}
+                placeholder="18000"
+              />
+            )}
+          />
           {errors.price ? <span className="text-xs text-destructive">{errors.price.message}</span> : null}
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">Modal / HPP</label>
-          <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.costPrice)} {...form.register('costPrice')} placeholder="12000" />
+          <Controller
+            control={form.control}
+            name="costPrice"
+            render={({ field }) => (
+              <CurrencyInput
+                prefix="Rp"
+                aria-invalid={Boolean(errors.costPrice)}
+                value={field.value}
+                onValueChange={(value) => field.onChange(String(value))}
+                onBlur={field.onBlur}
+                name={field.name}
+                ref={field.ref}
+                placeholder="12000"
+              />
+            )}
+          />
         </div>
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">Harga Grosir (Opsional)</label>
-        <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.wholesalePrice)} {...form.register('wholesalePrice')} placeholder="15000" />
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={hasWholesalePricing}
+            onChange={(event) => handleWholesaleToggle(event.target.checked)}
+            className="size-4 rounded border-input"
+          />
+          Harga Grosir
+        </label>
+
+        {hasWholesalePricing ? (
+          <div className="space-y-3 rounded-lg border p-3">
+            {wholesaleTierFields.map((field, index) => (
+              <div key={field.id} className="grid grid-cols-[1fr_1fr_auto] items-start gap-2">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Minimal Qty</label>
+                  <Input
+                    inputMode="numeric"
+                    aria-invalid={Boolean(errors.wholesaleTiers?.[index]?.minQty)}
+                    {...form.register(`wholesaleTiers.${index}.minQty`)}
+                    placeholder="10"
+                  />
+                  {errors.wholesaleTiers?.[index]?.minQty ? <span className="text-xs text-destructive">{errors.wholesaleTiers[index]?.minQty?.message}</span> : null}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Harga</label>
+                  <Controller
+                    control={form.control}
+                    name={`wholesaleTiers.${index}.price`}
+                    render={({ field: tierField }) => (
+                      <CurrencyInput
+                        prefix="Rp"
+                        aria-invalid={Boolean(errors.wholesaleTiers?.[index]?.price)}
+                        value={tierField.value}
+                        onValueChange={(value) => tierField.onChange(String(value))}
+                        onBlur={tierField.onBlur}
+                        name={tierField.name}
+                        ref={tierField.ref}
+                        placeholder="14000"
+                      />
+                    )}
+                  />
+                  {errors.wholesaleTiers?.[index]?.price ? <span className="text-xs text-destructive">{errors.wholesaleTiers[index]?.price?.message}</span> : null}
+                </div>
+
+                <Button type="button" variant="ghost" size="sm" className="mt-5" onClick={() => remove(index)}>
+                  Hapus
+                </Button>
+              </div>
+            ))}
+
+            <Button type="button" variant="outline" size="sm" onClick={() => append({ minQty: '', price: '' })}>
+              Tambah Tier
+            </Button>
+
+            {errors.wholesaleTiers && !Array.isArray(errors.wholesaleTiers) ? <span className="text-xs text-destructive">{errors.wholesaleTiers.message}</span> : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-2 gap-3 items-end">

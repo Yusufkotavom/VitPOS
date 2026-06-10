@@ -3,7 +3,7 @@ import { ArrowLeft, PencilIcon, XIcon, CheckIcon, Trash2Icon } from 'lucide-reac
 import { useState, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useQuery } from '@tanstack/react-query'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '@/services/local-db/reactivity'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'

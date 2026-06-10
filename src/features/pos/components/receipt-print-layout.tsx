@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '@/services/local-db/reactivity'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { formatCurrency } from '@/lib/format-currency'
 import { localDb } from '@/services/local-db/client'

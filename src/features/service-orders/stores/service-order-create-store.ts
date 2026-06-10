@@ -15,6 +15,9 @@ interface ServiceOrderCreateState {
   notes: string
   status: string
   estimatedCompletion?: string
+  hasWarranty: boolean
+  warrantyValue: string
+  warrantyUnit: 'hari' | 'bulan' | 'tahun'
   items: ServiceItem[]
 
   setCustomer: (name: string, id: string | null) => void
@@ -22,6 +25,9 @@ interface ServiceOrderCreateState {
   setNotes: (notes: string) => void
   setStatus: (status: string) => void
   setEstimatedCompletion: (date?: string) => void
+  setHasWarranty: (value: boolean) => void
+  setWarrantyValue: (value: string) => void
+  setWarrantyUnit: (value: 'hari' | 'bulan' | 'tahun') => void
   addItem: (item: { productId: string; name: string; price: number }) => void
   updateItemQty: (productId: string, qty: number) => void
   removeItem: (productId: string) => void
@@ -35,6 +41,9 @@ export const useServiceOrderCreateStore = create<ServiceOrderCreateState>((set) 
   notes: '',
   status: 'Baru',
   estimatedCompletion: undefined,
+  hasWarranty: false,
+  warrantyValue: '',
+  warrantyUnit: 'hari',
   items: [],
 
   setCustomer: (name, id) => set({ customerName: name, customerId: id }),
@@ -42,6 +51,9 @@ export const useServiceOrderCreateStore = create<ServiceOrderCreateState>((set) 
   setNotes: (notes) => set({ notes }),
   setStatus: (status) => set({ status }),
   setEstimatedCompletion: (date) => set({ estimatedCompletion: date }),
+  setHasWarranty: (value) => set({ hasWarranty: value }),
+  setWarrantyValue: (value) => set({ warrantyValue: value }),
+  setWarrantyUnit: (value) => set({ warrantyUnit: value }),
 
   addItem: (product) => {
     set((state) => {
@@ -74,5 +86,5 @@ export const useServiceOrderCreateStore = create<ServiceOrderCreateState>((set) 
     }))
   },
 
-  clear: () => set({ customerName: 'Umum', customerId: null, description: '', notes: '', status: 'Baru', estimatedCompletion: undefined, items: [] }),
+  clear: () => set({ customerName: 'Umum', customerId: null, description: '', notes: '', status: 'Baru', estimatedCompletion: undefined, hasWarranty: false, warrantyValue: '', warrantyUnit: 'hari', items: [] }),
 }))

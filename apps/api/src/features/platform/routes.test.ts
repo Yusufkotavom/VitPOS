@@ -14,7 +14,7 @@ const { dbMock } = vi.hoisted(() => {
       returning: vi.fn(),
       values: vi.fn(),
       set: vi.fn(),
-    }) as Promise<unknown[]> & Record<string, ReturnType<typeof vi.fn>>
+    }) as unknown as Promise<unknown[]> & Record<string, ReturnType<typeof vi.fn>>
     for (const key of ['from', 'where', 'orderBy', 'limit', 'offset', 'leftJoin', 'groupBy', 'returning', 'values', 'set']) {
       chain[key].mockReturnValue(chain)
     }
@@ -61,10 +61,10 @@ describe('platform routes guard', () => {
 
   it('returns 403 when user is not platform_admin', async () => {
     dbMock.select.mockReturnValueOnce(
-      Object.assign(Promise.resolve([{ id: 'regular-user-id', role: 'user' }]), {
+      (Object.assign(Promise.resolve([{ id: 'regular-user-id', role: 'user' }]), {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
-      })
+      }) as unknown) as ReturnType<typeof vi.fn>
     )
     const app = buildApp()
     const response = await app.request('/api/v1/platform/tenants', {
@@ -78,18 +78,18 @@ describe('platform routes guard', () => {
   it('allows platform_admin to list tenants', async () => {
     // 1st select: middleware user lookup
     dbMock.select.mockReturnValueOnce(
-      Object.assign(Promise.resolve([{ id: 'admin-id', role: 'platform_admin' }]), {
+      (Object.assign(Promise.resolve([{ id: 'admin-id', role: 'platform_admin' }]), {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
-      })
+      }) as unknown) as ReturnType<typeof vi.fn>
     )
     // 2nd select: /tenants handler
     dbMock.select.mockReturnValueOnce(
-      Object.assign(Promise.resolve([]), {
+      (Object.assign(Promise.resolve([]), {
         from: vi.fn().mockReturnThis(),
         leftJoin: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
-      })
+      }) as unknown) as ReturnType<typeof vi.fn>
     )
 
     const app = buildApp()

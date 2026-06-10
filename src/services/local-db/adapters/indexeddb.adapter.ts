@@ -1,4 +1,4 @@
-import { type Table, type UpdateSpec } from 'dexie'
+import { type IndexableType, type Table, type UpdateSpec } from 'dexie'
 
 import type {
   AdapterTable,
@@ -21,6 +21,13 @@ class DexieAdapterTable<T extends AnyRecord> implements AdapterTable<T> {
   count() { return this.source.count() }
   bulkPut(rows: T[]) { return this.source.bulkPut(rows) }
   clear() { return this.source.clear() }
+  findBy(key: string, value: string | number | boolean) { return this.source.where(key).equals(value as IndexableType).toArray() }
+  orderBy(key: string, direction: 'asc' | 'desc') { 
+    if (direction === 'desc') {
+      return this.source.orderBy(key).reverse().toArray()
+    }
+    return this.source.orderBy(key).toArray()
+  }
 }
 
 class DexieAdapter implements LocalDbAdapter {

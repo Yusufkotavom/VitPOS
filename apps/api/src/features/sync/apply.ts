@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq } from '../../lib/drizzle.js'
 
 import type { AppDb } from '../../lib/db.js'
 import {

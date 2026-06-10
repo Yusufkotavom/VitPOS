@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, inArray, lte, ne, sql, sum } from 'drizzle-orm'
+import { and, count, desc, eq, gte, inArray, lte, ne, sql, sum } from '../../lib/drizzle.js'
 
 import type { AppDb } from '../../lib/db.js'
 import {

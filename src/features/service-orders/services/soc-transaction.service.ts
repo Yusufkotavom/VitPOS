@@ -1,5 +1,6 @@
 import { localDb } from '@/services/local-db/client'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
+import { buildWarrantyTimelineNote } from '@/features/service-orders/lib/warranty'
 import type { 
   LocalServiceOrder, 
   LocalPayment, 
@@ -36,7 +37,7 @@ export const socTransactionService = {
     paidAmount: number, 
     customerName: string, 
     customerId: string | null,
-    serviceData: { description: string; notes: string; status: string; estimatedCompletion?: string }
+    serviceData: { description: string; notes: string; status: string; estimatedCompletion?: string; hasWarranty: boolean; warrantyValue?: number; warrantyUnit?: 'hari' | 'bulan' | 'tahun' }
   ) {
     if (!serviceData.description.trim()) throw new Error('Deskripsi pekerjaan wajib diisi')
 
@@ -69,10 +70,30 @@ export const socTransactionService = {
         status: serviceData.status,
         date: nowIso,
         note: 'Service order dibuat',
+        type: 'status',
       }],
+      hasWarranty: serviceData.hasWarranty,
+      warrantyValue: serviceData.hasWarranty ? serviceData.warrantyValue : undefined,
+      warrantyUnit: serviceData.hasWarranty ? serviceData.warrantyUnit : undefined,
+      warrantyStartDate: undefined,
+      warrantyEndDate: undefined,
       syncStatus: 'pending',
       version: 1,
       updatedAt: nowIso,
+    }
+
+    if (serviceData.hasWarranty && serviceData.warrantyValue && serviceData.warrantyUnit) {
+      serviceOrder.timeline?.push({
+        id: crypto.randomUUID(),
+        type: 'warranty',
+        status: 'Garansi',
+        date: nowIso,
+        note: buildWarrantyTimelineNote({
+          value: serviceData.warrantyValue,
+          unit: serviceData.warrantyUnit,
+          mode: 'created',
+        }),
+      })
     }
 
     const outboxPayload: OutboxItem[] = [

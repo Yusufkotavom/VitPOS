@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull } from 'drizzle-orm'
+import { and, desc, eq, gte, isNull } from '../../lib/drizzle.js'
 import { Hono } from 'hono'
 
 import { db } from '../../lib/db.js'

@@ -52,6 +52,11 @@ export type PaymentStatus = 'Berhasil' | 'Pending' | 'Gagal' | 'Refund'
 export type PosPaymentMethodCode = string
 export type StockMovementType = 'sale' | 'purchase' | 'return' | 'adjustment' | 'transfer_in' | 'transfer_out' | 'damage_lost' | 'production'
 
+export type LocalWholesaleTier = {
+  minQty: number
+  price: number
+}
+
 export type LocalProduct = {
   id: string
   tenantId: string
@@ -61,6 +66,7 @@ export type LocalProduct = {
   price: number
   costPrice?: number
   wholesalePrice?: number
+  wholesaleTiers?: LocalWholesaleTier[]
   stock: number
   manageStock?: boolean
   sku?: string
@@ -294,6 +300,16 @@ export type LocalReturn = {
 
 export type ServiceOrderStatus = 'Diterima' | 'Dikerjakan' | 'Selesai' | 'Diambil' | 'Batal'
 
+export type WarrantyUnit = 'hari' | 'bulan' | 'tahun'
+
+export type ServiceOrderTimelineItem = {
+  id: string
+  status: string
+  date: string
+  note: string
+  type?: 'status' | 'warranty'
+}
+
 export type LocalServiceOrder = {
   id: string
   tenantId: string
@@ -310,7 +326,12 @@ export type LocalServiceOrder = {
   // New fields for POS-like behavior
   items?: { productId: string, name: string, qty: number, price: number, subtotal: number }[]
   notes?: string
-  timeline?: { id: string, status: string, date: string, note: string }[]
+  timeline?: ServiceOrderTimelineItem[]
+  hasWarranty?: boolean
+  warrantyValue?: number
+  warrantyUnit?: WarrantyUnit
+  warrantyStartDate?: string
+  warrantyEndDate?: string
 
   syncStatus: SyncStatus
   version: number

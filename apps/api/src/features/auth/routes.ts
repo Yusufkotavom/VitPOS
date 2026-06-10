@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq } from '../../lib/drizzle.js'
 import { Hono } from 'hono'
 
 import { db, type AppDb } from '../../lib/db.js'

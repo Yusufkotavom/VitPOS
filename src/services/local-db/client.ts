@@ -344,4 +344,59 @@ export class VitposLocalDb extends Dexie {
   }
 }
 
-export const localDb = new VitposLocalDb()
+import { VirtualTableWrapper } from './virtual-table'
+import { getRuntimeTarget } from './runtime'
+
+export const baseLocalDb = new VitposLocalDb()
+
+export const LOCAL_DB_TABLES = [
+  'users',
+  'tenants',
+  'tenantMembers',
+  'products',
+  'productCategories',
+  'customers',
+  'salesOrders',
+  'salesOrderItems',
+  'payments',
+  'stockMovements',
+  'inventory',
+  'cash',
+  'cashCategories',
+  'settings',
+  'paymentMethods',
+  'shifts',
+  'suppliers',
+  'purchases',
+  'purchaseItems',
+  'returns',
+  'returnItems',
+  'serviceOrders',
+  'recipes',
+  'productionBatches',
+  'outbox',
+  'syncConflicts',
+  'syncRuns'
+]
+
+
+type WrapperCache = Record<string, unknown>
+
+export const localDb = new Proxy(baseLocalDb, {
+  get(target, prop, receiver) {
+    const value = Reflect.get(target, prop, receiver)
+    if (typeof prop === 'string' && LOCAL_DB_TABLES.includes(prop)) {
+      const wrapperKey = `__wrapper_${String(prop)}`
+      const targetRecord = target as unknown as WrapperCache
+      if (!targetRecord[wrapperKey]) {
+        if (getRuntimeTarget() === 'web') {
+          targetRecord[wrapperKey] = target.table(prop)
+        } else {
+          targetRecord[wrapperKey] = new VirtualTableWrapper(target.table(prop), prop)
+        }
+      }
+      return targetRecord[wrapperKey]
+    }
+    return value
+  }
+}) as VitposLocalDb

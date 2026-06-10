@@ -47,6 +47,12 @@ function displayStock(product: { type: string; stock: number; manageStock?: bool
   return `${product.stock} pcs`
 }
 
+function displayWholesaleSummary(product: { price: number; wholesaleTiers?: Array<{ minQty: number; price: number }> }) {
+  const firstTier = product.wholesaleTiers?.[0]
+  if (!firstTier) return formatCurrency(product.price)
+  return `${formatCurrency(product.price)} / Grosir mulai ${firstTier.minQty} pcs ${formatCurrency(firstTier.price)}`
+}
+
 export function ProductsPage() {
   const productRows = useProducts()
   const [view, setView] = useState<'list' | 'card'>('list')
@@ -176,7 +182,7 @@ export function ProductsPage() {
               { key: 'category', header: 'Kategori' },
               { key: 'type', header: 'Jenis' },
               { key: 'costPrice', header: 'HPP', render: (row) => formatCurrency(row.costPrice ?? 0) },
-              { key: 'price', header: 'Harga Jual', render: (row) => row.wholesalePrice ? `${formatCurrency(row.price)} / Grosir ${formatCurrency(row.wholesalePrice)}` : formatCurrency(row.price) },
+              { key: 'price', header: 'Harga Jual', render: (row) => displayWholesaleSummary(row) },
               { key: 'stock', header: 'Stok', render: (row) => displayStock(row) },
               { key: 'status', header: 'Status', render: (row) => <StatusBadge label={row.status} tone={statusTone(row.status)} /> },
               { key: 'actions', header: 'Aksi', render: (row) => <ProductCrudActions product={row} /> },
@@ -208,7 +214,7 @@ export function ProductsPage() {
                       </div>
                       <div className="flex flex-col bg-muted/30 p-2 rounded-lg">
                         <span className="text-muted-foreground text-xs mb-0.5">Harga Jual</span>
-                        <span className="font-medium">{formatCurrency(row.price)}</span>
+                        <span className="font-medium">{displayWholesaleSummary(row)}</span>
                       </div>
                       <div className="flex flex-col bg-muted/30 p-2 rounded-lg col-span-2">
                         <span className="text-muted-foreground text-xs mb-0.5">Sisa Stok</span>

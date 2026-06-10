@@ -1,5 +1,5 @@
 import type { Context, Next } from 'hono'
-import { eq } from 'drizzle-orm'
+import { eq } from '../../lib/drizzle.js'
 
 import { db } from '../../lib/db.js'
 import { users } from '../../../../../src/db/schema/index.js'

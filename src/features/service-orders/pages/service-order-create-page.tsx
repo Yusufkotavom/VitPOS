@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Plus, Minus, Trash2, Search, PlusCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '@/services/local-db/reactivity'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 
@@ -82,6 +82,10 @@ export function ServiceOrderCreatePage() {
   function handleOpenPayment() {
     if (!store.description.trim()) {
       toast.error('Deskripsi pekerjaan wajib diisi')
+      return
+    }
+    if (store.hasWarranty && (!store.warrantyValue.trim() || Number(store.warrantyValue) <= 0)) {
+      toast.error('Durasi garansi wajib diisi')
       return
     }
     setIsPaymentOpen(true)
@@ -167,6 +171,39 @@ export function ServiceOrderCreatePage() {
                   />
                 </PopoverContent>
               </Popover>
+            </div>
+
+            <div className="min-w-[220px] space-y-1">
+              <Label className="text-xs text-muted-foreground">Garansi</Label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={store.hasWarranty}
+                  onChange={(e) => store.setHasWarranty(e.target.checked)}
+                  className="size-4 rounded border-input"
+                />
+                Aktifkan garansi
+              </label>
+              {store.hasWarranty ? (
+                <div className="grid grid-cols-[1fr_120px] gap-2">
+                  <Input
+                    inputMode="numeric"
+                    value={store.warrantyValue}
+                    onChange={(e) => store.setWarrantyValue(e.target.value.replace(/\D/g, ''))}
+                    placeholder="30"
+                  />
+                  <Select value={store.warrantyUnit} onValueChange={store.setWarrantyUnit}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hari">Hari</SelectItem>
+                      <SelectItem value="bulan">Bulan</SelectItem>
+                      <SelectItem value="tahun">Tahun</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
             </div>
           </div>
         </Card>

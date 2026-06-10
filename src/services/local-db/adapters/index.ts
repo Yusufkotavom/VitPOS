@@ -7,6 +7,8 @@ export type AdapterTable<T extends { id: string }> = {
   count(): Promise<number>
   bulkPut(rows: T[]): Promise<unknown>
   clear(): Promise<void>
+  findBy(key: string, value: string | number | boolean): Promise<T[]>
+  orderBy(key: string, direction: 'asc' | 'desc'): Promise<T[]>
 }
 
 export type LocalDbAdapterName = 'indexeddb' | 'sqlite'
