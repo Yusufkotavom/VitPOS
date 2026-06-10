@@ -168,6 +168,40 @@ export function ServiceOrderCreatePage() {
                 </PopoverContent>
               </Popover>
             </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="soc-warranty"
+                  className="h-4 w-4 rounded border-gray-300"
+                  checked={store.hasWarranty}
+                  onChange={(e) => store.setHasWarranty(e.target.checked)}
+                />
+                <Label htmlFor="soc-warranty" className="text-xs text-muted-foreground cursor-pointer">Garansi Service</Label>
+              </div>
+              {store.hasWarranty && (
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="number"
+                    min="1"
+                    placeholder="Lama"
+                    className="h-8 w-20 text-sm"
+                    value={store.warrantyValue}
+                    onChange={(e) => store.setWarrantyValue(e.target.value)}
+                  />
+                  <select
+                    value={store.warrantyUnit}
+                    onChange={(e) => store.setWarrantyUnit(e.target.value as 'hari' | 'bulan' | 'tahun')}
+                    className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring"
+                  >
+                    <option value="hari">Hari</option>
+                    <option value="bulan">Bulan</option>
+                    <option value="tahun">Tahun</option>
+                  </select>
+                </div>
+              )}
+            </div>
           </div>
         </Card>
       </div>
@@ -225,7 +259,7 @@ export function ServiceOrderCreatePage() {
                       size="sm"
                       variant="outline"
                       onClick={() => {
-                        store.addItem({ productId: p.id, name: p.name, price: p.price })
+                        store.addItem({ productId: p.id, name: p.name, price: p.price, wholesaleTiers: p.wholesaleTiers })
                         toast.success(`${p.name} ditambahkan`)
                       }}
                     >
@@ -254,18 +288,18 @@ export function ServiceOrderCreatePage() {
                   <p className="text-xs text-muted-foreground">{formatCurrency(item.price)}</p>
                 </div>
                 <div className="flex items-center rounded-lg border bg-background">
-                  <button className="flex h-7 w-7 items-center justify-center rounded-l-lg text-muted-foreground hover:bg-muted" onClick={() => item.qty > 1 ? store.updateItemQty(item.productId, item.qty - 1) : store.removeItem(item.productId)}>
+                  <Button variant="secondary" className="flex h-7 w-7 items-center justify-center rounded-l-lg text-muted-foreground hover:bg-muted" onClick={() => item.qty > 1 ? store.updateItemQty(item.productId, item.qty - 1) : store.removeItem(item.productId)}>
                     <Minus className="h-3 w-3" />
-                  </button>
+                  </Button>
                   <span className="w-7 text-center text-sm font-medium">{item.qty}</span>
-                  <button className="flex h-7 w-7 items-center justify-center rounded-r-lg text-muted-foreground hover:bg-muted" onClick={() => store.updateItemQty(item.productId, item.qty + 1)}>
+                  <Button variant="secondary" className="flex h-7 w-7 items-center justify-center rounded-r-lg text-muted-foreground hover:bg-muted" onClick={() => store.updateItemQty(item.productId, item.qty + 1)}>
                     <Plus className="h-3 w-3" />
-                  </button>
+                  </Button>
                 </div>
                 <span className="text-sm font-semibold w-24 text-right">{formatCurrency(item.subtotal)}</span>
-                <button onClick={() => store.removeItem(item.productId)} className="text-muted-foreground hover:text-destructive shrink-0">
+                <Button variant="ghost" onClick={() => store.removeItem(item.productId)} className="text-muted-foreground hover:text-destructive shrink-0">
                   <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               </div>
             ))
           )}

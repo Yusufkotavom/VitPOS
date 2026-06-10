@@ -12,6 +12,7 @@ import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { localDb } from '@/services/local-db/client'
 import { messageTemplateService } from '@/services/message-template.service'
 import { type PosOrderSummary } from '@/features/pos/types/pos-order.types'
+import type { LocalPaymentMethod } from '@/services/local-db/schema'
 import { usePdf } from '@/shared/components/pdf/use-pdf'
 import type { PdfData } from '@/shared/components/pdf/types'
 import { User } from 'lucide-react'
@@ -27,6 +28,8 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
   const totals = selectPosTotals(store)
   const dbMethods = usePaymentMethods()
   const activeMethods = dbMethods && dbMethods.length > 0 ? dbMethods.filter((m) => m.status === 'Aktif') : defaultMethods
+
+  const selectedMethodObj = activeMethods.find(m => m.name.toLowerCase() === store.paymentMethod) as LocalPaymentMethod | undefined
   
   const [successOrder, setSuccessOrder] = useState<PosOrderSummary | null>(null)
   const { downloadPdf } = usePdf()
@@ -203,6 +206,30 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
         </div>
       </div>
 
+      {selectedMethodObj && (selectedMethodObj.qrImageUrl || selectedMethodObj.instructions) && (
+        <div className="bg-primary/5 rounded-xl p-4 flex flex-col items-center justify-center gap-3 border border-primary/20">
+          <h4 className="font-semibold text-primary">{selectedMethodObj.name}</h4>
+          {selectedMethodObj.qrImageUrl && (
+            <div className="bg-white p-2 rounded-xl shadow-sm">
+              <img 
+                src={selectedMethodObj.qrImageUrl} 
+                alt={`QRIS ${selectedMethodObj.name}`} 
+                className="w-48 h-48 object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  e.currentTarget.parentElement!.innerHTML = '<div class="w-48 h-48 flex items-center justify-center bg-muted/30 text-muted-foreground text-xs text-center rounded">Gambar<br/>Gagal Dimuat</div>';
+                }}
+              />
+            </div>
+          )}
+          {selectedMethodObj.instructions && (
+            <div className="text-sm text-center text-muted-foreground whitespace-pre-wrap mt-2">
+              {selectedMethodObj.instructions}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="space-y-3 p-4 border rounded-2xl bg-muted/10">
         <label className="text-sm font-medium">Uang Diterima / Dibayar</label>
         <Input
@@ -228,7 +255,7 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
       </div>
 
       <Button size="lg" className="h-14 text-lg font-semibold w-full mt-2" disabled={store.cartItems.length === 0} onClick={handleCheckout}>
-        Selesaikan Pembayaran
+        {selectedMethodObj?.qrImageUrl ? 'Verifikasi & Selesaikan' : 'Selesaikan Pembayaran'}
       </Button>
     </div>
   )

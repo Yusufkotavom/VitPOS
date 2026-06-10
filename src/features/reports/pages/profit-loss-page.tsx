@@ -2,8 +2,11 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { ReportDateFilter, useReportDateParams } from '@/features/reports/components/report-date-filter'
-import { ReportSection, ReportMetricCard } from '@/features/reports/components/report-section'
+import { ReportMetricCard } from '@/features/reports/components/report-section'
 import { useProfitLoss } from '@/features/reports/hooks/use-profit-loss'
 import { formatCurrency } from '@/lib/format-currency'
 import { exportToCsv } from '@/shared/utils/export-csv'
@@ -61,93 +64,121 @@ export function ProfitLossPage() {
             <ReportMetricCard label="Laba Bersih" value={formatCurrency(data.netProfit)} tone={data.netProfit >= 0 ? 'positive' : 'negative'} />
           </div>
 
-          <ReportSection title="Pendapatan">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <tbody>
-                  <tr className="border-b">
-                    <td className="py-2">Penjualan ({data.salesOrderCount} order)</td>
-                    <td className="py-2 text-right font-semibold">{formatCurrency(data.salesRevenue)}</td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="py-2">Service ({data.serviceOrderCount} order)</td>
-                    <td className="py-2 text-right font-semibold">{formatCurrency(data.serviceRevenue)}</td>
-                  </tr>
-                  <tr className="font-bold">
-                    <td className="py-2">Total Pendapatan</td>
-                    <td className="py-2 text-right text-green-600">{formatCurrency(data.totalRevenue)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </ReportSection>
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableBody>
+                  <TableRow className="border-b bg-muted/50">
+                    <TableCell colSpan={2} className="py-2 font-semibold">PENDAPATAN</TableCell>
+                  </TableRow>
+                  <TableRow className="border-b">
+                    <TableCell className="py-2">Penjualan ({data.salesOrderCount} order)</TableCell>
+                    <TableCell className="py-2 text-right font-semibold">{formatCurrency(data.salesRevenue)}</TableCell>
+                  </TableRow>
+                  <TableRow className="border-b">
+                    <TableCell className="py-2">Service ({data.serviceOrderCount} order)</TableCell>
+                    <TableCell className="py-2 text-right font-semibold">{formatCurrency(data.serviceRevenue)}</TableCell>
+                  </TableRow>
+                  <TableRow className="font-bold">
+                    <TableCell className="py-2">Total Pendapatan</TableCell>
+                    <TableCell className="py-2 text-right text-green-600">{formatCurrency(data.totalRevenue)}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
 
-          <ReportSection title="Harga Pokok Penjualan (HPP)">
-            <div className="flex justify-between text-sm">
-              <span>HPP dari {data.salesOrderCount} penjualan</span>
-              <span className="font-semibold">{formatCurrency(data.cogs)}</span>
-            </div>
-            <div className="border-t pt-2 mt-2 flex justify-between font-bold text-sm">
-              <span>Laba Kotor</span>
-              <span className={data.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'}>{formatCurrency(data.grossProfit)}</span>
-            </div>
-          </ReportSection>
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableBody>
+                  <TableRow className="border-b bg-muted/50">
+                    <TableCell colSpan={2} className="py-2 font-semibold">HARGA POKOK PENJUALAN (HPP)</TableCell>
+                  </TableRow>
+                  <TableRow className="border-b">
+                    <TableCell className="py-2">HPP dari {data.salesOrderCount} penjualan</TableCell>
+                    <TableCell className="py-2 text-right font-semibold">{formatCurrency(data.cogs)}</TableCell>
+                  </TableRow>
+                  <TableRow className="font-bold">
+                    <TableCell className="py-2">Laba Kotor</TableCell>
+                    <TableCell className={`py-2 text-right ${data.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(data.grossProfit)}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
 
           {data.expenses.length > 0 && (
-            <ReportSection title="Beban Operasional">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <tbody>
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableBody>
+                    <TableRow className="border-b bg-muted/50">
+                      <TableCell colSpan={2} className="py-2 font-semibold">BEBAN OPERASIONAL</TableCell>
+                    </TableRow>
                     {data.expenses.map((e, i) => (
-                      <tr key={i} className="border-b last:border-0">
-                        <td className="py-2">{e.category}</td>
-                        <td className="py-2 text-right font-semibold text-red-600">-{formatCurrency(e.total)}</td>
-                      </tr>
+                      <TableRow key={i} className="border-b last:border-0">
+                        <TableCell className="py-2">{e.category}</TableCell>
+                        <TableCell className="py-2 text-right font-semibold text-red-600">-{formatCurrency(e.total)}</TableCell>
+                      </TableRow>
                     ))}
-                    <tr className="font-bold">
-                      <td className="py-2">Total Beban</td>
-                      <td className="py-2 text-right text-red-600">-{formatCurrency(data.totalExpenses)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </ReportSection>
+                    <TableRow className="font-bold">
+                      <TableCell className="py-2">Total Beban</TableCell>
+                      <TableCell className="py-2 text-right text-red-600">-{formatCurrency(data.totalExpenses)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           )}
 
           {data.paymentBreakdown.length > 0 && (
-            <ReportSection title="Penerimaan per Metode Bayar">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-muted-foreground">
-                      <th className="pb-2 font-medium">Metode</th>
-                      <th className="pb-2 font-medium text-right">Total</th>
-                      <th className="pb-2 font-medium text-right">Transaksi</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b bg-muted/50">
+                      <TableHead className="py-2 font-semibold">PENERIMAAN PER METODE BAYAR</TableHead>
+                      <TableHead className="py-2 text-right font-semibold">Total</TableHead>
+                      <TableHead className="py-2 text-right font-semibold">Transaksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {data.paymentBreakdown.map((p) => (
-                      <tr key={p.method} className="border-b last:border-0">
-                        <td className="py-2 font-medium capitalize">{p.method}</td>
-                        <td className="py-2 text-right font-semibold">{formatCurrency(p.total)}</td>
-                        <td className="py-2 text-right">{p.count}</td>
-                      </tr>
+                      <TableRow key={p.method} className="border-b last:border-0">
+                        <TableCell className="py-2">
+                          <Badge variant="outline" className="capitalize">{p.method}</Badge>
+                        </TableCell>
+                        <TableCell className="py-2 text-right font-semibold">{formatCurrency(p.total)}</TableCell>
+                        <TableCell className="py-2 text-right">{p.count}</TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            </ReportSection>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           )}
 
-          <ReportSection title="Laba Bersih">
-            <div className="flex justify-between text-lg font-bold">
-              <span>Net Profit</span>
-              <span className={data.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}>{formatCurrency(data.netProfit)}</span>
-            </div>
-            {data.otherIncome > 0 && (
-              <p className="text-xs text-muted-foreground mt-1">Termasuk pendapatan lain: {formatCurrency(data.otherIncome)}</p>
-            )}
-          </ReportSection>
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableBody>
+                  <TableRow className="border-b bg-muted/50">
+                    <TableCell colSpan={2} className="py-2 font-semibold">LABA BERSIH</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="py-2 text-lg font-bold">Net Profit</TableCell>
+                    <TableCell className={`py-2 text-right text-lg font-bold ${data.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(data.netProfit)}</TableCell>
+                  </TableRow>
+                  {data.otherIncome > 0 && (
+                    <TableRow>
+                      <TableCell colSpan={2} className="py-1 text-xs text-muted-foreground">Termasuk pendapatan lain: {formatCurrency(data.otherIncome)}</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </>
       ) : null}
     </div>

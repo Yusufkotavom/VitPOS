@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useCategories } from '@/features/products/hooks/use-categories'
 import { productFormSchema, productInitialValues, productStatusOptions, productTypeOptions, type ProductFormValues } from '@/features/products/schemas/product-form-schema'
 
-import { Image, Upload, Package, Coffee, Shirt, MonitorSmartphone } from 'lucide-react'
+import { Image, Upload, Package, Coffee, Shirt, MonitorSmartphone, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 
 const iconOptions = [
   { id: 'Package', icon: <Package className="size-6" /> },
@@ -47,6 +47,9 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
   const selectedIcon = useWatch({ control: form.control, name: 'icon' })
   const categoryOptions = ['Umum', ...categoryRows.filter((category) => category.status === 'Aktif').map((category) => category.name)]
 
+  const [wholesaleOpen, setWholesaleOpen] = useState(false)
+  const wholesaleTiers = useWatch({ control: form.control, name: 'wholesaleTiers' }) ?? []
+
   function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -64,6 +67,22 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
     setPreviewImage(null)
     form.setValue('imageUrl', '', { shouldDirty: true })
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function addTier() {
+    const current = form.getValues('wholesaleTiers') ?? []
+    form.setValue('wholesaleTiers', [...current, { minQty: '', price: '' }], { shouldDirty: true })
+  }
+
+  function removeTier(index: number) {
+    const current = form.getValues('wholesaleTiers') ?? []
+    form.setValue('wholesaleTiers', current.filter((_, i) => i !== index), { shouldDirty: true })
+  }
+
+  function updateTier(index: number, field: 'minQty' | 'price', value: string) {
+    const current = form.getValues('wholesaleTiers') ?? []
+    const updated = current.map((t, i) => i === index ? { ...t, [field]: value } : t)
+    form.setValue('wholesaleTiers', updated, { shouldDirty: true })
   }
 
   return (
@@ -173,6 +192,58 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
       <div className="space-y-2">
         <label className="text-sm font-medium">Harga Grosir (Opsional)</label>
         <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.wholesalePrice)} {...form.register('wholesalePrice')} placeholder="15000" />
+      </div>
+
+      <div className="border rounded-lg">
+        <button
+          type="button"
+          onClick={() => setWholesaleOpen(!wholesaleOpen)}
+          className="flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium hover:bg-muted/50 rounded-lg"
+        >
+          Harga Grosir Bertingkat
+          {wholesaleOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+        </button>
+        {wholesaleOpen && (
+          <div className="px-3 pb-3 space-y-2">
+            <p className="text-xs text-muted-foreground">Harga otomatis menyesuaikan jumlah pembelian.</p>
+            {wholesaleTiers.map((tier, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <div className="flex-1">
+                  <label className="text-xs text-muted-foreground">Min. Qty</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    placeholder="10"
+                    className="h-8 text-sm"
+                    value={tier.minQty}
+                    onChange={(e) => updateTier(index, 'minQty', e.target.value)}
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="text-xs text-muted-foreground">Harga Grosir</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="9000"
+                    className="h-8 text-sm"
+                    value={tier.price}
+                    onChange={(e) => updateTier(index, 'price', e.target.value)}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeTier(index)}
+                  className="mt-5 flex size-8 items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              </div>
+            ))}
+            <Button type="button" variant="outline" size="sm" className="w-full gap-1" onClick={addTier}>
+              <Plus className="size-3.5" /> Tambah Tier
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3 items-end">

@@ -1,5 +1,6 @@
 import { localDb } from '@/services/local-db/client'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
+import { addWarrantyDuration, buildWarrantyTimelineNote } from '@/features/service-orders/lib/warranty'
 import type { 
   LocalServiceOrder, 
   LocalPayment, 
@@ -8,6 +9,7 @@ import type {
   OutboxItem,
   PosPaymentMethodCode,
   ServiceOrderStatus,
+  WarrantyUnit,
 } from '@/services/local-db/schema'
 
 export type SocItem = {
@@ -36,7 +38,7 @@ export const socTransactionService = {
     paidAmount: number, 
     customerName: string, 
     customerId: string | null,
-    serviceData: { description: string; notes: string; status: string; estimatedCompletion?: string }
+    serviceData: { description: string; notes: string; status: string; estimatedCompletion?: string; hasWarranty?: boolean; warrantyValue?: number; warrantyUnit?: WarrantyUnit }
   ) {
     if (!serviceData.description.trim()) throw new Error('Deskripsi pekerjaan wajib diisi')
 
@@ -49,6 +51,27 @@ export const socTransactionService = {
     const retainedAmount = Math.min(rawPaid, totals.total)
     
     const paymentStatus = paymentMethod === 'piutang' ? 'Pending' : 'Berhasil'
+
+    const warrantyEndDate = serviceData.hasWarranty && serviceData.warrantyValue && serviceData.warrantyUnit
+      ? addWarrantyDuration(nowIso, serviceData.warrantyValue, serviceData.warrantyUnit)
+      : undefined
+
+    const timelineEvents: LocalServiceOrder['timeline'] = [{
+      id: crypto.randomUUID(),
+      status: serviceData.status,
+      date: nowIso,
+      note: 'Service order dibuat',
+    }]
+
+    if (serviceData.hasWarranty && serviceData.warrantyValue && serviceData.warrantyUnit) {
+      timelineEvents.push({
+        id: crypto.randomUUID(),
+        status: serviceData.status,
+        date: nowIso,
+        note: buildWarrantyTimelineNote({ value: serviceData.warrantyValue, unit: serviceData.warrantyUnit, mode: 'created', endDate: warrantyEndDate }),
+        type: 'warranty',
+      })
+    }
 
     const serviceOrder: LocalServiceOrder = {
       id: serviceOrderId,
@@ -64,12 +87,12 @@ export const socTransactionService = {
       status: serviceData.status as ServiceOrderStatus,
       items: items.map(c => ({ ...c })),
       notes: serviceData.notes,
-      timeline: [{
-        id: crypto.randomUUID(),
-        status: serviceData.status,
-        date: nowIso,
-        note: 'Service order dibuat',
-      }],
+      hasWarranty: serviceData.hasWarranty,
+      warrantyValue: serviceData.warrantyValue,
+      warrantyUnit: serviceData.warrantyUnit,
+      warrantyStartDate: serviceData.hasWarranty ? nowIso : undefined,
+      warrantyEndDate,
+      timeline: timelineEvents,
       syncStatus: 'pending',
       version: 1,
       updatedAt: nowIso,

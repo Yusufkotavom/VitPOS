@@ -1,6 +1,7 @@
 import { type PropsWithChildren, type ReactNode } from 'react'
 
 import { cn } from '@/lib/utils'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 export function ContentCard({
   title,
@@ -15,17 +16,19 @@ export function ContentCard({
   className?: string
 }>) {
   return (
-    <section className={cn('rounded-2xl border bg-background p-5 shadow-sm', className)}>
-      {title || description || action ? (
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-1">
-            {title ? <h2 className="text-lg font-semibold">{title}</h2> : null}
-            {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+    <Card className={cn('shadow-sm overflow-hidden', className)}>
+      {(title || description || action) && (
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between space-y-0 pb-4">
+          <div className="space-y-1.5">
+            {title && <CardTitle className="text-lg">{title}</CardTitle>}
+            {description && <CardDescription>{description}</CardDescription>}
           </div>
-          {action ? <div className="flex flex-wrap gap-2">{action}</div> : null}
-        </div>
-      ) : null}
-      {children}
-    </section>
+          {action && <div className="flex flex-wrap gap-2">{action}</div>}
+        </CardHeader>
+      )}
+      <CardContent>
+        {children}
+      </CardContent>
+    </Card>
   )
 }

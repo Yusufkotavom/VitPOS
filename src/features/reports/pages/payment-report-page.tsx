@@ -2,6 +2,8 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
 import { ReportDateFilter, useReportDateParams } from '@/features/reports/components/report-date-filter'
 import { ReportSection, ReportMetricCard } from '@/features/reports/components/report-section'
 import { usePaymentReport } from '@/features/reports/hooks/use-payment-report'
@@ -129,24 +131,26 @@ export function PaymentReportPage() {
 
           <ReportSection title="Breakdown Metode">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-2 font-medium">Metode</th>
-                    <th className="pb-2 font-medium text-right">Total</th>
-                    <th className="pb-2 font-medium text-right">Transaksi</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table className="w-full text-sm">
+                <TableHeader>
+                  <TableRow className="border-b text-left text-muted-foreground">
+                    <TableHead className="pb-2 font-medium">Metode</TableHead>
+                    <TableHead className="pb-2 font-medium text-right">Total</TableHead>
+                    <TableHead className="pb-2 font-medium text-right">Transaksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {data.byMethod.map((m) => (
-                    <tr key={m.method} className="border-b last:border-0">
-                      <td className="py-2 font-medium">{METHOD_LABELS[m.method] ?? m.method}</td>
-                      <td className="py-2 text-right font-semibold">{formatCurrency(m.total)}</td>
-                      <td className="py-2 text-right">{m.count}</td>
-                    </tr>
+                    <TableRow key={m.method} className="border-b last:border-0">
+                      <TableCell className="py-2">
+                        <Badge variant="outline" className="capitalize">{METHOD_LABELS[m.method] ?? m.method}</Badge>
+                      </TableCell>
+                      <TableCell className="py-2 text-right font-semibold">{formatCurrency(m.total)}</TableCell>
+                      <TableCell className="py-2 text-right">{m.count}</TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           </ReportSection>
 
@@ -159,28 +163,28 @@ export function PaymentReportPage() {
                 <ReportMetricCard label="> 60 hari" value={formatCurrency(data.aging.over60)} tone="negative" />
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-muted-foreground">
-                      <th className="pb-2 font-medium">No. Order</th>
-                      <th className="pb-2 font-medium text-right">Total</th>
-                      <th className="pb-2 font-medium text-right">Dibayar</th>
-                      <th className="pb-2 font-medium text-right">Sisa</th>
-                      <th className="pb-2 font-medium text-right">Tanggal</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table className="w-full text-sm">
+                  <TableHeader>
+                    <TableRow className="border-b text-left text-muted-foreground">
+                      <TableHead className="pb-2 font-medium">No. Order</TableHead>
+                      <TableHead className="pb-2 font-medium text-right">Total</TableHead>
+                      <TableHead className="pb-2 font-medium text-right">Dibayar</TableHead>
+                      <TableHead className="pb-2 font-medium text-right">Sisa</TableHead>
+                      <TableHead className="pb-2 font-medium text-right">Tanggal</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {data.receivables.map((r) => (
-                      <tr key={r.id} className="border-b last:border-0">
-                        <td className="py-2 font-medium">{r.orderNumber}</td>
-                        <td className="py-2 text-right">{formatCurrency(r.grandTotal)}</td>
-                        <td className="py-2 text-right">{formatCurrency(r.paidTotal)}</td>
-                        <td className="py-2 text-right font-semibold text-red-600">{formatCurrency(r.outstanding)}</td>
-                        <td className="py-2 text-right text-muted-foreground">{new Date(r.createdAt).toLocaleDateString('id-ID')}</td>
-                      </tr>
+                      <TableRow key={r.id} className="border-b last:border-0">
+                        <TableCell className="py-2 font-medium">{r.orderNumber}</TableCell>
+                        <TableCell className="py-2 text-right">{formatCurrency(r.grandTotal)}</TableCell>
+                        <TableCell className="py-2 text-right">{formatCurrency(r.paidTotal)}</TableCell>
+                        <TableCell className="py-2 text-right font-semibold text-red-600">{formatCurrency(r.outstanding)}</TableCell>
+                        <TableCell className="py-2 text-right text-muted-foreground">{new Date(r.createdAt).toLocaleDateString('id-ID')}</TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             </ReportSection>
           )}

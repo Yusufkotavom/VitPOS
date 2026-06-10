@@ -30,6 +30,7 @@ export function ProductSearch() {
           stock: match.stock,
           unit: match.type === 'Jasa' ? 'unit' : 'pcs',
           isFavorite: false,
+          wholesaleTiers: match.wholesaleTiers,
         })
         setSearchQuery('')
       }

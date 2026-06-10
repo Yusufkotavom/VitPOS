@@ -6,6 +6,7 @@ import { Trash2Icon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { returnFormSchema, returnInitialValues, returnStatusOptions, returnTypeOptions, type ReturnFormValues } from '@/features/returns/schemas/return-form-schema'
+import { FormSelect } from '@/shared/components/form/form-select'
 import { FormSection } from '@/shared/components/forms/form-section'
 
 export function ReturnForm({ defaultValues, submitLabel, onCancel, onSubmit }: { defaultValues?: ReturnFormValues; submitLabel: string; onCancel: () => void; onSubmit: (values: ReturnFormValues) => Promise<void> }) {
@@ -32,9 +33,7 @@ export function ReturnForm({ defaultValues, submitLabel, onCancel, onSubmit }: {
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Tipe retur
-          <select className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" {...form.register('type')}>
-            {returnTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
+          <FormSelect control={form.control} name="type" options={returnTypeOptions.map(o => ({ label: o, value: o }))} />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Kode referensi
@@ -48,9 +47,7 @@ export function ReturnForm({ defaultValues, submitLabel, onCancel, onSubmit }: {
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Status
-          <select className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" {...form.register('status')}>
-            {returnStatusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
+          <FormSelect control={form.control} name="status" options={returnStatusOptions.map(o => ({ label: o, value: o }))} />
         </label>
       </FormSection>
 

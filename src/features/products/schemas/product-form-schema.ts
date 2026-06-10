@@ -2,10 +2,15 @@ import { z } from 'zod'
 
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { parseDigits } from '@/features/catalog/lib/formatters'
-import type { LocalProduct } from '@/services/local-db/schema'
+import type { LocalProduct, WholesaleTier } from '@/services/local-db/schema'
 
 export const productStatusOptions = ['Aktif', 'Draft', 'Arsip'] as const
 export const productTypeOptions = ['Produk Fisik', 'Jasa'] as const
+
+export const wholesaleTierSchema = z.object({
+  minQty: z.string().trim().min(1, 'Min qty wajib diisi'),
+  price: z.string().trim().min(1, 'Harga wajib diisi'),
+})
 
 export const productFormSchema = z.object({
   name: z.string().trim().min(1, 'Nama produk wajib diisi'),
@@ -14,6 +19,7 @@ export const productFormSchema = z.object({
   costPrice: z.string().trim().optional(),
   price: z.string().trim().min(1, 'Harga wajib diisi'),
   wholesalePrice: z.string().trim().optional(),
+  wholesaleTiers: z.array(wholesaleTierSchema).optional(),
   stock: z.string().trim().optional(),
   manageStock: z.boolean(),
   status: z.enum(productStatusOptions),
@@ -30,6 +36,7 @@ export const productInitialValues: ProductFormValues = {
   costPrice: '0',
   price: '0',
   wholesalePrice: '',
+  wholesaleTiers: [],
   stock: '0',
   manageStock: true,
   status: 'Aktif',
@@ -46,6 +53,14 @@ export function mapProductFormToRecord(values: ProductFormValues, id: string, ba
   const parsedStock = manageStock && values.stock ? parseDigits(values.stock) : 0
   const now = new Date().toISOString()
 
+  const wholesaleTiers: WholesaleTier[] | undefined = values.wholesaleTiers
+    ?.filter(t => t.minQty && t.price)
+    .map(t => ({
+      minQty: parseDigits(t.minQty) ?? 0,
+      price: parseDigits(t.price) ?? 0,
+    }))
+    .filter(t => t.minQty > 0 && t.price > 0)
+
   return {
     id,
     tenantId: resolveTenantId(base?.tenantId),
@@ -55,6 +70,7 @@ export function mapProductFormToRecord(values: ProductFormValues, id: string, ba
     costPrice: parsedCostPrice,
     price: parsedPrice,
     wholesalePrice: parsedWholesalePrice,
+    wholesaleTiers: wholesaleTiers && wholesaleTiers.length > 0 ? wholesaleTiers : undefined,
     stock: parsedStock,
     manageStock,
     status: values.status,
@@ -74,6 +90,10 @@ export function mapProductRecordToFormValues(product: LocalProduct): ProductForm
     costPrice: String(product.costPrice ?? 0),
     price: String(product.price),
     wholesalePrice: product.wholesalePrice ? String(product.wholesalePrice) : '',
+    wholesaleTiers: product.wholesaleTiers?.map(t => ({
+      minQty: String(t.minQty),
+      price: String(t.price),
+    })) ?? [],
     stock: String(product.stock),
     manageStock: product.manageStock ?? true,
     status: product.status === 'Aktif' || product.status === 'Draft' || product.status === 'Arsip' ? product.status : 'Aktif',

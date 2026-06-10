@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 import { type PosCartItem, type PosPaymentMethod, type PosProduct } from '@/features/pos/types/pos.types'
+import { getWholesalePrice } from '@/features/products/lib/wholesale'
 
 type PosStore = {
   searchQuery: string
@@ -43,10 +44,12 @@ export const usePosStore = create<PosStore>((set) => ({
     set((state) => {
       const existing = state.cartItems.find((item) => item.productId === product.id)
       if (existing) {
+        const newQty = existing.qty + 1
+        const newPrice = getWholesalePrice(existing.price, existing.wholesaleTiers, newQty)
         return {
           cartItems: state.cartItems.map((item) =>
             item.productId === product.id
-              ? { ...item, qty: item.qty + 1, subtotal: (item.qty + 1) * item.price }
+              ? { ...item, qty: newQty, price: newPrice, subtotal: newQty * newPrice }
               : item,
           ),
         }
@@ -61,6 +64,7 @@ export const usePosStore = create<PosStore>((set) => ({
             price: product.price,
             qty: 1,
             subtotal: product.price,
+            wholesaleTiers: product.wholesaleTiers,
           },
         ],
       }
@@ -69,8 +73,8 @@ export const usePosStore = create<PosStore>((set) => ({
     set((state) => ({
       cartItems: state.cartItems.map((item) => {
         if (item.productId === productId) {
-          const price = updates.price ?? item.price
           const qty = updates.qty ?? item.qty
+          const price = updates.price ?? getWholesalePrice(item.price, item.wholesaleTiers, qty)
           return { ...item, ...updates, price, qty, subtotal: price * qty }
         }
         return item
@@ -78,16 +82,22 @@ export const usePosStore = create<PosStore>((set) => ({
     })),
   increaseQty: (productId) =>
     set((state) => ({
-      cartItems: state.cartItems.map((item) =>
-        item.productId === productId ? { ...item, qty: item.qty + 1, subtotal: (item.qty + 1) * item.price } : item,
-      ),
+      cartItems: state.cartItems.map((item) => {
+        if (item.productId !== productId) return item
+        const newQty = item.qty + 1
+        const newPrice = getWholesalePrice(item.price, item.wholesaleTiers, newQty)
+        return { ...item, qty: newQty, price: newPrice, subtotal: newQty * newPrice }
+      }),
     })),
   decreaseQty: (productId) =>
     set((state) => ({
       cartItems: state.cartItems
-        .map((item) =>
-          item.productId === productId ? { ...item, qty: item.qty - 1, subtotal: (item.qty - 1) * item.price } : item,
-        )
+        .map((item) => {
+          if (item.productId !== productId) return item
+          const newQty = item.qty - 1
+          const newPrice = getWholesalePrice(item.price, item.wholesaleTiers, newQty)
+          return { ...item, qty: newQty, price: newPrice, subtotal: newQty * newPrice }
+        })
         .filter((item) => item.qty > 0),
     })),
   removeItem: (productId) => set((state) => ({ cartItems: state.cartItems.filter((item) => item.productId !== productId) })),

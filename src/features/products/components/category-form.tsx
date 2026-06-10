@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { FormSelect } from '@/shared/components/form/form-select'
 import { categoryFormSchema, categoryInitialValues, categoryStatusOptions, type CategoryFormValues } from '@/features/products/schemas/category-form-schema'
 
 export function CategoryForm({ defaultValues, submitLabel, onCancel, onSubmit }: { defaultValues?: CategoryFormValues; submitLabel: string; onCancel: () => void; onSubmit: (values: CategoryFormValues) => Promise<void> }) {
@@ -32,9 +33,7 @@ export function CategoryForm({ defaultValues, submitLabel, onCancel, onSubmit }:
       </div>
       <div className="space-y-2">
         <label className="text-sm font-medium">Status</label>
-        <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" {...form.register('status')}>
-          {categoryStatusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-        </select>
+        <FormSelect control={form.control} name="status" options={categoryStatusOptions.map(o => ({ label: o, value: o }))} />
       </div>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end pt-2">
         <Button type="button" variant="outline" onClick={onCancel}>Batal</Button>

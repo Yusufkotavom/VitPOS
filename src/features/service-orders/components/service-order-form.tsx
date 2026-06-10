@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { serviceOrderFormSchema, serviceOrderInitialValues, serviceOrderStatusOptions, type ServiceOrderFormValues } from '@/features/service-orders/schemas/service-order-form-schema'
+import { FormSelect } from '@/shared/components/form/form-select'
 import { FormSection } from '@/shared/components/forms/form-section'
 
 export function ServiceOrderForm({ defaultValues, submitLabel, onCancel, onSubmit }: { defaultValues?: ServiceOrderFormValues; submitLabel: string; onCancel: () => void; onSubmit: (values: ServiceOrderFormValues) => Promise<void> }) {
@@ -39,9 +40,7 @@ export function ServiceOrderForm({ defaultValues, submitLabel, onCancel, onSubmi
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Status
-          <select className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" {...form.register('status')}>
-            {serviceOrderStatusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
+          <FormSelect control={form.control} name="status" options={serviceOrderStatusOptions.map(o => ({ label: o, value: o }))} />
         </label>
       </FormSection>
       <FormSection title="Pekerjaan & biaya" description="Deskripsi pekerjaan dan estimasi biaya.">

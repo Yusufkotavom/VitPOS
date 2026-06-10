@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { supplierFormSchema, supplierInitialValues, supplierStatusOptions, type SupplierFormValues } from '@/features/suppliers/schemas/supplier-form-schema'
+import { FormSelect } from '@/shared/components/form/form-select'
 import { FormSection } from '@/shared/components/forms/form-section'
 
 export function SupplierForm({ defaultValues, submitLabel, onCancel, onSubmit }: { defaultValues?: SupplierFormValues; submitLabel: string; onCancel: () => void; onSubmit: (values: SupplierFormValues) => Promise<void> }) {
@@ -39,9 +40,7 @@ export function SupplierForm({ defaultValues, submitLabel, onCancel, onSubmit }:
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Status
-          <select className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" {...form.register('status')}>
-            {supplierStatusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
+          <FormSelect control={form.control} name="status" options={supplierStatusOptions.map(o => ({ label: o, value: o }))} />
         </label>
       </FormSection>
       <FormSection title="Ringkasan transaksi" description="Hutang berjalan dan total order supplier.">

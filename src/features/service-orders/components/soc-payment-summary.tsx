@@ -68,7 +68,10 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
           description: store.description,
           notes: store.notes,
           status: store.status,
-          estimatedCompletion: store.estimatedCompletion
+          estimatedCompletion: store.estimatedCompletion,
+          hasWarranty: store.hasWarranty,
+          warrantyValue: store.warrantyValue ? Number(store.warrantyValue) : undefined,
+          warrantyUnit: store.warrantyUnit,
         }
       )
 

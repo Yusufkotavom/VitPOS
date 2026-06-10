@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Printer, MessageSquare, Download, PencilIcon, XIcon, CheckIcon, Trash2Icon, CreditCard } from 'lucide-react'
+import { ArrowLeft, Printer, MessageSquare, Download, PencilIcon, XIcon, CheckIcon, Trash2Icon, CreditCard, ShieldCheck, ShieldX } from 'lucide-react'
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { usePdf } from '@/shared/components/pdf/use-pdf'
@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency } from '@/lib/format-currency'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
@@ -22,6 +23,7 @@ import { recordServiceOrderPayment } from '@/features/service-orders/services/se
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
+import { addWarrantyDuration, buildWarrantyTimelineNote, isWarrantyExpired } from '@/features/service-orders/lib/warranty'
 
 function tone(status: string) {
   if (status === 'Selesai' || status === 'Diambil') return 'success'
@@ -55,6 +57,9 @@ export function ServiceOrderDetailPage() {
   const [editDesc, setEditDesc] = useState('')
   const [editCost, setEditCost] = useState('')
   const [editStatus, setEditStatus] = useState('')
+  const [editHasWarranty, setEditHasWarranty] = useState(false)
+  const [editWarrantyValue, setEditWarrantyValue] = useState('')
+  const [editWarrantyUnit, setEditWarrantyUnit] = useState<'hari' | 'bulan' | 'tahun'>('hari')
   const [deleteOpen, setDeleteOpen] = useState(false)
 
   // Pelunasan State
@@ -99,6 +104,9 @@ export function ServiceOrderDetailPage() {
     setEditDesc(order.description)
     setEditCost(String(order.cost))
     setEditStatus(order.status)
+    setEditHasWarranty(order.hasWarranty ?? false)
+    setEditWarrantyValue(String(order.warrantyValue ?? ''))
+    setEditWarrantyUnit(order.warrantyUnit ?? 'hari')
     setEditing(true)
   }
 
@@ -114,16 +122,54 @@ export function ServiceOrderDetailPage() {
       : undefined
 
     let updatedTimeline = order.timeline || []
+    const nowIso = new Date().toISOString()
+
     if (editStatus !== order.status) {
       updatedTimeline = [
         ...updatedTimeline,
         {
           id: crypto.randomUUID(),
           status: editStatus,
-          date: new Date().toISOString(),
+          date: nowIso,
           note: `Status diubah menjadi ${editStatus}`,
         }
       ]
+    }
+
+    let warrantyStartDate = order.warrantyStartDate
+    let warrantyEndDate = order.warrantyEndDate
+    const prevHasWarranty = order.hasWarranty ?? false
+
+    if (editHasWarranty !== prevHasWarranty || (editHasWarranty && (String(order.warrantyValue ?? '') !== editWarrantyValue || (order.warrantyUnit ?? 'hari') !== editWarrantyUnit))) {
+      if (editHasWarranty && editWarrantyValue) {
+        const val = Number(editWarrantyValue)
+        warrantyStartDate = prevHasWarranty ? warrantyStartDate : nowIso
+        warrantyEndDate = addWarrantyDuration(warrantyStartDate ?? nowIso, val, editWarrantyUnit)
+        const mode = prevHasWarranty ? 'updated' : 'activated'
+        updatedTimeline = [
+          ...updatedTimeline,
+          {
+            id: crypto.randomUUID(),
+            status: editStatus,
+            date: nowIso,
+            note: buildWarrantyTimelineNote({ value: val, unit: editWarrantyUnit, mode, endDate: warrantyEndDate }),
+            type: 'warranty',
+          }
+        ]
+      } else if (!editHasWarranty && prevHasWarranty) {
+        warrantyStartDate = undefined
+        warrantyEndDate = undefined
+        updatedTimeline = [
+          ...updatedTimeline,
+          {
+            id: crypto.randomUUID(),
+            status: editStatus,
+            date: nowIso,
+            note: buildWarrantyTimelineNote({ value: 0, unit: 'hari', mode: 'removed' }),
+            type: 'warranty',
+          }
+        ]
+      }
     }
 
     await serviceOrderRepository.upsert({
@@ -133,9 +179,14 @@ export function ServiceOrderDetailPage() {
       description: editDesc.trim(),
       cost: Number(editCost) || 0,
       status: editStatus as typeof order.status,
+      hasWarranty: editHasWarranty,
+      warrantyValue: editHasWarranty ? Number(editWarrantyValue) || undefined : undefined,
+      warrantyUnit: editHasWarranty ? editWarrantyUnit : undefined,
+      warrantyStartDate,
+      warrantyEndDate,
       timeline: updatedTimeline,
       version: order.version + 1,
-      updatedAt: new Date().toISOString(),
+      updatedAt: nowIso,
     })
     toast.success('Service order diperbarui')
     setEditing(false)
@@ -330,12 +381,14 @@ export function ServiceOrderDetailPage() {
                 <p className="text-sm text-muted-foreground text-center py-4">Belum ada riwayat timeline</p>
               ) : (
                 <div className="space-y-4 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border before:to-transparent">
-                  {order.timeline.map((item: { id: string; status: string; date: string; note: string }) => (
+                  {order.timeline.map((item: { id: string; status: string; date: string; note: string; type?: string }) => (
                     <div key={item.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                      <div className="flex items-center justify-center w-5 h-5 rounded-full border-2 border-primary bg-background text-primary shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 shadow-sm" />
-                      <div className="w-[calc(100%-2.5rem)] md:w-[calc(50%-1.25rem)] border bg-background p-3 rounded-xl shadow-sm">
+                      <div className={`flex items-center justify-center w-5 h-5 rounded-full border-2 shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 shadow-sm ${item.type === 'warranty' ? 'border-amber-500 bg-amber-50 text-amber-600' : 'border-primary bg-background text-primary'}`}>
+                        {item.type === 'warranty' ? <ShieldCheck className="h-3 w-3" /> : null}
+                      </div>
+                      <div className={`w-[calc(100%-2.5rem)] md:w-[calc(50%-1.25rem)] border bg-background p-3 rounded-xl shadow-sm ${item.type === 'warranty' ? 'border-amber-200' : ''}`}>
                         <div className="flex items-center justify-between space-x-2 mb-1">
-                          <StatusBadge label={item.status} tone={tone(item.status)} />
+                          <StatusBadge label={item.type === 'warranty' ? 'Garansi' : item.status} tone={item.type === 'warranty' ? 'warning' : tone(item.status)} />
                           <time className="text-xs text-muted-foreground">{new Date(item.date).toLocaleDateString('id-ID')}</time>
                         </div>
                         <p className="text-sm mt-2 text-muted-foreground">{item.note}</p>
@@ -355,15 +408,16 @@ export function ServiceOrderDetailPage() {
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Status Pengerjaan</span>
               {editing ? (
-                <select
-                  value={editStatus}
-                  onChange={e => setEditStatus(e.target.value)}
-                  className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring"
-                >
-                  {serviceOrderStatusOptions.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
+                <Select value={editStatus} onValueChange={setEditStatus}>
+                  <SelectTrigger className="h-8 w-44">
+                    <SelectValue placeholder="Pilih..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {serviceOrderStatusOptions.map(opt => (
+                      <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               ) : (
                 <StatusBadge label={order.status} tone={tone(order.status)} />
               )}
@@ -400,6 +454,68 @@ export function ServiceOrderDetailPage() {
                 Terima Pembayaran
               </Button>
             )}
+
+            {/* Garansi */}
+            <div className="border-t border-dashed pt-3 mt-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Garansi Service</span>
+                {editing ? (
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      id="edit-warranty"
+                      className="h-4 w-4 rounded border-gray-300"
+                      checked={editHasWarranty}
+                      onChange={(e) => setEditHasWarranty(e.target.checked)}
+                    />
+                    {editHasWarranty && (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          min="1"
+                          className="h-7 w-14 text-sm"
+                          value={editWarrantyValue}
+                          onChange={(e) => setEditWarrantyValue(e.target.value)}
+                        />
+                        <Select value={editWarrantyUnit} onValueChange={(v) => setEditWarrantyUnit(v as 'hari' | 'bulan' | 'tahun')}>
+                          <SelectTrigger className="h-7 w-20 text-xs">
+                            <SelectValue placeholder="Pilih..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="hari">Hari</SelectItem>
+                            <SelectItem value="bulan">Bln</SelectItem>
+                            <SelectItem value="tahun">Thn</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                ) : order.hasWarranty ? (
+                  <div className="flex items-center gap-1.5">
+                    {order.warrantyEndDate && isWarrantyExpired(order.warrantyEndDate) ? (
+                      <>
+                        <ShieldX className="h-4 w-4 text-destructive" />
+                        <span className="text-xs text-destructive font-medium">Kadaluarsa</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="h-4 w-4 text-amber-500" />
+                        <span className="text-xs text-amber-600 font-medium">
+                          {order.warrantyValue} {order.warrantyUnit}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Tidak ada</span>
+                )}
+              </div>
+              {order.hasWarranty && order.warrantyEndDate && !editing && (
+                <div className="text-xs text-muted-foreground">
+                  Berlaku sampai {new Date(order.warrantyEndDate).toLocaleDateString('id-ID', { dateStyle: 'long' })}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Riwayat Pembayaran */}

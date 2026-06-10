@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog'
 import { useProducts } from '@/features/products/hooks/use-products'
 import { inventoryAdjustmentService } from '@/features/inventory/services/inventory-adjustment.service'
@@ -130,18 +131,19 @@ export function InventoryAdjustmentPage() {
             <div className="space-y-4">
               <label className="flex flex-col gap-1.5 text-sm font-medium">
                 Tipe Pergerakan
-                <select 
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  value={type}
-                  onChange={e => setType(e.target.value as StockMovementType)}
-                >
-                  <option value="adjustment">Adjustment (Penyesuaian)</option>
-                  <option value="purchase">Purchase (Pembelian / Masuk)</option>
-                  <option value="return">Return (Retur / Masuk)</option>
-                  <option value="transfer_in">Transfer In (Masuk)</option>
-                  <option value="transfer_out">Transfer Out (Keluar)</option>
-                  <option value="damage_lost">Rusak / Hilang (Keluar)</option>
-                </select>
+                <Select value={type} onValueChange={v => setType(v as StockMovementType)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Pilih tipe pergerakan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="adjustment">Adjustment (Penyesuaian)</SelectItem>
+                    <SelectItem value="purchase">Purchase (Pembelian / Masuk)</SelectItem>
+                    <SelectItem value="return">Return (Retur / Masuk)</SelectItem>
+                    <SelectItem value="transfer_in">Transfer In (Masuk)</SelectItem>
+                    <SelectItem value="transfer_out">Transfer Out (Keluar)</SelectItem>
+                    <SelectItem value="damage_lost">Rusak / Hilang (Keluar)</SelectItem>
+                  </SelectContent>
+                </Select>
               </label>
               <label className="flex flex-col gap-1.5 text-sm font-medium">
                 Gudang Tujuan / Asal
@@ -158,16 +160,16 @@ export function InventoryAdjustmentPage() {
         <div className="md:col-span-2 space-y-6">
           <ContentCard title="Daftar Barang" description="Pilih barang yang akan disesuaikan stoknya.">
             <div className="flex gap-2 mb-6">
-              <select 
-                className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                value={selectedProductId}
-                onChange={e => setSelectedProductId(e.target.value)}
-              >
-                <option value="">-- Cari atau pilih produk --</option>
-                {products.map(p => (
-                  <option key={p.id} value={p.id}>{p.name} (Sisa: {p.stock})</option>
-                ))}
-              </select>
+              <Select value={selectedProductId} onValueChange={setSelectedProductId}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="-- Cari atau pilih produk --" />
+                </SelectTrigger>
+                <SelectContent>
+                  {products.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.name} (Sisa: {p.stock})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button onClick={handleAddProduct} variant="secondary" className="shrink-0"><Plus className="mr-2 size-4" /> Tambah</Button>
             </div>
 

@@ -1,7 +1,7 @@
 import { productRepository } from '@/services/local-db/repository'
 import { createProductId } from '@/features/catalog/lib/entity-id'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
-import type { LocalProduct, ProductStatus, ProductType } from '@/services/local-db/schema'
+import type { LocalProduct, ProductStatus, ProductType, WholesaleTier } from '@/services/local-db/schema'
 
 const VALID_TYPES: ProductType[] = ['Produk Fisik', 'Jasa']
 const VALID_STATUSES: ProductStatus[] = ['Aktif', 'Draft', 'Arsip']
@@ -15,6 +15,7 @@ export interface ImportProductRow {
   costPrice: string
   price: string
   wholesalePrice: string
+  wholesaleTiers: string
   stock: string
   manageStock: string
   sku: string
@@ -51,6 +52,7 @@ export function validateImportRows(
     const costPrice = row['HPP'] ?? row['costPrice'] ?? ''
     const price = row['Harga Jual'] ?? row['price'] ?? ''
     const wholesalePrice = row['Harga Grosir'] ?? row['wholesalePrice'] ?? ''
+    const wholesaleTiers = row['Harga Grosir Bertingkat'] ?? row['wholesaleTiers'] ?? ''
     const stock = row['Stok'] ?? row['stock'] ?? ''
     const manageStock = row['Kelola Stok'] ?? row['manageStock'] ?? ''
     const sku = row['SKU'] ?? row['sku'] ?? ''
@@ -72,13 +74,28 @@ export function validateImportRows(
 
     return {
       rowIndex: index + 1,
-      id, name, category, type, costPrice, price, wholesalePrice,
+      id, name, category, type, costPrice, price, wholesalePrice, wholesaleTiers,
       stock, manageStock, sku, barcode, status,
       valid: errors.length === 0,
       errors,
       action,
     }
   })
+}
+
+function parseWholesaleTiers(raw: string): WholesaleTier[] | undefined {
+  if (!raw) return undefined
+  const parts = raw.split(';').map(s => s.trim()).filter(Boolean)
+  const tiers: WholesaleTier[] = []
+  for (const part of parts) {
+    const [qtyStr, priceStr] = part.split('=')
+    const minQty = parseNum(qtyStr)
+    const price = parseNum(priceStr)
+    if (minQty !== null && price !== null && minQty > 0 && price > 0) {
+      tiers.push({ minQty, price })
+    }
+  }
+  return tiers.length > 0 ? tiers : undefined
 }
 
 function rowToRecord(row: ImportProductRow, tenantId: string, base?: LocalProduct): LocalProduct {
@@ -97,6 +114,7 @@ function rowToRecord(row: ImportProductRow, tenantId: string, base?: LocalProduc
     costPrice: parseNum(row.costPrice) ?? 0,
     price: parseNum(row.price) ?? 0,
     wholesalePrice: row.wholesalePrice ? (parseNum(row.wholesalePrice) ?? undefined) : undefined,
+    wholesaleTiers: parseWholesaleTiers(row.wholesaleTiers),
     stock: manageStock ? (parseNum(row.stock) ?? 0) : 0,
     manageStock,
     sku: row.sku || undefined,

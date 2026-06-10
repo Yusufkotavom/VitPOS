@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { LayoutGrid, List, Filter } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/format-currency'
 import { SupplierCrudActions } from '@/features/suppliers/components/supplier-crud-actions'
 import { useSuppliers } from '@/features/suppliers/hooks/use-suppliers'
@@ -41,16 +42,25 @@ export function SuppliersPage() {
               <Filter className="h-4 w-4" />
             </Button>
             <div className="absolute top-full right-0 mt-2 hidden group-hover:flex flex-col gap-2 rounded-md border bg-popover p-2 shadow-md z-10 w-48">
-              <select className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-                <option value="">Status</option>
-                <option value="Aktif">Aktif</option>
-                <option value="Hutang">Hutang</option>
-              </select>
-              <select className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-                <option value="20">20 / halaman</option>
-                <option value="50">50 / halaman</option>
-                <option value="100">100 / halaman</option>
-              </select>
+              <Select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Aktif">Aktif</SelectItem>
+                  <SelectItem value="Hutang">Hutang</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select>
+                <SelectTrigger>
+                  <SelectValue placeholder="20 / halaman" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="20">20 / halaman</SelectItem>
+                  <SelectItem value="50">50 / halaman</SelectItem>
+                  <SelectItem value="100">100 / halaman</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-1 shrink-0">

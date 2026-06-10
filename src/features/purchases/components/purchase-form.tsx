@@ -6,6 +6,7 @@ import { Trash2Icon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { purchaseFormSchema, purchaseInitialValues, purchaseStatusOptions, type PurchaseFormValues } from '@/features/purchases/schemas/purchase-form-schema'
+import { FormSelect } from '@/shared/components/form/form-select'
 import { FormSection } from '@/shared/components/forms/form-section'
 
 export function PurchaseForm({ defaultValues, submitLabel, onCancel, onSubmit }: { defaultValues?: PurchaseFormValues; submitLabel: string; onCancel: () => void; onSubmit: (values: PurchaseFormValues) => Promise<void> }) {
@@ -42,9 +43,7 @@ export function PurchaseForm({ defaultValues, submitLabel, onCancel, onSubmit }:
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Status
-          <select className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" {...form.register('status')}>
-            {purchaseStatusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
+          <FormSelect control={form.control} name="status" options={purchaseStatusOptions.map(o => ({ label: o, value: o }))} />
         </label>
       </FormSection>
 

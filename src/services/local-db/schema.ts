@@ -61,6 +61,7 @@ export type LocalProduct = {
   price: number
   costPrice?: number
   wholesalePrice?: number
+  wholesaleTiers?: WholesaleTier[]
   stock: number
   manageStock?: boolean
   sku?: string
@@ -292,7 +293,22 @@ export type LocalReturn = {
   updatedAt: string
 }
 
+export type WholesaleTier = {
+  minQty: number
+  price: number
+}
+
 export type ServiceOrderStatus = 'Diterima' | 'Dikerjakan' | 'Selesai' | 'Diambil' | 'Batal'
+
+export type WarrantyUnit = 'hari' | 'bulan' | 'tahun'
+
+export type ServiceOrderTimelineItem = {
+  id: string
+  status: string
+  date: string
+  note: string
+  type?: 'status' | 'warranty'
+}
 
 export type LocalServiceOrder = {
   id: string
@@ -310,7 +326,12 @@ export type LocalServiceOrder = {
   // New fields for POS-like behavior
   items?: { productId: string, name: string, qty: number, price: number, subtotal: number }[]
   notes?: string
-  timeline?: { id: string, status: string, date: string, note: string }[]
+  timeline?: ServiceOrderTimelineItem[]
+  hasWarranty?: boolean
+  warrantyValue?: number
+  warrantyUnit?: WarrantyUnit
+  warrantyStartDate?: string
+  warrantyEndDate?: string
 
   syncStatus: SyncStatus
   version: number
@@ -347,6 +368,8 @@ export type LocalPaymentMethod = {
   type: string
   accountNumber?: string
   accountName?: string
+  qrImageUrl?: string
+  instructions?: string
   status: 'Aktif' | 'Tidak Aktif'
   updatedAt: string
 }

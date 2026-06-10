@@ -1,20 +1,25 @@
 import { ChartNoAxesCombined } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 
 export function RevenueExpensePanel() {
   const Icon = ChartNoAxesCombined
 
   return (
-    <article className="rounded-2xl border bg-background p-5 shadow-sm">
-      <div className="flex items-center gap-3">
-        <Icon className="text-primary" />
-        <div>
-          <h2 className="text-lg font-semibold">Pendapatan vs Pengeluaran</h2>
-          <p className="text-sm text-muted-foreground">Grafik arus kas</p>
+    <Card className="shadow-sm">
+      <CardHeader className="flex flex-row items-center gap-3 pb-2">
+        <div className="rounded-lg bg-primary/10 p-2 text-primary">
+          <Icon className="size-5" />
         </div>
-      </div>
-      <div className="mt-6 grid h-64 place-items-center rounded-2xl border border-dashed bg-muted/30 text-sm text-muted-foreground">
-        Area chart dashboard
-      </div>
-    </article>
+        <div className="flex flex-col">
+          <CardTitle className="text-lg">Pendapatan vs Pengeluaran</CardTitle>
+          <CardDescription>Grafik arus kas bulan ini</CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="mt-4 grid h-64 place-items-center rounded-xl border border-dashed bg-muted/20 text-sm text-muted-foreground">
+          Area chart dashboard
+        </div>
+      </CardContent>
+    </Card>
   )
 }

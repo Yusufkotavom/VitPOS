@@ -12,23 +12,7 @@ export function useServiceOrder(id?: string) {
       const order = await localDb.serviceOrders.get(id)
       if (!order || order.tenantId !== tenantId) return null
 
-      return {
-        ...order,
-        timeline: [
-          {
-            id: 'time-1',
-            date: order.date,
-            status: 'Baru',
-            note: 'Perangkat diterima'
-          },
-          {
-            id: 'time-2',
-            date: new Date(new Date(order.date).getTime() + 86400000).toISOString(), // +1 day
-            status: 'Dikerjakan',
-            note: 'Sedang dicek teknisi'
-          },
-        ]
-      }
+      return order
     },
     enabled: !!id,
   })

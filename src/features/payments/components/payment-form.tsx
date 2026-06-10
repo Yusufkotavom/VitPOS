@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CurrencyInput } from '@/shared/components/forms/currency-input'
 import { paymentFormSchema, paymentInitialValues, paymentMethodOptions, paymentStatusOptions, type PaymentFormValues } from '@/features/payments/schemas/payment-form-schema'
+import { FormSelect } from '@/shared/components/form/form-select'
 import { FormSection } from '@/shared/components/forms/form-section'
 
 export function PaymentForm({ defaultValues, submitLabel, onCancel, onSubmit }: { defaultValues?: PaymentFormValues; submitLabel: string; onCancel: () => void; onSubmit: (values: PaymentFormValues) => Promise<void> }) {
@@ -35,9 +36,7 @@ export function PaymentForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Metode bayar
-          <select className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" {...form.register('method')}>
-            {paymentMethodOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
+          <FormSelect control={form.control} name="method" options={paymentMethodOptions.map(o => ({ label: o, value: o }))} />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Tanggal
@@ -53,9 +52,7 @@ export function PaymentForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Status
-          <select className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50" {...form.register('status')}>
-            {paymentStatusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
+          <FormSelect control={form.control} name="status" options={paymentStatusOptions.map(o => ({ label: o, value: o }))} />
         </label>
       </FormSection>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

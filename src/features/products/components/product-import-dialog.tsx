@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { readCsvFile } from '@/shared/utils/import-csv'
 import { validateImportRows, executeImport, type ImportProductRow } from '@/features/products/lib/import-products'
 import type { LocalProduct } from '@/services/local-db/schema'
@@ -108,7 +109,7 @@ export function ProductImportDialog({ open, onOpenChange, existingProducts, onCo
               className="hidden"
               onChange={handleFile}
             />
-            <button
+            <Button
               type="button"
               onClick={() => fileRef.current?.click()}
               className="flex h-40 w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed text-muted-foreground transition-colors hover:border-primary hover:text-primary"
@@ -118,7 +119,7 @@ export function ProductImportDialog({ open, onOpenChange, existingProducts, onCo
                 <p className="font-medium">Klik untuk pilih file CSV</p>
                 <p className="text-xs">atau drag & drop file ke sini</p>
               </div>
-            </button>
+            </Button>
             {loading && <p className="text-sm text-muted-foreground">Memproses file...</p>}
           </div>
         )}
@@ -147,26 +148,26 @@ export function ProductImportDialog({ open, onOpenChange, existingProducts, onCo
             </div>
 
             <div className="flex-1 overflow-y-auto rounded-lg border">
-              <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-muted/70 text-left">
-                  <tr>
-                    <th className="px-2 py-1.5 w-8">#</th>
-                    <th className="px-2 py-1.5">Nama</th>
-                    <th className="px-2 py-1.5">Jenis</th>
-                    <th className="px-2 py-1.5">Harga</th>
-                    <th className="px-2 py-1.5">Status</th>
-                    <th className="px-2 py-1.5">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table className="w-full text-xs">
+                <TableHeader className="sticky top-0 bg-muted/70 text-left">
+                  <TableRow>
+                    <TableHead className="px-2 py-1.5 w-8">#</TableHead>
+                    <TableHead className="px-2 py-1.5">Nama</TableHead>
+                    <TableHead className="px-2 py-1.5">Jenis</TableHead>
+                    <TableHead className="px-2 py-1.5">Harga</TableHead>
+                    <TableHead className="px-2 py-1.5">Status</TableHead>
+                    <TableHead className="px-2 py-1.5">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {rows.slice(0, 50).map(row => (
-                    <tr key={row.rowIndex} className={`border-t ${!row.valid ? 'bg-destructive/5' : ''}`}>
-                      <td className="px-2 py-1.5 text-muted-foreground">{row.rowIndex}</td>
-                      <td className="px-2 py-1.5 font-medium max-w-[120px] truncate">{row.name || <span className="text-destructive italic">kosong</span>}</td>
-                      <td className="px-2 py-1.5">{row.type || '-'}</td>
-                      <td className="px-2 py-1.5">{row.price || '-'}</td>
-                      <td className="px-2 py-1.5">{row.status || '-'}</td>
-                      <td className="px-2 py-1.5">
+                    <TableRow key={row.rowIndex} className={`border-t ${!row.valid ? 'bg-destructive/5' : ''}`}>
+                      <TableCell className="px-2 py-1.5 text-muted-foreground">{row.rowIndex}</TableCell>
+                      <TableCell className="px-2 py-1.5 font-medium max-w-[120px] truncate">{row.name || <span className="text-destructive italic">kosong</span>}</TableCell>
+                      <TableCell className="px-2 py-1.5">{row.type ? <Badge variant="outline" className="capitalize">{row.type}</Badge> : '-'}</TableCell>
+                      <TableCell className="px-2 py-1.5">{row.price || '-'}</TableCell>
+                      <TableCell className="px-2 py-1.5">{row.status ? <Badge variant="outline" className="capitalize">{row.status}</Badge> : '-'}</TableCell>
+                      <TableCell className="px-2 py-1.5">
                         {row.valid ? (
                           <span className={`text-xs font-medium ${row.action === 'update' ? 'text-blue-500' : 'text-green-600'}`}>
                             {row.action === 'update' ? 'Update' : 'Baru'}
@@ -177,11 +178,11 @@ export function ProductImportDialog({ open, onOpenChange, existingProducts, onCo
                             <span className="truncate max-w-[100px]">{row.errors[0]}</span>
                           </span>
                         )}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
               {rows.length > 50 && (
                 <p className="px-2 py-2 text-center text-xs text-muted-foreground border-t">
                   +{rows.length - 50} baris lainnya tidak ditampilkan

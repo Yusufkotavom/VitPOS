@@ -11,6 +11,8 @@ export const paymentMethodFormSchema = z.object({
   type: z.string().trim().min(1, 'Tipe wajib diisi'),
   accountNumber: z.string().trim().optional(),
   accountName: z.string().trim().optional(),
+  qrImageUrl: z.string().trim().optional(),
+  instructions: z.string().trim().optional(),
   status: z.enum(paymentMethodStatusOptions),
 })
 
@@ -22,6 +24,8 @@ export const paymentMethodInitialValues: PaymentMethodFormValues = {
   type: '',
   accountNumber: '',
   accountName: '',
+  qrImageUrl: '',
+  instructions: '',
   status: 'Aktif',
 }
 
@@ -34,6 +38,8 @@ export function mapPaymentMethodFormToRecord(values: PaymentMethodFormValues, id
     type: values.type.trim(),
     accountNumber: values.accountNumber?.trim(),
     accountName: values.accountName?.trim(),
+    qrImageUrl: values.qrImageUrl?.trim(),
+    instructions: values.instructions?.trim(),
     status: values.status,
     updatedAt: new Intl.DateTimeFormat('id-ID', { dateStyle: 'long' }).format(new Date()),
   }
@@ -46,6 +52,8 @@ export function mapPaymentMethodRecordToFormValues(paymentMethod: LocalPaymentMe
     type: paymentMethod.type,
     accountNumber: paymentMethod.accountNumber || '',
     accountName: paymentMethod.accountName || '',
+    qrImageUrl: paymentMethod.qrImageUrl || '',
+    instructions: paymentMethod.instructions || '',
     status: paymentMethod.status === 'Aktif' || paymentMethod.status === 'Tidak Aktif'
       ? paymentMethod.status
       : 'Aktif',
