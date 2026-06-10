@@ -21,6 +21,8 @@ class DexieAdapterTable<T extends AnyRecord> implements AdapterTable<T> {
   count() { return this.source.count() }
   bulkPut(rows: T[]) { return this.source.bulkPut(rows) }
   clear() { return this.source.clear() }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  where(column: string): any { return this.source.where(column) }
 }
 
 class DexieAdapter implements LocalDbAdapter {
