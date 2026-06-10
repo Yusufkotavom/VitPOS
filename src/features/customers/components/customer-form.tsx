@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -47,7 +47,13 @@ export function CustomerForm({ defaultValues, submitLabel, onCancel, onSubmit }:
       <FormSection title="Ringkasan transaksi" description="Piutang berjalan dan total order pelanggan.">
         <label className="flex flex-col gap-1 text-sm font-medium">
           Piutang
-          <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.receivable)} {...form.register('receivable')} placeholder="0" />
+          <Controller
+            control={form.control}
+            name="receivable"
+            render={({ field }) => (
+              <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.receivable)} value={field.value} onChange={field.onChange} placeholder="0" />
+            )}
+          />
           {errors.receivable ? <span className="text-xs text-destructive">{errors.receivable.message}</span> : null}
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">

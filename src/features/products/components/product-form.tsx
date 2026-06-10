@@ -180,18 +180,36 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
           <label className="text-sm font-medium">Harga Jual</label>
-          <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.price)} {...form.register('price')} placeholder="18000" />
+          <Controller
+            control={form.control}
+            name="price"
+            render={({ field }) => (
+              <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.price)} value={field.value} onChange={field.onChange} placeholder="18000" />
+            )}
+          />
           {errors.price ? <span className="text-xs text-destructive">{errors.price.message}</span> : null}
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">Modal / HPP</label>
-          <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.costPrice)} {...form.register('costPrice')} placeholder="12000" />
+          <Controller
+            control={form.control}
+            name="costPrice"
+            render={({ field }) => (
+              <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.costPrice)} value={field.value} onChange={field.onChange} placeholder="12000" />
+            )}
+          />
         </div>
       </div>
 
       <div className="space-y-2">
         <label className="text-sm font-medium">Harga Grosir (Opsional)</label>
-        <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.wholesalePrice)} {...form.register('wholesalePrice')} placeholder="15000" />
+        <Controller
+          control={form.control}
+          name="wholesalePrice"
+          render={({ field }) => (
+            <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.wholesalePrice)} value={field.value} onChange={field.onChange} placeholder="15000" />
+          )}
+        />
       </div>
 
       <div className="border rounded-lg">

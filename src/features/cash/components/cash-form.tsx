@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useForm, useWatch, Controller } from 'react-hook-form'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -69,7 +69,13 @@ export function CashForm({
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           {type === 'Pemasukan' ? 'Nominal masuk' : 'Nominal keluar'}
-          <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.amount)} {...form.register('amount')} placeholder="0" />
+          <Controller
+            control={form.control}
+            name="amount"
+            render={({ field }) => (
+              <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.amount)} value={field.value} onChange={field.onChange} placeholder="0" />
+            )}
+          />
           {errors.amount ? <span className="text-xs text-destructive">{errors.amount.message}</span> : null}
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">

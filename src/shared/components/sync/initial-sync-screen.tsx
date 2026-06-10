@@ -10,10 +10,27 @@ type SyncPhase = 'syncing' | 'done' | 'error'
 const DONE_DELAY_MS = 1_200
 const FADE_OUT_MS = 400
 
+const SYNC_PHRASES = [
+  'Menyinkronkan data\u2026',
+  'Mengambil profil toko\u2026',
+  'Menyiapkan katalog produk\u2026',
+  'Memeriksa stok terbaru\u2026',
+  'Memuat riwayat transaksi\u2026',
+]
+
 export function InitialSyncScreen({ onDone }: { onDone: () => void }) {
   const [phase, setPhase] = useState<SyncPhase>('syncing')
   const [fadeOut, setFadeOut] = useState(false)
+  const [phraseIndex, setPhraseIndex] = useState(0)
   const mountedRef = useRef(true)
+
+  useEffect(() => {
+    if (phase !== 'syncing') return
+    const timer = setInterval(() => {
+      setPhraseIndex((i) => (i + 1) % SYNC_PHRASES.length)
+    }, 1500)
+    return () => clearInterval(timer)
+  }, [phase])
 
   const triggerSync = useCallback(async () => {
     setPhase('syncing')
@@ -91,7 +108,7 @@ export function InitialSyncScreen({ onDone }: { onDone: () => void }) {
             phase === 'error' && 'text-destructive',
           )}
         >
-          {phase === 'syncing' && 'Menyinkronkan data\u2026'}
+          {phase === 'syncing' && SYNC_PHRASES[phraseIndex]}
           {phase === 'done' && 'Sinkron selesai'}
           {phase === 'error' && 'Gagal terhubung'}
         </p>
@@ -100,7 +117,7 @@ export function InitialSyncScreen({ onDone }: { onDone: () => void }) {
           <div className="flex items-center gap-3 pt-2">
             <Button size="sm" onClick={triggerSync}>Coba Lagi</Button>
             <Button variant="ghost" size="sm" onClick={handleSkip}>
-              Lewati
+              Jalankan di Latar
             </Button>
           </div>
         )}
@@ -111,7 +128,7 @@ export function InitialSyncScreen({ onDone }: { onDone: () => void }) {
             onClick={handleSkip}
             className="pt-2 text-xs text-muted-foreground/70 underline-offset-2 transition-colors hover:text-foreground hover:underline"
           >
-            Lewati
+            Jalankan di Latar
           </button>
         )}
       </div>
