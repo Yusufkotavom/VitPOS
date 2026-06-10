@@ -6,7 +6,7 @@ import type {
   LocalDbAdapterMetadata,
   StorageTransactionMode,
 } from '@/services/local-db/adapters'
-import { localDb } from '@/services/local-db/client'
+import { dexieDb } from '@/services/local-db/dexie-instance'
 
 type AnyRecord = { id: string }
 
@@ -21,43 +21,41 @@ class DexieAdapterTable<T extends AnyRecord> implements AdapterTable<T> {
   count() { return this.source.count() }
   bulkPut(rows: T[]) { return this.source.bulkPut(rows) }
   clear() { return this.source.clear() }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  where(column: string): any { return this.source.where(column) }
 }
 
 class DexieAdapter implements LocalDbAdapter {
   metadata: LocalDbAdapterMetadata = { name: 'indexeddb', platform: 'web' }
 
   async init(): Promise<void> {
-    if (!localDb.isOpen()) await localDb.open()
+    if (!dexieDb.isOpen()) await dexieDb.open()
   }
 
   async teardown(): Promise<void> {
-    if (localDb.isOpen()) localDb.close()
+    if (dexieDb.isOpen()) dexieDb.close()
   }
 
   storageTable<T extends AnyRecord>(name: string): AdapterTable<T> {
-    const raw = (localDb as unknown as Record<string, Table<T, string> | undefined>)[name]
+    const raw = (dexieDb as unknown as Record<string, Table<T, string> | undefined>)[name]
     if (!raw) throw new Error(`Unknown table: ${name}`)
     return new DexieAdapterTable<T>(raw)
   }
 
   async runInTransaction<T>(mode: StorageTransactionMode, tableNames: string[], scope: () => Promise<T>): Promise<T> {
     const tables = tableNames.map((name) => {
-      const raw = (localDb as unknown as Record<string, Table<unknown, string> | undefined>)[name]
+      const raw = (dexieDb as unknown as Record<string, Table<unknown, string> | undefined>)[name]
       if (!raw) throw new Error(`Unknown table: ${name}`)
       return raw
     })
     const dexieMode = mode === 'readwrite' ? 'rw' : 'r'
-    return await localDb.transaction(dexieMode, tables, scope) as Promise<T>
+    return await dexieDb.transaction(dexieMode, tables, scope) as Promise<T>
   }
 }
 
 export const dexieAdapter = new DexieAdapter()
 
 // Re-export for backward compatibility (most existing code imports from here)
-export { localDb }
-export type { VitposLocalDb } from '@/services/local-db/client'
+export { dexieDb as localDb }
+export type { VitposLocalDb } from '@/services/local-db/dexie-instance'
 // Keep type imports valid for callers that reference EntityTable shapes
 export type {
   LocalCash, LocalCustomer, LocalInventory, LocalPayment, LocalProduct,
