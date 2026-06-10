@@ -1,6 +1,11 @@
 import { and, eq } from 'drizzle-orm'
 
 import type { AppDb } from '../../lib/db.js'
+
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+function isValidUuid(value: string): boolean {
+  return uuidPattern.test(value)
+}
 import {
   cash,
   cashCategories,
@@ -96,7 +101,9 @@ function toNumeric(value: number | string | undefined | null): string {
 }
 
 function toNullableUuid(value: unknown): string | null {
-  return typeof value === 'string' && value.length > 0 ? value : null
+  if (typeof value !== 'string' || value.length === 0) return null
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+  return uuidRegex.test(value) ? value : null
 }
 
 function mapClientProductType(value: unknown): 'physical' | 'service' {
@@ -239,7 +246,7 @@ async function applySale(db: AppDb, ctx: ApplyContext, entityId: string, mutatio
     if (payload.items.length > 0) {
       await db.insert(salesOrderItems).values(
         payload.items.map((item) => ({
-          id: item.id ?? crypto.randomUUID(),
+          id: item.id && isValidUuid(item.id) ? item.id : crypto.randomUUID(),
           tenantId: ctx.tenantId,
           salesOrderId: entityId,
           productId: toNullableUuid(item.productId),
@@ -851,7 +858,7 @@ async function applyPurchase(db: AppDb, ctx: ApplyContext, entityId: string, mut
     if (payload.items.length > 0) {
       await db.insert(purchaseItems).values(
         payload.items.map((item) => ({
-          id: item.id ?? crypto.randomUUID(),
+          id: item.id && isValidUuid(item.id) ? item.id : crypto.randomUUID(),
           tenantId: ctx.tenantId,
           purchaseId: entityId,
           productId: toNullableUuid(item.productId),
@@ -908,7 +915,7 @@ async function applyReturn(db: AppDb, ctx: ApplyContext, entityId: string, mutat
     if (payload.items.length > 0) {
       await db.insert(returnItems).values(
         payload.items.map((item) => ({
-          id: item.id ?? crypto.randomUUID(),
+          id: item.id && isValidUuid(item.id) ? item.id : crypto.randomUUID(),
           tenantId: ctx.tenantId,
           returnId: entityId,
           productId: toNullableUuid(item.productId),

@@ -32,9 +32,12 @@ export async function enqueueOutboxItem(input: {
 }
 
 export async function updateOutboxStatus(id: string, status: OutboxStatus, errorMessage?: string) {
+  const item = await localDb.outbox.get(id)
+  const attempts = (item?.attempts ?? 0) + (status === 'failed' ? 1 : 0)
   await localDb.outbox.update(id, {
     status,
     errorMessage,
+    attempts,
     updatedAt: new Date().toISOString(),
     syncedAt: status === 'synced' ? new Date().toISOString() : undefined,
   })

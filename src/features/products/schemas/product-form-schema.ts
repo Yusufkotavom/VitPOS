@@ -76,6 +76,8 @@ export function mapProductFormToRecord(values: ProductFormValues, id: string, ba
     status: values.status,
     imageUrl: values.imageUrl,
     icon: values.icon,
+    sku: base?.sku,
+    barcode: base?.barcode,
     syncStatus: 'pending',
     version: (base?.version ?? 0) + 1,
     updatedAt: now,

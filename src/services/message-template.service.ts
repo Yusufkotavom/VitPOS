@@ -1,4 +1,5 @@
 import { localDb } from '@/services/local-db/client'
+import { settingRepository } from '@/services/local-db/repository'
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
 
 export type MessageTemplateType =
@@ -135,8 +136,9 @@ export const messageTemplateService = {
   async setOverride(type: MessageTemplateType, value: string): Promise<void> {
     const tenantId = resolveTenantId()
     const now = new Date().toISOString()
-    await localDb.settings.put({
-      id: `msg_template_${type}`,
+    const id = `msg_template_${type}`
+    await settingRepository.upsert({
+      id,
       tenantId,
       area: 'Template Pesan',
       setting: TEMPLATE_LABELS[type],
@@ -156,6 +158,6 @@ export const messageTemplateService = {
   },
 
   async resetToDefault(type: MessageTemplateType): Promise<void> {
-    await localDb.settings.delete(`msg_template_${type}`)
+    await settingRepository.remove(`msg_template_${type}`)
   },
 }

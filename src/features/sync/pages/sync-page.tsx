@@ -135,6 +135,18 @@ export function SyncPage() {
               sortable: true,
             },
             {
+              key: 'errorMessage',
+              header: 'Error',
+              render: (row) =>
+                row.errorMessage ? (
+                  <span className="max-w-[240px] truncate text-xs text-red-600" title={row.errorMessage}>
+                    {row.errorMessage}
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">—</span>
+                ),
+            },
+            {
               key: 'attempts',
               header: 'Coba',
             },
@@ -151,6 +163,11 @@ export function SyncPage() {
               <div className="space-y-1">
                 <p className="font-medium">{entityLabel(row.entityType)} &middot; {row.mutationType}</p>
                 <p className="text-xs text-muted-foreground">ID: {row.entityId.slice(0, 12)}…</p>
+                {row.errorMessage && (
+                  <p className="max-w-[200px] truncate text-xs text-red-600" title={row.errorMessage}>
+                    {row.errorMessage}
+                  </p>
+                )}
                 <p className="text-xs text-muted-foreground">{fmtDate(row.createdAt)}</p>
               </div>
               <StatusBadge label={row.status} tone={statusTone(row.status)} />

@@ -92,7 +92,7 @@ export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
             ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />Ubah</Button>
             : <Button><PlusIcon data-icon="inline-start" />Record Payment</Button>}
         </DialogTrigger>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-sm max-h-[90vh] overflow-y-auto">
           <form onSubmit={form.handleSubmit(handleSubmit)}>
             <DialogHeader>
               <DialogTitle>{isEdit ? 'Ubah pembayaran' : 'Catat pembayaran'}</DialogTitle>

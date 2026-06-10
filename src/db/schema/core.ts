@@ -406,7 +406,7 @@ export const outboxLogs = pgTable('outbox_logs', {
   branchId: uuid('branch_id').references(() => branches.id),
   deviceId: varchar('device_id', { length: 120 }).notNull(),
   entityType: varchar('entity_type', { length: 80 }).notNull(),
-  entityId: uuid('entity_id').notNull(),
+  entityId: varchar('entity_id', { length: 120 }).notNull(),
   mutationType: varchar('mutation_type', { length: 40 }).notNull(),
   payload: jsonb('payload').notNull(),
   status: syncStatusEnum('status').default('pending').notNull(),

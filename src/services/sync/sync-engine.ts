@@ -35,6 +35,29 @@ const SERVER_TO_LOCAL_PAYMENT_METHOD: Record<string, PosPaymentMethodCode> = {
   receivable: 'piutang',
 }
 
+const SERVER_TO_LOCAL_SALE_STATUS: Record<string, LocalSalesOrder['status']> = {
+  draft: 'Draft',
+  paid: 'Lunas',
+  partial: 'Sebagian',
+  unpaid: 'Belum Bayar',
+  cancelled: 'Batal',
+}
+
+const SERVER_TO_LOCAL_PAYMENT_STATUS: Record<string, LocalPayment['status']> = {
+  success: 'Berhasil',
+  pending: 'Pending',
+  failed: 'Gagal',
+  refunded: 'Refund',
+}
+
+const SERVER_TO_LOCAL_SERVICE_STATUS: Record<string, LocalServiceOrder['status']> = {
+  received: 'Diterima',
+  in_progress: 'Dikerjakan',
+  completed: 'Selesai',
+  picked_up: 'Diambil',
+  cancelled: 'Batal',
+}
+
 function normalizePaymentMethod(serverMethod: unknown): PosPaymentMethodCode {
   if (typeof serverMethod !== 'string') return 'tunai'
   return SERVER_TO_LOCAL_PAYMENT_METHOD[serverMethod] ?? (serverMethod as PosPaymentMethodCode)
@@ -46,13 +69,39 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 async function resolveSyncContext() {
   const tenantId = requireActiveTenantId()
-  const branchSetting = await localDb.settings
+  let branchSetting = await localDb.settings
     .where('tenantId')
     .equals(tenantId)
     .filter((item) => item.setting === 'default_branch_id')
     .first()
 
-  const branchId = branchSetting?.value || (tenantId === DEMO_TENANT_ID ? baimRuntime.branchId : undefined)
+  let branchId = branchSetting?.value
+
+  if (!branchId && tenantId === DEMO_TENANT_ID) {
+    branchId = baimRuntime.branchId
+  }
+
+  if (!branchId) {
+    try {
+      const res = await apiGet<{ ok: true; id: string; name: string }>('/tenants/default-branch', new URLSearchParams({ tenantId }))
+      if (res.ok) {
+        branchId = res.id
+        const newSetting = {
+          id: `${tenantId}:default-branch-id`,
+          tenantId,
+          area: 'System',
+          setting: 'default_branch_id',
+          value: branchId,
+          status: 'Lengkap',
+          updatedAt: new Date().toISOString(),
+        }
+        await localDb.settings.put(newSetting)
+        branchSetting = newSetting
+      }
+    } catch {
+      // API tidak tersedia — branchId tetap undefined
+    }
+  }
 
   return { tenantId, branchId }
 }
@@ -82,56 +131,74 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
   if (!isRecord(payload)) return
 
   if (item.entityType === 'product') {
+    const existing = await localDb.products.get(item.entityId)
     const product: LocalProduct = {
       id: item.entityId,
       tenantId,
-      name: typeof payload.name === 'string' ? payload.name : '',
-      category: typeof payload.category === 'string' ? payload.category : '',
-      type: payload.type === 'Jasa' ? 'Jasa' : 'Produk Fisik',
-      price: typeof payload.salePrice === 'number' ? payload.salePrice : typeof payload.price === 'number' ? payload.price : 0,
-      stock: typeof payload.stock === 'number' ? payload.stock : 0,
-      sku: typeof payload.sku === 'string' ? payload.sku : undefined,
-      barcode: typeof payload.barcode === 'string' ? payload.barcode : undefined,
-      status: payload.isActive === false ? 'Arsip' : 'Aktif',
+      name: typeof payload.name === 'string' ? payload.name : existing?.name ?? '',
+      category: typeof payload.category === 'string' ? payload.category : existing?.category ?? '',
+      type: payload.type === 'Jasa' ? 'Jasa' : existing?.type ?? 'Produk Fisik',
+      price: typeof payload.salePrice === 'number' ? payload.salePrice : typeof payload.price === 'number' ? payload.price : existing?.price ?? 0,
+      costPrice: typeof payload.costPrice === 'number' ? payload.costPrice : existing?.costPrice,
+      wholesalePrice: typeof payload.wholesalePrice === 'number' ? payload.wholesalePrice : existing?.wholesalePrice,
+      wholesaleTiers: existing?.wholesaleTiers,
+      stock: existing?.stock ?? 0,
+      manageStock: existing?.manageStock,
+      sku: typeof payload.sku === 'string' ? payload.sku : existing?.sku,
+      barcode: typeof payload.barcode === 'string' ? payload.barcode : existing?.barcode,
+      imageUrl: typeof payload.imageUrl === 'string' ? payload.imageUrl : existing?.imageUrl,
+      icon: existing?.icon,
+      status: payload.isActive === false ? 'Arsip' : existing?.status ?? 'Aktif',
       syncStatus: 'synced',
       version: typeof payload.version === 'number' ? payload.version : 1,
       updatedAt: item.updatedAt,
     }
     await localDb.products.put(product)
   } else if (item.entityType === 'sale') {
+    const existing = await localDb.salesOrders.get(item.entityId)
+    const rawStatus = typeof payload.status === 'string' ? payload.status : ''
     const order: LocalSalesOrder = {
       id: item.entityId,
       tenantId,
       code: typeof payload.orderNumber === 'string' ? payload.orderNumber : typeof payload.code === 'string' ? payload.code : '',
-      customerId: typeof payload.customerId === 'string' ? payload.customerId : undefined,
-      customerName: typeof payload.customerName === 'string' ? payload.customerName : 'Umum',
-      date: typeof payload.date === 'string' ? payload.date : '',
+      customerId: typeof payload.customerId === 'string' ? payload.customerId : existing?.customerId,
+      customerName: typeof payload.customerName === 'string' ? payload.customerName : existing?.customerName ?? 'Umum',
+      date: typeof payload.date === 'string' ? payload.date : existing?.date ?? '',
       subtotal: Number(payload.subtotal ?? 0),
       discountTotal: Number(payload.discountTotal ?? 0),
       taxTotal: Number(payload.taxTotal ?? 0),
       grandTotal: Number(payload.grandTotal ?? 0),
       paidTotal: Number(payload.paidTotal ?? 0),
-      notes: typeof payload.notes === 'string' ? payload.notes : undefined,
-      status: (typeof payload.status === 'string' ? payload.status : 'Draft') as LocalSalesOrder['status'],
-      items: [],
+      notes: typeof payload.notes === 'string' ? payload.notes : existing?.notes,
+      status: SERVER_TO_LOCAL_SALE_STATUS[rawStatus] ?? existing?.status ?? 'Draft',
+      items: existing?.items ?? [],
       syncStatus: 'synced',
       version: typeof payload.version === 'number' ? payload.version : 1,
       updatedAt: item.updatedAt,
     }
     await localDb.salesOrders.put(order)
   } else if (item.entityType === 'payment') {
+    const salesOrderId = typeof payload.salesOrderId === 'string' ? payload.salesOrderId : undefined
+    const serviceOrderId = typeof payload.serviceOrderId === 'string' ? payload.serviceOrderId : undefined
+    const purchaseId = typeof payload.purchaseId === 'string' ? payload.purchaseId : undefined
+    const existingPayment = await localDb.payments.get(item.entityId)
+      ?? (salesOrderId ? await localDb.payments.where('[tenantId+salesOrderId]').equals([tenantId, salesOrderId]).first() : undefined)
+      ?? (serviceOrderId ? await localDb.payments.where('[tenantId+serviceOrderId]').equals([tenantId, serviceOrderId]).first() : undefined)
+      ?? (purchaseId ? await localDb.payments.where('[tenantId+purchaseId]').equals([tenantId, purchaseId]).first() : undefined)
+    const paymentId = existingPayment?.id ?? item.entityId
+    const rawStatus = typeof payload.status === 'string' ? payload.status : ''
     const payment: LocalPayment = {
-      id: item.entityId,
+      id: paymentId,
       tenantId,
-      ref: typeof payload.paymentNumber === 'string' ? payload.paymentNumber : typeof payload.ref === 'string' ? payload.ref : '',
-      salesOrderId: typeof payload.salesOrderId === 'string' ? payload.salesOrderId : undefined,
-      serviceOrderId: typeof payload.serviceOrderId === 'string' ? payload.serviceOrderId : undefined,
-      purchaseId: typeof payload.purchaseId === 'string' ? payload.purchaseId : undefined,
-      source: typeof payload.source === 'string' ? payload.source : 'cloud',
+      ref: typeof payload.paymentNumber === 'string' ? payload.paymentNumber : typeof payload.ref === 'string' ? payload.ref : existingPayment?.ref ?? '',
+      salesOrderId,
+      serviceOrderId: typeof payload.serviceOrderId === 'string' ? payload.serviceOrderId : existingPayment?.serviceOrderId,
+      purchaseId: typeof payload.purchaseId === 'string' ? payload.purchaseId : existingPayment?.purchaseId,
+      source: typeof payload.source === 'string' ? payload.source : existingPayment?.source ?? 'cloud',
       method: normalizePaymentMethod(payload.method),
       amount: Number(payload.amount ?? 0),
-      date: typeof payload.date === 'string' ? payload.date : '',
-      status: (typeof payload.status === 'string' ? payload.status : 'Pending') as LocalPayment['status'],
+      date: typeof payload.date === 'string' ? payload.date : existingPayment?.date ?? '',
+      status: SERVER_TO_LOCAL_PAYMENT_STATUS[rawStatus] ?? existingPayment?.status ?? 'Pending',
       syncStatus: 'synced',
       version: typeof payload.version === 'number' ? payload.version : 1,
       updatedAt: item.updatedAt,
@@ -272,17 +339,28 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
       updatedAt: item.updatedAt,
     })
     } else if (item.entityType === 'service_order') {
+      const existingSo = await localDb.serviceOrders.get(item.entityId)
+      const rawStatus = typeof payload.status === 'string' ? payload.status : ''
       await localDb.serviceOrders.put({
         id: item.entityId,
         tenantId,
-        code: typeof payload.code === 'string' ? payload.code : '',
-        customerId: typeof payload.customerId === 'string' ? payload.customerId : undefined,
-        customerName: typeof payload.customerName === 'string' ? payload.customerName : '',
-        description: typeof payload.description === 'string' ? payload.description : '',
-        date: typeof payload.date === 'string' ? payload.date : '',
-        cost: Number(payload.cost ?? 0),
-        paidTotal: Number(payload.paidTotal ?? 0),
-        status: (typeof payload.status === 'string' ? payload.status : 'Diterima') as LocalServiceOrder['status'],
+        code: typeof payload.code === 'string' ? payload.code : existingSo?.code ?? '',
+        customerId: typeof payload.customerId === 'string' ? payload.customerId : existingSo?.customerId,
+        customerName: typeof payload.customerName === 'string' ? payload.customerName : existingSo?.customerName ?? 'Umum',
+        description: typeof payload.description === 'string' ? payload.description : existingSo?.description ?? '',
+        date: typeof payload.date === 'string' ? payload.date : existingSo?.date ?? '',
+        cost: Number(payload.cost ?? existingSo?.cost ?? 0),
+        paidTotal: Number(payload.paidTotal ?? existingSo?.paidTotal ?? 0),
+        status: SERVER_TO_LOCAL_SERVICE_STATUS[rawStatus] ?? existingSo?.status ?? 'Diterima',
+        items: existingSo?.items,
+        notes: typeof payload.notes === 'string' ? payload.notes : existingSo?.notes,
+        timeline: existingSo?.timeline,
+        hasWarranty: existingSo?.hasWarranty,
+        warrantyValue: existingSo?.warrantyValue,
+        warrantyUnit: existingSo?.warrantyUnit,
+        warrantyStartDate: existingSo?.warrantyStartDate,
+        warrantyEndDate: existingSo?.warrantyEndDate,
+        estimatedCompletion: typeof payload.estimatedCompletion === 'string' ? payload.estimatedCompletion : existingSo?.estimatedCompletion,
         syncStatus: 'synced',
         version: typeof payload.version === 'number' ? payload.version : 1,
         updatedAt: item.updatedAt,
@@ -408,7 +486,7 @@ export async function runSync() {
   const indexedResults = indexPushResults(pushResponse.items)
 
   for (const item of accepted) {
-    const result = indexedResults.get(`${item.entityType}:${item.entityId}:${item.mutationType}`)
+    const result = indexedResults.get(`${item.entityType}:${extractEntityId(item.entityId)}:${item.mutationType}`)
 
     if (!result) {
       failed += 1

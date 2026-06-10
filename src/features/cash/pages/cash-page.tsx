@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { formatCurrency } from '@/lib/format-currency'
 import { CashCrudActions } from '@/features/cash/components/cash-crud-actions'
 import { useCash } from '@/features/cash/hooks/use-cash'
+import { useCashCategories } from '@/features/cash/hooks/use-cash-categories'
 import { DataTable } from '@/shared/components/data-table/data-table'
 import { ContentCard } from '@/shared/components/display/content-card'
 import { StatusBadge } from '@/shared/components/display/status-badge'
@@ -19,12 +20,23 @@ function tone(status: string) {
 
 export function CashPage() {
   const cash = useCash()
+  const categories = useCashCategories()
   const [view, setView] = useState<'list' | 'card'>('list')
   const [search, setSearch] = useState('')
+  const [filterAccount, setFilterAccount] = useState('all')
+  const [filterCategory, setFilterCategory] = useState('all')
+  const [pageSize, setPageSize] = useState('20')
 
-  const filtered = cash.filter(row =>
-    !search || [row.ref, row.account, row.category, row.date].some(f => f.toLowerCase().includes(search.toLowerCase()))
-  )
+  const getCategoryName = (id: string) => categories.find(c => c.id === id)?.name ?? id
+
+  const filtered = cash.filter(row => {
+    if (search && ![row.ref, row.account, getCategoryName(row.category), row.date].some(f => f.toLowerCase().includes(search.toLowerCase()))) return false
+    if (filterAccount !== 'all' && row.account !== filterAccount) return false
+    if (filterCategory !== 'all' && row.category !== filterCategory) return false
+    return true
+  })
+
+  const paginated = filtered.slice(0, parseInt(pageSize))
 
   const totalIncome = cash.reduce((sum, row) => sum + row.income, 0)
   const totalExpense = cash.reduce((sum, row) => sum + row.expense, 0)
@@ -60,25 +72,29 @@ export function CashPage() {
               <Filter className="h-4 w-4" />
             </Button>
             <div className="absolute top-full right-0 mt-2 hidden group-hover:flex flex-col gap-2 rounded-md border bg-popover p-2 shadow-md z-10 w-48">
-              <Select>
+              <Select value={filterAccount} onValueChange={setFilterAccount}>
                 <SelectTrigger>
                   <SelectValue placeholder="Semua Akun" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">Semua Akun</SelectItem>
                   {Array.from(new Set(cash.map(c => c.account))).map(acc => (
                     <SelectItem key={acc} value={acc}>{acc}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Select>
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
                 <SelectTrigger>
                   <SelectValue placeholder="Kategori" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Kategori</SelectItem>
+                  <SelectItem value="all">Semua Kategori</SelectItem>
+                  {Array.from(new Set(cash.map(c => c.category))).filter(Boolean).map(cat => (
+                    <SelectItem key={cat} value={cat}>{getCategoryName(cat)}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-              <Select>
+              <Select value={pageSize} onValueChange={setPageSize}>
                 <SelectTrigger>
                   <SelectValue placeholder="20 / halaman" />
                 </SelectTrigger>
@@ -113,12 +129,12 @@ export function CashPage() {
         </div>
         {view === 'list' ? (
           <DataTable
-            data={filtered}
+            data={paginated}
             columns={[
               { key: 'ref', header: 'Ref', sortable: true },
               { key: 'date', header: 'Tanggal', sortable: true },
               { key: 'account', header: 'Akun', sortable: true },
-              { key: 'category', header: 'Kategori', sortable: true },
+              { key: 'category', header: 'Kategori', sortable: true, render: (row) => getCategoryName(row.category) },
               { key: 'income', header: 'Masuk', render: (row) => row.income > 0 ? <span className="font-medium text-emerald-600">{formatCurrency(row.income)}</span> : '-' },
               { key: 'expense', header: 'Keluar', render: (row) => row.expense > 0 ? <span className="font-medium text-rose-600">{formatCurrency(row.expense)}</span> : '-' },
               { key: 'status', header: 'Status', render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
@@ -127,15 +143,15 @@ export function CashPage() {
           />
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {filtered.length === 0 ? (
+            {paginated.length === 0 ? (
               <p className="text-center text-muted-foreground py-12 col-span-full">Belum ada transaksi</p>
             ) : (
-              filtered.map((row) => (
+              paginated.map((row) => (
                 <div key={row.id} className="rounded-2xl border bg-background p-5 shadow-sm">
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div>
                       <p className="font-medium">{row.ref}</p>
-                      <p className="text-sm text-muted-foreground">{row.account} · {row.category}</p>
+                      <p className="text-sm text-muted-foreground">{row.account} · {getCategoryName(row.category)}</p>
                     </div>
                     <StatusBadge label={row.status} tone={tone(row.status)} />
                   </div>

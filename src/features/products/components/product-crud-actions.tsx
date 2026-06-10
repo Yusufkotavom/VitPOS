@@ -1,36 +1,55 @@
 import { PencilIcon, PlusIcon, Trash2Icon, Settings2, BookOpen } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog'
 import { createProductId } from '@/features/catalog/lib/entity-id'
 import { ProductForm } from '@/features/products/components/product-form'
 import { mapProductFormToRecord, mapProductRecordToFormValues, type ProductFormValues } from '@/features/products/schemas/product-form-schema'
 import { productRepository } from '@/services/local-db/repository'
+import { localDb } from '@/services/local-db/client'
 import type { LocalProduct } from '@/services/local-db/schema'
 
 export function ProductCrudActions({ product }: { product?: LocalProduct }) {
   const [formOpen, setFormOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [editProduct, setEditProduct] = useState<LocalProduct | undefined>()
   const isEdit = Boolean(product)
+
+  const defaultValues = useMemo(() => {
+    const source = editProduct ?? product
+    return source ? mapProductRecordToFormValues(source) : undefined
+  }, [editProduct, product])
+
+  async function handleEditClick() {
+    if (!product) return
+    const fresh = await localDb.products.get(product.id)
+    setEditProduct(fresh ?? product)
+    setFormOpen(true)
+  }
+
+  function handleFormClose() {
+    setFormOpen(false)
+    setEditProduct(undefined)
+  }
 
   async function handleSubmit(values: ProductFormValues) {
     const id = product?.id ?? createProductId()
-    const newRecord = mapProductFormToRecord(values, id, product)
-    const oldStock = product?.stock ?? 0
+    const base = editProduct ?? product
+    const newRecord = mapProductFormToRecord(values, id, base)
+    const oldStock = base?.stock ?? 0
     const newStock = newRecord.stock
 
     await productRepository.upsert(newRecord)
 
-    // Log stock movement if stock changed (including initial stock > 0)
     if (newStock !== oldStock && newRecord.manageStock) {
       const diff = newStock - oldStock
       const warehouseName = 'Gudang Utama'
       const movementId = crypto.randomUUID()
       const nowIso = new Date().toISOString()
-      
+
       const movement = {
         id: movementId,
         tenantId: newRecord.tenantId,
@@ -39,11 +58,11 @@ export function ProductCrudActions({ product }: { product?: LocalProduct }) {
         warehouseName,
         type: 'adjustment' as const,
         qty: diff,
-        notes: product ? 'Update dari halaman Produk' : 'Stok awal produk',
+        notes: base ? 'Update dari halaman Produk' : 'Stok awal produk',
         syncStatus: 'pending' as const,
         updatedAt: nowIso,
       }
-      
+
       let status = 'Aman'
       if (newStock <= 0) status = 'Habis'
       else if (newStock <= 5) status = 'Stok Rendah'
@@ -59,11 +78,11 @@ export function ProductCrudActions({ product }: { product?: LocalProduct }) {
         status,
       }
 
-      const { localDb } = await import('@/services/local-db/client')
+      const { localDb: db } = await import('@/services/local-db/client')
       const { stockMovementRepository } = await import('@/services/local-db/repository')
-      
-      await localDb.stockMovements.put(movement)
-      await localDb.inventory.put(inventory)
+
+      await db.stockMovements.put(movement)
+      await db.inventory.put(inventory)
       await stockMovementRepository.upsert(movement)
     }
 
@@ -81,9 +100,11 @@ export function ProductCrudActions({ product }: { product?: LocalProduct }) {
   return (
     <div className="flex flex-wrap gap-2">
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogTrigger asChild>
-          {product ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />Ubah</Button> : <Button><PlusIcon data-icon="inline-start" />Tambah Produk</Button>}
-        </DialogTrigger>
+        {product ? (
+          <Button variant="outline" size="sm" onClick={handleEditClick}><PencilIcon data-icon="inline-start" />Ubah</Button>
+        ) : (
+          <Button onClick={() => { setEditProduct(undefined); setFormOpen(true); }}><PlusIcon data-icon="inline-start" />Tambah Produk</Button>
+        )}
         {!product && (
           <>
             <Button variant="outline" asChild>
@@ -102,7 +123,7 @@ export function ProductCrudActions({ product }: { product?: LocalProduct }) {
           <DialogHeader>
             <DialogTitle>{isEdit ? 'Ubah produk' : 'Tambah produk'}</DialogTitle>
           </DialogHeader>
-          <ProductForm defaultValues={product ? mapProductRecordToFormValues(product) : undefined} submitLabel={isEdit ? 'Simpan perubahan' : 'Simpan produk'} onCancel={() => setFormOpen(false)} onSubmit={handleSubmit} />
+          <ProductForm key={product?.id ?? 'new'} defaultValues={defaultValues} submitLabel={isEdit ? 'Simpan perubahan' : 'Simpan produk'} onCancel={handleFormClose} onSubmit={handleSubmit} />
         </DialogContent>
       </Dialog>
       {product ? (

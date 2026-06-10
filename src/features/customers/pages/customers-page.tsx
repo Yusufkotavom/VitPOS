@@ -22,10 +22,16 @@ export function CustomersPage() {
   const customerRows = useCustomers()
   const [view, setView] = useState<'list' | 'card'>('list')
   const [search, setSearch] = useState('')
+  const [filterStatus, setFilterStatus] = useState('all')
+  const [pageSize, setPageSize] = useState('20')
 
-  const filtered = customerRows.filter(row =>
-    !search || [row.name, row.phone, row.city].some(f => f.toLowerCase().includes(search.toLowerCase()))
-  )
+  const filtered = customerRows.filter(row => {
+    if (search && ![row.name, row.phone, row.city].some(f => f.toLowerCase().includes(search.toLowerCase()))) return false
+    if (filterStatus !== 'all' && row.status !== filterStatus) return false
+    return true
+  })
+
+  const paginated = filtered.slice(0, parseInt(pageSize))
 
   return (
     <PageShell title="Pelanggan" description="Kelola pelanggan aktif, histori belanja, dan piutang." actions={<CustomerCrudActions />}>
@@ -39,17 +45,17 @@ export function CustomersPage() {
             </Button>
             
             <div className="absolute top-full right-0 mt-2 hidden group-hover:flex flex-col gap-2 rounded-md border bg-popover p-2 shadow-md z-10 w-48">
-              <Select>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Pilih..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Status</SelectItem>
+                  <SelectItem value="all">Semua Status</SelectItem>
                   <SelectItem value="Aktif">Aktif</SelectItem>
                   <SelectItem value="Piutang">Piutang</SelectItem>
                 </SelectContent>
               </Select>
-              <Select>
+              <Select value={pageSize} onValueChange={setPageSize}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Pilih..." />
                 </SelectTrigger>
@@ -86,7 +92,7 @@ export function CustomersPage() {
 
         {view === 'list' ? (
           <DataTable
-            data={filtered}
+            data={paginated}
             columns={[
               { key: 'name', header: 'Pelanggan', sortable: true, render: (row) => <Link to={`/customers/${row.id}`} className="font-medium text-primary hover:underline">{row.name}</Link> },
               { key: 'phone', header: 'WhatsApp' },
@@ -97,11 +103,11 @@ export function CustomersPage() {
               { key: 'actions', header: 'Aksi', render: (row) => <CustomerCrudActions customer={row} /> },
             ]}
           />
-        ) : filtered.length === 0 ? (
+        ) : paginated.length === 0 ? (
           <p className="text-center text-muted-foreground py-12">Belum ada pelanggan</p>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {filtered.map((row) => (
+            {paginated.map((row) => (
               <div key={row.id} className="relative flex flex-col gap-3 rounded-2xl border bg-background p-4 shadow-sm transition-all hover:border-primary/20 hover:shadow-md">
                 <div className="flex items-start justify-between gap-3">
                   <div>

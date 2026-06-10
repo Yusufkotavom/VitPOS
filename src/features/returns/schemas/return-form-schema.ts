@@ -14,7 +14,7 @@ export const returnItemSchema = z.object({
 })
 
 export const returnFormSchema = z.object({
-  code: z.string().trim().min(1, 'Nomor retur wajib diisi'),
+  code: z.string().trim(),
   type: z.enum(returnTypeOptions),
   referenceCode: z.string().trim().min(1, 'Kode referensi wajib diisi'),
   date: z.string().trim().min(1, 'Tanggal wajib diisi'),

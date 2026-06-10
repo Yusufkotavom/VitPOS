@@ -24,10 +24,13 @@ function newId(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`
 }
 
-function serviceOrderCode() {
-  const stamp = new Date().toISOString().slice(2, 10).replace(/-/g, '')
-  const rand = crypto.randomUUID().slice(0, 3).toUpperCase()
-  return `SRV-${stamp}-${rand}`
+async function serviceOrderCode(): Promise<string> {
+  const all = await localDb.serviceOrders.toArray()
+  const max = all.reduce((highest, o) => {
+    const m = o.code.match(/^SRV-(\d+)$/)
+    return m ? Math.max(highest, parseInt(m[1], 10)) : highest
+  }, 0)
+  return `SRV-${String(max + 1).padStart(4, '0')}`
 }
 
 export const socTransactionService = {
@@ -76,7 +79,7 @@ export const socTransactionService = {
     const serviceOrder: LocalServiceOrder = {
       id: serviceOrderId,
       tenantId,
-      code: serviceOrderCode(),
+      code: await serviceOrderCode(),
       customerId: customerId ?? undefined,
       customerName: customerName || 'Umum',
       description: serviceData.description,

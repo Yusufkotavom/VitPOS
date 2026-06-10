@@ -1,4 +1,4 @@
-import { buildBaimTenantQuery } from '@/lib/baim-runtime'
+import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { apiGet, buildTenantQuery } from '@/services/api/client'
 
 export type BalanceSheetData = {
@@ -21,7 +21,7 @@ export type BalanceSheetData = {
 }
 
 export async function fetchBalanceSheet(params?: { from?: string; to?: string }) {
-  const query = buildTenantQuery(buildBaimTenantQuery())
+  const query = buildTenantQuery({ tenantId: resolveTenantId() })
   if (params?.from) query.set('from', params.from)
   if (params?.to) query.set('to', params.to)
   const res = await apiGet<{ ok: true; data: BalanceSheetData }>('/reports/balance-sheet', query)

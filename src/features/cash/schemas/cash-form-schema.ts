@@ -9,7 +9,7 @@ export const cashStatusOptions = ['Tercatat', 'Pending Sinkron', 'Butuh Review']
 export const cashAccountOptions = ['Kas Toko', 'Bank BCA', 'Bank Mandiri', 'Bank BRI'] as const
 
 export const cashFormSchema = z.object({
-  ref: z.string().trim().min(1, 'Nomor referensi wajib diisi'),
+  ref: z.string().trim(),
   date: z.string().trim().min(1, 'Tanggal wajib diisi'),
   account: z.string().trim().min(1, 'Akun kas wajib diisi'),
   category: z.string().trim().min(1, 'Kategori wajib diisi'),

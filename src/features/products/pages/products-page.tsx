@@ -54,19 +54,19 @@ export function ProductsPage() {
   const [view, setView] = useState<'list' | 'card'>('list')
   const [search, setSearch] = useState('')
   const [filterOpen, setFilterOpen] = useState(false)
-  const [filterType, setFilterType] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
+  const [filterType, setFilterType] = useState('all')
+  const [filterStatus, setFilterStatus] = useState('all')
   const [importOpen, setImportOpen] = useState(false)
   const activeView = view
 
   const filtered = productRows.filter(row => {
     if (search && ![row.name, row.category, row.type].some(f => f.toLowerCase().includes(search.toLowerCase()))) return false
-    if (filterType && row.type !== filterType) return false
-    if (filterStatus && row.status !== filterStatus) return false
+    if (filterType !== 'all' && row.type !== filterType) return false
+    if (filterStatus !== 'all' && row.status !== filterStatus) return false
     return true
   })
 
-  const hasActiveFilter = filterType || filterStatus
+  const hasActiveFilter = filterType !== 'all' || filterStatus !== 'all'
 
   return (
     <PageShell title="Barang & Jasa" description="Kelola produk fisik, jasa, harga grosir, gambar, dan stok." actions={<ProductCrudActions />}>
@@ -92,7 +92,7 @@ export function ProductsPage() {
                         <SelectValue placeholder="Pilih..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Semua</SelectItem>
+                        <SelectItem value="all">Semua</SelectItem>
                         <SelectItem value="Produk Fisik">Barang</SelectItem>
                         <SelectItem value="Jasa">Jasa</SelectItem>
                       </SelectContent>
@@ -105,7 +105,7 @@ export function ProductsPage() {
                         <SelectValue placeholder="Pilih..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Semua</SelectItem>
+                        <SelectItem value="all">Semua</SelectItem>
                         <SelectItem value="Aktif">Aktif</SelectItem>
                         <SelectItem value="Draft">Draft</SelectItem>
                         <SelectItem value="Arsip">Arsip</SelectItem>
@@ -114,7 +114,7 @@ export function ProductsPage() {
                   </div>
                   <div className="flex gap-2 pt-2">
                     {hasActiveFilter && (
-                      <Button variant="outline" className="flex-1" onClick={() => { setFilterType(''); setFilterStatus('') }}>
+                      <Button variant="outline" className="flex-1" onClick={() => { setFilterType('all'); setFilterStatus('all') }}>
                         Reset
                       </Button>
                     )}

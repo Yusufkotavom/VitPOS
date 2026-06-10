@@ -41,7 +41,20 @@ export function CashCrudActions({ cash }: { cash?: LocalCash }) {
 
   async function handleSubmit(values: CashFormValues) {
     const id = cash?.id ?? crypto.randomUUID()
-    await cashRepository.upsert(mapCashFormToRecord(values, id))
+    
+    let finalRef = values.ref.trim()
+    if (!finalRef) {
+      const allCash = await cashRepository.list()
+      const existingRefs = allCash.map(c => c.ref).filter(r => r.startsWith('KAS-'))
+      const maxNum = existingRefs.reduce((max, r) => {
+        const num = parseInt(r.replace('KAS-', ''), 10)
+        return !isNaN(num) && num > max ? num : max
+      }, 0)
+      finalRef = `KAS-${String(maxNum + 1).padStart(3, '0')}`
+    }
+
+    const finalValues = { ...values, ref: finalRef }
+    await cashRepository.upsert(mapCashFormToRecord(finalValues, id))
     toast.success(isEdit ? 'Transaksi diperbarui' : 'Transaksi ditambahkan')
     setFormOpen(false)
   }
@@ -79,7 +92,7 @@ export function CashCrudActions({ cash }: { cash?: LocalCash }) {
             <FieldGroup>
               <Field data-invalid={!!errors.ref}>
                 <Label htmlFor="ref">No. Referensi</Label>
-                <Input id="ref" {...form.register('ref')} aria-invalid={!!errors.ref} placeholder="KAS-004" />
+                <Input id="ref" {...form.register('ref')} aria-invalid={!!errors.ref} placeholder="Otomatis jika kosong" />
               </Field>
               <Field data-invalid={!!errors.date}>
                 <Label htmlFor="date">Tanggal</Label>
@@ -149,7 +162,7 @@ export function CashCrudActions({ cash }: { cash?: LocalCash }) {
                                 <SelectItem value="_none" disabled>Tidak ada kategori</SelectItem>
                               ) : (
                                 filteredCategories.map(cat => (
-                                  <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                                  <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                                 ))
                               )}
                             </SelectGroup>

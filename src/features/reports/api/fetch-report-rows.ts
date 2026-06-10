@@ -1,4 +1,4 @@
-import { buildBaimTenantQuery } from '@/lib/baim-runtime'
+import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { apiGet, buildTenantQuery } from '@/services/api/client'
 
 export type ReportRow = {
@@ -39,7 +39,7 @@ type InventoryMovementResponse = {
 }
 
 export async function fetchReportRows(params?: { from?: string; to?: string }) {
-  const query = buildTenantQuery(buildBaimTenantQuery())
+  const query = buildTenantQuery({ tenantId: resolveTenantId() })
   if (params?.from) query.set('from', params.from)
   if (params?.to) query.set('to', params.to)
 

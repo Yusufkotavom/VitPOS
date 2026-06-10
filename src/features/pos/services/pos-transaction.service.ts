@@ -25,10 +25,13 @@ function todayLabel() {
   return new Intl.DateTimeFormat('id-ID', { dateStyle: 'long' }).format(new Date())
 }
 
-function orderCode() {
-  const stamp = new Date().toISOString().slice(2, 10).replace(/-/g, '')
-  const rand = crypto.randomUUID().slice(0, 3).toUpperCase()
-  return `INV-${stamp}-${rand}`
+async function orderCode(): Promise<string> {
+  const all = await localDb.salesOrders.toArray()
+  const max = all.reduce((highest, o) => {
+    const m = o.code.match(/^INV-(\d+)$/)
+    return m ? Math.max(highest, parseInt(m[1], 10)) : highest
+  }, 0)
+  return `INV-${String(max + 1).padStart(4, '0')}`
 }
 
 function isPaidStatus(total: number, paid: number): LocalSalesOrder['status'] {
@@ -120,7 +123,7 @@ export const posTransactionService = {
     const salesOrder: LocalSalesOrder = {
       id: salesOrderId,
       tenantId,
-      code: orderCode(),
+      code: await orderCode(),
       customerId: customerId ?? undefined,
       customerName: customerName || 'Umum',
       date: todayLabel(),

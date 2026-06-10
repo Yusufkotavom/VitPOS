@@ -32,10 +32,6 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
     defaultValues: defaultValues ?? productInitialValues,
   })
 
-  useEffect(() => {
-    form.reset(defaultValues ?? productInitialValues)
-  }, [defaultValues, form])
-
   const errors = form.formState.errors
   const type = useWatch({ control: form.control, name: 'type' })
   const manageStock = useWatch({ control: form.control, name: 'manageStock' })
@@ -44,6 +40,10 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [previewImage, setPreviewImage] = useState<string | null>(defaultValues?.imageUrl || null)
+
+  useEffect(() => {
+    setPreviewImage(defaultValues?.imageUrl || null)
+  }, [defaultValues?.imageUrl])
   const selectedIcon = useWatch({ control: form.control, name: 'icon' })
   const categoryOptions = ['Umum', ...categoryRows.filter((category) => category.status === 'Aktif').map((category) => category.name)]
 

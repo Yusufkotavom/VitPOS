@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { apiGet } from '@/services/api/client'
 import { localDb } from '@/services/local-db/client'
 import type { LocalTenant } from '@/services/local-db/schema'
 
@@ -81,9 +82,35 @@ export function TenantSelectorPage() {
     loadTenants()
   }, [currentUser])
 
-  function handleSelect(tenant: LocalTenant, role: string) {
+  async function handleSelect(tenant: LocalTenant, role: string) {
     localStorage.removeItem('vitpos-initial-sync-done')
     setActiveTenant(tenant, role)
+
+    const existingBranch = await localDb.settings
+      .where('tenantId')
+      .equals(tenant.id)
+      .filter((s) => s.setting === 'default_branch_id')
+      .first()
+
+    if (!existingBranch) {
+      try {
+        const res = await apiGet<{ ok: true; id: string; name: string }>('/tenants/default-branch', new URLSearchParams({ tenantId: tenant.id }))
+        if (res.ok) {
+          await localDb.settings.put({
+            id: `${tenant.id}:default-branch-id`,
+            tenantId: tenant.id,
+            area: 'System',
+            setting: 'default_branch_id',
+            value: res.id,
+            status: 'Lengkap',
+            updatedAt: new Date().toISOString(),
+          })
+        }
+      } catch {
+        // API tidak tersedia — branchId akan di-resolve saat sync pertama
+      }
+    }
+
     navigate('/')
   }
 

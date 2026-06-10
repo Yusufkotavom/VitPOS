@@ -43,6 +43,13 @@
       "when": 1781100000000,
       "tag": "0005_report_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781112092981,
+      "tag": "0006_last_kinsey_walden",
+      "breakpoints": true
     }
   ]
 }

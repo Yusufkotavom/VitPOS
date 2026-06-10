@@ -12,9 +12,14 @@ export type SyncMutationInput = SyncPushBody['mutations'][number]
 const syncEntityTypes = new Set<SyncEntityType>(['product', 'customer', 'sale', 'payment', 'stock_movement', 'cash', 'cash_category', 'setting', 'shift', 'product_category', 'supplier', 'purchase', 'return', 'service_order', 'payment_method', 'recipe'])
 const syncMutationTypes = new Set<SyncMutationType>(['create', 'update', 'delete'])
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const prefixedIdPattern = /^[a-z]+-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function isUuid(value: unknown): value is string {
   return typeof value === 'string' && uuidPattern.test(value)
+}
+
+function isPrefixedId(value: unknown): value is string {
+  return typeof value === 'string' && prefixedIdPattern.test(value)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -84,7 +89,11 @@ export function parseSyncPushBody(input: unknown): ValidationResult<SyncPushBody
     if (!isRecord(mutation)) {
       return { ok: false, message: 'mutations invalid' }
     }
-    if (!isUuid(mutation.entityId)) {
+    if (mutation.entityType === 'setting') {
+      if (typeof mutation.entityId !== 'string' || mutation.entityId.trim().length === 0) {
+        return { ok: false, message: 'mutations entityId invalid' }
+      }
+    } else if (!isUuid(mutation.entityId) && !isPrefixedId(mutation.entityId)) {
       return { ok: false, message: 'mutations entityId invalid' }
     }
     if (!syncEntityTypes.has(mutation.entityType as SyncEntityType)) {

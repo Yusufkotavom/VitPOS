@@ -5,7 +5,7 @@ var __export = (target, all) => {
 };
 
 // src/app.ts
-import { Hono as Hono8 } from "hono";
+import { Hono as Hono9 } from "hono";
 import { cors } from "hono/cors";
 
 // src/features/auth/routes.ts
@@ -454,7 +454,7 @@ var outboxLogs = pgTable("outbox_logs", {
   branchId: uuid("branch_id").references(() => branches.id),
   deviceId: varchar("device_id", { length: 120 }).notNull(),
   entityType: varchar("entity_type", { length: 80 }).notNull(),
-  entityId: uuid("entity_id").notNull(),
+  entityId: varchar("entity_id", { length: 120 }).notNull(),
   mutationType: varchar("mutation_type", { length: 40 }).notNull(),
   payload: jsonb("payload").notNull(),
   status: syncStatusEnum("status").default("pending").notNull(),
@@ -1257,8 +1257,12 @@ function serverSyncStatusToApiItemStatus(status) {
 var syncEntityTypes = /* @__PURE__ */ new Set(["product", "customer", "sale", "payment", "stock_movement", "cash", "cash_category", "setting", "shift", "product_category", "supplier", "purchase", "return", "service_order", "payment_method", "recipe"]);
 var syncMutationTypes = /* @__PURE__ */ new Set(["create", "update", "delete"]);
 var uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+var prefixedIdPattern = /^[a-z]+-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function isUuid(value) {
   return typeof value === "string" && uuidPattern.test(value);
+}
+function isPrefixedId(value) {
+  return typeof value === "string" && prefixedIdPattern.test(value);
 }
 function isRecord(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -1315,7 +1319,11 @@ function parseSyncPushBody(input) {
     if (!isRecord(mutation)) {
       return { ok: false, message: "mutations invalid" };
     }
-    if (!isUuid(mutation.entityId)) {
+    if (mutation.entityType === "setting") {
+      if (typeof mutation.entityId !== "string" || mutation.entityId.trim().length === 0) {
+        return { ok: false, message: "mutations entityId invalid" };
+      }
+    } else if (!isUuid(mutation.entityId) && !isPrefixedId(mutation.entityId)) {
       return { ok: false, message: "mutations entityId invalid" };
     }
     if (!syncEntityTypes.has(mutation.entityType)) {
@@ -1352,6 +1360,10 @@ function parseSyncPushBody(input) {
 
 // src/features/sync/apply.ts
 import { and as and3, eq as eq3 } from "drizzle-orm";
+var uuidPattern2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function isValidUuid(value) {
+  return uuidPattern2.test(value);
+}
 function toNumeric(value) {
   if (value === void 0 || value === null) return "0";
   if (typeof value === "number") return String(value);
@@ -1359,7 +1371,9 @@ function toNumeric(value) {
   return Number.isFinite(parsed) ? String(parsed) : "0";
 }
 function toNullableUuid(value) {
-  return typeof value === "string" && value.length > 0 ? value : null;
+  if (typeof value !== "string" || value.length === 0) return null;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(value) ? value : null;
 }
 function mapClientProductType(value) {
   if (value === "Jasa" || value === "service") return "service";
@@ -1482,7 +1496,7 @@ async function applySale(db2, ctx, entityId, mutationType, payload) {
     if (payload.items.length > 0) {
       await db2.insert(salesOrderItems).values(
         payload.items.map((item) => ({
-          id: item.id ?? crypto.randomUUID(),
+          id: item.id && isValidUuid(item.id) ? item.id : crypto.randomUUID(),
           tenantId: ctx.tenantId,
           salesOrderId: entityId,
           productId: toNullableUuid(item.productId),
@@ -1542,12 +1556,24 @@ async function applyStockMovement(db2, ctx, entityId, mutationType, payload) {
     await db2.delete(stockMovements).where(eq3(stockMovements.id, entityId));
     return;
   }
+  let warehouseId = payload.warehouseId;
+  if (!warehouseId && ctx.branchId) {
+    const defaultWarehouse = await db2.select({ id: warehouses.id }).from(warehouses).where(and3(eq3(warehouses.tenantId, ctx.tenantId), eq3(warehouses.branchId, ctx.branchId), eq3(warehouses.isDefault, true))).limit(1).then((rows) => rows[0]);
+    warehouseId = defaultWarehouse?.id;
+  }
+  if (!warehouseId) {
+    const anyWarehouse = await db2.select({ id: warehouses.id }).from(warehouses).where(eq3(warehouses.tenantId, ctx.tenantId)).limit(1).then((rows) => rows[0]);
+    warehouseId = anyWarehouse?.id;
+  }
+  if (!warehouseId) {
+    throw new Error("No warehouse found for stock_movement mutation");
+  }
   const now = /* @__PURE__ */ new Date();
   await db2.insert(stockMovements).values({
     id: entityId,
     tenantId: ctx.tenantId,
     branchId: toNullableUuid(ctx.branchId),
-    warehouseId: ctx.branchId ?? "",
+    warehouseId,
     productId: payload.productId,
     type: mapClientStockMovementType(payload.type),
     qty: toNumeric(payload.qty),
@@ -1860,7 +1886,7 @@ async function applyPurchase(db2, ctx, entityId, mutationType, payload) {
     if (payload.items.length > 0) {
       await db2.insert(purchaseItems).values(
         payload.items.map((item) => ({
-          id: item.id ?? crypto.randomUUID(),
+          id: item.id && isValidUuid(item.id) ? item.id : crypto.randomUUID(),
           tenantId: ctx.tenantId,
           purchaseId: entityId,
           productId: toNullableUuid(item.productId),
@@ -1910,7 +1936,7 @@ async function applyReturn(db2, ctx, entityId, mutationType, payload) {
     if (payload.items.length > 0) {
       await db2.insert(returnItems).values(
         payload.items.map((item) => ({
-          id: item.id ?? crypto.randomUUID(),
+          id: item.id && isValidUuid(item.id) ? item.id : crypto.randomUUID(),
           tenantId: ctx.tenantId,
           returnId: entityId,
           productId: toNullableUuid(item.productId),
@@ -2217,10 +2243,12 @@ syncRoutes.get("/pull", async (c) => {
         barcode: row.barcode,
         type: row.type === "service" ? "Jasa" : "Produk Fisik",
         price: Number(row.salePrice),
-        stock: 0,
+        salePrice: Number(row.salePrice),
+        costPrice: row.costPrice ? Number(row.costPrice) : void 0,
+        wholesalePrice: row.wholesalePrice ? Number(row.wholesalePrice) : void 0,
+        imageUrl: row.imageUrl,
         status: row.isActive ? "Aktif" : "Arsip",
         isActive: row.isActive,
-        salePrice: Number(row.salePrice),
         version: row.version
       },
       transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
@@ -2243,6 +2271,7 @@ syncRoutes.get("/pull", async (c) => {
         taxTotal: Number(row.taxTotal),
         grandTotal: Number(row.grandTotal),
         paidTotal: Number(row.paidTotal),
+        notes: row.notes,
         version: row.version
       },
       transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
@@ -2259,6 +2288,9 @@ syncRoutes.get("/pull", async (c) => {
         ref: row.paymentNumber,
         paymentNumber: row.paymentNumber,
         salesOrderId: row.salesOrderId,
+        serviceOrderId: row.serviceOrderId,
+        purchaseId: row.purchaseId,
+        source: row.source,
         method: row.method,
         amount: Number(row.amount),
         status: row.status
@@ -2460,6 +2492,7 @@ syncRoutes.get("/pull", async (c) => {
         description: row.description,
         date: row.date.toISOString(),
         cost: Number(row.cost),
+        paidTotal: Number(row.paidTotal),
         status: row.status,
         version: row.version
       },
@@ -2958,8 +2991,30 @@ subscriptionRoutes.post("/tenants/:tenantId/cancel", async (c) => {
   return c.json({ ok: true, item: updated });
 });
 
-// src/features/updates/routes.ts
+// src/features/tenants/routes.ts
+import { and as and6, eq as eq8 } from "drizzle-orm";
 import { Hono as Hono7 } from "hono";
+var tenantRoutes = new Hono7();
+tenantRoutes.get("/default-branch", async (c) => {
+  const tenantId = c.req.query("tenantId");
+  if (!tenantId) {
+    return c.json({ ok: false, message: "tenantId required" }, 400);
+  }
+  const branch = await db.query.branches.findFirst({
+    where: and6(
+      eq8(branches.tenantId, tenantId),
+      eq8(branches.isDefault, true),
+      eq8(branches.isActive, true)
+    )
+  });
+  if (!branch) {
+    return c.json({ ok: false, message: "No default branch found for this tenant" }, 404);
+  }
+  return c.json({ ok: true, id: branch.id, name: branch.name });
+});
+
+// src/features/updates/routes.ts
+import { Hono as Hono8 } from "hono";
 
 // src/features/updates/service.ts
 var GITHUB_RELEASES_API_URL = process.env.GITHUB_RELEASES_API_URL ?? "https://api.github.com/repos/Yusufkotavom/VitPOS/releases/latest";
@@ -3097,7 +3152,7 @@ async function resolveAppUpdate(platform, currentVersion) {
 }
 
 // src/features/updates/routes.ts
-var updateRoutes = new Hono7();
+var updateRoutes = new Hono8();
 updateRoutes.get("/latest", async (c) => {
   const platform = c.req.query("platform");
   const currentVersion = c.req.query("currentVersion");
@@ -3120,7 +3175,7 @@ updateRoutes.get("/desktop/:target/:arch/:currentVersion", async (c) => {
 
 // src/app.ts
 function createApp() {
-  const app2 = new Hono8();
+  const app2 = new Hono9();
   app2.use("*", cors());
   app2.get("/", (c) => c.json({ message: "VitPOS API is running!" }));
   app2.route("/health", healthRoutes);
@@ -3130,6 +3185,7 @@ function createApp() {
   app2.route("/api/v1/reports", reportRoutes);
   app2.route("/api/v1/platform", platformRoutes);
   app2.route("/api/v1/subscription", subscriptionRoutes);
+  app2.route("/api/v1/tenants", tenantRoutes);
   app2.route("/api/v1/updates", updateRoutes);
   app2.onError((error, c) => {
     return c.json({ ok: false, message: error.message }, 500);
