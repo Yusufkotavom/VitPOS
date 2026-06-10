@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Building2,
   Boxes,
   MessageSquare,
   ClipboardList,
@@ -110,9 +111,10 @@ export const sidebarNavigation: SidebarNavigationGroup[] = [
       { to: '/sync', label: appLabels.offlineSync, icon: RefreshCw },
       {
         to: '/settings',
-        label: appLabels.companySetting,
+        label: 'Pengaturan',
         icon: Settings,
         items: [
+          { to: '/settings/company', label: 'Profil Usaha', icon: Building2 },
           { to: '/settings/profile', label: 'Profil Pengguna', icon: Users },
           { to: '/settings/invoice', label: 'Invoice & Struk', icon: ReceiptText },
           { to: '/settings/templates', label: 'Template WhatsApp', icon: MessageSquare },

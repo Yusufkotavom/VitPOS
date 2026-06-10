@@ -27,6 +27,7 @@ const SalesReportPage = lazy(() => import('@/features/reports/pages/sales-report
 const PaymentReportPage = lazy(() => import('@/features/reports/pages/payment-report-page').then(pick('PaymentReportPage')))
 const InventoryReportPage = lazy(() => import('@/features/reports/pages/inventory-report-page').then(pick('InventoryReportPage')))
 const SettingsPage = lazy(() => import('@/features/settings/pages/settings-page').then(pick('SettingsPage')))
+const CompanySettingsPage = lazy(() => import('@/features/settings/pages/company-settings-page').then(pick('CompanySettingsPage')))
 const UserProfilePage = lazy(() => import('@/features/settings/pages/user-profile-page').then(pick('UserProfilePage')))
 const InvoiceSettingsPage = lazy(() => import('@/features/settings/pages/invoice-settings-page').then(pick('InvoiceSettingsPage')))
 const SubscriptionPage = lazy(() => import('@/features/settings/pages/subscription-page').then(pick('SubscriptionPage')))
@@ -101,6 +102,7 @@ export const router = createBrowserRouter([
       { path: 'suppliers', element: routeElement(SuppliersPage) },
       { path: 'returns', element: routeElement(ReturnsPage) },
       { path: 'settings', element: routeElement(SettingsPage) },
+      { path: 'settings/company', element: routeElement(CompanySettingsPage) },
       { path: 'settings/profile', element: routeElement(UserProfilePage) },
       { path: 'settings/invoice', element: routeElement(InvoiceSettingsPage) },
       { path: 'settings/billing', element: routeElement(SubscriptionPage) },

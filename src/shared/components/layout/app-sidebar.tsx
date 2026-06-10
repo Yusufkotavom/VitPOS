@@ -1,4 +1,4 @@
-import { Building2, ChevronsUpDown, Store, ShoppingCart, Coffee, Monitor } from 'lucide-react'
+import { Building2, ChevronsUpDown, ChevronRight, Store, ShoppingCart, Coffee, Monitor } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 
 import { sidebarNavigation } from '@/app/navigation'
@@ -18,6 +18,7 @@ import {
   SidebarMenuSubItem,
   SidebarRail,
 } from '@/components/ui/sidebar'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { useSyncStore } from '@/features/sync/stores/sync-store'
 import { useSettings } from '@/features/settings/hooks/use-settings'
 import { SyncStatusBadge } from '@/shared/components/sync/sync-status-badge'
@@ -66,30 +67,48 @@ export function AppSidebar() {
             <SidebarGroupLabel>{group.group}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.to}>
-                    <SidebarMenuButton asChild tooltip={item.label}>
-                      <NavLink to={item.to} end={item.to === '/'}>
-                        <item.icon aria-hidden="true" />
-                        <span>{item.label}</span>
-                      </NavLink>
-                    </SidebarMenuButton>
-                    {item.items?.length ? (
-                      <SidebarMenuSub>
-                        {item.items.map((child) => (
-                          <SidebarMenuSubItem key={child.to}>
-                            <SidebarMenuSubButton asChild>
-                              <NavLink to={child.to}>
-                                <child.icon aria-hidden="true" />
-                                <span>{child.label}</span>
-                              </NavLink>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    ) : null}
-                  </SidebarMenuItem>
-                ))}
+                {group.items.map((item) => {
+                  if (item.items?.length) {
+                    return (
+                      <Collapsible key={item.to} defaultOpen className="group/collapsible">
+                        <SidebarMenuItem>
+                          <CollapsibleTrigger asChild>
+                            <SidebarMenuButton tooltip={item.label}>
+                              <item.icon aria-hidden="true" />
+                              <span>{item.label}</span>
+                              <ChevronRight className="ml-auto size-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                            </SidebarMenuButton>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <SidebarMenuSub>
+                              {item.items.map((child) => (
+                                <SidebarMenuSubItem key={child.to}>
+                                  <SidebarMenuSubButton asChild>
+                                    <NavLink to={child.to} end={child.to === '/settings'}>
+                                      <child.icon aria-hidden="true" />
+                                      <span>{child.label}</span>
+                                    </NavLink>
+                                  </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                              ))}
+                            </SidebarMenuSub>
+                          </CollapsibleContent>
+                        </SidebarMenuItem>
+                      </Collapsible>
+                    )
+                  }
+                  
+                  return (
+                    <SidebarMenuItem key={item.to}>
+                      <SidebarMenuButton asChild tooltip={item.label}>
+                        <NavLink to={item.to} end={item.to === '/'}>
+                          <item.icon aria-hidden="true" />
+                          <span>{item.label}</span>
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

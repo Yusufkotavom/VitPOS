@@ -51,8 +51,8 @@ export function UserProfilePage() {
   if (!currentUser) return null
 
   return (
-    <PageShell title="Profil Pengguna" description="Atur nama, email, password, dan langganan akun.">
-      <SettingsNav className="mb-6" />
+    <PageShell title="Profil Pengguna" description="Atur nama, email, password, dan langganan akun." backTo="/settings">
+      <SettingsNav className="mb-6 hidden md:flex" />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
         <ContentCard title="Informasi Akun" description="Perbarui detail login pengguna aktif.">
           <form onSubmit={onSubmit} className="flex flex-col gap-5">

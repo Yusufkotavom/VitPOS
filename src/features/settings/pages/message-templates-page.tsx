@@ -56,8 +56,8 @@ export function MessageTemplatesPage() {
   }
 
   return (
-    <PageShell title="Template Pesan WhatsApp" description="Atur template pesan WhatsApp untuk berbagai keperluan">
-      <SettingsNav className="mb-6" />
+    <PageShell title="Template Pesan WhatsApp" description="Atur template pesan WhatsApp untuk berbagai keperluan" backTo="/settings">
+      <SettingsNav className="mb-6 hidden md:flex" />
       <div className="space-y-6">
         {TEMPLATE_TYPES.map((type) => (
           <div key={type} className="rounded-2xl border bg-background p-5 shadow-sm">

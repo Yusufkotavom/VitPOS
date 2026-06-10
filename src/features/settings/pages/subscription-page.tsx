@@ -92,8 +92,8 @@ export function SubscriptionPage() {
   const plans = plansQuery.data ?? []
 
   return (
-    <PageShell title="Langganan & Tagihan" description="Kelola paket, periode, dan status langganan usaha Anda.">
-      <SettingsNav className="mb-6" />
+    <PageShell title="Langganan & Tagihan" description="Kelola paket, periode, dan status langganan usaha Anda." backTo="/settings">
+      <SettingsNav className="mb-6 hidden md:flex" />
 
       <div className="space-y-6">
         <ContentCard
