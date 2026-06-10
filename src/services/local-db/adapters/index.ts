@@ -7,6 +7,8 @@ export type AdapterTable<T extends { id: string }> = {
   count(): Promise<number>
   bulkPut(rows: T[]): Promise<unknown>
   clear(): Promise<void>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  where?(column: string): any
 }
 
 export type LocalDbAdapterName = 'indexeddb' | 'sqlite'
@@ -40,7 +42,9 @@ export const LOCAL_DB_TABLES = [
   'stockMovements',
   'inventory',
   'cash',
+  'cashCategories',
   'settings',
+  'paymentMethods',
   'shifts',
   'suppliers',
   'purchases',
@@ -48,6 +52,8 @@ export const LOCAL_DB_TABLES = [
   'returns',
   'returnItems',
   'serviceOrders',
+  'recipes',
+  'productionBatches',
   'outbox',
   'syncConflicts',
   'syncRuns',

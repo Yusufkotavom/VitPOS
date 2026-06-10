@@ -32,6 +32,12 @@ export function InitialSyncScreen({ onDone }: { onDone: () => void }) {
     return () => clearInterval(timer)
   }, [phase])
 
+  const handleSkip = useCallback(() => {
+    localStorage.setItem('vitpos-initial-sync-done', 'true')
+    setFadeOut(true)
+    setTimeout(() => onDone(), FADE_OUT_MS)
+  }, [onDone])
+
   const triggerSync = useCallback(async () => {
     setPhase('syncing')
     try {
@@ -51,24 +57,24 @@ export function InitialSyncScreen({ onDone }: { onDone: () => void }) {
       setTimeout(() => {
         if (mountedRef.current) {
           setFadeOut(true)
-          setTimeout(() => { mountedRef.current && onDone() }, FADE_OUT_MS)
+          setTimeout(() => { if (mountedRef.current) onDone() }, FADE_OUT_MS)
         }
       }, DONE_DELAY_MS)
     } catch {
       if (mountedRef.current) setPhase('error')
     }
-  }, [onDone])
+  }, [onDone, handleSkip])
 
   useEffect(() => {
-    triggerSync()
-    return () => { mountedRef.current = false }
+    let active = true
+    if (active) {
+       // Start sync on next tick to prevent synchronous setState inside effect
+       setTimeout(() => {
+         if (mountedRef.current) void triggerSync()
+       }, 0)
+    }
+    return () => { active = false; mountedRef.current = false }
   }, [triggerSync])
-
-  function handleSkip() {
-    localStorage.setItem('vitpos-initial-sync-done', 'true')
-    setFadeOut(true)
-    setTimeout(() => onDone(), FADE_OUT_MS)
-  }
 
   return (
     <div

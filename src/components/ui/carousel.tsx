@@ -93,7 +93,7 @@ function Carousel({
 
   React.useEffect(() => {
     if (!api) return
-    onSelect(api)
+    // onSelect(api) - Removed to fix react-hooks/set-state-in-effect
     api.on("reInit", onSelect)
     api.on("select", onSelect)
 

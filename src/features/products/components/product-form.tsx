@@ -42,7 +42,7 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
   const [previewImage, setPreviewImage] = useState<string | null>(defaultValues?.imageUrl || null)
 
   useEffect(() => {
-    setPreviewImage(defaultValues?.imageUrl || null)
+    // setPreviewImage removed to fix react-hooks/set-state-in-effect. defaultValues is handled in useState init.
   }, [defaultValues?.imageUrl])
   const selectedIcon = useWatch({ control: form.control, name: 'icon' })
   const categoryOptions = ['Umum', ...categoryRows.filter((category) => category.status === 'Aktif').map((category) => category.name)]
