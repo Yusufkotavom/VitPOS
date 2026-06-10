@@ -1,4 +1,5 @@
 import { useDashboardStats } from '@/features/dashboard/hooks/use-dashboard-stats'
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 
 export function DashboardAlertList() {
   const { dashboardAlerts } = useDashboardStats()
@@ -9,15 +10,17 @@ export function DashboardAlertList() {
         const Icon = alert.icon
 
         return (
-          <article key={alert.title} className="rounded-2xl border bg-background p-5 shadow-sm">
-            <div className="flex items-center gap-3">
-              <Icon className={alert.tone} />
-              <div>
-                <h2 className="text-lg font-semibold">{alert.title}</h2>
-                <p className="text-sm text-muted-foreground">{alert.description}</p>
+          <Card key={alert.title} className="shadow-sm">
+            <CardHeader className="flex flex-row items-center gap-4 py-4">
+              <div className="rounded-full bg-muted/50 p-2.5">
+                <Icon className={`size-5 ${alert.tone}`} />
               </div>
-            </div>
-          </article>
+              <div className="flex flex-col">
+                <CardTitle className="text-base">{alert.title}</CardTitle>
+                <CardDescription className="mt-0.5">{alert.description}</CardDescription>
+              </div>
+            </CardHeader>
+          </Card>
         )
       })}
     </div>

@@ -368,6 +368,8 @@ export type LocalPaymentMethod = {
   type: string
   accountNumber?: string
   accountName?: string
+  qrImageUrl?: string
+  instructions?: string
   status: 'Aktif' | 'Tidak Aktif'
   updatedAt: string
 }

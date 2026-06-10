@@ -1,25 +1,51 @@
 import { useDashboardStats } from '@/features/dashboard/hooks/use-dashboard-stats'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
 
 export function RecentTransactions() {
   const { dashboardTransactions } = useDashboardStats()
 
   return (
-    <article className="rounded-2xl border bg-background p-5 shadow-sm">
-      <h2 className="text-lg font-semibold">Transaksi Terbaru</h2>
-      <div className="mt-4 overflow-hidden rounded-2xl border">
-        {dashboardTransactions.map((transaction) => (
-          <div key={transaction.code} className="flex flex-col gap-2 border-b p-4 last:border-b-0 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="font-medium">{transaction.code}</p>
-              <p className="text-sm text-muted-foreground">{transaction.customer}</p>
-            </div>
-            <div className="text-right">
-              <p className="font-semibold">{transaction.total}</p>
-              <p className="text-sm text-muted-foreground">{transaction.status}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </article>
+    <Card className="shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-lg">Transaksi Terbaru</CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30">
+                <TableHead className="w-[120px]">ID Pesanan</TableHead>
+                <TableHead>Pelanggan</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right w-[100px]">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {dashboardTransactions.map((transaction) => (
+                <TableRow key={transaction.code} className="hover:bg-muted/10">
+                  <TableCell className="font-medium text-primary">{transaction.code}</TableCell>
+                  <TableCell>{transaction.customer}</TableCell>
+                  <TableCell className="text-right font-semibold">{transaction.total}</TableCell>
+                  <TableCell className="text-right">
+                    <Badge variant={transaction.status?.toLowerCase() === 'lunas' ? 'default' : 'secondary'} className="font-normal capitalize">
+                      {transaction.status || 'Draft'}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {dashboardTransactions.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                    Belum ada transaksi hari ini
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

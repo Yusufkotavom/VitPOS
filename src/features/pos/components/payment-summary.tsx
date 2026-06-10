@@ -124,6 +124,8 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
     window.open(buildWhatsAppLink(phone, text), '_blank')
   }
 
+  const selectedMethodObj = activeMethods.find(m => m.name.toLowerCase() === store.paymentMethod) as any
+
   return (
     <div className="flex flex-col gap-4">
       <PosSuccessDialog 
@@ -190,7 +192,7 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
       <div className="space-y-3 pt-2">
         <label className="text-sm font-medium">Metode Pembayaran</label>
         <div className="grid grid-cols-3 gap-2">
-          {activeMethods.map((method: { id: string; name: string }) => (
+          {activeMethods.map((method: any) => (
             <Button
               key={method.id}
               variant={store.paymentMethod === method.name.toLowerCase() ? 'default' : 'outline'}
@@ -202,6 +204,30 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
           ))}
         </div>
       </div>
+
+      {selectedMethodObj && (selectedMethodObj.qrImageUrl || selectedMethodObj.instructions) && (
+        <div className="bg-primary/5 rounded-xl p-4 flex flex-col items-center justify-center gap-3 border border-primary/20">
+          <h4 className="font-semibold text-primary">{selectedMethodObj.name}</h4>
+          {selectedMethodObj.qrImageUrl && (
+            <div className="bg-white p-2 rounded-xl shadow-sm">
+              <img 
+                src={selectedMethodObj.qrImageUrl} 
+                alt={`QRIS ${selectedMethodObj.name}`} 
+                className="w-48 h-48 object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  e.currentTarget.parentElement!.innerHTML = '<div class="w-48 h-48 flex items-center justify-center bg-muted/30 text-muted-foreground text-xs text-center rounded">Gambar<br/>Gagal Dimuat</div>';
+                }}
+              />
+            </div>
+          )}
+          {selectedMethodObj.instructions && (
+            <div className="text-sm text-center text-muted-foreground whitespace-pre-wrap mt-2">
+              {selectedMethodObj.instructions}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="space-y-3 p-4 border rounded-2xl bg-muted/10">
         <label className="text-sm font-medium">Uang Diterima / Dibayar</label>
@@ -228,7 +254,7 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
       </div>
 
       <Button size="lg" className="h-14 text-lg font-semibold w-full mt-2" disabled={store.cartItems.length === 0} onClick={handleCheckout}>
-        Selesaikan Pembayaran
+        {selectedMethodObj?.qrImageUrl ? 'Verifikasi & Selesaikan' : 'Selesaikan Pembayaran'}
       </Button>
     </div>
   )

@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { paymentMethodFormSchema, paymentMethodInitialValues, paymentMethodStatusOptions, type PaymentMethodFormValues } from '@/features/settings/schemas/payment-method-schema'
 import { FormSection } from '@/shared/components/forms/form-section'
 import { FormSelect } from '@/shared/components/form/form-select'
@@ -34,7 +35,7 @@ export function PaymentMethodForm({ defaultValues, submitLabel, onCancel, onSubm
           {errors.provider ? <span className="text-xs text-destructive">{errors.provider.message}</span> : null}
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Tipe
+          Tipe (cth: Transfer Bank, QRIS, e-Wallet)
           <Input aria-invalid={Boolean(errors.type)} {...form.register('type')} placeholder="Transfer Bank" />
           {errors.type ? <span className="text-xs text-destructive">{errors.type.message}</span> : null}
         </label>
@@ -49,10 +50,24 @@ export function PaymentMethodForm({ defaultValues, submitLabel, onCancel, onSubm
           {errors.accountName ? <span className="text-xs text-destructive">{errors.accountName.message}</span> : null}
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
+          URL Gambar QRIS (Opsional)
+          <Input aria-invalid={Boolean(errors.qrImageUrl)} {...form.register('qrImageUrl')} placeholder="https://example.com/qris.jpg" />
+          {errors.qrImageUrl ? <span className="text-xs text-destructive">{errors.qrImageUrl.message}</span> : null}
+        </label>
+      </FormSection>
+      
+      <FormSection title="Instruksi & Status" description="Cara pembayaran dan status aktif.">
+        <label className="flex flex-col gap-1 text-sm font-medium sm:col-span-2">
+          Instruksi Pembayaran (Opsional)
+          <Textarea aria-invalid={Boolean(errors.instructions)} {...form.register('instructions')} placeholder="1. Buka aplikasi bank/e-wallet&#10;2. Scan QRIS di atas&#10;3. Masukkan nominal..." className="min-h-24" />
+          {errors.instructions ? <span className="text-xs text-destructive">{errors.instructions.message}</span> : null}
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-medium">
           Status
           <FormSelect control={form.control} name="status" options={paymentMethodStatusOptions.map(o => ({ label: o, value: o }))} />
         </label>
       </FormSection>
+
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button type="button" variant="outline" onClick={onCancel}>Batal</Button>
         <Button type="submit" disabled={form.formState.isSubmitting}>{submitLabel}</Button>
