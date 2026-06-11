@@ -7,23 +7,56 @@ import { useShifts } from '@/features/shift/hooks/use-shifts'
 import { shiftRepository } from '@/services/local-db/repository'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { EmptyState } from '@/shared/components/feedback/empty-state'
+import { useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { localDb } from '@/services/local-db/client'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export function ShiftPage() {
   const shifts = useShifts()
   const currentShift = shifts.find((shift) => shift.status === 'open')
   const closedShifts = shifts.filter((shift) => shift.status === 'closed')
 
+  const [isOpenerOpen, setOpenerOpen] = useState(false)
+  const [isCloserOpen, setCloserOpen] = useState(false)
+  const [startCash, setStartCash] = useState('')
+  const [actualCash, setActualCash] = useState('')
+
+  // Calculate expected cash dynamically
+  const expectedCash = useLiveQuery(async () => {
+    if (!currentShift) return 0
+    const payments = await localDb.payments.where('shiftId').equals(currentShift.id).toArray()
+    // For now, assume all Tunai payments add to cash
+    const cashPayments = payments.filter(p => p.method === 'tunai' && p.status !== 'Failed' && p.status !== 'Pending')
+    const totalCashIncome = cashPayments.reduce((sum, p) => sum + p.amount, 0)
+    
+    // Phase 2 will deduct expenses here
+    return currentShift.startCash + totalCashIncome
+  }, [currentShift?.id, currentShift?.startCash], currentShift?.startCash ?? 0)
+
   async function openShift() {
+    if (!startCash) return toast.error('Modal awal harus diisi')
     try {
       await shiftRepository.upsert({
         id: crypto.randomUUID(),
         tenantId: resolveTenantId(),
         cashierName: 'Kasir Aktif',
         startTime: new Date().toISOString(),
-        startCash: 500000,
+        startCash: parseFloat(startCash),
         status: 'open',
       })
       toast.success('Shift berhasil dibuka')
+      setOpenerOpen(false)
+      setStartCash('')
     } catch (error) {
       toast.error(`Gagal buka shift: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
     }
@@ -31,18 +64,20 @@ export function ShiftPage() {
 
   async function closeShift() {
     if (!currentShift) return
+    if (!actualCash) return toast.error('Uang riil di laci harus diisi')
     try {
-      const expectedCash = currentShift.startCash
-      const actualCash = currentShift.startCash
+      const actual = parseFloat(actualCash)
       await shiftRepository.upsert({
         ...currentShift,
         endTime: new Date().toISOString(),
         expectedCash,
-        actualCash,
-        difference: actualCash - expectedCash,
+        actualCash: actual,
+        difference: actual - expectedCash,
         status: 'closed',
       })
       toast.success('Shift berhasil ditutup')
+      setCloserOpen(false)
+      setActualCash('')
     } catch (error) {
       toast.error(`Gagal tutup shift: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
     }
@@ -59,8 +94,8 @@ export function ShiftPage() {
       description="Buka shift, pantau kas berjalan, cocokkan expected cash, lalu tutup shift."
       actions={
         currentShift
-          ? <Button variant="destructive" onClick={closeShift}>Tutup Shift</Button>
-          : <Button onClick={openShift}>Buka Shift</Button>
+          ? <Button variant="destructive" onClick={() => setCloserOpen(true)}>Tutup Shift</Button>
+          : <Button onClick={() => setOpenerOpen(true)}>Buka Shift</Button>
       }
     >
       <section className="grid gap-3 md:grid-cols-4">
@@ -141,6 +176,62 @@ export function ShiftPage() {
           )}
         </div>
       </div>
+
+      <Dialog open={isOpenerOpen} onOpenChange={setOpenerOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Buka Shift Kasir</DialogTitle>
+            <DialogDescription>Masukkan modal uang kasir (Start Cash) sebelum mulai transaksi.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Modal Awal Kasir (Rp)</Label>
+              <Input
+                type="number"
+                value={startCash}
+                onChange={(e) => setStartCash(e.target.value)}
+                placeholder="Contoh: 500000"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenerOpen(false)}>Batal</Button>
+            <Button onClick={openShift}>Buka Sekarang</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCloserOpen} onOpenChange={setCloserOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tutup Shift Kasir</DialogTitle>
+            <DialogDescription>Masukkan uang fisik yang ada di laci (Actual Cash).</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Estimasi Kas Sistem (Expected)</Label>
+              <Input
+                type="text"
+                disabled
+                value={formatCurrency(expectedCash)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Uang Fisik di Laci (Actual) (Rp)</Label>
+              <Input
+                type="number"
+                value={actualCash}
+                onChange={(e) => setActualCash(e.target.value)}
+                placeholder="Masukkan jumlah riil"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCloserOpen(false)}>Batal</Button>
+            <Button variant="destructive" onClick={closeShift}>Konfirmasi Tutup</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   )
 }

@@ -39,7 +39,7 @@ function isPaidStatus(total: number, paid: number): LocalSalesOrder['status'] {
 }
 
 export const posTransactionService = {
-  async saveDraft(cartItems: CartItem[], totals: PosTotals, discountTotal: number = 0, customerName?: string | null, customerId?: string | null) {
+  async saveDraft(cartItems: CartItem[], totals: PosTotals, discountTotal: number = 0, customerName?: string | null, customerId?: string | null, shiftId?: string | null) {
     if (cartItems.length === 0) return
 
     const tenantId = requireActiveTenantId()
@@ -63,6 +63,7 @@ export const posTransactionService = {
       code: `DRF-${Date.now()}`,
       customerId: customerId ?? undefined,
       customerName: customerName || 'Umum',
+      shiftId: shiftId ?? undefined,
       date: todayISO(),
       subtotal: totals.subtotal,
       discountTotal: discountTotal,
@@ -96,7 +97,7 @@ export const posTransactionService = {
     })
   },
 
-  async checkout(cartItems: CartItem[], totals: PosTotals, paymentMethod: PosPaymentMethod, paidAmount: number, discountTotal: number = 0, customerName?: string | null, customerId?: string | null) {
+  async checkout(cartItems: CartItem[], totals: PosTotals, paymentMethod: PosPaymentMethod, paidAmount: number, discountTotal: number = 0, customerName?: string | null, customerId?: string | null, shiftId?: string | null) {
     if (cartItems.length === 0) return
 
     const tenantId = requireActiveTenantId()
@@ -124,6 +125,7 @@ export const posTransactionService = {
       code: await orderCode(),
       customerId: customerId ?? undefined,
       customerName: customerName || 'Umum',
+      shiftId: shiftId ?? undefined,
       date: todayISO(),
       subtotal: totals.subtotal,
       discountTotal: discountTotal,
@@ -143,6 +145,7 @@ export const posTransactionService = {
       ref: `PAY-${Date.now().toString().slice(-6)}`,
       salesOrderId,
       source: 'POS',
+      shiftId: shiftId ?? undefined,
       method: paymentMethod as PosPaymentMethodCode,
       amount: retainedAmount,
       date: todayISO(),

@@ -116,6 +116,7 @@ export type LocalSalesOrder = {
   code: string
   customerId?: string
   customerName: string
+  shiftId?: string
   date: string
   subtotal: number
   discountTotal: number
@@ -137,6 +138,7 @@ export type LocalPayment = {
   salesOrderId?: string
   serviceOrderId?: string
   purchaseId?: string
+  shiftId?: string
   source: string
   method: PosPaymentMethodCode
   amount: number

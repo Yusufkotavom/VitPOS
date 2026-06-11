@@ -13,22 +13,50 @@ import { selectPosTotals, usePosStore } from '@/features/pos/stores/pos-store'
 import { formatCurrency } from '@/lib/format-currency'
 import { toast } from 'sonner'
 import { posTransactionService } from '@/features/pos/services/pos-transaction.service'
+import { useActiveShift } from '@/features/shift/hooks/use-active-shift'
+import { useNavigate } from 'react-router-dom'
+import { LockIcon } from 'lucide-react'
 
 export function PosPage() {
   const syncSummary = useSyncStore()
   const store = usePosStore()
   const totals = selectPosTotals(store)
   const hasItems = totals.itemCount > 0
+  const activeShift = useActiveShift()
+  const navigate = useNavigate()
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
   const [isDrafting, setIsDraftingState] = useState(false)
   const isDraftingRef = useRef(false)
   const setDrafting = (v: boolean) => { isDraftingRef.current = v; setIsDraftingState(v) }
 
+  if (activeShift === undefined) {
+    return <div className="flex h-[100dvh] items-center justify-center text-muted-foreground">Memeriksa sesi kasir...</div>
+  }
+
+  if (activeShift === null) {
+    return (
+      <div className="flex h-[100dvh] flex-col items-center justify-center bg-muted/20">
+        <div className="rounded-2xl border bg-background p-8 text-center shadow-sm max-w-md w-full mx-4">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-orange-100">
+            <LockIcon className="h-8 w-8 text-orange-600" />
+          </div>
+          <h2 className="text-xl font-bold mb-2">Sesi Kasir Belum Dibuka</h2>
+          <p className="text-muted-foreground mb-6">
+            Anda harus membuka sesi shift (memasukkan modal awal) sebelum dapat menggunakan mesin POS.
+          </p>
+          <Button size="lg" className="w-full" onClick={() => navigate('/shift')}>
+            Buka Shift Sekarang
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   async function handleDraft() {
     if (!hasItems || isDraftingRef.current) return
     setDrafting(true)
     try {
-      await posTransactionService.saveDraft(store.cartItems, totals, store.discount, store.customerName)
+      await posTransactionService.saveDraft(store.cartItems, totals, store.discount, store.customerName, store.customerId, activeShift.id)
       toast.success('Draft berhasil disimpan')
       store.clearCart()
     } catch (error) {
@@ -115,7 +143,7 @@ export function PosPage() {
             <DialogTitle>Pembayaran</DialogTitle>
           </DialogHeader>
           <div className="py-2">
-            <PaymentSummary onComplete={() => setIsPaymentOpen(false)} />
+            <PaymentSummary onComplete={() => setIsPaymentOpen(false)} shiftId={activeShift.id} />
           </div>
         </DialogContent>
       </Dialog>

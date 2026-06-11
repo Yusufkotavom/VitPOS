@@ -125,8 +125,8 @@ class TauriSqlAdapterTable<T extends { id: string }> implements AdapterTable<T> 
 
   where(column: string) {
     return {
-      equals: (value: unknown) => {
-        let sqlValue = value;
+      equals: (val: unknown) => {
+        let sqlValue = val;
         if (typeof sqlValue === 'boolean') {
           sqlValue = sqlValue ? 1 : 0;
         } else if (Array.isArray(sqlValue)) {
@@ -216,9 +216,9 @@ class TauriSqlAdapterImpl implements LocalDbAdapter {
       products: `id TEXT PRIMARY KEY, tenantId TEXT, name TEXT, category TEXT, type TEXT, price REAL, costPrice REAL, wholesalePrice REAL, wholesaleTiers TEXT, stock REAL, manageStock INTEGER, sku TEXT, barcode TEXT, imageUrl TEXT, icon TEXT, status TEXT, syncStatus TEXT, version INTEGER, updatedAt TEXT`,
       productCategories: `id TEXT PRIMARY KEY, tenantId TEXT, name TEXT, description TEXT, status TEXT, syncStatus TEXT, version INTEGER, updatedAt TEXT`,
       customers: `id TEXT PRIMARY KEY, tenantId TEXT, name TEXT, phone TEXT, city TEXT, receivable REAL, orders INTEGER, status TEXT, syncStatus TEXT, version INTEGER, updatedAt TEXT`,
-      salesOrders: `id TEXT PRIMARY KEY, tenantId TEXT, code TEXT, customerId TEXT, customerName TEXT, date TEXT, subtotal REAL, discountTotal REAL, taxTotal REAL, grandTotal REAL, paidTotal REAL, notes TEXT, status TEXT, items TEXT, syncStatus TEXT, version INTEGER, updatedAt TEXT`,
+      salesOrders: `id TEXT PRIMARY KEY, tenantId TEXT, code TEXT, customerId TEXT, customerName TEXT, shiftId TEXT, date TEXT, subtotal REAL, discountTotal REAL, taxTotal REAL, grandTotal REAL, paidTotal REAL, notes TEXT, status TEXT, items TEXT, syncStatus TEXT, version INTEGER, updatedAt TEXT`,
       salesOrderItems: `id TEXT PRIMARY KEY, tenantId TEXT, salesOrderId TEXT, productId TEXT, name TEXT, qty REAL, unitPrice REAL, subtotal REAL`,
-      payments: `id TEXT PRIMARY KEY, tenantId TEXT, ref TEXT, salesOrderId TEXT, serviceOrderId TEXT, purchaseId TEXT, source TEXT, method TEXT, amount REAL, date TEXT, status TEXT, syncStatus TEXT, version INTEGER, updatedAt TEXT`,
+      payments: `id TEXT PRIMARY KEY, tenantId TEXT, ref TEXT, salesOrderId TEXT, serviceOrderId TEXT, purchaseId TEXT, shiftId TEXT, source TEXT, method TEXT, amount REAL, date TEXT, status TEXT, syncStatus TEXT, version INTEGER, updatedAt TEXT`,
       stockMovements: `id TEXT PRIMARY KEY, tenantId TEXT, productId TEXT, productName TEXT, warehouseId TEXT, warehouseName TEXT, type TEXT, qty REAL, referenceType TEXT, referenceId TEXT, notes TEXT, syncStatus TEXT, updatedAt TEXT`,
       inventory: `id TEXT PRIMARY KEY, tenantId TEXT, product TEXT, warehouse TEXT, stockSystem REAL, stockSafe REAL, movement TEXT, status TEXT`,
       cash: `id TEXT PRIMARY KEY, tenantId TEXT, ref TEXT, date TEXT, account TEXT, category TEXT, income REAL, expense REAL, status TEXT`,

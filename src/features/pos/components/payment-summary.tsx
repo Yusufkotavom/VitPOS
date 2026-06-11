@@ -23,7 +23,7 @@ const defaultMethods = [
   { id: 'transfer', name: 'Transfer' },
 ]
 
-export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
+export function PaymentSummary({ onComplete, shiftId }: { onComplete?: () => void, shiftId?: string }) {
   const store = usePosStore()
   const totals = selectPosTotals(store)
   const dbMethods = usePaymentMethods()
@@ -64,7 +64,7 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
 
     setProcessing(true)
     try {
-      const result = await posTransactionService.checkout(store.cartItems, totals, store.paymentMethod, store.paidAmount, store.discount, store.customerName, store.customerId)
+      const result = await posTransactionService.checkout(store.cartItems, totals, store.paymentMethod, store.paidAmount, store.discount, store.customerName, store.customerId, shiftId)
       if (!result) {
         throw new Error('Transaksi tidak menghasilkan data order')
       }
