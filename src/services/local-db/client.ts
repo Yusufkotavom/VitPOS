@@ -4,16 +4,13 @@ import type { VitposLocalDb } from './dexie-instance'
 
 export type { VitposLocalDb }
 
-// Create the adapter first
-const adapter = getLocalDbAdapter()
+export const localDb = new Proxy({} as VitposLocalDb, {
+  get(_target, prop) {
+    const adapter = getLocalDbAdapter()
 
-export const localDb = new Proxy(adapter, {
-  get(target, prop) {
     if (typeof prop === 'string' && LOCAL_DB_TABLES.includes(prop as unknown as typeof LOCAL_DB_TABLES[number])) {
-      // It's a table access!
-      const table = target.storageTable(prop)
-      
-      // We wrap the table to make it Dexie compatible enough for existing code
+      const table = adapter.storageTable(prop)
+
       return new Proxy(table, {
         has(tbl, tblProp) {
           return tblProp === 'name' || tblProp === '__tableName' || tblProp === 'orderBy' || tblProp in tbl
@@ -22,7 +19,7 @@ export const localDb = new Proxy(adapter, {
           if (tblProp === 'name' || tblProp === '__tableName') {
             return prop
           }
-          
+
           if (tblProp in tbl) {
              const val = (tbl as Record<string, unknown>)[tblProp as string];
              if (typeof val === 'function') {
@@ -30,15 +27,12 @@ export const localDb = new Proxy(adapter, {
              }
              return val
           }
-          
+
           if (tblProp === 'add') {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return (item: any) => tbl.put(item)
+            return (item: unknown) => tbl.put(item as never)
           }
-          
-          // Fake Dexie orderBy() emulation
+
           if (tblProp === 'orderBy') {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             return (column: string) => {
               let reversed = false
               const collection = {
@@ -67,8 +61,7 @@ export const localDb = new Proxy(adapter, {
                   const arr = await collection.toArray()
                   return arr.length
                 },
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                filter: (fn: (item: any) => boolean) => ({
+                filter: (fn: (item: unknown) => boolean) => ({
                   toArray: async () => {
                     const arr = await collection.toArray()
                     return arr.filter(fn)
@@ -82,7 +75,7 @@ export const localDb = new Proxy(adapter, {
               return collection
             }
           }
-          
+
           function matches(item: Record<string, unknown>, column: string, val: unknown): boolean {
             if (column.startsWith('[') && column.endsWith(']') && Array.isArray(val)) {
               const cols = column.slice(1, -1).split('+')
@@ -91,7 +84,6 @@ export const localDb = new Proxy(adapter, {
             return item[column] === val
           }
 
-          // Fake Dexie where() emulation fallback if not implemented natively on adapter
           if (tblProp === 'where' && !('where' in tbl)) {
              return (column: string) => ({
                 equals: (val: unknown) => {
@@ -115,8 +107,7 @@ export const localDb = new Proxy(adapter, {
                          await tbl.delete((item as { id: string }).id)
                        }
                      },
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      filter: (fn: (item: any) => boolean) => {
+                      filter: (fn: (item: unknown) => boolean) => {
                        return {
                          toArray: async () => {
                            const all = await tbl.toArray()
@@ -136,39 +127,36 @@ export const localDb = new Proxy(adapter, {
         }
       })
     }
-    
+
     if (prop === 'transaction') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return async (...args: any[]) => {
+      return async (...args: unknown[]) => {
          const mode = args[0] as string
          const scope = args[args.length - 1] as () => Promise<unknown>
          const tablesArg = args.slice(1, args.length - 1)
-         
+
          let dexieMode = 'readonly'
          if (mode === 'rw' || mode === 'readwrite') dexieMode = 'readwrite'
-         
-         // Flatten tables if they passed an array as the second argument
+
          const flatTables = Array.isArray(tablesArg[0]) && tablesArg.length === 1 ? tablesArg[0] : tablesArg
-         
+
           const tableNames = flatTables.map(t => {
             if (typeof t === 'string') return t;
             if (t && typeof t === 'object' && 'name' in t) return (t as { name: string }).name;
             if (t && typeof t === 'object' && '__tableName' in t) return (t as { __tableName: string }).__tableName;
             return 'unknown'
           })
-           
-         return target.runInTransaction(dexieMode as 'readonly' | 'readwrite', tableNames, scope)
+
+         return adapter.runInTransaction(dexieMode as 'readonly' | 'readwrite', tableNames, scope)
       }
     }
-    
-    if (prop === 'open') return async () => target.init()
-    if (prop === 'close') return async () => target.teardown()
+
+    if (prop === 'open') return async () => adapter.init()
+    if (prop === 'close') return async () => adapter.teardown()
     if (prop === 'isOpen') return () => true
-    
-    // Fallback to adapter method
-    if (prop in target) {
-      const val = (target as unknown as Record<string, unknown>)[prop as string]
-      return typeof val === 'function' ? val.bind(target) : val
+
+    if (prop in adapter) {
+      const val = (adapter as unknown as Record<string, unknown>)[prop as string]
+      return typeof val === 'function' ? val.bind(adapter) : val
     }
   }
 }) as unknown as VitposLocalDb

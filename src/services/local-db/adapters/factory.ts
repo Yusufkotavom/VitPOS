@@ -1,6 +1,5 @@
 import { dexieAdapter } from '@/services/local-db/adapters/indexeddb.adapter'
 import { sqliteAdapter } from '@/services/local-db/adapters/sqlite.adapter'
-import { tauriSqlAdapter } from '@/services/local-db/adapters/tauri-sql.adapter'
 import type { LocalDbAdapter } from '@/services/local-db/adapters'
 import { Capacitor } from '@capacitor/core'
 
@@ -10,28 +9,22 @@ function isTauri(): boolean {
   )
 }
 
-/**
- * Gets the appropriate local database adapter based on the current platform
- */
+let _tauriAdapter: LocalDbAdapter | null = null
+
 export function getLocalDbAdapter(): LocalDbAdapter {
-  if (isTauri()) {
-    return tauriSqlAdapter
-  }
-  if (Capacitor.isNativePlatform()) {
-    return sqliteAdapter
-  }
+  if (_tauriAdapter) return _tauriAdapter
+  if (Capacitor.isNativePlatform()) return sqliteAdapter
   return dexieAdapter
 }
 
-/**
- * Initializes the appropriate local database adapter
- */
 export async function initLocalDb(): Promise<void> {
-  const adapter = getLocalDbAdapter()
+  let adapter: LocalDbAdapter
+  if (isTauri()) {
+    const { tauriSqlAdapter } = await import('@/services/local-db/adapters/tauri-sql.adapter')
+    _tauriAdapter = tauriSqlAdapter
+    adapter = tauriSqlAdapter
+  } else {
+    adapter = getLocalDbAdapter()
+  }
   await adapter.init()
 }
-
-/**
- * Provides access to the active database adapter instance
- */
-export const activeDb = getLocalDbAdapter()
