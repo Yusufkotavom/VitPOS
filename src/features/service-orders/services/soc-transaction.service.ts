@@ -3,6 +3,7 @@ import { productRepository } from '@/services/local-db/repository'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { todayISO } from '@/lib/date'
 import { addWarrantyDuration, buildWarrantyTimelineNote } from '@/features/service-orders/lib/warranty'
+import { syncCustomerSalesMetrics } from '@/features/sales-orders/services/sales-order-finance.service'
 import type { 
   LocalServiceOrder, 
   LocalPayment, 
@@ -223,6 +224,10 @@ export const socTransactionService = {
       if (inventoryRows.length > 0) await localDb.inventory.bulkPut(inventoryRows)
       if (outboxPayload.length > 0) await localDb.outbox.bulkPut(outboxPayload)
     })
+
+    if (customerId) {
+      await syncCustomerSalesMetrics(customerId, tenantId)
+    }
 
     return { serviceOrderId, paymentId, code: serviceOrder.code, serviceOrder, payment }
   }

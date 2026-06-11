@@ -40,9 +40,16 @@ type ProductPayload = {
   category?: string
   type?: string
   price?: number
+  costPrice?: number
+  wholesalePrice?: number
+  wholesaleTiers?: unknown[]
+  manageStock?: boolean
+  minimumStock?: number
   stock?: number
   sku?: string
   barcode?: string
+  imageUrl?: string
+  icon?: string
   status?: string
   isActive?: boolean
 }
@@ -169,10 +176,13 @@ async function applyProduct(db: AppDb, ctx: ApplyContext, entityId: string, muta
       barcode: payload.barcode ?? null,
       type: mapClientProductType(payload.type),
       salePrice: toNumeric(payload.price),
-      costPrice: null,
-      wholesalePrice: null,
-      minimumStock: 0,
-      imageUrl: null,
+      costPrice: toNumeric(payload.costPrice),
+      wholesalePrice: toNumeric(payload.wholesalePrice),
+      wholesaleTiers: payload.wholesaleTiers ?? null,
+      manageStock: payload.manageStock ?? true,
+      minimumStock: payload.minimumStock ?? 0,
+      imageUrl: payload.imageUrl ?? null,
+      icon: payload.icon ?? null,
       isActive: mapClientProductStatus(payload.status ?? payload.isActive),
       syncStatus: 'synced',
       version: 1,
@@ -187,6 +197,13 @@ async function applyProduct(db: AppDb, ctx: ApplyContext, entityId: string, muta
         barcode: payload.barcode ?? null,
         type: mapClientProductType(payload.type),
         salePrice: toNumeric(payload.price),
+        costPrice: toNumeric(payload.costPrice),
+        wholesalePrice: toNumeric(payload.wholesalePrice),
+        wholesaleTiers: payload.wholesaleTiers ?? null,
+        manageStock: payload.manageStock ?? true,
+        minimumStock: payload.minimumStock ?? 0,
+        imageUrl: payload.imageUrl ?? null,
+        icon: payload.icon ?? null,
         isActive: mapClientProductStatus(payload.status ?? payload.isActive),
         syncStatus: 'synced',
         updatedAt: now,
@@ -725,7 +742,7 @@ async function applySetting(db: AppDb, ctx: ApplyContext, entityId: string, muta
       })
       .where(eq(settings.id, existing.id))
   } else {
-    const uuid = /^[0-9a-f]{8}-/i.test(entityId) ? entityId : crypto.randomUUID()
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(entityId) ? entityId : crypto.randomUUID()
     await db.insert(settings).values({
       id: uuid,
       tenantId: ctx.tenantId,

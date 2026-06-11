@@ -8,6 +8,8 @@ function createId(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`
 }
 
+import { syncCustomerSalesMetrics } from '@/features/sales-orders/services/sales-order-finance.service'
+
 export async function recordServiceOrderPayment(
   orderId: string,
   amount: number,
@@ -83,6 +85,8 @@ export async function recordServiceOrderPayment(
     }
   })
 
+  await syncCustomerSalesMetrics(updatedOrder.customerId, tenantId)
+
   return { order: updatedOrder, payment }
 }
 
@@ -118,6 +122,7 @@ export async function syncServiceOrderPaymentSummary(orderId: string, tenantId: 
     await localDb.outbox.put(outboxItem)
   })
 
+  await syncCustomerSalesMetrics(nextOrder.customerId, tenantId)
   return nextOrder
 }
 

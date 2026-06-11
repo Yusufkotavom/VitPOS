@@ -23,7 +23,7 @@ export function CashCategoriesPage() {
       title="Kategori Kas"
       description="Kelola kategori pemasukan dan pengeluaran."
       actions={
-        <div className="flex items-center gap-2">
+        <>
           <Button variant="outline" size="sm" asChild>
             <Link to="/cash">
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -31,7 +31,7 @@ export function CashCategoriesPage() {
             </Link>
           </Button>
           <CashCategoryCrudActions />
-        </div>
+        </>
       }
     >
       <ContentCard>

@@ -225,8 +225,6 @@ export async function seedLocalDemoData() {
   const existingInventory = await localDb.inventory.count()
   const existingCash = await localDb.cash.count()
   const existingSettings = await localDb.settings.count()
-  const existingOutbox = await localDb.outbox.count()
-  const existingConflicts = await localDb.syncConflicts.count()
 
   if (existingProducts === 0) await localDb.products.bulkPut(demoProducts)
   if (existingCustomers === 0) await localDb.customers.bulkPut(demoCustomers)
@@ -236,6 +234,5 @@ export async function seedLocalDemoData() {
   if (existingInventory === 0) await localDb.inventory.bulkPut(demoInventory)
   if (existingCash === 0) await localDb.cash.bulkPut(demoCash)
   if (existingSettings === 0) await localDb.settings.bulkPut(demoSettings)
-  if (existingOutbox === 0) await localDb.outbox.bulkPut(demoOutboxItems)
-  if (existingConflicts === 0) await localDb.syncConflicts.bulkPut(demoConflicts)
+  // Demo outbox and conflicts intentionally NOT seeded to prevent sync loops
 }

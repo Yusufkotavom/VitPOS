@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CheckCircle2, ChevronRight, Store, Building2, Package, CreditCard, ShoppingCart, Coffee, Monitor, Stethoscope, Users, Truck, Banknote, Edit, Trash2 } from 'lucide-react'
+import { CheckCircle2, ChevronRight, Store, Building2, Package, CreditCard, ShoppingCart, Coffee, Monitor, Stethoscope, Users, Truck, Banknote, Edit, Trash2, Loader2 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
@@ -151,12 +151,16 @@ export function OnboardingPage() {
     setSelectedPayments(Object.fromEntries(p.paymentMethods.map((pm) => [pm.name, true])))
   }
 
+  const [loading, setLoading] = useState(false)
+
   const canGoNextStep1 = currentUser
     ? tenantName.trim() !== ''
     : ownerData.name && ownerData.email && ownerData.password && tenantName.trim() !== ''
 
   async function handleFinish() {
+    if (loading) return
     setError(null)
+    setLoading(true)
     const now = new Date().toISOString()
     let userId = currentUser?.id
     let tenantRole = 'owner'
@@ -235,8 +239,26 @@ export function OnboardingPage() {
         tenantRole = primaryMembership.role
         defaultBranchId = registerResponse.defaultBranchId
         defaultWarehouseId = registerResponse.defaultWarehouseId
-      } else if (!userId) {
-        userId = crypto.randomUUID()
+      } else {
+        if (!userId) {
+          userId = crypto.randomUUID()
+        }
+        const res = await apiPost<{
+          ok: boolean
+          tenantId: string
+          defaultBranchId: string
+          defaultWarehouseId: string
+        }>('/tenants', {
+          id: tenantId,
+          name: tenantName.trim(),
+        })
+        if (res && res.ok) {
+          tenantId = res.tenantId as `${string}-${string}-${string}-${string}-${string}`
+          defaultBranchId = res.defaultBranchId
+          defaultWarehouseId = res.defaultWarehouseId
+        } else {
+          throw new Error('Gagal mendaftarkan unit usaha baru di server cloud.')
+        }
       }
 
       const nextUser = {
@@ -404,6 +426,9 @@ export function OnboardingPage() {
       console.error(err)
       const detail = err instanceof Error ? err.message : String(err)
       setError(`Terjadi kesalahan saat menyimpan data: ${detail}`)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -643,7 +668,7 @@ export function OnboardingPage() {
                     {editableProducts.length === 0 ? (
                       <p className="text-sm text-muted-foreground">Belum ada produk.</p>
                     ) : (
-                      <div className="border rounded-xl overflow-hidden text-sm">
+                      <div className="border rounded-xl overflow-x-auto text-sm">
                         <Table>
                           <TableHeader className="bg-muted">
                             <TableRow>
@@ -698,7 +723,7 @@ export function OnboardingPage() {
                     {editablePaymentMethods.length === 0 ? (
                       <p className="text-sm text-muted-foreground">Belum ada metode pembayaran.</p>
                     ) : (
-                      <div className="border rounded-xl overflow-hidden text-sm">
+                      <div className="border rounded-xl overflow-x-auto text-sm">
                         <Table>
                           <TableHeader className="bg-muted">
                             <TableRow>
@@ -711,9 +736,9 @@ export function OnboardingPage() {
                           <TableBody>
                             {editablePaymentMethods.map((pm) => (
                               <TableRow key={pm.id}>
-                                <TableCell className="p-2">{pm.name}</TableCell>
-                                <TableCell className="p-2 text-muted-foreground">{pm.provider}</TableCell>
-                                <TableCell className="p-2"><Badge variant="outline" className="capitalize">{pm.type}</Badge></TableCell>
+                                <TableCell className="p-2 whitespace-nowrap">{pm.name}</TableCell>
+                                <TableCell className="p-2 text-muted-foreground whitespace-nowrap">{pm.provider}</TableCell>
+                                <TableCell className="p-2"><Badge variant="outline" className="capitalize whitespace-nowrap">{pm.type}</Badge></TableCell>
                                 <TableCell className="p-2 text-center">
                                   <div className="flex items-center justify-center gap-1">
                                     <Button type="button" onClick={() => openEditPm(pm)} variant="ghost" size="icon" className="h-7 w-7 text-primary"><Edit className="size-3.5" /></Button>
@@ -746,16 +771,16 @@ export function OnboardingPage() {
                   </section>
 
                   {/* Customer & Supplier */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <section>
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="font-medium flex items-center gap-1.5"><Users className="size-4" /> Pelanggan</h4>
                         <Button variant="outline" size="sm" onClick={() => openEditPerson('customer')}>Ubah</Button>
                       </div>
-                      <div className="text-sm text-muted-foreground border rounded-xl p-3">
-                        <div className="font-medium text-foreground">{editableCustomer.name}</div>
-                        <div>{editableCustomer.phone}</div>
-                        <div>{editableCustomer.city}</div>
+                      <div className="text-sm text-muted-foreground border rounded-xl p-3 overflow-hidden">
+                        <div className="font-medium text-foreground truncate">{editableCustomer.name}</div>
+                        <div className="truncate">{editableCustomer.phone}</div>
+                        <div className="truncate">{editableCustomer.city}</div>
                       </div>
                     </section>
                     <section>
@@ -763,10 +788,10 @@ export function OnboardingPage() {
                         <h4 className="font-medium flex items-center gap-1.5"><Truck className="size-4" /> Supplier</h4>
                         <Button variant="outline" size="sm" onClick={() => openEditPerson('supplier')}>Ubah</Button>
                       </div>
-                      <div className="text-sm text-muted-foreground border rounded-xl p-3">
-                        <div className="font-medium text-foreground">{editableSupplier.name}</div>
-                        <div>{editableSupplier.phone}</div>
-                        <div>{editableSupplier.city}</div>
+                      <div className="text-sm text-muted-foreground border rounded-xl p-3 overflow-hidden">
+                        <div className="font-medium text-foreground truncate">{editableSupplier.name}</div>
+                        <div className="truncate">{editableSupplier.phone}</div>
+                        <div className="truncate">{editableSupplier.city}</div>
                       </div>
                     </section>
                   </div>
@@ -914,7 +939,8 @@ export function OnboardingPage() {
                   Lanjut <ChevronRight className="ml-2 size-4" />
                 </Button>
               ) : (
-                <Button onClick={handleFinish}>
+                <Button onClick={handleFinish} disabled={loading}>
+                  {loading && <Loader2 className="mr-2 size-4 animate-spin" />}
                   Lanjut ke Tagihan <ChevronRight className="ml-2 size-4" />
                 </Button>
               )}

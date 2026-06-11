@@ -6,7 +6,7 @@ import { config } from 'dotenv'
 import { createApp } from '../../../apps/api/src/app'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { localDb } from '@/services/local-db/client'
-import { DEMO_TENANT_ID, seedLocalDemoData } from '@/services/local-db/seeds'
+import { DEMO_TENANT_ID, seedLocalDemoData, demoOutboxItems } from '@/services/local-db/seeds'
 import { runSync } from '@/services/sync/sync-engine'
 
 config({ path: '.env.local' })
@@ -63,6 +63,7 @@ describe('runSync integration', () => {
       updatedAt: new Date().toISOString(),
     })
     await seedLocalDemoData()
+    await localDb.outbox.bulkPut(demoOutboxItems)
     const tenant = await localDb.tenants.get(DEMO_TENANT_ID)
     const user = await localDb.users.get('test-user')
     useAuthStore.setState({ currentUser: user, activeTenant: { ...tenant!, role: 'owner' } })

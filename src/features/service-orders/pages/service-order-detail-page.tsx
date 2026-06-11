@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Printer, MessageSquare, Download, PencilIcon, XIcon, CheckIcon, Trash2Icon, CreditCard, ShieldCheck, ShieldX } from 'lucide-react'
+import { ArrowLeft, Printer, MessageSquare, Download, PencilIcon, XIcon, CheckIcon, Trash2Icon, CreditCard, ShieldCheck, ShieldX, PlusIcon, Search } from 'lucide-react'
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { usePdf } from '@/shared/components/pdf/use-pdf'
@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatCurrency } from '@/lib/format-currency'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { useServiceOrder } from '@/features/service-orders/hooks/use-service-order'
@@ -31,6 +32,8 @@ function tone(status: string) {
   if (status === 'Batal') return 'danger'
   return 'warning'
 }
+
+type EditableItem = { id: string; name: string; qty: string; unitPrice: string; productId?: string }
 
 export function ServiceOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -60,6 +63,18 @@ export function ServiceOrderDetailPage() {
   const [editHasWarranty, setEditHasWarranty] = useState(false)
   const [editWarrantyValue, setEditWarrantyValue] = useState('')
   const [editWarrantyUnit, setEditWarrantyUnit] = useState<'hari' | 'bulan' | 'tahun'>('hari')
+  const [editItems, setEditItems] = useState<EditableItem[]>([])
+
+  // Product dialog states
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false)
+  const [productSearch, setProductSearch] = useState('')
+  const products = useLiveQuery(() => localDb.products.where('tenantId').equals(tenantId).toArray(), [tenantId], [])
+  const filteredProducts = (products || []).filter(p => {
+    if (p.status !== 'Aktif') return false
+    if (productSearch && !p.name.toLowerCase().includes(productSearch.toLowerCase())) return false
+    return true
+  })
+
   const [deleteOpen, setDeleteOpen] = useState(false)
 
   // Pelunasan State
@@ -107,6 +122,15 @@ export function ServiceOrderDetailPage() {
     setEditHasWarranty(order.hasWarranty ?? false)
     setEditWarrantyValue(String(order.warrantyValue ?? ''))
     setEditWarrantyUnit(order.warrantyUnit ?? 'hari')
+    setEditItems(
+      order.items?.map((i: NonNullable<typeof order.items>[number]) => ({
+        id: crypto.randomUUID(),
+        productId: i.productId,
+        name: i.name,
+        qty: String(i.qty),
+        unitPrice: String(i.price),
+      })) || []
+    )
     setEditing(true)
   }
 
@@ -139,14 +163,19 @@ export function ServiceOrderDetailPage() {
 
       let warrantyStartDate = order.warrantyStartDate
       let warrantyEndDate = order.warrantyEndDate
-      const prevHasWarranty = order.hasWarranty ?? false
 
-      if (editHasWarranty !== prevHasWarranty || (editHasWarranty && (String(order.warrantyValue ?? '') !== editWarrantyValue || (order.warrantyUnit ?? 'hari') !== editWarrantyUnit))) {
-        if (editHasWarranty && editWarrantyValue) {
-          const val = Number(editWarrantyValue)
-          warrantyStartDate = prevHasWarranty ? warrantyStartDate : nowIso
+      if (editStatus === 'Selesai' && editHasWarranty) {
+        if (!order.warrantyStartDate) {
+          warrantyStartDate = nowIso
+        }
+        const prevHasWarranty = order.hasWarranty
+        const prevVal = order.warrantyValue
+        const prevUnit = order.warrantyUnit
+        
+        const val = Number(editWarrantyValue) || 0
+        if (!prevHasWarranty || val !== prevVal || editWarrantyUnit !== prevUnit || !order.warrantyEndDate) {
           warrantyEndDate = addWarrantyDuration(warrantyStartDate ?? nowIso, val, editWarrantyUnit)
-          const mode = prevHasWarranty ? 'updated' : 'activated'
+          const mode = !prevHasWarranty ? 'created' : 'updated'
           updatedTimeline = [
             ...updatedTimeline,
             {
@@ -157,28 +186,39 @@ export function ServiceOrderDetailPage() {
               type: 'warranty',
             }
           ]
-        } else if (!editHasWarranty && prevHasWarranty) {
-          warrantyStartDate = undefined
-          warrantyEndDate = undefined
-          updatedTimeline = [
-            ...updatedTimeline,
-            {
-              id: crypto.randomUUID(),
-              status: editStatus,
-              date: nowIso,
-              note: buildWarrantyTimelineNote({ value: 0, unit: 'hari', mode: 'removed' }),
-              type: 'warranty',
-            }
-          ]
         }
+      } else if (!editHasWarranty && order.hasWarranty) {
+        warrantyStartDate = undefined
+        warrantyEndDate = undefined
+        updatedTimeline = [
+          ...updatedTimeline,
+          {
+            id: crypto.randomUUID(),
+            status: editStatus,
+            date: nowIso,
+            note: buildWarrantyTimelineNote({ value: 0, unit: 'hari', mode: 'removed' }),
+            type: 'warranty',
+          }
+        ]
       }
+
+      const finalItems = editItems.map(i => ({
+        productId: i.productId ?? '',
+        name: i.name,
+        qty: Number(i.qty) || 1,
+        price: Number(i.unitPrice) || 0,
+        subtotal: (Number(i.qty) || 1) * (Number(i.unitPrice) || 0)
+      }))
+      const itemsCost = finalItems.reduce((acc, i) => acc + i.subtotal, 0)
+      const finalCost = finalItems.length > 0 ? itemsCost : (Number(editCost) || 0)
 
       await serviceOrderRepository.upsert({
         ...order,
         customerId: customer?.id,
         customerName: customerName,
         description: editDesc.trim(),
-        cost: Number(editCost) || 0,
+        cost: finalCost,
+        items: finalItems.length > 0 ? finalItems : undefined,
         status: editStatus as typeof order.status,
         hasWarranty: editHasWarranty,
         warrantyValue: editHasWarranty ? Number(editWarrantyValue) || undefined : undefined,
@@ -273,7 +313,7 @@ export function ServiceOrderDetailPage() {
       title={order.code}
       description={`${order.customerName} · ${order.date}`}
       actions={
-        <div className="flex items-center gap-2">
+        <>
           <Button variant="outline" size="sm" onClick={() => serviceData && printPdf(serviceData)}>
             <Printer className="mr-2 h-4 w-4" />
             Print
@@ -309,7 +349,7 @@ export function ServiceOrderDetailPage() {
               </Button>
             </>
           )}
-        </div>
+        </>
       }
     >
       <div className="grid gap-6 md:grid-cols-3">
@@ -366,20 +406,142 @@ export function ServiceOrderDetailPage() {
           <div>
             <h3 className="text-sm font-medium text-muted-foreground mb-3">Item Produk / Jasa yang Dipakai</h3>
             <div className="rounded-2xl border p-5 shadow-sm bg-card">
-              {(!order.items || order.items.length === 0) ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Tidak ada rincian item (Hanya biaya total)</p>
-              ) : (
-                <div className="space-y-3">
-                  {order.items.map(item => (
-                    <div key={item.productId} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0">
-                      <div>
-                        <p className="font-medium text-sm">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">{formatCurrency(item.price)} x {item.qty}</p>
+              {editing ? (
+                <div className="flex flex-col gap-3">
+                  <div className="hidden sm:block rounded-lg border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/40">
+                          <TableHead>Nama</TableHead>
+                          <TableHead className="text-right w-20">Qty</TableHead>
+                          <TableHead className="text-right w-28">Harga</TableHead>
+                          <TableHead className="text-right w-28">Subtotal</TableHead>
+                          <TableHead className="w-10"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {editItems.map((item, idx) => (
+                          <TableRow key={item.id}>
+                            <TableCell className="py-1.5 px-2">
+                              <Input value={item.name} onChange={e => { const newItems = [...editItems]; newItems[idx].name = e.target.value; setEditItems(newItems) }} placeholder="Nama produk" className="h-8 text-sm" />
+                            </TableCell>
+                            <TableCell className="py-1.5 px-2">
+                              <Input value={item.qty} onChange={e => { const newItems = [...editItems]; newItems[idx].qty = e.target.value; setEditItems(newItems) }} inputMode="numeric" className="h-8 text-sm text-right" />
+                            </TableCell>
+                            <TableCell className="py-1.5 px-2">
+                              <Input value={item.unitPrice} onChange={e => { const newItems = [...editItems]; newItems[idx].unitPrice = e.target.value; setEditItems(newItems) }} inputMode="numeric" className="h-8 text-sm text-right" />
+                            </TableCell>
+                            <TableCell className="py-1.5 px-3 text-right font-medium">{(Number(item.qty) || 0) * (Number(item.unitPrice) || 0) > 0 ? formatCurrency((Number(item.qty) || 0) * (Number(item.unitPrice) || 0)) : '-'}</TableCell>
+                            <TableCell className="py-1.5 px-2">
+                              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditItems(editItems.filter((_, i) => i !== idx))}>
+                                <Trash2Icon className="h-3.5 w-3.5 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="flex flex-col gap-3 sm:hidden">
+                    {editItems.map((item, idx) => {
+                      const itemSubtotal = (Number(item.qty) || 0) * (Number(item.unitPrice) || 0)
+                      return (
+                        <div key={item.id} className="rounded-xl border bg-muted/20 p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-muted-foreground">Item {idx + 1}</span>
+                            <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditItems(editItems.filter((_, i) => i !== idx))}>
+                              <Trash2Icon className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                          <Input value={item.name} onChange={e => { const newItems = [...editItems]; newItems[idx].name = e.target.value; setEditItems(newItems) }} placeholder="Nama produk" className="h-8 text-sm" />
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-xs text-muted-foreground">Qty</span>
+                              <Input value={item.qty} onChange={e => { const newItems = [...editItems]; newItems[idx].qty = e.target.value; setEditItems(newItems) }} inputMode="numeric" className="h-8 text-sm" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <span className="text-xs text-muted-foreground">Harga</span>
+                              <Input value={item.unitPrice} onChange={e => { const newItems = [...editItems]; newItems[idx].unitPrice = e.target.value; setEditItems(newItems) }} inputMode="numeric" className="h-8 text-sm" />
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center pt-1">
+                            <span className="text-xs text-muted-foreground">Subtotal</span>
+                            <span className="text-sm font-medium">{itemSubtotal > 0 ? formatCurrency(itemSubtotal) : '-'}</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <Dialog open={isProductModalOpen} onOpenChange={setIsProductModalOpen}>
+                    <DialogTrigger asChild>
+                      <Button type="button" variant="ghost" size="sm" className="self-start">
+                        <PlusIcon className="mr-1 h-3.5 w-3.5" />Tambah Produk / Jasa
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col">
+                      <DialogHeader>
+                        <DialogTitle>Pilih Produk / Jasa</DialogTitle>
+                      </DialogHeader>
+                      <div className="relative mt-2">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Cari produk / jasa..."
+                          className="pl-8"
+                          value={productSearch}
+                          onChange={(e) => setProductSearch(e.target.value)}
+                        />
                       </div>
-                      <p className="font-semibold text-sm">{formatCurrency(item.subtotal)}</p>
-                    </div>
-                  ))}
+                      <div className="flex-1 overflow-y-auto space-y-1 mt-4">
+                        {filteredProducts.map(p => (
+                          <div key={p.id} className="flex items-center justify-between p-2.5 rounded-lg hover:bg-muted/50">
+                            <div>
+                              <p className="font-medium text-sm">{p.name}</p>
+                              <p className="text-xs text-muted-foreground">{formatCurrency(p.price)}</p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditItems(prev => [...prev, { id: crypto.randomUUID(), name: p.name, qty: '1', unitPrice: String(p.price) }])
+                                toast.success(`${p.name} ditambahkan`)
+                                setIsProductModalOpen(false)
+                              }}
+                            >
+                              Tambah
+                            </Button>
+                          </div>
+                        ))}
+                        {filteredProducts.length === 0 && (
+                          <p className="text-center text-sm text-muted-foreground py-8">Tidak ada item ditemukan</p>
+                        )}
+                      </div>
+                      <DialogFooter>
+                        <Button variant="secondary" className="w-full" onClick={() => {
+                          setEditItems(prev => [...prev, { id: crypto.randomUUID(), name: '', qty: '1', unitPrice: '' }])
+                          setIsProductModalOpen(false)
+                        }}>
+                          + Tambah Item Manual
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
+              ) : (
+                (!order.items || order.items.length === 0) ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Tidak ada rincian item (Hanya biaya total)</p>
+                ) : (
+                  <div className="space-y-3">
+                    {order.items.map(item => (
+                      <div key={item.productId || crypto.randomUUID()} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0">
+                        <div>
+                          <p className="font-medium text-sm">{item.name}</p>
+                          <p className="text-xs text-muted-foreground">{formatCurrency(item.price)} x {item.qty}</p>
+                        </div>
+                        <p className="font-semibold text-sm">{formatCurrency(item.subtotal)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )
               )}
             </div>
           </div>
@@ -436,7 +598,13 @@ export function ServiceOrderDetailPage() {
             
             <div className="flex justify-between items-center pt-2">
               <span className="text-sm text-muted-foreground">Biaya Service</span>
-              <span className="font-bold">{formatCurrency(editing ? Number(editCost) || 0 : order.cost)}</span>
+              <span className="font-bold">
+                {formatCurrency(
+                  editing 
+                    ? (editItems.length > 0 ? editItems.reduce((acc, i) => acc + (Number(i.qty) || 0) * (Number(i.unitPrice) || 0), 0) : Number(editCost) || 0) 
+                    : order.cost
+                )}
+              </span>
             </div>
 
             <div className="flex justify-between items-center text-primary pt-2 border-t border-dashed">

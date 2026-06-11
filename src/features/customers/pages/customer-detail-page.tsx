@@ -2,7 +2,6 @@ import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, PencilIcon, XIcon, CheckIcon, Trash2Icon } from 'lucide-react'
 import { useState, useMemo } from 'react'
 import { toast } from 'sonner'
-import { useQuery } from '@tanstack/react-query'
 import { useLiveQuery } from 'dexie-react-hooks'
 
 import { Button } from '@/components/ui/button'
@@ -34,6 +33,7 @@ type OrderRow = {
   date: string
   type: 'Penjualan' | 'Servis'
   total: number
+  paidTotal: number
   status: string
 }
 
@@ -41,11 +41,8 @@ export function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
   const activeTenantId = useAuthStore((state) => state.activeTenant?.id)
 
-  const { data: customer, isLoading, refetch } = useQuery({
-    queryKey: ['customer', id],
-    queryFn: () => customerRepository.get(id!),
-    enabled: !!id,
-  })
+  const customer = useLiveQuery(() => id ? localDb.customers.get(id) : undefined, [id])
+  const isLoading = customer === undefined
 
   const rawSales = useLiveQuery(
     () => activeTenantId ? localDb.salesOrders.where('tenantId').equals(activeTenantId).toArray() : [],
@@ -77,6 +74,7 @@ export function CustomerDetailPage() {
         date: so.date,
         type: 'Penjualan' as const,
         total: so.grandTotal,
+        paidTotal: so.paidTotal,
         status: so.status,
       }))
     const serviceOrders: OrderRow[] = allServiceOrders
@@ -87,6 +85,7 @@ export function CustomerDetailPage() {
         date: so.date,
         type: 'Servis' as const,
         total: so.cost,
+        paidTotal: so.paidTotal,
         status: so.status,
       }))
     return [...salesOrders, ...serviceOrders].sort((a, b) => {
@@ -95,6 +94,13 @@ export function CustomerDetailPage() {
       return (isNaN(db) ? 0 : db) - (isNaN(da) ? 0 : da)
     })
   }, [customer, allSalesOrders, allServiceOrders, id])
+
+  const calculatedReceivable = useMemo(() => {
+    return orders.reduce((sum, order) => {
+      if (order.status === 'Batal') return sum
+      return sum + Math.max(0, order.total - order.paidTotal)
+    }, 0)
+  }, [orders])
 
   if (isLoading) {
     return (
@@ -149,7 +155,6 @@ export function CustomerDetailPage() {
       await customerRepository.upsert(updated)
       toast.success('Pelanggan diperbarui')
       setEditing(false)
-      refetch()
     } catch (error) {
       toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
     }
@@ -171,7 +176,7 @@ export function CustomerDetailPage() {
       title={customer.name}
       description={`${customer.phone} · ${customer.city}`}
       actions={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link to="/customers">
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -205,7 +210,7 @@ export function CustomerDetailPage() {
       }
     >
       <div className="grid gap-6 md:grid-cols-3">
-        <div className="space-y-6 md:col-span-2">
+        <div className="space-y-6 md:col-span-2 min-w-0">
           <div>
             <h3 className="text-sm font-medium text-muted-foreground mb-3">Info Pelanggan</h3>
             <div className="rounded-lg border p-4 space-y-4">
@@ -300,7 +305,7 @@ export function CustomerDetailPage() {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Total Piutang</span>
-              <span className="font-bold text-red-600">{formatCurrency(customer.receivable)}</span>
+              <span className="font-bold text-red-600">{formatCurrency(calculatedReceivable)}</span>
             </div>
           </div>
         </div>

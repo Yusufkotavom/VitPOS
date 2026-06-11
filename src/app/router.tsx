@@ -39,6 +39,7 @@ const ServiceOrdersPage = lazy(() => import('@/features/service-orders/pages/ser
 const ServiceOrderDetailPage = lazy(() => import('@/features/service-orders/pages/service-order-detail-page').then(pick('ServiceOrderDetailPage')))
 const ServiceOrderCreatePage = lazy(() => import('@/features/service-orders/pages/service-order-create-page').then(pick('ServiceOrderCreatePage')))
 const PurchasesPage = lazy(() => import('@/features/purchases/pages/purchases-page').then(pick('PurchasesPage')))
+const PurchaseDetailPage = lazy(() => import('@/features/purchases/pages/purchase-detail-page').then(pick('PurchaseDetailPage')))
 const SuppliersPage = lazy(() => import('@/features/suppliers/pages/suppliers-page').then(pick('SuppliersPage')))
 const ReturnsPage = lazy(() => import('@/features/returns/pages/returns-page').then(pick('ReturnsPage')))
 const PlatformAdminPage = lazy(() => import('@/features/platform-admin/pages/platform-admin-page').then(pick('PlatformAdminPage')))
@@ -99,6 +100,7 @@ export const router = createBrowserRouter([
       { path: 'service-orders/create', element: routeElement(ServiceOrderCreatePage) },
       { path: 'service-orders/:id', element: routeElement(ServiceOrderDetailPage) },
       { path: 'purchases', element: routeElement(PurchasesPage) },
+      { path: 'purchases/:id', element: routeElement(PurchaseDetailPage) },
       { path: 'suppliers', element: routeElement(SuppliersPage) },
       { path: 'returns', element: routeElement(ReturnsPage) },
       { path: 'settings', element: routeElement(SettingsPage) },

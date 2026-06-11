@@ -7,6 +7,13 @@ import { LOCAL_DB_TABLES } from '@/services/local-db/adapters';
 const DB_NAME = 'vitpos_db';
 const DB_VERSION = 1;
 
+const BOOLEAN_FIELDS: Record<string, string[]> = {
+  tenants: ['isActive'],
+  tenantMembers: ['isActive'],
+  products: ['manageStock'],
+  serviceOrders: ['hasWarranty'],
+};
+
 class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
   private getDb: () => SQLiteDBConnection | null;
   private tableName: string;
@@ -249,13 +256,10 @@ class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
           // Keep as string if parsing fails
         }
       }
-      // Naive boolean check for numeric 1/0
-      // If we had schema defs per table we would know exactly which cols are booleans
       else if (parsedRow[key] === 1 || parsedRow[key] === 0) {
-          // In some cases we might misinterpret a 1/0 number as boolean
-          // To be perfectly safe, we need schema maps. We'll leave it as number
-          // unless the property specifically requires boolean. In JS true/false
-          // truthiness often handles 1/0 correctly anyway.
+        if (BOOLEAN_FIELDS[this.tableName]?.includes(key)) {
+          parsedRow[key] = parsedRow[key] === 1;
+        }
       }
     }
     return parsedRow as T;

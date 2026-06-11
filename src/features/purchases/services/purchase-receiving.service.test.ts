@@ -16,7 +16,7 @@ vi.mock('@/services/local-db/client', () => ({
     purchases: { where: vi.fn(), put: vi.fn() },
     stockMovements: { put: vi.fn() },
     inventory: { put: vi.fn() },
-    suppliers: { get: vi.fn(), update: vi.fn() },
+    suppliers: { get: vi.fn(), put: vi.fn(), update: vi.fn() },
     outbox: { put: vi.fn() },
   },
 }))
@@ -25,6 +25,7 @@ vi.mock('@/services/local-db/repository', () => ({
   productRepository: { upsert: vi.fn() },
   stockMovementRepository: { upsert: vi.fn() },
   purchaseRepository: { upsert: vi.fn() },
+  supplierRepository: { upsert: vi.fn() },
 }))
 
 describe('purchaseReceivingService', () => {
@@ -85,6 +86,10 @@ describe('purchaseReceivingService', () => {
 
     await syncSupplierPurchaseMetrics('sup-1')
 
-    expect(localDb.suppliers.update).toHaveBeenCalledWith('sup-1', expect.objectContaining({ orders: 2, payable: 50000 }))
+    expect(repository.supplierRepository.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'sup-1',
+      orders: 2,
+      payable: 50000
+    }))
   })
 })

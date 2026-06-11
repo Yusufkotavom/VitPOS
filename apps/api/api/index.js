@@ -450,8 +450,8 @@ var productionBatches = pgTable("production_batches", {
 }, (table) => [index("production_batches_tenant_id_idx").on(table.tenantId), index("production_batches_branch_id_idx").on(table.branchId), index("production_batches_recipe_id_idx").on(table.recipeId), index("production_batches_product_id_idx").on(table.productId)]);
 var outboxLogs = pgTable("outbox_logs", {
   id: uuid("id").primaryKey().defaultRandom(),
-  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
-  branchId: uuid("branch_id").references(() => branches.id),
+  tenantId: uuid("tenant_id").notNull(),
+  branchId: uuid("branch_id"),
   deviceId: varchar("device_id", { length: 120 }).notNull(),
   entityType: varchar("entity_type", { length: 80 }).notNull(),
   entityId: varchar("entity_id", { length: 120 }).notNull(),
@@ -2608,7 +2608,27 @@ syncRoutes.post("/push", async (c) => {
   const items = [];
   for (const mutation of parsed.value.mutations) {
     const payload = mutation.payload;
+    let itemStatus = "applied";
+    let message;
     if (payload === void 0) {
+      itemStatus = "rejected";
+      message = "payload missing";
+    } else {
+      try {
+        await applyMutation(
+          db,
+          { tenantId: parsed.value.tenantId, branchId: parsed.value.branchId },
+          mutation.entityType,
+          mutation.entityId,
+          mutation.mutationType,
+          payload
+        );
+      } catch (error) {
+        itemStatus = "rejected";
+        message = error instanceof Error ? error.message : "apply failed";
+      }
+    }
+    try {
       await db.insert(outboxLogs).values({
         tenantId: parsed.value.tenantId,
         branchId: parsed.value.branchId ?? null,
@@ -2616,51 +2636,17 @@ syncRoutes.post("/push", async (c) => {
         entityType: mutation.entityType,
         entityId: mutation.entityId,
         mutationType: mutation.mutationType,
-        payload: { message: "payload missing" },
-        status: "failed",
+        payload: payload ?? { message: "payload missing" },
+        status: itemStatus === "applied" ? "synced" : "failed",
         attempts: 1,
-        errorMessage: "payload missing",
+        errorMessage: itemStatus === "rejected" ? message ?? "rejected" : null,
         createdAt: now,
         updatedAt: now
       });
-      items.push({
-        entityId: mutation.entityId,
-        entityType: mutation.entityType,
-        mutationType: mutation.mutationType,
-        status: "rejected",
-        message: "payload missing"
-      });
-      continue;
-    }
-    let itemStatus = "applied";
-    let message;
-    try {
-      await applyMutation(
-        db,
-        { tenantId: parsed.value.tenantId, branchId: parsed.value.branchId },
-        mutation.entityType,
-        mutation.entityId,
-        mutation.mutationType,
-        payload
-      );
     } catch (error) {
       itemStatus = "rejected";
-      message = error instanceof Error ? error.message : "apply failed";
+      message = error instanceof Error ? error.message : "gagal log outbox";
     }
-    await db.insert(outboxLogs).values({
-      tenantId: parsed.value.tenantId,
-      branchId: parsed.value.branchId ?? null,
-      deviceId: parsed.value.deviceId,
-      entityType: mutation.entityType,
-      entityId: mutation.entityId,
-      mutationType: mutation.mutationType,
-      payload,
-      status: itemStatus === "applied" ? "synced" : "failed",
-      attempts: 1,
-      errorMessage: itemStatus === "rejected" ? message ?? "rejected" : null,
-      createdAt: now,
-      updatedAt: now
-    });
     items.push({
       entityId: mutation.entityId,
       entityType: mutation.entityType,

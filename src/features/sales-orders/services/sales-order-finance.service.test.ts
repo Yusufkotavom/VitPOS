@@ -11,9 +11,10 @@ vi.mock('@/services/local-db/client', () => ({
   localDb: {
     transaction: vi.fn(),
     salesOrders: { get: vi.fn(), put: vi.fn(), where: vi.fn() },
+    serviceOrders: { get: vi.fn(), put: vi.fn(), where: vi.fn(() => ({ equals: vi.fn(() => ({ toArray: vi.fn(async () => []) })) })) },
     payments: { get: vi.fn(), put: vi.fn(), where: vi.fn(), delete: vi.fn() },
     outbox: { put: vi.fn() },
-    customers: { get: vi.fn(), update: vi.fn() },
+    customers: { get: vi.fn(), put: vi.fn(), update: vi.fn() },
   },
 }))
 
@@ -89,7 +90,7 @@ describe('salesOrderFinanceService', () => {
     expect(result.order.status).toBe('Lunas')
     expect(localDb.payments.put).toHaveBeenCalled()
     expect(localDb.salesOrders.put).toHaveBeenCalledWith(expect.objectContaining({ paidTotal: 100000, status: 'Lunas' }))
-    expect(localDb.customers.update).toHaveBeenCalledWith('cust-1', expect.objectContaining({ receivable: 0, orders: 1 }))
+    expect(localDb.customers.put).toHaveBeenCalledWith(expect.objectContaining({ id: 'cust-1', receivable: 0, orders: 1 }))
   })
 
   it('recalculates customer receivable from active tenant orders', async () => {
@@ -118,7 +119,7 @@ describe('salesOrderFinanceService', () => {
 
     await syncCustomerSalesMetrics('cust-1')
 
-    expect(localDb.customers.update).toHaveBeenCalledWith('cust-1', expect.objectContaining({ receivable: 80000, orders: 2 }))
+    expect(localDb.customers.put).toHaveBeenCalledWith(expect.objectContaining({ id: 'cust-1', receivable: 80000, orders: 2 }))
   })
 
   it('syncs invoice paidTotal from linked payment rows', async () => {

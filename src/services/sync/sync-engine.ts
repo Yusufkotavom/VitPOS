@@ -110,7 +110,10 @@ async function resolveSyncContext() {
 async function applyPullItem(item: SyncPullItem, tenantId: string) {
   if (item.mutationType === 'delete') {
     if (item.entityType === 'product') await localDb.products.delete(item.entityId)
-    else if (item.entityType === 'sale') await localDb.salesOrders.delete(item.entityId)
+    else if (item.entityType === 'sale') {
+      await localDb.salesOrders.delete(item.entityId)
+      await localDb.salesOrderItems.where('salesOrderId').equals(item.entityId).delete()
+    }
     else if (item.entityType === 'payment') await localDb.payments.delete(item.entityId)
     else if (item.entityType === 'stock_movement') await localDb.stockMovements.delete(item.entityId)
     else if (item.entityType === 'customer') await localDb.customers.delete(item.entityId)
@@ -120,8 +123,14 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
     else if (item.entityType === 'setting') await localDb.settings.delete(item.entityId)
     else if (item.entityType === 'shift') await localDb.shifts.delete(item.entityId)
     else if (item.entityType === 'supplier') await localDb.suppliers.delete(item.entityId)
-    else if (item.entityType === 'purchase') await localDb.purchases.delete(item.entityId)
-    else if (item.entityType === 'return') await localDb.returns.delete(item.entityId)
+    else if (item.entityType === 'purchase') {
+      await localDb.purchases.delete(item.entityId)
+      await localDb.purchaseItems.where('purchaseId').equals(item.entityId).delete()
+    }
+    else if (item.entityType === 'return') {
+      await localDb.returns.delete(item.entityId)
+      await localDb.returnItems.where('returnId').equals(item.entityId).delete()
+    }
     else if (item.entityType === 'service_order') await localDb.serviceOrders.delete(item.entityId)
     else if (item.entityType === 'payment_method') await localDb.paymentMethods.delete(item.entityId)
     else if (item.entityType === 'recipe') await localDb.recipes.delete(item.entityId)
@@ -173,12 +182,16 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
       paidTotal: Number(payload.paidTotal ?? 0),
       notes: typeof payload.notes === 'string' ? payload.notes : existing?.notes,
       status: SERVER_TO_LOCAL_SALE_STATUS[rawStatus] ?? existing?.status ?? 'Draft',
-      items: existing?.items ?? [],
+      items: Array.isArray(payload.items) ? payload.items : existing?.items ?? [],
       syncStatus: 'synced',
       version: typeof payload.version === 'number' ? payload.version : 1,
       updatedAt: item.updatedAt,
     }
     await localDb.salesOrders.put(order)
+    if (Array.isArray(payload.items)) {
+      await localDb.salesOrderItems.where('salesOrderId').equals(item.entityId).delete()
+      await localDb.salesOrderItems.bulkPut(payload.items)
+    }
   } else if (item.entityType === 'payment') {
     const salesOrderId = typeof payload.salesOrderId === 'string' ? payload.salesOrderId : undefined
     const serviceOrderId = typeof payload.serviceOrderId === 'string' ? payload.serviceOrderId : undefined
@@ -323,7 +336,7 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
       updatedAt: item.updatedAt,
     })
   } else if (item.entityType === 'purchase') {
-    await localDb.purchases.put({
+    const purchase: LocalPurchase = {
       id: item.entityId,
       tenantId,
       code: typeof payload.code === 'string' ? payload.code : '',
@@ -334,13 +347,18 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
       grandTotal: Number(payload.grandTotal ?? 0),
       paidTotal: Number(payload.paidTotal ?? 0),
       status: (typeof payload.status === 'string' ? payload.status : 'Draft') as LocalPurchase['status'],
-      items: [],
+      items: Array.isArray(payload.items) ? payload.items : [],
       syncStatus: 'synced',
       version: typeof payload.version === 'number' ? payload.version : 1,
       updatedAt: item.updatedAt,
-    })
+    }
+    await localDb.purchases.put(purchase)
+    if (Array.isArray(payload.items)) {
+      await localDb.purchaseItems.where('purchaseId').equals(item.entityId).delete()
+      await localDb.purchaseItems.bulkPut(payload.items)
+    }
   } else if (item.entityType === 'return') {
-    await localDb.returns.put({
+    const ret: LocalReturn = {
       id: item.entityId,
       tenantId,
       code: typeof payload.code === 'string' ? payload.code : '',
@@ -349,11 +367,16 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
       date: typeof payload.date === 'string' ? payload.date : '',
       total: Number(payload.total ?? 0),
       status: (typeof payload.status === 'string' ? payload.status : 'Draft') as LocalReturn['status'],
-      items: [],
+      items: Array.isArray(payload.items) ? payload.items : [],
       syncStatus: 'synced',
       version: typeof payload.version === 'number' ? payload.version : 1,
       updatedAt: item.updatedAt,
-    })
+    }
+    await localDb.returns.put(ret)
+    if (Array.isArray(payload.items)) {
+      await localDb.returnItems.where('returnId').equals(item.entityId).delete()
+      await localDb.returnItems.bulkPut(payload.items)
+    }
     } else if (item.entityType === 'service_order') {
       const existingSo = await localDb.serviceOrders.get(item.entityId)
       const rawStatus = typeof payload.status === 'string' ? payload.status : ''
@@ -368,7 +391,7 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
         cost: Number(payload.cost ?? existingSo?.cost ?? 0),
         paidTotal: Number(payload.paidTotal ?? existingSo?.paidTotal ?? 0),
         status: SERVER_TO_LOCAL_SERVICE_STATUS[rawStatus] ?? existingSo?.status ?? 'Diterima',
-        items: existingSo?.items,
+        items: Array.isArray(payload.items) ? payload.items : existingSo?.items,
         notes: typeof payload.notes === 'string' ? payload.notes : existingSo?.notes,
         timeline: existingSo?.timeline,
         hasWarranty: existingSo?.hasWarranty,

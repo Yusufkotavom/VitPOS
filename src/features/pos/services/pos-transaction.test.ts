@@ -18,7 +18,7 @@ vi.mock('@/services/local-db/client', () => ({
     salesOrderItems: { put: vi.fn(), bulkPut: vi.fn() },
     payments: { put: vi.fn() },
     stockMovements: { put: vi.fn(), bulkPut: vi.fn() },
-    products: { get: vi.fn(), bulkGet: vi.fn(), update: vi.fn() },
+    products: { get: vi.fn(), bulkGet: vi.fn(), update: vi.fn(), put: vi.fn() },
     inventory: { put: vi.fn(), bulkPut: vi.fn() },
     recipes: { where: vi.fn(() => ({ equals: vi.fn(() => ({ filter: vi.fn(() => ({ toArray: vi.fn(async () => []) })) })) })) },
     outbox: { put: vi.fn(), bulkPut: vi.fn() }
@@ -66,7 +66,7 @@ describe('posTransactionService', () => {
     expect(localDb.salesOrderItems.bulkPut).toHaveBeenCalled()
     expect(localDb.payments.put).toHaveBeenCalled()
     expect(localDb.stockMovements.bulkPut).toHaveBeenCalled()
-    expect(localDb.products.update).toHaveBeenCalledWith('p1', expect.objectContaining({ stock: 8 }))
+    expect(localDb.products.put).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1', stock: 8 }))
     expect(localDb.inventory.bulkPut).toHaveBeenCalled()
     expect(localDb.outbox.bulkPut).toHaveBeenCalled()
   })

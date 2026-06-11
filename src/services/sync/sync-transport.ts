@@ -13,7 +13,7 @@ export function toLocalOutboxStatus(status: ApiSyncItemStatus): LocalOutboxStatu
   return 'failed'
 }
 
-const prefixedIdPattern = /^[a-z]+-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const prefixedIdPattern = /^[a-z_]+-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function extractEntityId(entityId: string): string {
   const match = entityId.match(prefixedIdPattern)

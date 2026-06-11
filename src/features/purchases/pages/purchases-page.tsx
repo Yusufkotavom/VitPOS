@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { formatCurrency } from '@/lib/format-currency'
 import { PurchaseCrudActions } from '@/features/purchases/components/purchase-crud-actions'
 import { usePurchases } from '@/features/purchases/hooks/use-purchases'
@@ -23,25 +24,23 @@ export function PurchasesPage() {
           data={purchaseRows}
           emptyTitle="Belum ada purchase order"
           columns={[
-            { key: 'code', header: 'PO' },
+            { key: 'code', header: 'PO', render: (row) => <Link to={`/purchases/${row.id}`} className="font-medium text-primary hover:underline">{row.code}</Link> },
             { key: 'supplierName', header: 'Supplier' },
             { key: 'date', header: 'Tanggal' },
             { key: 'grandTotal', header: 'Total', render: (row) => formatCurrency(row.grandTotal) },
             { key: 'status', header: 'Status', render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
-            { key: 'actions', header: 'Aksi', render: (row) => <PurchaseCrudActions purchase={row} /> },
           ]}
           mobileRender={(row) => (
-            <div className="flex flex-col gap-3">
+            <Link to={`/purchases/${row.id}`} className="flex flex-col gap-3 group">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-medium">{row.code}</p>
+                  <p className="font-medium group-hover:underline text-primary">{row.code}</p>
                   <p className="text-sm text-muted-foreground">{row.supplierName} · {row.date}</p>
                 </div>
                 <StatusBadge label={row.status} tone={tone(row.status)} />
               </div>
               <p className="text-sm font-semibold">{formatCurrency(row.grandTotal)}</p>
-              <PurchaseCrudActions purchase={row} />
-            </div>
+            </Link>
           )}
         />
       </ContentCard>

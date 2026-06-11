@@ -24,11 +24,18 @@ export async function syncCustomerSalesMetrics(customerId?: string, tenantId: st
 
   const allOrders = await localDb.salesOrders.where('tenantId').equals(tenantId).toArray()
   const customerOrders = allOrders.filter((order) => order.customerId === customerId && order.status !== 'Batal')
-  const receivable = customerOrders.reduce((sum, order) => sum + Math.max(0, order.grandTotal - order.paidTotal), 0)
+  const salesReceivable = customerOrders.reduce((sum, order) => sum + Math.max(0, order.grandTotal - order.paidTotal), 0)
+
+  const allService = await localDb.serviceOrders.where('tenantId').equals(tenantId).toArray()
+  const customerService = allService.filter((order) => order.customerId === customerId && order.status !== 'Batal')
+  const serviceReceivable = customerService.reduce((sum, order) => sum + Math.max(0, order.cost - order.paidTotal), 0)
+
+  const receivable = salesReceivable + serviceReceivable
+  const totalOrders = customerOrders.length + customerService.length
 
   await customerRepository.upsert({
     ...customer,
-    orders: customerOrders.length,
+    orders: totalOrders,
     receivable,
     status: receivable > 0 ? 'Piutang' : customer.status === 'Nonaktif' ? 'Nonaktif' : 'Aktif',
     updatedAt: new Date().toISOString(),

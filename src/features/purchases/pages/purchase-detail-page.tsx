@@ -15,9 +15,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { formatCurrency } from '@/lib/format-currency'
 import { formatDate } from '@/lib/date'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
-import { useSalesOrder } from '@/features/sales-orders/hooks/use-sales-order'
-import { deleteSalesOrder, recordSalesOrderPayment } from '@/features/sales-orders/services/sales-order-finance.service'
-import { salesOrderRepository } from '@/services/local-db/repository'
+import { usePurchase } from '@/features/purchases/hooks/use-purchase'
+import { recordPurchasePayment } from '@/features/purchases/services/purchase-payment.service'
+import { receivePurchaseOrder, syncSupplierPurchaseMetrics } from '@/features/purchases/services/purchase-receiving.service'
+import { purchaseRepository } from '@/services/local-db/repository'
+
 import { localDb } from '@/services/local-db/client'
 import { messageTemplateService } from '@/services/message-template.service'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
@@ -26,18 +28,18 @@ import { StatusBadge } from '@/shared/components/display/status-badge'
 import { DataTable } from '@/shared/components/data-table/data-table'
 
 function tone(status: string) {
-  if (status === 'Lunas') return 'success'
-  if (status === 'Sebagian') return 'warning'
-  if (status === 'Belum Bayar') return 'danger'
-  return 'neutral'
+  if (status === 'Diterima') return 'success'
+  if (status === 'Dikirim') return 'info'
+  if (status === 'Batal') return 'danger'
+  return 'warning'
 }
 
 type EditableItem = { id: string; name: string; qty: string; unitPrice: string }
 
-export function SalesOrderDetailPage() {
+export function PurchaseDetailPage() {
   const { id } = useParams<{ id: string }>()
   const tenantId = requireActiveTenantId()
-  const { data: order, isLoading, refetch } = useSalesOrder(id)
+  const { data: order, isLoading, refetch } = usePurchase(id)
   const [editing, setEditing] = useState(false)
   const [editItems, setEditItems] = useState<EditableItem[]>([])
   
@@ -57,26 +59,26 @@ export function SalesOrderDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const { downloadPdf, printPdf } = usePdf()
 
-  const invoiceCustomer = useLiveQuery(
-    () => order?.customerId ? localDb.customers.get(order.customerId) : undefined,
-    [order?.customerId],
+  const invoiceSupplier = useLiveQuery(
+    () => order?.supplierId ? localDb.suppliers.get(order.supplierId) : undefined,
+    [order?.supplierId],
   )
 
   const invoiceData: PdfData | null = order ? {
     type: 'invoice',
     code: order.code,
     date: order.date,
-    customer: { name: order.customerName, phone: invoiceCustomer?.phone },
+    customer: { name: order.supplierName, phone: invoiceSupplier?.phone },
     items: order.items?.map(i => ({ name: i.name, qty: i.qty, price: i.unitPrice, subtotal: i.subtotal })) || [],
     summary: {
       subtotal: order.subtotal,
-      discount: order.discountTotal,
+      discount: 0,
       grandTotal: order.grandTotal,
       paidTotal: order.paidTotal,
       change: Math.max(0, order.paidTotal - order.grandTotal),
       status: order.status,
     },
-    notes: order.notes || '',
+    notes: '',
   } : null
 
   if (isLoading) {
@@ -110,14 +112,14 @@ export function SalesOrderDetailPage() {
         return { ...i, qty, unitPrice, subtotal: qty * unitPrice }
       })
       const subtotal = items.reduce((s, i) => s + i.subtotal, 0)
-      const grandTotal = subtotal - order.discountTotal + order.taxTotal
+      const grandTotal = subtotal
 
-      await salesOrderRepository.upsert({
+      await purchaseRepository.upsert({
         ...order,
         items: items.map(i => ({
           id: i.id,
           tenantId: order.tenantId,
-          salesOrderId: order.id,
+          purchaseId: order.id,
           productId: order.items.find((item) => item.id === i.id)?.productId ?? '',
           name: i.name,
           qty: i.qty,
@@ -154,7 +156,7 @@ export function SalesOrderDetailPage() {
     const amount = Number(payAmount) || 0
     if (amount <= 0) return toast.error('Nominal pembayaran harus lebih dari 0')
     try {
-      await recordSalesOrderPayment(order.id, amount, payMethod as 'tunai' | 'qris' | 'kartu' | 'transfer' | 'e-wallet' | 'piutang')
+      await recordPurchasePayment(order.id, amount, payMethod, 'Pembelian')
       toast.success(`Pembayaran Rp ${amount.toLocaleString('id-ID')} diterima`)
       setPayOpen(false)
       setPayAmount('')
@@ -167,8 +169,12 @@ export function SalesOrderDetailPage() {
   async function handleDelete() {
     if (!order) return
     try {
-      await deleteSalesOrder(order.id)
-      toast.success('Invoice dihapus')
+      const supplierId = order.supplierId
+      await purchaseRepository.remove(order.id)
+      if (supplierId) {
+        await syncSupplierPurchaseMetrics(supplierId)
+      }
+      toast.success('PO dihapus')
       setDeleteOpen(false)
     } catch (error) {
       toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
@@ -177,14 +183,14 @@ export function SalesOrderDetailPage() {
 
   async function handleWhatsApp() {
     if (!order) return
-    if (!order.customerId) {
-      toast.error('Pelanggan tidak memiliki nomor WhatsApp')
+    if (!order.supplierId) {
+      toast.error('Supplier tidak memiliki nomor WhatsApp')
       return
     }
-    const customer = await localDb.customers.get(order.customerId)
+    const customer = await localDb.suppliers.get(order.supplierId)
     const phone = customer?.phone
     if (!phone) {
-      toast.error('Nomor WhatsApp pelanggan tidak ditemukan')
+      toast.error('Nomor WhatsApp supplier tidak ditemukan')
       return
     }
 
@@ -199,7 +205,7 @@ export function SalesOrderDetailPage() {
     const text = await messageTemplateService.render('invoice', {
       code: order.code,
       date: order.date,
-      customer_name: order.customerName,
+      customer_name: order.supplierName,
       items,
       total,
       paid,
@@ -215,9 +221,9 @@ export function SalesOrderDetailPage() {
 
   if (!order) {
     return (
-      <PageShell title="Tidak Ditemukan" description="Sales Order tidak ditemukan">
+      <PageShell title="Tidak Ditemukan" description="Purchase Order tidak ditemukan">
         <Button asChild variant="outline">
-          <Link to="/sales-orders">
+          <Link to="/purchases">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Kembali ke Daftar
           </Link>
@@ -234,12 +240,25 @@ export function SalesOrderDetailPage() {
   const editSubtotal = editItems.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.unitPrice) || 0), 0)
 
   const actionButtons = (
-    <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+      {order.status !== 'Diterima' && order.status !== 'Batal' && (
+        <Button variant="outline" size="sm" onClick={async () => {
+          try {
+            await receivePurchaseOrder(order)
+            toast.success('Barang diterima')
+            refetch()
+          } catch(error) {
+            toast.error(error instanceof Error ? error.message : 'Terjadi kesalahan')
+          }
+        }}>
+          Terima Barang
+        </Button>
+      )}
       <Button variant="outline" size="sm" onClick={() => invoiceData && printPdf(invoiceData)}>
         <Printer className="mr-2 h-4 w-4" />
         Print
       </Button>
-      <Button variant="outline" size="sm" onClick={() => invoiceData && downloadPdf(invoiceData, `Invoice-${order?.code || 'download'}`)}>
+      <Button variant="outline" size="sm" onClick={() => invoiceData && downloadPdf(invoiceData, `PO-${order?.code || 'download'}`)}>
         <Download className="mr-2 h-4 w-4" />
         PDF
       </Button>
@@ -276,7 +295,7 @@ export function SalesOrderDetailPage() {
   return (
     <PageShell
       title={order.code}
-      description={`${order.customerName} · ${formatDate(order.date)}`}
+      description={`${order.supplierName} · ${formatDate(order.date)}`}
       actions={actionButtons}
     >
       <div className="grid gap-6 md:grid-cols-3">
@@ -445,21 +464,9 @@ export function SalesOrderDetailPage() {
               <span className="text-sm text-muted-foreground">Subtotal</span>
               <span className="font-medium">{formatCurrency(editing ? editSubtotal : order.subtotal)}</span>
             </div>
-            {order.discountTotal > 0 && (
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Diskon</span>
-                <span className="font-medium text-red-600">-{formatCurrency(order.discountTotal)}</span>
-              </div>
-            )}
-            {order.taxTotal > 0 && (
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Pajak</span>
-                <span className="font-medium">+{formatCurrency(order.taxTotal)}</span>
-              </div>
-            )}
             <div className="flex justify-between items-center pt-2 border-t">
               <span className="font-medium">Total</span>
-              <span className="font-semibold text-lg">{formatCurrency(editing ? editSubtotal - order.discountTotal + order.taxTotal : order.grandTotal)}</span>
+              <span className="font-semibold text-lg">{formatCurrency(editing ? editSubtotal : order.grandTotal)}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Dibayar</span>
@@ -477,7 +484,7 @@ export function SalesOrderDetailPage() {
             {shortage > 0 && (
               <Button className="w-full" onClick={() => setPayOpen(true)}>
                 <CreditCard className="mr-2 h-4 w-4" />
-                Terima Pembayaran
+                Bayar ke Supplier
               </Button>
             )}
           </div>
@@ -487,7 +494,7 @@ export function SalesOrderDetailPage() {
       <Dialog open={payOpen} onOpenChange={setPayOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Terima Pembayaran</DialogTitle>
+            <DialogTitle>Bayar ke Supplier</DialogTitle>
             <DialogDescription>Invoice {order.code} - Sisa tagihan {formatCurrency(shortage)}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -526,12 +533,12 @@ export function SalesOrderDetailPage() {
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Hapus invoice</DialogTitle>
+            <DialogTitle>Hapus PO</DialogTitle>
             <DialogDescription>Invoice {order.code} akan dihapus dari data lokal dan masuk antrean sinkron.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteOpen(false)}>Batal</Button>
-            <Button variant="destructive" onClick={handleDelete}>Hapus invoice</Button>
+            <Button variant="destructive" onClick={handleDelete}>Hapus PO</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
