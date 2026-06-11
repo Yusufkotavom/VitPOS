@@ -20,6 +20,7 @@ import {
   paymentMethods,
   payments,
   productCategories,
+  productionBatches,
   products,
   purchases,
   recipes,
@@ -63,6 +64,12 @@ syncRoutes.get('/pull', async (c) => {
     orderBy: [desc(salesOrders.updatedAt)],
     limit: 100,
   })
+
+  const saleCustomerIds = [...new Set(saleRows.filter((r) => r.customerId).map((r) => r.customerId!))]
+  const saleCustomerRows = saleCustomerIds.length > 0
+    ? await db.query.customers.findMany({ where: (c, { inArray }) => inArray(c.id, saleCustomerIds) })
+    : []
+  const saleCustomerNameMap = new Map(saleCustomerRows.map((c) => [c.id, c.name]))
 
   const paymentBranchFilter = parsed.value.branchId ? eq(payments.branchId, parsed.value.branchId) : undefined
   const paymentSinceFilter = parsed.value.since ? gte(payments.updatedAt, parsed.value.since) : undefined
@@ -169,6 +176,13 @@ syncRoutes.get('/pull', async (c) => {
     limit: 100,
   })
 
+  const productionBatchSinceFilter = parsed.value.since ? gte(productionBatches.updatedAt, parsed.value.since) : undefined
+  const productionBatchRows = await db.query.productionBatches.findMany({
+    where: and(eq(productionBatches.tenantId, parsed.value.tenantId), productionBatchSinceFilter),
+    orderBy: [desc(productionBatches.updatedAt)],
+    limit: 100,
+  })
+
   const items: SyncPullItem[] = [
     ...productRows.map<SyncPullItem>((row) => ({
       id: row.id,
@@ -204,6 +218,7 @@ syncRoutes.get('/pull', async (c) => {
         code: row.orderNumber,
         orderNumber: row.orderNumber,
         customerId: row.customerId,
+        customerName: row.customerId ? (saleCustomerNameMap.get(row.customerId) ?? null) : null,
         status: row.status,
         subtotal: Number(row.subtotal),
         discountTotal: Number(row.discountTotal),
@@ -472,6 +487,24 @@ syncRoutes.get('/pull', async (c) => {
         batchYield: row.batchYield,
         items: row.items,
         status: row.status === 'active' ? 'Aktif' : 'Draft',
+      },
+      transportStatus: 'applied',
+      serverSyncStatus: 'synced',
+      updatedAt: row.updatedAt.toISOString(),
+    })),
+
+    ...productionBatchRows.map<SyncPullItem>((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: 'production_batch',
+      mutationType: 'update',
+      payload: {
+        id: row.id,
+        recipeId: row.recipeId,
+        productId: row.productId,
+        batchQty: row.batchQty,
+        date: row.date.toISOString(),
+        version: row.version,
       },
       transportStatus: 'applied',
       serverSyncStatus: 'synced',

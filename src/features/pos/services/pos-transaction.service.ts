@@ -1,8 +1,9 @@
 import { localDb } from '@/services/local-db/client'
+import { productRepository } from '@/services/local-db/repository'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { syncCustomerSalesMetrics } from '@/features/sales-orders/services/sales-order-finance.service'
 import { todayISO } from '@/lib/date'
-import type { LocalPayment, LocalSalesOrder, LocalSalesOrderItem, LocalStockMovement, OutboxItem, PosPaymentMethodCode, LocalInventory } from '@/services/local-db/schema'
+import type { LocalPayment, LocalProduct, LocalSalesOrder, LocalSalesOrderItem, LocalStockMovement, OutboxItem, PosPaymentMethodCode, LocalInventory } from '@/services/local-db/schema'
 import type { PosPaymentMethod } from '@/features/pos/types/pos.types'
 
 interface CartItem {
@@ -242,14 +243,14 @@ export const posTransactionService = {
     const productMap = new Map(existingProducts.filter(Boolean).map((p) => [p!.id, p!]))
 
     const inventoryRows: LocalInventory[] = []
-    const productUpdates: { id: string; stock: number; updatedAt: string; version: number; syncStatus: 'pending' }[] = []
+    const productUpdates: LocalProduct[] = []
 
     for (const sm of stockMovements) {
       const existing = productMap.get(sm.productId)
       if (!existing || existing.tenantId !== tenantId || existing.type !== 'Produk Fisik') continue
 
       const nextStock = Math.max(0, existing.stock + sm.qty)
-      productUpdates.push({ id: sm.productId, stock: nextStock, updatedAt: nowIso, version: existing.version + 1, syncStatus: 'pending' })
+      productUpdates.push({ ...existing, stock: nextStock, updatedAt: nowIso, version: existing.version + 1, syncStatus: 'pending' })
 
       let status = 'Aman'
       if (nextStock <= 0) status = 'Habis'
@@ -273,8 +274,8 @@ export const posTransactionService = {
       if (items.length > 0) await localDb.salesOrderItems.bulkPut(items)
       await localDb.payments.put(payment)
       if (stockMovements.length > 0) await localDb.stockMovements.bulkPut(stockMovements)
-      for (const upd of productUpdates) {
-        await localDb.products.update(upd.id, upd)
+      for (const product of productUpdates) {
+        await productRepository.upsert(product)
       }
       if (inventoryRows.length > 0) await localDb.inventory.bulkPut(inventoryRows)
       if (outboxPayload.length > 0) await localDb.outbox.bulkPut(outboxPayload)

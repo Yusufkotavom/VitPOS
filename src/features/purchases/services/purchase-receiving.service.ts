@@ -1,6 +1,6 @@
 import { requireActiveTenantId, resolveTenantId } from '@/features/auth/stores/auth-store'
 import { localDb } from '@/services/local-db/client'
-import { productRepository, stockMovementRepository, purchaseRepository } from '@/services/local-db/repository'
+import { productRepository, stockMovementRepository, purchaseRepository, supplierRepository } from '@/services/local-db/repository'
 import type { LocalInventory, LocalProduct, LocalPurchase } from '@/services/local-db/schema'
 
 function createId(prefix: string) {
@@ -23,7 +23,8 @@ export async function syncSupplierPurchaseMetrics(supplierId?: string, tenantId:
     .reduce((sum, purchase) => sum + (purchase.paidTotal || 0), 0)
   const payable = Math.max(0, grossPayable - totalPaid)
 
-  await localDb.suppliers.update(supplierId, {
+  await supplierRepository.upsert({
+    ...supplier,
     orders: supplierPurchases.length,
     payable,
     updatedAt: new Date().toISOString(),

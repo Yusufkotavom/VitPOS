@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency } from '@/lib/format-currency'
+import { formatDate } from '@/lib/date'
 import { customerRepository } from '@/services/local-db/repository'
 import { localDb } from '@/services/local-db/client'
 import { customerStatusOptions } from '@/features/customers/schemas/customer-form-schema'
@@ -88,9 +89,11 @@ export function CustomerDetailPage() {
         total: so.cost,
         status: so.status,
       }))
-    return [...salesOrders, ...serviceOrders].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    )
+    return [...salesOrders, ...serviceOrders].sort((a, b) => {
+      const da = new Date(a.date).getTime()
+      const db = new Date(b.date).getTime()
+      return (isNaN(db) ? 0 : db) - (isNaN(da) ? 0 : da)
+    })
   }, [customer, allSalesOrders, allServiceOrders, id])
 
   if (isLoading) {
@@ -269,7 +272,7 @@ export function CustomerDetailPage() {
                         {row.code}
                       </Link>
                     )},
-                    { key: 'date', header: 'Tanggal', sortable: true, render: (row: OrderRow) => new Date(row.date).toLocaleDateString('id-ID') },
+                    { key: 'date', header: 'Tanggal', sortable: true, render: (row: OrderRow) => formatDate(row.date) },
                     { key: 'type', header: 'Tipe', render: (row: OrderRow) => (
                       <StatusBadge label={row.type} tone={row.type === 'Penjualan' ? 'info' : 'warning'} />
                     )},

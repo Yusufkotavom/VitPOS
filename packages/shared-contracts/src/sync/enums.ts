@@ -1,4 +1,4 @@
-export type SyncEntityType = 'product' | 'customer' | 'sale' | 'payment' | 'stock_movement' | 'cash' | 'cash_category' | 'setting' | 'shift' | 'product_category' | 'supplier' | 'purchase' | 'return' | 'service_order' | 'payment_method' | 'recipe'
+export type SyncEntityType = 'product' | 'customer' | 'sale' | 'payment' | 'stock_movement' | 'cash' | 'cash_category' | 'setting' | 'shift' | 'product_category' | 'supplier' | 'purchase' | 'return' | 'service_order' | 'payment_method' | 'recipe' | 'production_batch'
 export type SyncMutationType = 'create' | 'update' | 'delete'
 export type LocalOutboxStatus = 'queued' | 'syncing' | 'synced' | 'failed' | 'conflict'
 export type ServerSyncStatus = 'pending' | 'synced' | 'failed' | 'conflict'

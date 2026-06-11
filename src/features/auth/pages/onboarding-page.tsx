@@ -35,6 +35,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { apiPost } from '@/services/api/client'
 import { localDb } from '@/services/local-db/client'
+import { settingRepository } from '@/services/local-db/repository'
 import { enqueueOutboxItem } from '@/services/sync/outbox-service'
 import { TEMPLATE_PRESETS, type TemplatePreset } from '@/features/auth/data/template-data'
 
@@ -395,7 +396,7 @@ export function OnboardingPage() {
       }
 
       for (const s of printSettings) {
-        await localDb.settings.put({ ...s, status: 'Lengkap', updatedAt: now, tenantId })
+        await settingRepository.upsert({ ...s, status: 'Lengkap', updatedAt: now, tenantId })
       }
 
       navigate('/billing')

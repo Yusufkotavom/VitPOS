@@ -8,6 +8,7 @@ import type {
   LocalPayment,
   LocalProduct,
   LocalProductCategory,
+  LocalProductionBatch,
   LocalPurchase,
   LocalRecipe,
   LocalReturn,
@@ -112,3 +113,4 @@ export const returnRepository = createRepository<LocalReturn>({ table: localDb.r
 export const serviceOrderRepository = createRepository<LocalServiceOrder>({ table: localDb.serviceOrders, outboxTable: localDb.outbox, entityType: 'service_order' })
 export const paymentMethodRepository = createRepository<LocalPaymentMethod>({ table: localDb.paymentMethods, outboxTable: localDb.outbox, entityType: 'payment_method' })
 export const recipeRepository = createRepository<LocalRecipe>({ table: localDb.recipes, outboxTable: localDb.outbox, entityType: 'recipe' })
+export const productionBatchRepository = createRepository<LocalProductionBatch>({ table: localDb.productionBatches, outboxTable: localDb.outbox, entityType: 'production_batch' })

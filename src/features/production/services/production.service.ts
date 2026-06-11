@@ -1,6 +1,7 @@
 import { localDb } from '@/services/local-db/client'
+import { productRepository } from '@/services/local-db/repository'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
-import type { LocalProductionBatch, LocalStockMovement, OutboxItem } from '@/services/local-db/schema'
+import type { LocalProduct, LocalProductionBatch, LocalStockMovement, OutboxItem } from '@/services/local-db/schema'
 
 function createId(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`
@@ -29,7 +30,7 @@ export async function produceFromRecipe(
 
   const stockMovements: LocalStockMovement[] = []
   const outboxItems: OutboxItem[] = []
-  const productUpdates: { id: string; stock: number; updatedAt: string; version: number; syncStatus: 'pending' }[] = []
+  const productUpdates: LocalProduct[] = []
 
   const products = await localDb.products.where('tenantId').equals(tenantId).toArray()
   const productMap = new Map(products.map((p) => [p.id, p]))
@@ -62,13 +63,7 @@ export async function produceFromRecipe(
     })
 
     const nextStock = Math.max(0, ingredient.stock - consumeQty)
-    productUpdates.push({
-      id: item.productId,
-      stock: nextStock,
-      updatedAt: nowIso,
-      version: ingredient.version + 1,
-      syncStatus: 'pending',
-    })
+    productUpdates.push({ ...ingredient, stock: nextStock, updatedAt: nowIso, version: ingredient.version + 1, syncStatus: 'pending' })
   }
 
   stockMovements.push({
@@ -86,13 +81,7 @@ export async function produceFromRecipe(
   })
 
   const nextStockProduced = (producedProduct.stock || 0) + producedQty
-  productUpdates.push({
-    id: recipe.productId,
-    stock: nextStockProduced,
-    updatedAt: nowIso,
-    version: producedProduct.version + 1,
-    syncStatus: 'pending',
-  })
+  productUpdates.push({ ...producedProduct, stock: nextStockProduced, updatedAt: nowIso, version: producedProduct.version + 1, syncStatus: 'pending' })
 
   const batch: LocalProductionBatch = {
     id: batchId,
@@ -123,11 +112,24 @@ export async function produceFromRecipe(
     })
   }
 
+  outboxItems.push({
+    id: createId('outbox'),
+    tenantId,
+    entityType: 'production_batch',
+    entityId: batch.id,
+    mutationType: 'create',
+    payload: batch,
+    status: 'queued',
+    attempts: 0,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  })
+
   await localDb.transaction('rw', [localDb.productionBatches, localDb.stockMovements, localDb.products, localDb.outbox], async () => {
     await localDb.productionBatches.put(batch)
     await localDb.stockMovements.bulkPut(stockMovements)
-    for (const upd of productUpdates) {
-      await localDb.products.update(upd.id, upd)
+    for (const product of productUpdates) {
+      await productRepository.upsert(product)
     }
     await localDb.outbox.bulkPut(outboxItems)
   })

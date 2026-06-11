@@ -1,5 +1,6 @@
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { localDb } from '@/services/local-db/client'
+import { customerRepository } from '@/services/local-db/repository'
 import { enqueueOutboxItem } from '@/services/sync/outbox-service'
 import { todayISO } from '@/lib/date'
 import type { LocalPayment, LocalSalesOrder, OutboxItem, PosPaymentMethodCode } from '@/services/local-db/schema'
@@ -25,7 +26,8 @@ export async function syncCustomerSalesMetrics(customerId?: string, tenantId: st
   const customerOrders = allOrders.filter((order) => order.customerId === customerId && order.status !== 'Batal')
   const receivable = customerOrders.reduce((sum, order) => sum + Math.max(0, order.grandTotal - order.paidTotal), 0)
 
-  await localDb.customers.update(customerId, {
+  await customerRepository.upsert({
+    ...customer,
     orders: customerOrders.length,
     receivable,
     status: receivable > 0 ? 'Piutang' : customer.status === 'Nonaktif' ? 'Nonaktif' : 'Aktif',

@@ -1,9 +1,12 @@
 import { localDb } from '@/services/local-db/client'
+import { productRepository } from '@/services/local-db/repository'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
+import { todayISO } from '@/lib/date'
 import { addWarrantyDuration, buildWarrantyTimelineNote } from '@/features/service-orders/lib/warranty'
 import type { 
   LocalServiceOrder, 
   LocalPayment, 
+  LocalProduct,
   LocalStockMovement, 
   LocalInventory, 
   OutboxItem,
@@ -83,7 +86,7 @@ export const socTransactionService = {
       customerId: customerId ?? undefined,
       customerName: customerName || 'Umum',
       description: serviceData.description,
-      date: new Intl.DateTimeFormat('id-ID', { dateStyle: 'long' }).format(new Date()),
+        date: todayISO(),
       estimatedCompletion: serviceData.estimatedCompletion,
       cost: totals.total,
       paidTotal: retainedAmount,
@@ -126,7 +129,7 @@ export const socTransactionService = {
         source: 'SERVICE',
         method: paymentMethod as PosPaymentMethodCode,
         amount: retainedAmount,
-        date: new Intl.DateTimeFormat('id-ID', { dateStyle: 'long' }).format(new Date()),
+      date: todayISO(),
         status: paymentStatus,
         syncStatus: 'pending',
         version: 1,
@@ -185,14 +188,14 @@ export const socTransactionService = {
     const productMap = new Map(existingProducts.filter(Boolean).map((p) => [p!.id, p!]))
 
     const inventoryRows: LocalInventory[] = []
-    const productUpdates: { id: string; stock: number; updatedAt: string; version: number; syncStatus: 'pending' }[] = []
+    const productUpdates: LocalProduct[] = []
 
     for (const item of items) {
       const existing = productMap.get(item.productId)
       if (!existing || existing.tenantId !== tenantId || existing.type !== 'Produk Fisik') continue
 
       const nextStock = Math.max(0, existing.stock - item.qty)
-      productUpdates.push({ id: item.productId, stock: nextStock, updatedAt: nowIso, version: existing.version + 1, syncStatus: 'pending' })
+      productUpdates.push({ ...existing, stock: nextStock, updatedAt: nowIso, version: existing.version + 1, syncStatus: 'pending' })
 
       let status = 'Aman'
       if (nextStock <= 0) status = 'Habis'
@@ -214,8 +217,8 @@ export const socTransactionService = {
       await localDb.serviceOrders.put(serviceOrder)
       if (payment) await localDb.payments.put(payment)
       if (stockMovements.length > 0) await localDb.stockMovements.bulkPut(stockMovements)
-      for (const upd of productUpdates) {
-        await localDb.products.update(upd.id, upd)
+      for (const product of productUpdates) {
+        await productRepository.upsert(product)
       }
       if (inventoryRows.length > 0) await localDb.inventory.bulkPut(inventoryRows)
       if (outboxPayload.length > 0) await localDb.outbox.bulkPut(outboxPayload)

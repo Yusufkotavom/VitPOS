@@ -13,6 +13,7 @@ import {
   paymentMethods,
   payments,
   productCategories,
+  productionBatches,
   products,
   purchaseItems,
   purchases,
@@ -1041,6 +1042,48 @@ async function applyRecipe(db: AppDb, ctx: ApplyContext, entityId: string, mutat
     })
 }
 
+type ProductionBatchPayload = {
+  id?: string
+  recipeId?: string
+  recipeName?: string
+  productId?: string
+  productName?: string
+  batchQty?: number
+  date?: string
+}
+
+async function applyProductionBatch(db: AppDb, ctx: ApplyContext, entityId: string, mutationType: string, payload: ProductionBatchPayload) {
+  if (mutationType === 'delete') {
+    await db.delete(productionBatches).where(eq(productionBatches.id, entityId))
+    return
+  }
+
+  const now = new Date()
+  await db
+    .insert(productionBatches)
+    .values({
+      id: entityId,
+      tenantId: ctx.tenantId,
+      branchId: toNullableUuid(ctx.branchId),
+      recipeId: payload.recipeId ?? entityId,
+      productId: payload.productId ?? entityId,
+      batchQty: payload.batchQty ?? 1,
+      date: payload.date ? new Date(payload.date) : now,
+      syncStatus: 'synced',
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: productionBatches.id,
+      set: {
+        batchQty: payload.batchQty ?? 1,
+        syncStatus: 'synced',
+        updatedAt: now,
+      },
+    })
+}
+
 export async function applyMutation(
   db: AppDb,
   ctx: ApplyContext,
@@ -1111,6 +1154,10 @@ export async function applyMutation(
   }
   if (entityType === 'recipe') {
     await applyRecipe(db, ctx, entityId, mutationType, (payload ?? {}) as RecipePayload)
+    return
+  }
+  if (entityType === 'production_batch') {
+    await applyProductionBatch(db, ctx, entityId, mutationType, (payload ?? {}) as ProductionBatchPayload)
     return
   }
 }

@@ -2046,6 +2046,33 @@ async function applyRecipe(db2, ctx, entityId, mutationType, payload) {
     }
   });
 }
+async function applyProductionBatch(db2, ctx, entityId, mutationType, payload) {
+  if (mutationType === "delete") {
+    await db2.delete(productionBatches).where(eq3(productionBatches.id, entityId));
+    return;
+  }
+  const now = /* @__PURE__ */ new Date();
+  await db2.insert(productionBatches).values({
+    id: entityId,
+    tenantId: ctx.tenantId,
+    branchId: toNullableUuid(ctx.branchId),
+    recipeId: payload.recipeId ?? entityId,
+    productId: payload.productId ?? entityId,
+    batchQty: payload.batchQty ?? 1,
+    date: payload.date ? new Date(payload.date) : now,
+    syncStatus: "synced",
+    version: 1,
+    createdAt: now,
+    updatedAt: now
+  }).onConflictDoUpdate({
+    target: productionBatches.id,
+    set: {
+      batchQty: payload.batchQty ?? 1,
+      syncStatus: "synced",
+      updatedAt: now
+    }
+  });
+}
 async function applyMutation(db2, ctx, entityType, entityId, mutationType, payload) {
   if (entityType === "product") {
     await applyProduct(db2, ctx, entityId, mutationType, payload ?? {});
@@ -2111,6 +2138,10 @@ async function applyMutation(db2, ctx, entityType, entityId, mutationType, paylo
     await applyRecipe(db2, ctx, entityId, mutationType, payload ?? {});
     return;
   }
+  if (entityType === "production_batch") {
+    await applyProductionBatch(db2, ctx, entityId, mutationType, payload ?? {});
+    return;
+  }
 }
 
 // src/features/sync/routes.ts
@@ -2139,6 +2170,9 @@ syncRoutes.get("/pull", async (c) => {
     orderBy: [desc2(salesOrders.updatedAt)],
     limit: 100
   });
+  const saleCustomerIds = [...new Set(saleRows.filter((r) => r.customerId).map((r) => r.customerId))];
+  const saleCustomerRows = saleCustomerIds.length > 0 ? await db.query.customers.findMany({ where: (c2, { inArray: inArray2 }) => inArray2(c2.id, saleCustomerIds) }) : [];
+  const saleCustomerNameMap = new Map(saleCustomerRows.map((c2) => [c2.id, c2.name]));
   const paymentBranchFilter = parsed.value.branchId ? eq4(payments.branchId, parsed.value.branchId) : void 0;
   const paymentSinceFilter = parsed.value.since ? gte2(payments.updatedAt, parsed.value.since) : void 0;
   const paymentRows = await db.query.payments.findMany({
@@ -2230,6 +2264,12 @@ syncRoutes.get("/pull", async (c) => {
     orderBy: [desc2(recipes.updatedAt)],
     limit: 100
   });
+  const productionBatchSinceFilter = parsed.value.since ? gte2(productionBatches.updatedAt, parsed.value.since) : void 0;
+  const productionBatchRows = await db.query.productionBatches.findMany({
+    where: and4(eq4(productionBatches.tenantId, parsed.value.tenantId), productionBatchSinceFilter),
+    orderBy: [desc2(productionBatches.updatedAt)],
+    limit: 100
+  });
   const items = [
     ...productRows.map((row) => ({
       id: row.id,
@@ -2265,6 +2305,7 @@ syncRoutes.get("/pull", async (c) => {
         code: row.orderNumber,
         orderNumber: row.orderNumber,
         customerId: row.customerId,
+        customerName: row.customerId ? saleCustomerNameMap.get(row.customerId) ?? null : null,
         status: row.status,
         subtotal: Number(row.subtotal),
         discountTotal: Number(row.discountTotal),
@@ -2531,6 +2572,23 @@ syncRoutes.get("/pull", async (c) => {
         batchYield: row.batchYield,
         items: row.items,
         status: row.status === "active" ? "Aktif" : "Draft"
+      },
+      transportStatus: "applied",
+      serverSyncStatus: "synced",
+      updatedAt: row.updatedAt.toISOString()
+    })),
+    ...productionBatchRows.map((row) => ({
+      id: row.id,
+      entityId: row.id,
+      entityType: "production_batch",
+      mutationType: "update",
+      payload: {
+        id: row.id,
+        recipeId: row.recipeId,
+        productId: row.productId,
+        batchQty: row.batchQty,
+        date: row.date.toISOString(),
+        version: row.version
       },
       transportStatus: "applied",
       serverSyncStatus: "synced",

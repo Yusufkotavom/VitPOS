@@ -10,6 +10,7 @@ import type {
   LocalPayment,
   LocalPaymentMethod,
   LocalProduct,
+  LocalProductionBatch,
   LocalPurchase,
   LocalRecipe,
   LocalReturn,
@@ -124,6 +125,7 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
     else if (item.entityType === 'service_order') await localDb.serviceOrders.delete(item.entityId)
     else if (item.entityType === 'payment_method') await localDb.paymentMethods.delete(item.entityId)
     else if (item.entityType === 'recipe') await localDb.recipes.delete(item.entityId)
+    else if (item.entityType === 'production_batch') await localDb.productionBatches.delete(item.entityId)
     return
   }
 
@@ -389,6 +391,22 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
         status: (typeof payload.status === 'string' ? payload.status : 'Draft') as LocalRecipe['status'],
         updatedAt: item.updatedAt,
       })
+    } else if (item.entityType === 'production_batch') {
+      const existingPb = await localDb.productionBatches.get(item.entityId)
+      const batch: LocalProductionBatch = {
+        id: item.entityId,
+        tenantId,
+        recipeId: typeof payload.recipeId === 'string' ? payload.recipeId : existingPb?.recipeId ?? '',
+        recipeName: typeof payload.recipeName === 'string' ? payload.recipeName : existingPb?.recipeName ?? '',
+        productId: typeof payload.productId === 'string' ? payload.productId : existingPb?.productId ?? '',
+        productName: typeof payload.productName === 'string' ? payload.productName : existingPb?.productName ?? '',
+        batchQty: Number(payload.batchQty ?? existingPb?.batchQty ?? 1),
+        date: typeof payload.date === 'string' ? payload.date : existingPb?.date ?? new Date().toISOString().slice(0, 10),
+        syncStatus: 'synced',
+        version: typeof payload.version === 'number' ? payload.version : 1,
+        updatedAt: item.updatedAt,
+      }
+      await localDb.productionBatches.put(batch)
     }
   }
 
@@ -400,6 +418,7 @@ export async function applyPullItems(items: SyncPullItem[], tenantId: string) {
       localDb.stockMovements, localDb.cash, localDb.productCategories, localDb.cashCategories,
       localDb.settings, localDb.shifts, localDb.suppliers, localDb.purchases,
       localDb.returns, localDb.serviceOrders, localDb.paymentMethods, localDb.recipes,
+      localDb.productionBatches,
     ],
     async () => {
       for (const item of items) {
