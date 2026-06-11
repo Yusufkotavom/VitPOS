@@ -8,21 +8,27 @@ const DB_NAME = 'vitpos_db';
 const DB_VERSION = 1;
 
 class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
-  private db: SQLiteDBConnection;
+  private getDb: () => SQLiteDBConnection | null;
   private tableName: string;
 
-  constructor(db: SQLiteDBConnection, tableName: string) {
-    this.db = db;
+  constructor(getDb: () => SQLiteDBConnection | null, tableName: string) {
+    this.getDb = getDb;
     this.tableName = tableName;
   }
 
+  private db(): SQLiteDBConnection {
+    const conn = this.getDb();
+    if (!conn) throw new Error('Database tidak tersedia. Init() harus dipanggil sebelum akses data.');
+    return conn;
+  }
+
   async toArray(): Promise<T[]> {
-    const res = await this.db.query(`SELECT * FROM ${this.tableName}`);
+    const res = await this.db().query(`SELECT * FROM ${this.tableName}`);
     return res.values ? res.values.map(v => this.parseRow(v)) : [];
   }
 
   async get(id: string): Promise<T | undefined> {
-    const res = await this.db.query(`SELECT * FROM ${this.tableName} WHERE id = ?`, [id]);
+    const res = await this.db().query(`SELECT * FROM ${this.tableName} WHERE id = ?`, [id]);
     if (res.values && res.values.length > 0) {
       return this.parseRow(res.values[0]);
     }
@@ -32,7 +38,7 @@ class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
   async bulkGet(ids: string[]): Promise<(T | undefined)[]> {
     if (ids.length === 0) return [];
     const placeholders = ids.map(() => '?').join(', ');
-    const res = await this.db.query(`SELECT * FROM ${this.tableName} WHERE id IN (${placeholders})`, ids);
+    const res = await this.db().query(`SELECT * FROM ${this.tableName} WHERE id IN (${placeholders})`, ids);
     const rows = res.values ? res.values.map(v => this.parseRow(v)) : [];
     const map = new Map(rows.map(r => [r.id, r]));
     return ids.map(id => map.get(id));
@@ -52,12 +58,12 @@ class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
             }
             const whereClause = cols.map(c => `${c} = ?`).join(' AND ');
             const query = `SELECT * FROM ${this.tableName} WHERE ${whereClause}`;
-            const res = await this.db.query(query, value);
+            const res = await this.db().query(query, value);
             return res.values ? res.values.map(v => this.parseRow(v)) : [];
           }
           
           const query = `SELECT * FROM ${this.tableName} WHERE ${column} = ?`;
-          const res = await this.db.query(query, [value]);
+          const res = await this.db().query(query, [value]);
           return res.values ? res.values.map(v => this.parseRow(v)) : [];
         };
 
@@ -76,10 +82,10 @@ class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
                const cols = column.slice(1, -1).split('+');
                const whereClause = cols.map(c => `${c} = ?`).join(' AND ');
                const delQuery = `DELETE FROM ${this.tableName} WHERE ${whereClause}`;
-               await this.db.run(delQuery, value);
+               await this.db().run(delQuery, value);
              } else {
                const delQuery = `DELETE FROM ${this.tableName} WHERE ${column} = ?`;
-               await this.db.run(delQuery, [value]);
+               await this.db().run(delQuery, [value]);
              }
           },
            // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -129,12 +135,12 @@ class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
       query += ` ON CONFLICT(id) DO NOTHING`;
     }
 
-    await this.db.run(query, values);
+    await this.db().run(query, values);
     return row.id;
   }
 
   async delete(id: string): Promise<void> {
-    await this.db.run(`DELETE FROM ${this.tableName} WHERE id = ?`, [id]);
+    await this.db().run(`DELETE FROM ${this.tableName} WHERE id = ?`, [id]);
   }
 
   async update(id: string, changes: Partial<T>): Promise<unknown> {
@@ -154,12 +160,12 @@ class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
     const setClause = keys.map(k => `${k} = ?`).join(', ');
     const query = `UPDATE ${this.tableName} SET ${setClause} WHERE id = ?`;
     
-    await this.db.run(query, values);
+    await this.db().run(query, values);
     return id;
   }
 
   async count(): Promise<number> {
-    const res = await this.db.query(`SELECT COUNT(*) as count FROM ${this.tableName}`);
+    const res = await this.db().query(`SELECT COUNT(*) as count FROM ${this.tableName}`);
     if (res.values && res.values.length > 0) {
       return res.values[0].count;
     }
@@ -193,7 +199,7 @@ class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
       });
     });
 
-    await this.db.executeSet([
+    await this.db().executeSet([
       {
         statement,
         values: valuesArray
@@ -204,7 +210,7 @@ class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
   }
 
   async clear(): Promise<void> {
-    await this.db.run(`DELETE FROM ${this.tableName}`);
+    await this.db().run(`DELETE FROM ${this.tableName}`);
   }
 
   // Helper to parse JSON strings and handle boolean conversions back to objects where needed
@@ -345,10 +351,7 @@ class SqliteAdapterImpl implements LocalDbAdapter {
   }
 
   storageTable<T extends { id: string }>(name: string): AdapterTable<T> {
-    if (!this.db) {
-      throw new Error('Database not initialized');
-    }
-    return new SqliteAdapterTable<T>(this.db, name);
+    return new SqliteAdapterTable<T>(() => this.db, name);
   }
 
   async runInTransaction<T>(_mode: StorageTransactionMode, _tableNames: string[], scope: () => Promise<T>): Promise<T> {
