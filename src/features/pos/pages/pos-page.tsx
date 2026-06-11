@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { HeldSaleBanner } from '@/features/pos/components/held-sale-banner'
@@ -20,15 +20,21 @@ export function PosPage() {
   const totals = selectPosTotals(store)
   const hasItems = totals.itemCount > 0
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
+  const [isDrafting, setIsDraftingState] = useState(false)
+  const isDraftingRef = useRef(false)
+  const setDrafting = (v: boolean) => { isDraftingRef.current = v; setIsDraftingState(v) }
 
   async function handleDraft() {
-    if (!hasItems) return
+    if (!hasItems || isDraftingRef.current) return
+    setDrafting(true)
     try {
       await posTransactionService.saveDraft(store.cartItems, totals, store.discount, store.customerName)
       toast.success('Draft berhasil disimpan')
       store.clearCart()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Gagal menyimpan draft')
+    } finally {
+      setDrafting(false)
     }
   }
 
@@ -76,8 +82,8 @@ export function PosPage() {
               <span className="text-xl font-bold">{formatCurrency(totals.total)}</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" disabled={!hasItems} onClick={handleDraft}>
-                Simpan Draft
+              <Button variant="outline" disabled={!hasItems || isDrafting} onClick={handleDraft}>
+                {isDrafting ? 'Menyimpan...' : 'Simpan Draft'}
               </Button>
               <Button disabled={!hasItems} onClick={() => setIsPaymentOpen(true)}>
                 Bayar
@@ -94,8 +100,8 @@ export function PosPage() {
             <p className="text-xs text-muted-foreground">{totals.itemCount} item</p>
             <p className="text-lg font-bold">{formatCurrency(totals.total)}</p>
           </div>
-          <Button variant="outline" size="sm" disabled={!hasItems} onClick={handleDraft}>
-            Draft
+          <Button variant="outline" size="sm" disabled={!hasItems || isDrafting} onClick={handleDraft}>
+            {isDrafting ? '...' : 'Draft'}
           </Button>
           <Button size="lg" className="min-w-32" disabled={!hasItems} onClick={() => setIsPaymentOpen(true)}>
             Bayar

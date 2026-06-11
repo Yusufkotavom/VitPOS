@@ -2,14 +2,11 @@ import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { localDb } from '@/services/local-db/client'
 import { enqueueOutboxItem } from '@/services/sync/outbox-service'
 import { syncSupplierPurchaseMetrics } from '@/features/purchases/services/purchase-receiving.service'
+import { todayISO } from '@/lib/date'
 import type { LocalPayment, LocalPurchase, OutboxItem } from '@/services/local-db/schema'
 
 function createId(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`
-}
-
-function todayLabel() {
-  return new Intl.DateTimeFormat('id-ID', { dateStyle: 'long' }).format(new Date())
 }
 
 export async function recordPurchasePayment(
@@ -38,7 +35,7 @@ export async function recordPurchasePayment(
     source,
     method,
     amount: paidAmount,
-    date: todayLabel(),
+    date: todayISO(),
     status: 'Berhasil',
     syncStatus: 'pending',
     version: 1,

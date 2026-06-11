@@ -6,7 +6,7 @@ import { selectPosTotals, usePosStore } from '@/features/pos/stores/pos-store'
 import { posTransactionService } from '@/features/pos/services/pos-transaction.service'
 import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
 import { toast } from 'sonner'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { PosSuccessDialog } from '@/features/pos/components/pos-success-dialog'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { localDb } from '@/services/local-db/client'
@@ -32,6 +32,9 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
   const selectedMethodObj = activeMethods.find(m => m.name.toLowerCase() === store.paymentMethod) as LocalPaymentMethod | undefined
   
   const [successOrder, setSuccessOrder] = useState<PosOrderSummary | null>(null)
+  const [isProcessing, setIsProcessingState] = useState(false)
+  const isProcessingRef = useRef(false)
+  const setProcessing = (v: boolean) => { isProcessingRef.current = v; setIsProcessingState(v) }
   const { downloadPdf } = usePdf()
 
   const receiptData: PdfData | null = successOrder ? {
@@ -57,8 +60,9 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
   }, [setPaidAmount, totals.total])
 
   async function handleCheckout() {
-    if (store.cartItems.length === 0) return
+    if (store.cartItems.length === 0 || isProcessingRef.current) return
 
+    setProcessing(true)
     try {
       const result = await posTransactionService.checkout(store.cartItems, totals, store.paymentMethod, store.paidAmount, store.discount, store.customerName, store.customerId)
       if (!result) {
@@ -84,6 +88,8 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Gagal mencatat pembayaran'
       toast.error(message)
+    } finally {
+      setProcessing(false)
     }
   }
 
@@ -254,8 +260,8 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
         </div>
       </div>
 
-      <Button size="lg" className="h-14 text-lg font-semibold w-full mt-2" disabled={store.cartItems.length === 0} onClick={handleCheckout}>
-        {selectedMethodObj?.qrImageUrl ? 'Verifikasi & Selesaikan' : 'Selesaikan Pembayaran'}
+      <Button size="lg" className="h-14 text-lg font-semibold w-full mt-2" disabled={store.cartItems.length === 0 || isProcessing} onClick={handleCheckout}>
+        {isProcessing ? 'Memproses...' : selectedMethodObj?.qrImageUrl ? 'Verifikasi & Selesaikan' : 'Selesaikan Pembayaran'}
       </Button>
     </div>
   )

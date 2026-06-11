@@ -6,7 +6,7 @@ import { useServiceOrderCreateStore } from '@/features/service-orders/stores/ser
 import { socTransactionService } from '@/features/service-orders/services/soc-transaction.service'
 import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
 import { toast } from 'sonner'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { PosSuccessDialog } from '@/features/pos/components/pos-success-dialog'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { localDb } from '@/services/local-db/client'
@@ -28,6 +28,9 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
   const activeMethods = dbMethods && dbMethods.length > 0 ? dbMethods.filter((m) => m.status === 'Aktif') : defaultMethods
   
   const [successOrder, setSuccessOrder] = useState<PosOrderSummary | null>(null)
+  const [isProcessing, setIsProcessingState] = useState(false)
+  const isProcessingRef = useRef(false)
+  const setProcessing = (v: boolean) => { isProcessingRef.current = v; setIsProcessingState(v) }
   const { downloadPdf } = usePdf()
 
   const totals = {
@@ -56,6 +59,9 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
   const [paymentMethod, setPaymentMethod] = useState('tunai')
 
   async function handleCheckout() {
+    if (isProcessingRef.current) return
+
+    setProcessing(true)
     try {
       const result = await socTransactionService.checkout(
         store.items,
@@ -99,6 +105,8 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Gagal mencatat order'
       toast.error(message)
+    } finally {
+      setProcessing(false)
     }
   }
 
@@ -243,8 +251,8 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
         </div>
       </div>
 
-      <Button size="lg" className="h-14 text-lg font-semibold w-full mt-2" onClick={handleCheckout}>
-        Proses Service Order
+      <Button size="lg" className="h-14 text-lg font-semibold w-full mt-2" disabled={isProcessing} onClick={handleCheckout}>
+        {isProcessing ? 'Memproses...' : 'Proses Service Order'}
       </Button>
     </div>
   )

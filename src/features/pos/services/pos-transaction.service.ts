@@ -1,6 +1,7 @@
 import { localDb } from '@/services/local-db/client'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { syncCustomerSalesMetrics } from '@/features/sales-orders/services/sales-order-finance.service'
+import { todayISO } from '@/lib/date'
 import type { LocalPayment, LocalSalesOrder, LocalSalesOrderItem, LocalStockMovement, OutboxItem, PosPaymentMethodCode, LocalInventory } from '@/services/local-db/schema'
 import type { PosPaymentMethod } from '@/features/pos/types/pos.types'
 
@@ -19,10 +20,6 @@ interface PosTotals {
 
 function newId(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`
-}
-
-function todayLabel() {
-  return new Intl.DateTimeFormat('id-ID', { dateStyle: 'long' }).format(new Date())
 }
 
 async function orderCode(): Promise<string> {
@@ -65,7 +62,7 @@ export const posTransactionService = {
       code: `DRF-${Date.now()}`,
       customerId: customerId ?? undefined,
       customerName: customerName || 'Umum',
-      date: todayLabel(),
+      date: todayISO(),
       subtotal: totals.subtotal,
       discountTotal: discountTotal,
       taxTotal: 0,
@@ -126,7 +123,7 @@ export const posTransactionService = {
       code: await orderCode(),
       customerId: customerId ?? undefined,
       customerName: customerName || 'Umum',
-      date: todayLabel(),
+      date: todayISO(),
       subtotal: totals.subtotal,
       discountTotal: discountTotal,
       taxTotal: 0,
@@ -147,7 +144,7 @@ export const posTransactionService = {
       source: 'POS',
       method: paymentMethod as PosPaymentMethodCode,
       amount: retainedAmount,
-      date: todayLabel(),
+      date: todayISO(),
       status: paymentMethod === 'piutang' ? 'Pending' : 'Berhasil',
       syncStatus: 'pending',
       version: 1,

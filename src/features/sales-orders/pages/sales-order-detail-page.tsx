@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/format-currency'
+import { formatDate } from '@/lib/date'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { useSalesOrder } from '@/features/sales-orders/hooks/use-sales-order'
 import { deleteSalesOrder, recordSalesOrderPayment } from '@/features/sales-orders/services/sales-order-finance.service'
@@ -262,7 +263,7 @@ export function SalesOrderDetailPage() {
   return (
     <PageShell
       title={order.code}
-      description={`${order.customerName} · ${order.date}`}
+      description={`${order.customerName} · ${formatDate(order.date)}`}
       actions={actionButtons}
     >
       <div className="grid gap-6 md:grid-cols-3">
@@ -363,7 +364,7 @@ export function SalesOrderDetailPage() {
               data={order.payments?.map((p: PaymentRow, idx: number) => ({ ...p, id: String(idx) })) || []}
               emptyTitle="Belum ada pembayaran"
               columns={[
-                { key: 'date', header: 'Tanggal', render: (row: PaymentRow) => new Date(row.date).toLocaleDateString('id-ID') },
+                { key: 'date', header: 'Tanggal', render: (row: PaymentRow) => formatDate(row.date) },
                 { key: 'method', header: 'Metode', render: (row: PaymentRow) => <span className="capitalize">{row.method}</span> },
                 { key: 'amount', header: 'Nominal', render: (row: PaymentRow) => formatCurrency(row.amount) },
               ]}

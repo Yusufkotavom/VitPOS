@@ -16,19 +16,21 @@ class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
     this.tableName = tableName;
   }
 
-  private db(): SQLiteDBConnection {
-    const conn = this.getDb();
-    if (!conn) throw new Error('Database tidak tersedia. Init() harus dipanggil sebelum akses data.');
-    return conn;
+  private db(): SQLiteDBConnection | null {
+    return this.getDb();
   }
 
   async toArray(): Promise<T[]> {
-    const res = await this.db().query(`SELECT * FROM ${this.tableName}`);
+    const conn = this.db();
+    if (!conn) return [];
+    const res = await conn.query(`SELECT * FROM ${this.tableName}`);
     return res.values ? res.values.map(v => this.parseRow(v)) : [];
   }
 
   async get(id: string): Promise<T | undefined> {
-    const res = await this.db().query(`SELECT * FROM ${this.tableName} WHERE id = ?`, [id]);
+    const conn = this.db();
+    if (!conn) return undefined;
+    const res = await conn.query(`SELECT * FROM ${this.tableName} WHERE id = ?`, [id]);
     if (res.values && res.values.length > 0) {
       return this.parseRow(res.values[0]);
     }
@@ -37,8 +39,10 @@ class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
 
   async bulkGet(ids: string[]): Promise<(T | undefined)[]> {
     if (ids.length === 0) return [];
+    const conn = this.db();
+    if (!conn) return ids.map(() => undefined);
     const placeholders = ids.map(() => '?').join(', ');
-    const res = await this.db().query(`SELECT * FROM ${this.tableName} WHERE id IN (${placeholders})`, ids);
+    const res = await conn.query(`SELECT * FROM ${this.tableName} WHERE id IN (${placeholders})`, ids);
     const rows = res.values ? res.values.map(v => this.parseRow(v)) : [];
     const map = new Map(rows.map(r => [r.id, r]));
     return ids.map(id => map.get(id));
@@ -46,27 +50,47 @@ class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
 
   // Minimal Dexie-like where emulation
   where(column: string) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let value: any;
+
+    const executeQuery = async (): Promise<T[]> => {
+      const conn = this.db();
+      if (!conn) return [];
+
+      if (column.startsWith('[') && column.endsWith(']') && Array.isArray(value)) {
+        const cols = column.slice(1, -1).split('+');
+        if (cols.length !== value.length) {
+          throw new Error(`Compound index mismatch: ${column} vs values length`);
+        }
+        const whereClause = cols.map(c => `${c} = ?`).join(' AND ');
+        const query = `SELECT * FROM ${this.tableName} WHERE ${whereClause}`;
+        const res = await conn.query(query, value);
+        return res.values ? res.values.map(v => this.parseRow(v)) : [];
+      }
+
+      const query = `SELECT * FROM ${this.tableName} WHERE ${column} = ?`;
+      const res = await conn.query(query, [value]);
+      return res.values ? res.values.map(v => this.parseRow(v)) : [];
+    };
+
+    const executeDelete = async (): Promise<void> => {
+      const conn = this.db();
+      if (!conn) return;
+      if (column.startsWith('[') && column.endsWith(']') && Array.isArray(value)) {
+        const cols = column.slice(1, -1).split('+');
+        const whereClause = cols.map(c => `${c} = ?`).join(' AND ');
+        const delQuery = `DELETE FROM ${this.tableName} WHERE ${whereClause}`;
+        await conn.run(delQuery, value);
+      } else {
+        const delQuery = `DELETE FROM ${this.tableName} WHERE ${column} = ?`;
+        await conn.run(delQuery, [value]);
+      }
+    };
+
     return {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      equals: (value: any) => {
-        const executeQuery = async () => {
-          // Handle compound index queries like '[tenantId+name]' -> ['t1', 'foo']
-          if (column.startsWith('[') && column.endsWith(']') && Array.isArray(value)) {
-            const cols = column.slice(1, -1).split('+');
-            if (cols.length !== value.length) {
-              throw new Error(`Compound index mismatch: ${column} vs values length`);
-            }
-            const whereClause = cols.map(c => `${c} = ?`).join(' AND ');
-            const query = `SELECT * FROM ${this.tableName} WHERE ${whereClause}`;
-            const res = await this.db().query(query, value);
-            return res.values ? res.values.map(v => this.parseRow(v)) : [];
-          }
-          
-          const query = `SELECT * FROM ${this.tableName} WHERE ${column} = ?`;
-          const res = await this.db().query(query, [value]);
-          return res.values ? res.values.map(v => this.parseRow(v)) : [];
-        };
-
+      equals: (val: any) => {
+        value = val;
         return {
           toArray: async () => await executeQuery(),
           first: async () => {
@@ -77,75 +101,68 @@ class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
             const results = await executeQuery();
             return results.length;
           },
-          delete: async () => {
-             if (column.startsWith('[') && column.endsWith(']') && Array.isArray(value)) {
-               const cols = column.slice(1, -1).split('+');
-               const whereClause = cols.map(c => `${c} = ?`).join(' AND ');
-               const delQuery = `DELETE FROM ${this.tableName} WHERE ${whereClause}`;
-               await this.db().run(delQuery, value);
-             } else {
-               const delQuery = `DELETE FROM ${this.tableName} WHERE ${column} = ?`;
-               await this.db().run(delQuery, [value]);
-             }
-          },
-           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-           filter: (fn: (item: any) => boolean) => {
-            return {
-              toArray: async () => {
-                const results = await executeQuery();
-                return results.filter(fn);
-              },
-              first: async () => {
-                const results = await executeQuery();
-                return results.find(fn);
-              },
-              count: async () => {
-                const results = await executeQuery();
-                return results.filter(fn).length;
-              }
-            };
-          }
+          delete: async () => await executeDelete(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          filter: (fn: (item: any) => boolean) => ({
+            toArray: async () => {
+              const results = await executeQuery();
+              return results.filter(fn);
+            },
+            first: async () => {
+              const results = await executeQuery();
+              return results.find(fn);
+            },
+            count: async () => {
+              const results = await executeQuery();
+              return results.filter(fn).length;
+            },
+          }),
         };
-      }
+      },
     };
   }
 
   async put(row: T): Promise<unknown> {
+    const conn = this.db();
+    if (!conn) return row.id;
     const keys = Object.keys(row).filter(k => row[k as keyof T] !== undefined);
     const values = keys.map(k => {
       const val = row[k as keyof T];
       if (typeof val === 'boolean') return val ? 1 : 0;
       return typeof val === 'object' && val !== null ? JSON.stringify(val) : val;
     });
-    
+
     const placeholders = keys.map(() => '?').join(', ');
     const columns = keys.join(', ');
-    
-    // SQLite upsert
+
     const updateAssignments = keys
       .filter(k => k !== 'id')
       .map(k => `${k} = EXCLUDED.${k}`)
       .join(', ');
-      
+
     let query = `INSERT INTO ${this.tableName} (${columns}) VALUES (${placeholders})`;
-    
+
     if (updateAssignments.length > 0) {
       query += ` ON CONFLICT(id) DO UPDATE SET ${updateAssignments}`;
     } else {
       query += ` ON CONFLICT(id) DO NOTHING`;
     }
 
-    await this.db().run(query, values);
+    await conn.run(query, values);
     return row.id;
   }
 
   async delete(id: string): Promise<void> {
-    await this.db().run(`DELETE FROM ${this.tableName} WHERE id = ?`, [id]);
+    const conn = this.db();
+    if (!conn) return;
+    await conn.run(`DELETE FROM ${this.tableName} WHERE id = ?`, [id]);
   }
 
   async update(id: string, changes: Partial<T>): Promise<unknown> {
+    const conn = this.db();
+    if (!conn) return id;
     const keys = Object.keys(changes).filter(k => changes[k as keyof Partial<T>] !== undefined && k !== 'id');
-    
+
     if (keys.length === 0) return id;
 
     const values = keys.map(k => {
@@ -153,19 +170,20 @@ class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
       if (typeof val === 'boolean') return val ? 1 : 0;
       return typeof val === 'object' && val !== null ? JSON.stringify(val) : val;
     });
-    
-    // Add id to values for the WHERE clause
+
     values.push(id);
-    
+
     const setClause = keys.map(k => `${k} = ?`).join(', ');
     const query = `UPDATE ${this.tableName} SET ${setClause} WHERE id = ?`;
-    
-    await this.db().run(query, values);
+
+    await conn.run(query, values);
     return id;
   }
 
   async count(): Promise<number> {
-    const res = await this.db().query(`SELECT COUNT(*) as count FROM ${this.tableName}`);
+    const conn = this.db();
+    if (!conn) return 0;
+    const res = await conn.query(`SELECT COUNT(*) as count FROM ${this.tableName}`);
     if (res.values && res.values.length > 0) {
       return res.values[0].count;
     }
@@ -174,16 +192,17 @@ class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
 
   async bulkPut(rows: T[]): Promise<unknown> {
     if (rows.length === 0) return undefined;
-    
-    // Create a transaction for bulk insert
+    const conn = this.db();
+    if (!conn) return rows.map(r => r.id);
+
     const keys = Object.keys(rows[0]).filter(k => rows[0][k as keyof T] !== undefined);
     const columns = keys.join(', ');
-    
+
     const updateAssignments = keys
       .filter(k => k !== 'id')
       .map(k => `${k} = EXCLUDED.${k}`)
       .join(', ');
-      
+
     let statement = `INSERT INTO ${this.tableName} (${columns}) VALUES (${keys.map(() => '?').join(', ')})`;
     if (updateAssignments.length > 0) {
       statement += ` ON CONFLICT(id) DO UPDATE SET ${updateAssignments}`;
@@ -199,18 +218,20 @@ class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
       });
     });
 
-    await this.db().executeSet([
+    await conn.executeSet([
       {
         statement,
-        values: valuesArray
-      }
+        values: valuesArray,
+      },
     ]);
-    
+
     return rows.map(r => r.id);
   }
 
   async clear(): Promise<void> {
-    await this.db().run(`DELETE FROM ${this.tableName}`);
+    const conn = this.db();
+    if (!conn) return;
+    await conn.run(`DELETE FROM ${this.tableName}`);
   }
 
   // Helper to parse JSON strings and handle boolean conversions back to objects where needed
