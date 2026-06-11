@@ -95,9 +95,14 @@ class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
     };
 
     return {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       equals: (val: any) => {
-        value = val;
+        if (typeof val === 'boolean') {
+          value = val ? 1 : 0;
+        } else if (Array.isArray(val)) {
+          value = val.map(v => typeof v === 'boolean' ? (v ? 1 : 0) : v);
+        } else {
+          value = val;
+        }
         return {
           toArray: async () => await executeQuery(),
           first: async () => {

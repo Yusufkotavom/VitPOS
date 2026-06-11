@@ -5,6 +5,13 @@ import { LOCAL_DB_TABLES } from '@/services/local-db/adapters'
 
 const DB_PATH = 'sqlite:vitpos.db'
 
+const BOOLEAN_FIELDS: Record<string, string[]> = {
+  tenants: ['isActive'],
+  tenantMembers: ['isActive'],
+  products: ['manageStock'],
+  serviceOrders: ['hasWarranty'],
+};
+
 class TauriSqlAdapterTable<T extends { id: string }> implements AdapterTable<T> {
   private db: Database
   private tableName: string
@@ -14,20 +21,42 @@ class TauriSqlAdapterTable<T extends { id: string }> implements AdapterTable<T> 
     this.tableName = tableName
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private parseRow(row: any): T {
+    const parsedRow = { ...row };
+    for (const key in parsedRow) {
+      if (typeof parsedRow[key] === 'string' && 
+         (parsedRow[key].startsWith('{') || parsedRow[key].startsWith('['))) {
+        try {
+          parsedRow[key] = JSON.parse(parsedRow[key]);
+        } catch {
+          // Keep as string if parsing fails
+        }
+      }
+      else if (parsedRow[key] === 1 || parsedRow[key] === 0) {
+        if (BOOLEAN_FIELDS[this.tableName]?.includes(key)) {
+          parsedRow[key] = parsedRow[key] === 1;
+        }
+      }
+    }
+    return parsedRow as T;
+  }
+
   async toArray(): Promise<T[]> {
-    return this.db.select<T[]>(`SELECT * FROM ${this.tableName}`)
+    const rows = await this.db.select<T[]>(`SELECT * FROM ${this.tableName}`)
+    return rows.map(r => this.parseRow(r))
   }
 
   async get(id: string): Promise<T | undefined> {
     const rows = await this.db.select<T[]>(`SELECT * FROM ${this.tableName} WHERE id = $1`, [id])
-    return rows.length > 0 ? rows[0] : undefined
+    return rows.length > 0 ? this.parseRow(rows[0]) : undefined
   }
 
   async bulkGet(ids: string[]): Promise<(T | undefined)[]> {
     if (ids.length === 0) return []
     const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ')
     const rows = await this.db.select<T[]>(`SELECT * FROM ${this.tableName} WHERE id IN (${placeholders})`, ids)
-    const map = new Map(rows.map(r => [r.id, r]))
+    const map = new Map(rows.map(r => [r.id, this.parseRow(r)]))
     return ids.map(id => map.get(id))
   }
 
@@ -97,19 +126,28 @@ class TauriSqlAdapterTable<T extends { id: string }> implements AdapterTable<T> 
   where(column: string) {
     return {
       equals: (value: unknown) => {
+        let sqlValue = value;
+        if (typeof sqlValue === 'boolean') {
+          sqlValue = sqlValue ? 1 : 0;
+        } else if (Array.isArray(sqlValue)) {
+          sqlValue = sqlValue.map(v => typeof v === 'boolean' ? (v ? 1 : 0) : v);
+        }
         const executeQuery = async () => {
-          if (column.startsWith('[') && column.endsWith(']') && Array.isArray(value)) {
+          if (column.startsWith('[') && column.endsWith(']') && Array.isArray(sqlValue)) {
             const cols = column.slice(1, -1).split('+')
-            if (cols.length !== value.length) {
+            if (cols.length !== sqlValue.length) {
               throw new Error(`Compound index mismatch: ${column} vs values length`)
             }
             const whereClause = cols.map((_, i) => `${cols[i]} = $${i + 1}`).join(' AND ')
             const query = `SELECT * FROM ${this.tableName} WHERE ${whereClause}`
-            return this.db.select<T[]>(query, value)
+            const rows = await this.db.select<T[]>(query, sqlValue)
+            return rows.map(r => this.parseRow(r))
           }
           const query = `SELECT * FROM ${this.tableName} WHERE ${column} = $1`
-          return this.db.select<T[]>(query, [value])
+          const rows = await this.db.select<T[]>(query, [sqlValue])
+          return rows.map(r => this.parseRow(r))
         }
+
 
         return {
           toArray: async () => await executeQuery(),
@@ -122,12 +160,12 @@ class TauriSqlAdapterTable<T extends { id: string }> implements AdapterTable<T> 
             return results.length
           },
           delete: async () => {
-            if (column.startsWith('[') && column.endsWith(']') && Array.isArray(value)) {
+            if (column.startsWith('[') && column.endsWith(']') && Array.isArray(sqlValue)) {
               const cols = column.slice(1, -1).split('+')
               const whereClause = cols.map((_, i) => `${cols[i]} = $${i + 1}`).join(' AND ')
-              await this.db.execute(`DELETE FROM ${this.tableName} WHERE ${whereClause}`, value)
+              await this.db.execute(`DELETE FROM ${this.tableName} WHERE ${whereClause}`, sqlValue)
             } else {
-              await this.db.execute(`DELETE FROM ${this.tableName} WHERE ${column} = $1`, [value])
+              await this.db.execute(`DELETE FROM ${this.tableName} WHERE ${column} = $1`, [sqlValue])
             }
           },
           filter: (fn: (item: T) => boolean) => ({
@@ -196,7 +234,7 @@ class TauriSqlAdapterImpl implements LocalDbAdapter {
       serviceOrders: `id TEXT PRIMARY KEY, tenantId TEXT, code TEXT, customerId TEXT, customerName TEXT, description TEXT, date TEXT, estimatedCompletion TEXT, cost REAL, paidTotal REAL, status TEXT, items TEXT, notes TEXT, timeline TEXT, hasWarranty INTEGER, warrantyValue INTEGER, warrantyUnit TEXT, warrantyStartDate TEXT, warrantyEndDate TEXT, syncStatus TEXT, version INTEGER, updatedAt TEXT`,
       recipes: `id TEXT PRIMARY KEY, tenantId TEXT, productId TEXT, productName TEXT, name TEXT, batchYield REAL, items TEXT, status TEXT, updatedAt TEXT`,
       productionBatches: `id TEXT PRIMARY KEY, tenantId TEXT, recipeId TEXT, recipeName TEXT, productId TEXT, productName TEXT, batchQty REAL, date TEXT, syncStatus TEXT, version INTEGER, updatedAt TEXT`,
-      outbox: `id TEXT PRIMARY KEY, tenantId TEXT, entityType TEXT, entityId TEXT, mutationType TEXT, status TEXT, createdAt TEXT, updatedAt TEXT, syncedAt TEXT, payload TEXT`,
+      outbox: `id TEXT PRIMARY KEY, tenantId TEXT, entityType TEXT, entityId TEXT, mutationType TEXT, payload TEXT, status TEXT, attempts INTEGER DEFAULT 0, errorMessage TEXT, createdAt TEXT, updatedAt TEXT, syncedAt TEXT`,
       syncConflicts: `id TEXT PRIMARY KEY, tenantId TEXT, entityType TEXT, entityId TEXT, localValue TEXT, cloudValue TEXT, reason TEXT, status TEXT, resolution TEXT, createdAt TEXT, resolvedAt TEXT`,
       syncRuns: `id TEXT PRIMARY KEY, tenantId TEXT, startedAt TEXT, finishedAt TEXT, status TEXT, processed INTEGER, failed INTEGER, pulled INTEGER`,
     }
