@@ -532,7 +532,29 @@ syncRoutes.post('/push', async (c) => {
   for (const mutation of parsed.value.mutations) {
     const payload = mutation.payload
 
+    let itemStatus: 'applied' | 'rejected' = 'applied'
+    let message: string | undefined
+
     if (payload === undefined) {
+      itemStatus = 'rejected'
+      message = 'payload missing'
+    } else {
+      try {
+        await applyMutation(
+          db,
+          { tenantId: parsed.value.tenantId, branchId: parsed.value.branchId },
+          mutation.entityType,
+          mutation.entityId,
+          mutation.mutationType,
+          payload,
+        )
+      } catch (error) {
+        itemStatus = 'rejected'
+        message = error instanceof Error ? error.message : 'apply failed'
+      }
+    }
+
+    try {
       await db.insert(outboxLogs).values({
         tenantId: parsed.value.tenantId,
         branchId: parsed.value.branchId ?? null,
@@ -540,55 +562,17 @@ syncRoutes.post('/push', async (c) => {
         entityType: mutation.entityType,
         entityId: mutation.entityId,
         mutationType: mutation.mutationType,
-        payload: { message: 'payload missing' },
-        status: 'failed',
+        payload: payload ?? { message: 'payload missing' },
+        status: itemStatus === 'applied' ? 'synced' : 'failed',
         attempts: 1,
-        errorMessage: 'payload missing',
+        errorMessage: itemStatus === 'rejected' ? message ?? 'rejected' : null,
         createdAt: now,
         updatedAt: now,
       })
-
-      items.push({
-        entityId: mutation.entityId,
-        entityType: mutation.entityType,
-        mutationType: mutation.mutationType,
-        status: 'rejected',
-        message: 'payload missing',
-      })
-      continue
-    }
-
-    let itemStatus: 'applied' | 'rejected' = 'applied'
-    let message: string | undefined
-
-    try {
-      await applyMutation(
-        db,
-        { tenantId: parsed.value.tenantId, branchId: parsed.value.branchId },
-        mutation.entityType,
-        mutation.entityId,
-        mutation.mutationType,
-        payload,
-      )
     } catch (error) {
       itemStatus = 'rejected'
-      message = error instanceof Error ? error.message : 'apply failed'
+      message = error instanceof Error ? error.message : 'gagal log outbox'
     }
-
-    await db.insert(outboxLogs).values({
-      tenantId: parsed.value.tenantId,
-      branchId: parsed.value.branchId ?? null,
-      deviceId: parsed.value.deviceId,
-      entityType: mutation.entityType,
-      entityId: mutation.entityId,
-      mutationType: mutation.mutationType,
-      payload,
-      status: itemStatus === 'applied' ? 'synced' : 'failed',
-      attempts: 1,
-      errorMessage: itemStatus === 'rejected' ? message ?? 'rejected' : null,
-      createdAt: now,
-      updatedAt: now,
-    })
 
     items.push({
       entityId: mutation.entityId,

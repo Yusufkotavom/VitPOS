@@ -402,8 +402,8 @@ export const productionBatches = pgTable('production_batches', {
 
 export const outboxLogs = pgTable('outbox_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
-  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
-  branchId: uuid('branch_id').references(() => branches.id),
+  tenantId: uuid('tenant_id').notNull(),
+  branchId: uuid('branch_id'),
   deviceId: varchar('device_id', { length: 120 }).notNull(),
   entityType: varchar('entity_type', { length: 80 }).notNull(),
   entityId: varchar('entity_id', { length: 120 }).notNull(),
