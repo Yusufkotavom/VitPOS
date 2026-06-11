@@ -191,19 +191,3 @@ If commands are not yet defined, add them during bootstrap.
   - reports
 - Avoid worktrees during empty-repo stage
 
-## First Build Priority
-
-1. app bootstrap
-2. design system foundation
-3. app shell
-4. auth shell
-5. dashboard skeleton
-6. POS foundation
-7. products
-8. customers
-9. sales orders
-10. payments
-11. inventory
-12. reports
-13. settings
-14. sync center

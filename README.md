@@ -165,6 +165,9 @@ Agar semua kode fitur (POS, produk, sales order) **tidak peduli** backend databa
 
 Karena module dievaluasi saat import. Dulu `repository.ts` akses `localDb.settings` di module level → langsung panggil `adapter.storageTable('settings')` → throw karena SQLite blom `init()`. Sekarang Proxy menunda panggilan `storageTable()` sampai method beneran dipanggil (pas user action atau useEffect jalan).
 
+### Sync Engine & Local Adapters
+Penjelasan teknis detail mengenai penanganan gap arsitektur SQLite/Tauri SQL dengan JSON dan boolean (serta _fallback_ mitigasinya) dapat dibaca di **[Dokumentasi Sync Engine & Adapters](docs/SYNC_ENGINE.md)**.
+
 ### Schema SQLite vs TypeScript
 
 Semua SQLite schema didefinisikan di `sqlite.adapter.ts:298-325`. **Setiap kolom harus cocok** dengan tipe TypeScript di `schema.ts`. Migrasi kolom baru ditambah via `ALTER TABLE` di `initializeSchema()` — lihat pattern `outbox.attempts`.
