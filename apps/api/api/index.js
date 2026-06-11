@@ -201,8 +201,11 @@ var products = pgTable("products", {
   salePrice: numeric("sale_price", { precision: 14, scale: 2 }).notNull(),
   wholesalePrice: numeric("wholesale_price", { precision: 14, scale: 2 }),
   costPrice: numeric("cost_price", { precision: 14, scale: 2 }),
+  wholesaleTiers: jsonb("wholesale_tiers"),
   minimumStock: integer("minimum_stock").default(0).notNull(),
+  manageStock: boolean("manage_stock").default(true).notNull(),
   imageUrl: text("image_url"),
+  icon: varchar("icon", { length: 80 }),
   isActive: boolean("is_active").default(true).notNull(),
   syncStatus: syncStatusEnum("sync_status").default("synced").notNull(),
   version: integer("version").default(1).notNull(),
@@ -1257,7 +1260,7 @@ function serverSyncStatusToApiItemStatus(status) {
 var syncEntityTypes = /* @__PURE__ */ new Set(["product", "customer", "sale", "payment", "stock_movement", "cash", "cash_category", "setting", "shift", "product_category", "supplier", "purchase", "return", "service_order", "payment_method", "recipe"]);
 var syncMutationTypes = /* @__PURE__ */ new Set(["create", "update", "delete"]);
 var uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-var prefixedIdPattern = /^[a-z]+-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+var prefixedIdPattern = /^[a-z_]+-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function isUuid(value) {
   return typeof value === "string" && uuidPattern.test(value);
 }
@@ -1428,10 +1431,13 @@ async function applyProduct(db2, ctx, entityId, mutationType, payload) {
     barcode: payload.barcode ?? null,
     type: mapClientProductType(payload.type),
     salePrice: toNumeric(payload.price),
-    costPrice: null,
-    wholesalePrice: null,
-    minimumStock: 0,
-    imageUrl: null,
+    costPrice: toNumeric(payload.costPrice),
+    wholesalePrice: toNumeric(payload.wholesalePrice),
+    wholesaleTiers: payload.wholesaleTiers ?? null,
+    manageStock: payload.manageStock ?? true,
+    minimumStock: payload.minimumStock ?? 0,
+    imageUrl: payload.imageUrl ?? null,
+    icon: payload.icon ?? null,
     isActive: mapClientProductStatus(payload.status ?? payload.isActive),
     syncStatus: "synced",
     version: 1,
@@ -1445,6 +1451,13 @@ async function applyProduct(db2, ctx, entityId, mutationType, payload) {
       barcode: payload.barcode ?? null,
       type: mapClientProductType(payload.type),
       salePrice: toNumeric(payload.price),
+      costPrice: toNumeric(payload.costPrice),
+      wholesalePrice: toNumeric(payload.wholesalePrice),
+      wholesaleTiers: payload.wholesaleTiers ?? null,
+      manageStock: payload.manageStock ?? true,
+      minimumStock: payload.minimumStock ?? 0,
+      imageUrl: payload.imageUrl ?? null,
+      icon: payload.icon ?? null,
       isActive: mapClientProductStatus(payload.status ?? payload.isActive),
       syncStatus: "synced",
       updatedAt: now
@@ -1769,7 +1782,7 @@ async function applySetting(db2, ctx, entityId, mutationType, payload) {
       updatedAt: now
     }).where(eq3(settings.id, existing.id));
   } else {
-    const uuid2 = /^[0-9a-f]{8}-/i.test(entityId) ? entityId : crypto.randomUUID();
+    const uuid2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(entityId) ? entityId : crypto.randomUUID();
     await db2.insert(settings).values({
       id: uuid2,
       tenantId: ctx.tenantId,
@@ -2286,7 +2299,11 @@ syncRoutes.get("/pull", async (c) => {
         salePrice: Number(row.salePrice),
         costPrice: row.costPrice ? Number(row.costPrice) : void 0,
         wholesalePrice: row.wholesalePrice ? Number(row.wholesalePrice) : void 0,
+        wholesaleTiers: row.wholesaleTiers,
+        manageStock: row.manageStock,
+        minimumStock: row.minimumStock,
         imageUrl: row.imageUrl,
+        icon: row.icon,
         status: row.isActive ? "Aktif" : "Arsip",
         isActive: row.isActive,
         version: row.version
@@ -3039,6 +3056,7 @@ subscriptionRoutes.post("/tenants/:tenantId/cancel", async (c) => {
 import { and as and6, eq as eq8 } from "drizzle-orm";
 import { Hono as Hono7 } from "hono";
 var tenantRoutes = new Hono7();
+tenantRoutes.use("*", authMiddleware);
 tenantRoutes.get("/default-branch", async (c) => {
   const tenantId = c.req.query("tenantId");
   if (!tenantId) {
@@ -3055,6 +3073,67 @@ tenantRoutes.get("/default-branch", async (c) => {
     return c.json({ ok: false, message: "No default branch found for this tenant" }, 404);
   }
   return c.json({ ok: true, id: branch.id, name: branch.name });
+});
+tenantRoutes.post("/", async (c) => {
+  const userId = c.get("userId");
+  const body = await c.req.json().catch(() => null);
+  const tenantId = body?.id || crypto.randomUUID();
+  const tenantName = body?.name?.trim();
+  if (!tenantName) {
+    return c.json({ ok: false, message: "name required" }, 400);
+  }
+  const branchId = crypto.randomUUID();
+  const warehouseId = crypto.randomUUID();
+  const now = /* @__PURE__ */ new Date();
+  await db.transaction(async (tx) => {
+    await tx.insert(tenants).values({
+      id: tenantId,
+      name: tenantName,
+      planCode: "trial-monthly",
+      billingPeriod: "monthly",
+      subscriptionStatus: "trial",
+      planValidUntil: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1e3),
+      storageLimitMb: 1024,
+      maxBranches: 1,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
+    });
+    await tx.insert(branches).values({
+      id: branchId,
+      tenantId,
+      name: "Cabang Utama",
+      isDefault: true,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
+    });
+    await tx.insert(warehouses).values({
+      id: warehouseId,
+      tenantId,
+      branchId,
+      name: "Gudang Utama",
+      isDefault: true,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
+    });
+    await tx.insert(tenantMembers).values({
+      id: crypto.randomUUID(),
+      tenantId,
+      userId,
+      role: "owner",
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
+    });
+  });
+  return c.json({
+    ok: true,
+    tenantId,
+    defaultBranchId: branchId,
+    defaultWarehouseId: warehouseId
+  });
 });
 
 // src/features/updates/routes.ts
