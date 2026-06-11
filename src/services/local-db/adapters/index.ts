@@ -12,7 +12,7 @@ export type AdapterTable<T extends { id: string }> = {
   where?(column: string): any
 }
 
-export type LocalDbAdapterName = 'indexeddb' | 'sqlite'
+export type LocalDbAdapterName = 'indexeddb' | 'sqlite' | 'tauri-sql'
 export type LocalDbPlatform = 'web' | 'mobile' | 'desktop'
 
 export type LocalDbAdapterMetadata = {
