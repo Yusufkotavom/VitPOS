@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/dev.ts",
-    "build": "if [ -z \"$VERCEL\" ]; then tsup src/index.ts --format esm --target node20 --clean --out-dir api; else echo 'Skipping tsup on Vercel'; fi",
+    "build": "node -e \"process.env.VERCEL ? console.log('Skipping tsup on Vercel') : require('child_process').execSync('tsup src/index.ts --format esm --target node20 --clean --out-dir api', { stdio: 'inherit' })\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
