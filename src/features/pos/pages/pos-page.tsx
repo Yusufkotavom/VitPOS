@@ -6,6 +6,7 @@ import { useSyncStore } from '@/features/sync/stores/sync-store'
 import { CartPanel } from '@/features/pos/components/cart-panel'
 import { CategoryTabs } from '@/features/pos/components/category-tabs'
 import { PaymentSummary } from '@/features/pos/components/payment-summary'
+import { PosDraftDialog } from '@/features/pos/components/pos-draft-dialog'
 import { ProductGrid } from '@/features/pos/components/product-grid'
 import { ProductSearch } from '@/features/pos/components/product-search'
 import { PosCustomerSelect } from '@/features/pos/components/pos-customer-select'
@@ -35,6 +36,7 @@ export function PosPage() {
   const setDrafting = (v: boolean) => { isDraftingRef.current = v; setIsDraftingState(v) }
 
   const [startCash, setStartCash] = useState('')
+  const [isDraftsOpen, setIsDraftsOpen] = useState(false)
 
   async function handleOpenShift() {
     if (!startCash) return toast.error('Modal awal harus diisi')
@@ -93,7 +95,7 @@ export function PosPage() {
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate('/sales-orders?status=Draft')}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsDraftsOpen(true)}>
                         <FileText className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
@@ -228,6 +230,8 @@ export function PosPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <PosDraftDialog open={isDraftsOpen} onOpenChange={setIsDraftsOpen} />
     </div>
   )
 }

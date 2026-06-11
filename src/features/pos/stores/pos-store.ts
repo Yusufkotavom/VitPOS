@@ -25,6 +25,7 @@ type PosStore = {
   setPaidAmount: (value: number) => void
   setDiscount: (value: number) => void
   setCustomer: (id: string | null, name: string | null) => void
+  setCart: (items: PosCartItem[]) => void
   setViewMode: (value: 'grid' | 'list') => void
 }
 
@@ -106,6 +107,7 @@ export const usePosStore = create<PosStore>((set) => ({
   setPaidAmount: (paidAmount) => set({ paidAmount }),
   setDiscount: (discount) => set({ discount }),
   setCustomer: (id, name) => set({ customerId: id, customerName: name }),
+  setCart: (items) => set({ cartItems: items }),
   setViewMode: (viewMode) => set({ viewMode }),
 }))
 
