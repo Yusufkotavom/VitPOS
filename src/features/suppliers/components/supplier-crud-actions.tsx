@@ -31,17 +31,25 @@ export function SupplierCrudActions({ supplier }: { supplier?: LocalSupplier }) 
   }, [supplier, form])
 
   async function handleSubmit(values: SupplierFormValues) {
-    const id = supplier?.id ?? crypto.randomUUID()
-    await supplierRepository.upsert(mapSupplierFormToRecord(values, id, supplier))
-    toast.success(isEdit ? 'Supplier diperbarui' : 'Supplier ditambahkan')
-    setFormOpen(false)
+    try {
+      const id = supplier?.id ?? crypto.randomUUID()
+      await supplierRepository.upsert(mapSupplierFormToRecord(values, id, supplier))
+      toast.success(isEdit ? 'Supplier diperbarui' : 'Supplier ditambahkan')
+      setFormOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   async function handleDelete() {
     if (!supplier) return
-    await supplierRepository.remove(supplier.id)
-    toast.success('Supplier dihapus')
-    setDeleteOpen(false)
+    try {
+      await supplierRepository.remove(supplier.id)
+      toast.success('Supplier dihapus')
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   const errors = form.formState.errors

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,28 +30,31 @@ export function ProductFormSheet() {
 
   async function saveProduct() {
     if (!name.trim()) return
+    try {
+      await productRepository.upsert({
+        id: createProductId(),
+        tenantId: resolveTenantId(),
+        name: name.trim(),
+        category: category.trim() || 'Umum',
+        type: 'Produk Fisik',
+        costPrice: parseDigits(costPrice),
+        price: parseDigits(price),
+        stock: parseDigits(stock),
+        status: 'Aktif',
+        syncStatus: 'pending',
+        version: 1,
+        updatedAt: new Date().toISOString(),
+      })
 
-    await productRepository.upsert({
-      id: createProductId(),
-      tenantId: resolveTenantId(),
-      name: name.trim(),
-      category: category.trim() || 'Umum',
-      type: 'Produk Fisik',
-      costPrice: parseDigits(costPrice),
-      price: parseDigits(price),
-      stock: parseDigits(stock),
-      status: 'Aktif',
-      syncStatus: 'pending',
-      version: 1,
-      updatedAt: new Date().toISOString(),
-    })
-
-    setName('')
-    setCategory('Umum')
-    setCostPrice('0')
-    setPrice('0')
-    setStock('0')
-    setOpen(false)
+      setName('')
+      setCategory('Umum')
+      setCostPrice('0')
+      setPrice('0')
+      setStock('0')
+      setOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   return (

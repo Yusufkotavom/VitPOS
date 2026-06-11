@@ -17,17 +17,25 @@ export function PaymentMethodCrudActions({ paymentMethod }: { paymentMethod?: Lo
   const isEdit = Boolean(paymentMethod)
 
   async function handleSubmit(values: PaymentMethodFormValues) {
-    const id = paymentMethod?.id ?? createEntityId('pm')
-    await paymentMethodRepository.upsert(mapPaymentMethodFormToRecord(values, id))
-    toast.success(isEdit ? 'Metode pembayaran diperbarui' : 'Metode pembayaran ditambahkan')
-    setFormOpen(false)
+    try {
+      const id = paymentMethod?.id ?? createEntityId('pm')
+      await paymentMethodRepository.upsert(mapPaymentMethodFormToRecord(values, id))
+      toast.success(isEdit ? 'Metode pembayaran diperbarui' : 'Metode pembayaran ditambahkan')
+      setFormOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   async function handleDelete() {
     if (!paymentMethod) return
-    await paymentMethodRepository.remove(paymentMethod.id)
-    toast.success('Metode pembayaran dihapus')
-    setDeleteOpen(false)
+    try {
+      await paymentMethodRepository.remove(paymentMethod.id)
+      toast.success('Metode pembayaran dihapus')
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   return (

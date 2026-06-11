@@ -1,142 +1,213 @@
 # VitPOS / KOTACOM Business Suite
-**Comprehensive Technical Architecture & Implementation Guide**
 
-VitPOS (KOTACOM Business Suite) is an advanced, Offline-First SaaS Point of Sale (POS), CRM, and Accounting engine designed specifically for the Indonesian SME market. 
+Offline-first POS, CRM & Accounting untuk UKM Indonesia. Satu kode React untuk Web (PWA), Android (Capacitor), dan Desktop (Tauri).
 
-This repository implements a **multi-target deployment architecture**, providing a unified Vite/React web engine that powers three distinct platforms simultaneously:
-1. **Web Dashboard (PWA)** - Deployed statically to Vercel/Cloudflare Pages.
-2. **Android Application** - Wrapped using Capacitor.
-3. **Desktop Application (Windows/Linux)** - Wrapped using Tauri (Rust).
-
----
-
-## 🏗️ System Architecture
-
-### 1. Frontend & UI Layer (Web/Android/Desktop)
-- **Framework:** Vite + React 19.
-- **Styling:** Tailwind CSS v4 + shadcn/ui.
-- **State Management (Client-Side):** `zustand` for persistent UI states (active tenant, auth state, sync UI queues).
-- **Server State & Data Fetching:** `@tanstack/react-query` to handle REST API fetches for real-time cloud data (e.g., Platform Admin dashboards).
-- **Form & Validation:** `react-hook-form` + `zod` for strictly typed forms.
-
-### 2. The Offline-First Engine (Local DB)
-To guarantee 100% uptime regardless of internet availability, the core POS features operate entirely locally.
-- **Engine:** `dexie` (IndexedDB wrapper).
-- **Structure:** 26 separate tables reflecting cloud structure (Products, Sales, Stock Movements, Customers, etc).
-- **Philosophy:** Read from local, write to local. The local DB is the *Single Source of Truth* during operational hours.
-
-### 3. Synchronization Engine (Outbox Pattern)
-Instead of executing direct API calls for operational mutations, the system utilizes a resilient sync engine:
-1. **Outbox Logger:** Every insert/update/delete operation writes a serialized JSON payload to a local `outbox` table.
-2. **Auto-Sync Hook (`useAutoSync`):** A background worker pings the `/health` API every 15 seconds. If the API is reachable and the device is `navigator.onLine`, it flushes the outbox.
-3. **Conflict Resolver:** If the server rejects a payload (e.g., version mismatch or data collision), the outbox item is flagged as `conflict` and surfaced to the UI (`/sync` page) for manual resolution.
-4. **Push & Pull APIs:** The Hono API exposes `/api/v1/sync/push` (to process outbox) and `/api/v1/sync/pull` (cursor-based pagination to retrieve newly updated rows from the cloud).
-
-### 4. Backend API Layer
-- **Framework:** Hono (Deployed as Vercel Serverless Functions).
-- **Database ORM:** Drizzle ORM (`drizzle-kit` for migrations).
-- **Primary Database:** PostgreSQL (Neon DB).
-- **Authentication:** Custom JWT-like tokens (`x-user-id` and `Authorization: Bearer dev-*` for development scaling). 
-- **Multi-Tenancy:** Strict row-level isolation via `tenantId`. A single `users` row can belong to multiple `tenants` via the `tenant_members` junction table.
-
-### 5. SaaS Platform Billing
-- **Schema:** The `tenants` table contains robust billing mechanisms: `subscriptionStatus` (trial, active, suspended), `planValidUntil` (expiration timestamp), `storageLimitMb`, and `maxBranches`.
-- **Onboarding Workflow:** When `authRoutes.post('/register')` is hit, the system inherently calculates a 14-day `trial` logic. 
-- **Admin Visibility:** Super Admins can access `/platform-admin` to fetch real-time joining between users and tenants via `/api/v1/platform/tenants`.
-
----
-
-## 📂 Repository Structure
-
-The architecture enforces a Feature-Sliced Design (FSD) approach inside a monolithic React project:
+## Arsitektur
 
 ```text
-VitPOS/
-├── apps/
-│   ├── api/            # Hono Backend API (Vercel target)
-│   ├── desktop/        # Tauri Rust Shell (Desktop target)
-│   └── mobile/         # Capacitor Shell (Android target)
-├── src/
-│   ├── components/     # Global UI primitives (shadcn)
-│   ├── db/             # Drizzle Schema & core definitions
-│   ├── features/       # Business modules (pos, inventory, platform-admin)
-│   ├── lib/            # Utilities (formatters, cn, math)
-│   ├── services/       # Local DB instances, API Clients, Sync Engine
-│   └── shared/         # Reusable layouts, hooks, pdf generators
-└── docs/               # Architecture diagrams, agent plans, logs
+src/
+├── app/              # Router, providers, navigation config
+├── components/       # Global UI primitives (shadcn/ui)
+├── features/         # 23 modul bisnis (pos, products, sales-orders, dll)
+│   └── feature-x/
+│       ├── components/
+│       ├── hooks/
+│       ├── schemas/   # Zod + react-hook-form
+│       └── pages/
+├── services/
+│   ├── local-db/     # Jantung offline-first — lihat diagram bawah
+│   ├── sync/         # Outbox sync engine
+│   └── api/          # HTTP client
+├── shared/
+│   ├── components/   # Layout, sync indicator, dll
+│   └── utils/
+├── db/               # Drizzle ORM schema (cloud Postgres)
+├── lib/              # Utility helpers
+└── types/
 ```
 
----
+### Offline-First Engine (local-db)
 
-## 🚀 Environment Variables
+Ini layer paling kritis. Semua operasi baca/tulis lewat abstraction ini, bukan langsung ke Dexie atau SQLite.
 
-You only need minimal environment configurations.
-
-**Frontend (`.env.production` / Vercel Web Dashboard):**
-```env
-VITE_API_BASE_URL="https://vit-pos-8vle.vercel.app"
+```text
+┌─────────────────────────────────────────────────────┐
+│  feature code (repository.upsert, localDb.table.x)  │
+├─────────────────────────────────────────────────────┤
+│  client.ts  ──  Proxy ke adapter                    │
+│    - Lazy: storageTable() dipanggil pas method       │
+│      diakses, bukan pas module dievaluasi            │
+│    - Emulasi method Dexie (where, orderBy, dll)      │
+│      untuk adapter yg ga punya                      │
+├─────────────────────────────────────────────────────┤
+│  factory.ts  ──  pilih adapter sesuai platform       │
+│    Web    → dexieAdapter (IndexedDB)                 │
+│    Mobile → sqliteAdapter (Capacitor SQLite)         │
+│    Tauri  → tauriSqlAdapter (dynamic import)         │
+├─────────────────────────────────────────────────────┤
+│  sqlite.adapter.ts   │  indexeddb.adapter.ts        │
+│  (CREATE TABLE,      │  (Dexie wrapper)              │
+│   ALTER TABLE migrasi)│                              │
+└─────────────────────────────────────────────────────┘
 ```
-*(When building Tauri/APK, Vite will bake this URL into the binary. If omitted, it falls back to `http://localhost:3010`)*
 
-**Backend (`apps/api/.vercel/.env.production.local` / Vercel API):**
-```env
-DATABASE_URL="postgres://neondb_owner:.../neondb?sslmode=require"
+### Alur Init & Lazy Loading
+
+```
+AppProviders.useEffect → bootstrapLocalDb() → initLocalDb()
+                                                    │
+                    ┌───────────────────────────────┘
+                    ▼
+          adapter.init() (buka koneksi SQLite / open Dexie)
+
+Sementara itu, komponen React mungkin akses repository.
+Dulu ini CRASH (storageTable throw karena db blom init).
+Sekarang aman karena client.ts pake Proxy lazy:
+
+  localDb.products  →  return Proxy (blom panggil storageTable)
+  proxy.get('toArray')  →  baru panggil storageTable() → pake koneksi db
 ```
 
----
+### Alur Save (Repository + Outbox)
 
-## 🛠️ Development & Tooling
+```
+User klik Save
+  → handleSubmit (try/catch → toast.error bila gagal)
+  → productRepository.upsert(data)
+      → table.put(data)          # simpan ke SQLite / IndexedDB
+      → enqueueMutation(...)     # tulis ke tabel outbox
+          → outbox.put({ entityType, entityId, mutationType, payload, status: 'queued', attempts: 0 })
+  → toast.success()
+  → setFormOpen(false)
+```
 
-We provide unified scripts for cross-platform validation.
+Outbox kemudian diproses oleh `sync-engine.ts` secara berkala (tiap 15 detik via `useAutoSync`).
 
-### Web & Frontend Development
+### Platform Targets
+
+| Target | Shell | Local DB | Build |
+|--------|-------|----------|-------|
+| Web (PWA) | Vite dev server | IndexedDB (Dexie) | `npm run build` |
+| Android | Capacitor (`apps/mobile/`) | `@capacitor-community/sqlite` | `npm run build && cd apps/mobile && npm run build:android` |
+| Desktop | Tauri (`apps/desktop/`) | `@tauri-apps/plugin-sql` | `npm run build && cd apps/desktop && cargo tauri build` |
+
+## Prasyarat
+
+- Node.js 22+
+- Java 21+ (untuk build Android)
+- Android SDK (untuk build Android)
+
+## Development
+
 ```bash
+# Web (development)
 npm install
-npm run dev       # Start Vite dev server
-npm run check     # Run linting, typecheck, vitest, and build
+npm run dev              # Vite + Hono API concurrently
+
+# Cek kualitas
+npm run check            # lint → typecheck → test → build
+
+# Script penting lain
+npm run test             # vitest
+npm run lint             # eslint
+npm run typecheck        # tsc --noEmit
+
+# Database (cloud Postgres)
+npm run db:generate      # Generate migration Drizzle
+npm run db:migrate       # Apply migration
+npm run db:studio        # Drizzle Studio UI
 ```
 
-### Database Operations (Drizzle)
+## Android
+
+### Build APK
+
 ```bash
-npm run db:generate   # Generate SQL migrations
-npm run db:migrate    # Apply migrations locally
-npm run db:push       # Push schema directly to Neon DB
-npm run db:studio     # Launch Drizzle Studio UI
+npm run build                                    # build web dulu
+cd apps/mobile
+npm install                                      # include @capacitor-community/sqlite
+npx cap sync                                     # sync plugin ke Android project
+npm run build:android                            # build APK
+# APK output: apps/mobile/android/app/build/outputs/apk/release/
 ```
 
-### API Backend Development
+### Cek Log
+
 ```bash
-npm run api:dev       # Start Hono server locally
-npm run api:check     # Test and typecheck API
+# USB debug
+adb logcat -c && adb logcat | grep -i "error\|vitpos\|sqlite\|capacitor"
+
+# Filter console.log dari webview
+adb logcat -s "Capacitor/Console"
+
+# Chrome DevTools remote debug
+# Buka chrome://inspect → inspect VitPOS → lihat Console & Network
+
+# Android Studio
+# Buka apps/mobile/android/ → Tab Logcat → filter com.kotacom.vitpos
 ```
 
-### Mobile & Desktop Validation
+### CI Release
+
+Tag `v*` push → GitHub Actions build APK otomatis & attach ke Release.
+
 ```bash
-npm run mobile:check  # Sync Capacitor and validate Android setup
-npm run desktop:check # Validate Tauri Rust toolchain and web build
+git tag v1.2.0 && git push origin v1.2.0
 ```
 
----
+## Architecture Decisions
 
-## 🔄 CI/CD & Release Pipeline
+### Kenapa Proxy + Adapter Pattern?
 
-We utilize **GitHub Actions** (`.github/workflows/release.yml`) for automated cross-platform building.
+Agar semua kode fitur (POS, produk, sales order) **tidak peduli** backend database-nya. Kode cukup panggil `localDb.products.put(...)`. Di web dia pake Dexie, di Android pake SQLite native — tanpa import kondisional atau platform check di tiap file.
 
-1. The pipeline triggers on Git Tags (e.g., `v1.0.0`).
-2. **Android Pipeline:** Bootstraps Java 21 & Android SDK, syncs Capacitor, and builds Signed/Debug APKs via Gradle.
-3. **Desktop Pipeline:** Bootstraps Rust toolchain, fetches `libwebkit2gtk`, and compiles `.exe`, `.deb`, and `.AppImage` via `tauri-action`.
-4. Artifacts are automatically attached to the GitHub Release.
+### Kenapa Lazy Proxy?
 
-### App Update Behavior
+Karena module dievaluasi saat import. Dulu `repository.ts` akses `localDb.settings` di module level → langsung panggil `adapter.storageTable('settings')` → throw karena SQLite blom `init()`. Sekarang Proxy menunda panggilan `storageTable()` sampai method beneran dipanggil (pas user action atau useEffect jalan).
 
-1. **Web update path:** App can always open the latest deployed web build at `https://vit-pos-8vle.vercel.app`.
-2. **Android non-Play-Store path:** The app checks GitHub Releases and offers the latest APK download.
-3. **Tauri desktop path:** The app checks GitHub Releases and offers the latest installer for the current OS.
-4. **Version sync in CI:** Tagged releases automatically sync version numbers into Android and Tauri build files before artifacts are built.
-5. **Important limitation:** Android sideload updates cannot install silently; the user must still confirm APK installation.
+### Schema SQLite vs TypeScript
 
-To trigger a release manually:
-```bash
-git tag -a v1.0.0 -m "Release v1.0.0"
-git push origin v1.0.0
-```
+Semua SQLite schema didefinisikan di `sqlite.adapter.ts:298-325`. **Setiap kolom harus cocok** dengan tipe TypeScript di `schema.ts`. Migrasi kolom baru ditambah via `ALTER TABLE` di `initializeSchema()` — lihat pattern `outbox.attempts`.
+
+## Cara Nambah Fitur Baru
+
+1. Tambah schema TypeScript di `schema.ts`
+2. Tambah definisi tabel di `sqlite.adapter.ts` (`tableSchemas`)
+3. Tambah ALTER TABLE migration bila kolom baru
+4. Buat repository baru di `repository.ts` (atau pake yg ada)
+5. Buat fitur di `src/features/` dengan struktur:
+   ```
+   components/    # Form, table, dialog
+   hooks/         # Custom hooks
+   schemas/       # Zod validation
+   pages/         # Full page (untuk router)
+   ```
+6. Form submit handler WAJIB punya **try/catch + toast.error**
+
+## Struktur Fitur (23 modul)
+
+| Feature | Path | Description |
+|---------|------|-------------|
+| auth | `features/auth/` | Login, register, onboarding |
+| pos | `features/pos/` | Point of Sale — cart, checkout, payment |
+| products | `features/products/` | CRUD produk, kategori, resep |
+| sales-orders | `features/sales-orders/` | Pesanan penjualan |
+| customers | `features/customers/` | Manajemen pelanggan |
+| payments | `features/payments/` | Riwayat pembayaran |
+| purchases | `features/purchases/` | Pembelian supplier |
+| suppliers | `features/suppliers/` | Manajemen supplier |
+| stock | `features/inventory/` | Stok & gudang |
+| returns | `features/returns/` | Retur penjualan & pembelian |
+| service-orders | `features/service-orders/` | Pesanan jasa/service |
+| reports | `features/reports/` | Laporan penjualan, pembayaran |
+| cash | `features/cash/` | Buku kas |
+| shift | `features/shift/` | Shift kasir |
+| settings | `features/settings/` | Pengaturan toko, payment method |
+| sync | `features/sync/` | Pusat sinkronisasi |
+| billing | `features/billing/` | Subscription & billing |
+| dashboard | `features/dashboard/` | Dashboard utama |
+| platform-admin | `features/platform-admin/` | Admin panel SaaS |
+| updates | `features/updates/` | Update announcer |
+| catalog | `features/catalog/` | Shared catalog libs |
+| production | `features/production/` | Produksi / BOM |
+| recipes | `features/recipes/` | Resep produksi |

@@ -44,12 +44,16 @@ export function PosCustomerSelect() {
   }
 
   async function handleAddSave(values: CustomerFormValues) {
-    const id = createCustomerId()
-    await customerRepository.upsert(mapCustomerFormToRecord(values, id))
-    setCustomer(id, values.name.trim())
-    toast.success('Pelanggan ditambahkan')
-    setIsAddOpen(false)
-    form.reset()
+    try {
+      const id = createCustomerId()
+      await customerRepository.upsert(mapCustomerFormToRecord(values, id))
+      setCustomer(id, values.name.trim())
+      toast.success('Pelanggan ditambahkan')
+      setIsAddOpen(false)
+      form.reset()
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   const errors = form.formState.errors

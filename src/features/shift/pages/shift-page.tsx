@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { formatCurrency } from '@/lib/format-currency'
 import { PageShell } from '@/shared/components/layout/page-shell'
@@ -13,28 +14,38 @@ export function ShiftPage() {
   const closedShifts = shifts.filter((shift) => shift.status === 'closed')
 
   async function openShift() {
-    await shiftRepository.upsert({
-      id: crypto.randomUUID(),
-      tenantId: resolveTenantId(),
-      cashierName: 'Kasir Aktif',
-      startTime: new Date().toISOString(),
-      startCash: 500000,
-      status: 'open',
-    })
+    try {
+      await shiftRepository.upsert({
+        id: crypto.randomUUID(),
+        tenantId: resolveTenantId(),
+        cashierName: 'Kasir Aktif',
+        startTime: new Date().toISOString(),
+        startCash: 500000,
+        status: 'open',
+      })
+      toast.success('Shift berhasil dibuka')
+    } catch (error) {
+      toast.error(`Gagal buka shift: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   async function closeShift() {
     if (!currentShift) return
-    const expectedCash = currentShift.startCash
-    const actualCash = currentShift.startCash
-    await shiftRepository.upsert({
-      ...currentShift,
-      endTime: new Date().toISOString(),
-      expectedCash,
-      actualCash,
-      difference: actualCash - expectedCash,
-      status: 'closed',
-    })
+    try {
+      const expectedCash = currentShift.startCash
+      const actualCash = currentShift.startCash
+      await shiftRepository.upsert({
+        ...currentShift,
+        endTime: new Date().toISOString(),
+        expectedCash,
+        actualCash,
+        difference: actualCash - expectedCash,
+        status: 'closed',
+      })
+      toast.success('Shift berhasil ditutup')
+    } catch (error) {
+      toast.error(`Gagal tutup shift: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   const totalExpected = closedShifts.reduce((sum, shift) => sum + (shift.expectedCash ?? 0), 0)

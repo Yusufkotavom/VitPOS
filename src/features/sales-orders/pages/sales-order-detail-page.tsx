@@ -89,34 +89,38 @@ export function SalesOrderDetailPage() {
 
   async function saveEditing() {
     if (!order) return
-    const items = editItems.map(i => {
-      const qty = Number(i.qty) || 0
-      const unitPrice = Number(i.unitPrice) || 0
-      return { ...i, qty, unitPrice, subtotal: qty * unitPrice }
-    })
-    const subtotal = items.reduce((s, i) => s + i.subtotal, 0)
-    const grandTotal = subtotal - order.discountTotal + order.taxTotal
+    try {
+      const items = editItems.map(i => {
+        const qty = Number(i.qty) || 0
+        const unitPrice = Number(i.unitPrice) || 0
+        return { ...i, qty, unitPrice, subtotal: qty * unitPrice }
+      })
+      const subtotal = items.reduce((s, i) => s + i.subtotal, 0)
+      const grandTotal = subtotal - order.discountTotal + order.taxTotal
 
-    await salesOrderRepository.upsert({
-      ...order,
-      items: items.map(i => ({
-        id: i.id,
-        tenantId: order.tenantId,
-        salesOrderId: order.id,
-        productId: order.items.find((item) => item.id === i.id)?.productId ?? '',
-        name: i.name,
-        qty: i.qty,
-        unitPrice: i.unitPrice,
-        subtotal: i.subtotal,
-      })),
-      subtotal,
-      grandTotal,
-      version: order.version + 1,
-      updatedAt: new Date().toISOString(),
-    })
-    toast.success('Item diperbarui')
-    setEditing(false)
-    refetch()
+      await salesOrderRepository.upsert({
+        ...order,
+        items: items.map(i => ({
+          id: i.id,
+          tenantId: order.tenantId,
+          salesOrderId: order.id,
+          productId: order.items.find((item) => item.id === i.id)?.productId ?? '',
+          name: i.name,
+          qty: i.qty,
+          unitPrice: i.unitPrice,
+          subtotal: i.subtotal,
+        })),
+        subtotal,
+        grandTotal,
+        version: order.version + 1,
+        updatedAt: new Date().toISOString(),
+      })
+      toast.success('Item diperbarui')
+      setEditing(false)
+      refetch()
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   function addItem() {
@@ -135,19 +139,26 @@ export function SalesOrderDetailPage() {
     if (!order) return
     const amount = Number(payAmount) || 0
     if (amount <= 0) return toast.error('Nominal pembayaran harus lebih dari 0')
-
-    await recordSalesOrderPayment(order.id, amount, payMethod as 'tunai' | 'qris' | 'kartu' | 'transfer' | 'e-wallet' | 'piutang')
-    toast.success(`Pembayaran Rp ${amount.toLocaleString('id-ID')} diterima`)
-    setPayOpen(false)
-    setPayAmount('')
-    refetch()
+    try {
+      await recordSalesOrderPayment(order.id, amount, payMethod as 'tunai' | 'qris' | 'kartu' | 'transfer' | 'e-wallet' | 'piutang')
+      toast.success(`Pembayaran Rp ${amount.toLocaleString('id-ID')} diterima`)
+      setPayOpen(false)
+      setPayAmount('')
+      refetch()
+    } catch (error) {
+      toast.error(`Gagal memproses pembayaran: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   async function handleDelete() {
     if (!order) return
-    await deleteSalesOrder(order.id)
-    toast.success('Invoice dihapus')
-    setDeleteOpen(false)
+    try {
+      await deleteSalesOrder(order.id)
+      toast.success('Invoice dihapus')
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   async function handleWhatsApp() {

@@ -15,30 +15,38 @@ export function ReturnCrudActions({ ret }: { ret?: LocalReturn }) {
   const isEdit = Boolean(ret)
 
   async function handleSubmit(values: ReturnFormValues) {
-    const id = ret?.id ?? crypto.randomUUID()
-    
-    let finalCode = values.code.trim()
-    if (!finalCode) {
-      const allReturns = await returnRepository.list()
-      const existingCodes = allReturns.map(r => r.code).filter(c => c.startsWith('RET-'))
-      const maxNum = existingCodes.reduce((max, c) => {
-        const num = parseInt(c.replace('RET-', ''), 10)
-        return !isNaN(num) && num > max ? num : max
-      }, 0)
-      finalCode = `RET-${String(maxNum + 1).padStart(3, '0')}`
-    }
+    try {
+      const id = ret?.id ?? crypto.randomUUID()
 
-    const finalValues = { ...values, code: finalCode }
-    await returnRepository.upsert(mapReturnFormToRecord(finalValues, id, ret))
-    toast.success(isEdit ? 'Retur diperbarui' : 'Retur dibuat')
-    setFormOpen(false)
+      let finalCode = values.code.trim()
+      if (!finalCode) {
+        const allReturns = await returnRepository.list()
+        const existingCodes = allReturns.map(r => r.code).filter(c => c.startsWith('RET-'))
+        const maxNum = existingCodes.reduce((max, c) => {
+          const num = parseInt(c.replace('RET-', ''), 10)
+          return !isNaN(num) && num > max ? num : max
+        }, 0)
+        finalCode = `RET-${String(maxNum + 1).padStart(3, '0')}`
+      }
+
+      const finalValues = { ...values, code: finalCode }
+      await returnRepository.upsert(mapReturnFormToRecord(finalValues, id, ret))
+      toast.success(isEdit ? 'Retur diperbarui' : 'Retur dibuat')
+      setFormOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   async function handleDelete() {
     if (!ret) return
-    await returnRepository.remove(ret.id)
-    toast.success('Retur dihapus')
-    setDeleteOpen(false)
+    try {
+      await returnRepository.remove(ret.id)
+      toast.success('Retur dihapus')
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   return (

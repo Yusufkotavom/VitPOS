@@ -32,29 +32,36 @@ export function CustomerCrudActions({ customer }: { customer?: LocalCustomer }) 
   }, [customer, form])
 
   async function handleSubmit(values: CustomerFormValues) {
-    const id = customer?.id ?? createCustomerId()
-    
-    // Check for duplicate phone
-    const existingCustomers = await customerRepository.list()
-    const isDuplicatePhone = existingCustomers.some(
-      (c) => c.phone === values.phone.trim() && c.id !== id
-    )
-    
-    if (isDuplicatePhone) {
-      form.setError('phone', { type: 'manual', message: 'Nomor WhatsApp sudah terdaftar' })
-      return
-    }
+    try {
+      const id = customer?.id ?? createCustomerId()
 
-    await customerRepository.upsert(mapCustomerFormToRecord(values, id, customer))
-    toast.success(isEdit ? 'Pelanggan diperbarui' : 'Pelanggan ditambahkan')
-    setFormOpen(false)
+      const existingCustomers = await customerRepository.list()
+      const isDuplicatePhone = existingCustomers.some(
+        (c) => c.phone === values.phone.trim() && c.id !== id
+      )
+
+      if (isDuplicatePhone) {
+        form.setError('phone', { type: 'manual', message: 'Nomor WhatsApp sudah terdaftar' })
+        return
+      }
+
+      await customerRepository.upsert(mapCustomerFormToRecord(values, id, customer))
+      toast.success(isEdit ? 'Pelanggan diperbarui' : 'Pelanggan ditambahkan')
+      setFormOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   async function handleDelete() {
     if (!customer) return
-    await customerRepository.remove(customer.id)
-    toast.success('Pelanggan dihapus')
-    setDeleteOpen(false)
+    try {
+      await customerRepository.remove(customer.id)
+      toast.success('Pelanggan dihapus')
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   const errors = form.formState.errors

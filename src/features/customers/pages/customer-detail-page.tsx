@@ -134,25 +134,33 @@ export function CustomerDetailPage() {
 
   async function saveEditing() {
     if (!customer) return
-    const updated = { ...customer }
-    updated.name = editName.trim()
-    updated.phone = editPhone.trim()
-    updated.city = editCity.trim()
-    updated.status = editStatus
-    updated.receivable = Number(editReceivable) || 0
-    updated.version = customer.version + 1
-    updated.updatedAt = new Date().toISOString()
-    await customerRepository.upsert(updated)
-    toast.success('Pelanggan diperbarui')
-    setEditing(false)
-    refetch()
+    try {
+      const updated = { ...customer }
+      updated.name = editName.trim()
+      updated.phone = editPhone.trim()
+      updated.city = editCity.trim()
+      updated.status = editStatus
+      updated.receivable = Number(editReceivable) || 0
+      updated.version = customer.version + 1
+      updated.updatedAt = new Date().toISOString()
+      await customerRepository.upsert(updated)
+      toast.success('Pelanggan diperbarui')
+      setEditing(false)
+      refetch()
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   async function handleDelete() {
     if (!customer) return
-    await customerRepository.remove(customer.id)
-    toast.success('Pelanggan dihapus')
-    setDeleteOpen(false)
+    try {
+      await customerRepository.remove(customer.id)
+      toast.success('Pelanggan dihapus')
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   return (

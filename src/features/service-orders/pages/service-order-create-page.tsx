@@ -71,12 +71,16 @@ export function ServiceOrderCreatePage() {
   }
 
   async function handleAddCustomer(values: CustomerFormValues) {
-    const id = createCustomerId()
-    await customerRepository.upsert(mapCustomerFormToRecord(values, id))
-    store.setCustomer(values.name.trim(), id)
-    toast.success('Pelanggan ditambahkan')
-    setIsAddCustomerOpen(false)
-    addCustomerForm.reset()
+    try {
+      const id = createCustomerId()
+      await customerRepository.upsert(mapCustomerFormToRecord(values, id))
+      store.setCustomer(values.name.trim(), id)
+      toast.success('Pelanggan ditambahkan')
+      setIsAddCustomerOpen(false)
+      addCustomerForm.reset()
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   function handleOpenPayment() {

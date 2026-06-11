@@ -19,28 +19,36 @@ export function SalesOrderCrudActions({ order }: { order?: LocalSalesOrder }) {
   const isEdit = Boolean(order)
 
   async function handleSubmit(values: SalesOrderFormValues) {
-    const id = order?.id ?? crypto.randomUUID()
-    const tenantId = requireActiveTenantId()
-    const customerName = values.customerName.trim()
-    const existingCustomer = customerName
-      ? await localDb.customers.where('[tenantId+name]').equals([tenantId, customerName]).first()
-      : undefined
-    const nextOrder = {
-      ...mapSalesOrderFormToRecord(values, id, order),
-      customerId: existingCustomer?.id,
+    try {
+      const id = order?.id ?? crypto.randomUUID()
+      const tenantId = requireActiveTenantId()
+      const customerName = values.customerName.trim()
+      const existingCustomer = customerName
+        ? await localDb.customers.where('[tenantId+name]').equals([tenantId, customerName]).first()
+        : undefined
+      const nextOrder = {
+        ...mapSalesOrderFormToRecord(values, id, order),
+        customerId: existingCustomer?.id,
+      }
+      await salesOrderRepository.upsert(nextOrder)
+      await syncCustomerSalesMetrics(order?.customerId)
+      await syncCustomerSalesMetrics(nextOrder.customerId)
+      toast.success(isEdit ? 'Invoice diperbarui' : 'Invoice dibuat')
+      setFormOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
     }
-    await salesOrderRepository.upsert(nextOrder)
-    await syncCustomerSalesMetrics(order?.customerId)
-    await syncCustomerSalesMetrics(nextOrder.customerId)
-    toast.success(isEdit ? 'Invoice diperbarui' : 'Invoice dibuat')
-    setFormOpen(false)
   }
 
   async function handleDelete() {
     if (!order) return
-    await deleteSalesOrder(order.id)
-    toast.success('Invoice dihapus')
-    setDeleteOpen(false)
+    try {
+      await deleteSalesOrder(order.id)
+      toast.success('Invoice dihapus')
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   return (

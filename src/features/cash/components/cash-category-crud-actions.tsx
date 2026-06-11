@@ -34,27 +34,35 @@ export function CashCategoryCrudActions({ category }: { category?: LocalCashCate
   }, [category, form])
 
   async function handleSubmit(values: CashCategoryFormValues) {
-    const id = category?.id ?? crypto.randomUUID()
-    const now = new Date().toISOString()
-    await cashCategoryRepository.upsert({
-      id,
-      tenantId: resolveTenantId(category?.tenantId),
-      name: values.name.trim(),
-      type: values.type,
-      status: values.status,
-      syncStatus: 'pending',
-      version: (category?.version ?? 0) + 1,
-      updatedAt: now,
-    })
-    toast.success(isEdit ? 'Kategori diperbarui' : 'Kategori ditambahkan')
-    setFormOpen(false)
+    try {
+      const id = category?.id ?? crypto.randomUUID()
+      const now = new Date().toISOString()
+      await cashCategoryRepository.upsert({
+        id,
+        tenantId: resolveTenantId(category?.tenantId),
+        name: values.name.trim(),
+        type: values.type,
+        status: values.status,
+        syncStatus: 'pending',
+        version: (category?.version ?? 0) + 1,
+        updatedAt: now,
+      })
+      toast.success(isEdit ? 'Kategori diperbarui' : 'Kategori ditambahkan')
+      setFormOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   async function handleDelete() {
     if (!category) return
-    await cashCategoryRepository.remove(category.id)
-    toast.success('Kategori dihapus')
-    setDeleteOpen(false)
+    try {
+      await cashCategoryRepository.remove(category.id)
+      toast.success('Kategori dihapus')
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   const errors = form.formState.errors

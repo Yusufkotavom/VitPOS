@@ -40,30 +40,38 @@ export function CashCrudActions({ cash }: { cash?: LocalCash }) {
   const filteredCategories = activeCategories.filter(c => c.type === type)
 
   async function handleSubmit(values: CashFormValues) {
-    const id = cash?.id ?? crypto.randomUUID()
-    
-    let finalRef = values.ref.trim()
-    if (!finalRef) {
-      const allCash = await cashRepository.list()
-      const existingRefs = allCash.map(c => c.ref).filter(r => r.startsWith('KAS-'))
-      const maxNum = existingRefs.reduce((max, r) => {
-        const num = parseInt(r.replace('KAS-', ''), 10)
-        return !isNaN(num) && num > max ? num : max
-      }, 0)
-      finalRef = `KAS-${String(maxNum + 1).padStart(3, '0')}`
-    }
+    try {
+      const id = cash?.id ?? crypto.randomUUID()
 
-    const finalValues = { ...values, ref: finalRef }
-    await cashRepository.upsert(mapCashFormToRecord(finalValues, id))
-    toast.success(isEdit ? 'Transaksi diperbarui' : 'Transaksi ditambahkan')
-    setFormOpen(false)
+      let finalRef = values.ref.trim()
+      if (!finalRef) {
+        const allCash = await cashRepository.list()
+        const existingRefs = allCash.map(c => c.ref).filter(r => r.startsWith('KAS-'))
+        const maxNum = existingRefs.reduce((max, r) => {
+          const num = parseInt(r.replace('KAS-', ''), 10)
+          return !isNaN(num) && num > max ? num : max
+        }, 0)
+        finalRef = `KAS-${String(maxNum + 1).padStart(3, '0')}`
+      }
+
+      const finalValues = { ...values, ref: finalRef }
+      await cashRepository.upsert(mapCashFormToRecord(finalValues, id))
+      toast.success(isEdit ? 'Transaksi diperbarui' : 'Transaksi ditambahkan')
+      setFormOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   async function handleDelete() {
     if (!cash) return
-    await cashRepository.remove(cash.id)
-    toast.success('Transaksi dihapus')
-    setDeleteOpen(false)
+    try {
+      await cashRepository.remove(cash.id)
+      toast.success('Transaksi dihapus')
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   const errors = form.formState.errors

@@ -16,17 +16,25 @@ export function SettingCrudActions({ setting }: { setting?: LocalSetting }) {
   const isEdit = Boolean(setting)
 
   async function handleSubmit(values: SettingFormValues) {
-    const id = setting?.id ?? crypto.randomUUID()
-    await settingRepository.upsert(mapSettingFormToRecord(values, id))
-    toast.success(isEdit ? 'Pengaturan diperbarui' : 'Pengaturan ditambahkan')
-    setFormOpen(false)
+    try {
+      const id = setting?.id ?? crypto.randomUUID()
+      await settingRepository.upsert(mapSettingFormToRecord(values, id))
+      toast.success(isEdit ? 'Pengaturan diperbarui' : 'Pengaturan ditambahkan')
+      setFormOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   async function handleDelete() {
     if (!setting) return
-    await settingRepository.remove(setting.id)
-    toast.success('Pengaturan dihapus')
-    setDeleteOpen(false)
+    try {
+      await settingRepository.remove(setting.id)
+      toast.success('Pengaturan dihapus')
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   return (

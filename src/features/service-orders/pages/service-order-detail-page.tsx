@@ -116,96 +116,107 @@ export function ServiceOrderDetailPage() {
 
   async function saveEditing() {
     if (!order) return
-    const customerName = editCustomer.trim()
-    const customer = customerName
-      ? await localDb.customers.where('[tenantId+name]').equals([tenantId, customerName]).first()
-      : undefined
+    try {
+      const customerName = editCustomer.trim()
+      const customer = customerName
+        ? await localDb.customers.where('[tenantId+name]').equals([tenantId, customerName]).first()
+        : undefined
 
-    let updatedTimeline = order.timeline || []
-    const nowIso = new Date().toISOString()
+      let updatedTimeline = order.timeline || []
+      const nowIso = new Date().toISOString()
 
-    if (editStatus !== order.status) {
-      updatedTimeline = [
-        ...updatedTimeline,
-        {
-          id: crypto.randomUUID(),
-          status: editStatus,
-          date: nowIso,
-          note: `Status diubah menjadi ${editStatus}`,
-        }
-      ]
-    }
-
-    let warrantyStartDate = order.warrantyStartDate
-    let warrantyEndDate = order.warrantyEndDate
-    const prevHasWarranty = order.hasWarranty ?? false
-
-    if (editHasWarranty !== prevHasWarranty || (editHasWarranty && (String(order.warrantyValue ?? '') !== editWarrantyValue || (order.warrantyUnit ?? 'hari') !== editWarrantyUnit))) {
-      if (editHasWarranty && editWarrantyValue) {
-        const val = Number(editWarrantyValue)
-        warrantyStartDate = prevHasWarranty ? warrantyStartDate : nowIso
-        warrantyEndDate = addWarrantyDuration(warrantyStartDate ?? nowIso, val, editWarrantyUnit)
-        const mode = prevHasWarranty ? 'updated' : 'activated'
+      if (editStatus !== order.status) {
         updatedTimeline = [
           ...updatedTimeline,
           {
             id: crypto.randomUUID(),
             status: editStatus,
             date: nowIso,
-            note: buildWarrantyTimelineNote({ value: val, unit: editWarrantyUnit, mode, endDate: warrantyEndDate }),
-            type: 'warranty',
-          }
-        ]
-      } else if (!editHasWarranty && prevHasWarranty) {
-        warrantyStartDate = undefined
-        warrantyEndDate = undefined
-        updatedTimeline = [
-          ...updatedTimeline,
-          {
-            id: crypto.randomUUID(),
-            status: editStatus,
-            date: nowIso,
-            note: buildWarrantyTimelineNote({ value: 0, unit: 'hari', mode: 'removed' }),
-            type: 'warranty',
+            note: `Status diubah menjadi ${editStatus}`,
           }
         ]
       }
-    }
 
-    await serviceOrderRepository.upsert({
-      ...order,
-      customerId: customer?.id,
-      customerName: customerName,
-      description: editDesc.trim(),
-      cost: Number(editCost) || 0,
-      status: editStatus as typeof order.status,
-      hasWarranty: editHasWarranty,
-      warrantyValue: editHasWarranty ? Number(editWarrantyValue) || undefined : undefined,
-      warrantyUnit: editHasWarranty ? editWarrantyUnit : undefined,
-      warrantyStartDate,
-      warrantyEndDate,
-      timeline: updatedTimeline,
-      version: order.version + 1,
-      updatedAt: nowIso,
-    })
-    toast.success('Service order diperbarui')
-    setEditing(false)
-    refetch()
+      let warrantyStartDate = order.warrantyStartDate
+      let warrantyEndDate = order.warrantyEndDate
+      const prevHasWarranty = order.hasWarranty ?? false
+
+      if (editHasWarranty !== prevHasWarranty || (editHasWarranty && (String(order.warrantyValue ?? '') !== editWarrantyValue || (order.warrantyUnit ?? 'hari') !== editWarrantyUnit))) {
+        if (editHasWarranty && editWarrantyValue) {
+          const val = Number(editWarrantyValue)
+          warrantyStartDate = prevHasWarranty ? warrantyStartDate : nowIso
+          warrantyEndDate = addWarrantyDuration(warrantyStartDate ?? nowIso, val, editWarrantyUnit)
+          const mode = prevHasWarranty ? 'updated' : 'activated'
+          updatedTimeline = [
+            ...updatedTimeline,
+            {
+              id: crypto.randomUUID(),
+              status: editStatus,
+              date: nowIso,
+              note: buildWarrantyTimelineNote({ value: val, unit: editWarrantyUnit, mode, endDate: warrantyEndDate }),
+              type: 'warranty',
+            }
+          ]
+        } else if (!editHasWarranty && prevHasWarranty) {
+          warrantyStartDate = undefined
+          warrantyEndDate = undefined
+          updatedTimeline = [
+            ...updatedTimeline,
+            {
+              id: crypto.randomUUID(),
+              status: editStatus,
+              date: nowIso,
+              note: buildWarrantyTimelineNote({ value: 0, unit: 'hari', mode: 'removed' }),
+              type: 'warranty',
+            }
+          ]
+        }
+      }
+
+      await serviceOrderRepository.upsert({
+        ...order,
+        customerId: customer?.id,
+        customerName: customerName,
+        description: editDesc.trim(),
+        cost: Number(editCost) || 0,
+        status: editStatus as typeof order.status,
+        hasWarranty: editHasWarranty,
+        warrantyValue: editHasWarranty ? Number(editWarrantyValue) || undefined : undefined,
+        warrantyUnit: editHasWarranty ? editWarrantyUnit : undefined,
+        warrantyStartDate,
+        warrantyEndDate,
+        timeline: updatedTimeline,
+        version: order.version + 1,
+        updatedAt: nowIso,
+      })
+      toast.success('Service order diperbarui')
+      setEditing(false)
+      refetch()
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   async function handleDelete() {
     if (!order) return
-    await serviceOrderRepository.remove(order.id)
-    toast.success('Service order dihapus')
-    setDeleteOpen(false)
+    try {
+      await serviceOrderRepository.remove(order.id)
+      toast.success('Service order dihapus')
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   async function handleAddPayment() {
     if (!order || payAmount <= 0) return
-
-    await recordServiceOrderPayment(order.id, payAmount, payMethod, 'Service Order', tenantId)
-    toast.success('Pembayaran berhasil ditambahkan')
-    setPaymentOpen(false)
+    try {
+      await recordServiceOrderPayment(order.id, payAmount, payMethod, 'Service Order', tenantId)
+      toast.success('Pembayaran berhasil ditambahkan')
+      setPaymentOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menambah pembayaran: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   async function handleWhatsApp() {

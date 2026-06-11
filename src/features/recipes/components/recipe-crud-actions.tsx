@@ -1,5 +1,6 @@
 import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import { useState } from 'react'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -63,14 +64,22 @@ export function RecipeCrudActions({ recipe }: { recipe?: LocalRecipe }) {
     }
 
     nextRecipe.items = nextRecipe.items.map((item) => ({ ...item, recipeId: nextRecipe.id }))
-    await recipeRepository.upsert(nextRecipe)
-    setFormOpen(false)
+    try {
+      await recipeRepository.upsert(nextRecipe)
+      setFormOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   async function handleDelete() {
     if (!recipe) return
-    await recipeRepository.remove(recipe.id)
-    setDeleteOpen(false)
+    try {
+      await recipeRepository.remove(recipe.id)
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   return (

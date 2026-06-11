@@ -39,47 +39,55 @@ export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
   }, [payment, form])
 
   async function handleSubmit(values: PaymentFormValues) {
-    const id = payment?.id ?? crypto.randomUUID()
-    const previousSalesOrderId = payment?.salesOrderId
-    const previousServiceOrderId = payment?.serviceOrderId
-    const previousPurchaseId = payment?.purchaseId
-    const nextPayment = mapPaymentFormToRecord(values, id, payment)
-    await paymentRepository.upsert(nextPayment)
-    if (previousSalesOrderId && previousSalesOrderId !== nextPayment.salesOrderId) {
-      await syncSalesOrderPaymentSummary(previousSalesOrderId)
+    try {
+      const id = payment?.id ?? crypto.randomUUID()
+      const previousSalesOrderId = payment?.salesOrderId
+      const previousServiceOrderId = payment?.serviceOrderId
+      const previousPurchaseId = payment?.purchaseId
+      const nextPayment = mapPaymentFormToRecord(values, id, payment)
+      await paymentRepository.upsert(nextPayment)
+      if (previousSalesOrderId && previousSalesOrderId !== nextPayment.salesOrderId) {
+        await syncSalesOrderPaymentSummary(previousSalesOrderId)
+      }
+      if (nextPayment.salesOrderId) {
+        await syncSalesOrderPaymentSummary(nextPayment.salesOrderId)
+      }
+      if (previousServiceOrderId && previousServiceOrderId !== nextPayment.serviceOrderId) {
+        await syncServiceOrderPaymentSummary(previousServiceOrderId)
+      }
+      if (nextPayment.serviceOrderId) {
+        await syncServiceOrderPaymentSummary(nextPayment.serviceOrderId)
+      }
+      if (previousPurchaseId && previousPurchaseId !== nextPayment.purchaseId) {
+        await syncPurchasePaymentSummary(previousPurchaseId)
+      }
+      if (nextPayment.purchaseId) {
+        await syncPurchasePaymentSummary(nextPayment.purchaseId)
+      }
+      toast.success(isEdit ? 'Pembayaran diperbarui' : 'Pembayaran dicatat')
+      setFormOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
     }
-    if (nextPayment.salesOrderId) {
-      await syncSalesOrderPaymentSummary(nextPayment.salesOrderId)
-    }
-    if (previousServiceOrderId && previousServiceOrderId !== nextPayment.serviceOrderId) {
-      await syncServiceOrderPaymentSummary(previousServiceOrderId)
-    }
-    if (nextPayment.serviceOrderId) {
-      await syncServiceOrderPaymentSummary(nextPayment.serviceOrderId)
-    }
-    if (previousPurchaseId && previousPurchaseId !== nextPayment.purchaseId) {
-      await syncPurchasePaymentSummary(previousPurchaseId)
-    }
-    if (nextPayment.purchaseId) {
-      await syncPurchasePaymentSummary(nextPayment.purchaseId)
-    }
-    toast.success(isEdit ? 'Pembayaran diperbarui' : 'Pembayaran dicatat')
-    setFormOpen(false)
   }
 
   async function handleDelete() {
     if (!payment) return
-    if (payment.salesOrderId) {
-      await deleteSalesOrderPayment(payment.id)
-    } else if (payment.serviceOrderId) {
-      await deleteServiceOrderPayment(payment.id)
-    } else if (payment.purchaseId) {
-      await deletePurchasePayment(payment.id)
-    } else {
-      await paymentRepository.remove(payment.id)
+    try {
+      if (payment.salesOrderId) {
+        await deleteSalesOrderPayment(payment.id)
+      } else if (payment.serviceOrderId) {
+        await deleteServiceOrderPayment(payment.id)
+      } else if (payment.purchaseId) {
+        await deletePurchasePayment(payment.id)
+      } else {
+        await paymentRepository.remove(payment.id)
+      }
+      toast.success('Pembayaran dihapus')
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
     }
-    toast.success('Pembayaran dihapus')
-    setDeleteOpen(false)
   }
 
   const errors = form.formState.errors

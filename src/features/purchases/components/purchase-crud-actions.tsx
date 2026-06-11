@@ -26,50 +26,66 @@ export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) 
   const isEdit = Boolean(purchase)
 
   async function handleSubmit(values: PurchaseFormValues) {
-    const id = purchase?.id ?? crypto.randomUUID()
-    const tenantId = requireActiveTenantId()
-    const supplierName = values.supplierName.trim()
-    const supplier = supplierName
-      ? await localDb.suppliers.where('[tenantId+name]').equals([tenantId, supplierName]).first()
-      : undefined
-    const tenantProducts = await localDb.products.where('tenantId').equals(tenantId).toArray()
-    const mappedPurchase = mapPurchaseFormToRecord(values, id, purchase)
-    const nextPurchase = {
-      ...mappedPurchase,
-      supplierId: supplier?.id,
-      items: mappedPurchase.items.map((item) => ({
-        ...item,
-        productId: tenantProducts.find((product) => product.name.toLowerCase() === item.name.toLowerCase())?.id ?? item.productId,
-      })),
+    try {
+      const id = purchase?.id ?? crypto.randomUUID()
+      const tenantId = requireActiveTenantId()
+      const supplierName = values.supplierName.trim()
+      const supplier = supplierName
+        ? await localDb.suppliers.where('[tenantId+name]').equals([tenantId, supplierName]).first()
+        : undefined
+      const tenantProducts = await localDb.products.where('tenantId').equals(tenantId).toArray()
+      const mappedPurchase = mapPurchaseFormToRecord(values, id, purchase)
+      const nextPurchase = {
+        ...mappedPurchase,
+        supplierId: supplier?.id,
+        items: mappedPurchase.items.map((item) => ({
+          ...item,
+          productId: tenantProducts.find((product) => product.name.toLowerCase() === item.name.toLowerCase())?.id ?? item.productId,
+        })),
+      }
+      await purchaseRepository.upsert(nextPurchase)
+      await syncSupplierPurchaseMetrics(purchase?.supplierId)
+      await syncSupplierPurchaseMetrics(nextPurchase.supplierId)
+      toast.success(isEdit ? 'PO diperbarui' : 'PO dibuat')
+      setFormOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
     }
-    await purchaseRepository.upsert(nextPurchase)
-    await syncSupplierPurchaseMetrics(purchase?.supplierId)
-    await syncSupplierPurchaseMetrics(nextPurchase.supplierId)
-    toast.success(isEdit ? 'PO diperbarui' : 'PO dibuat')
-    setFormOpen(false)
   }
 
   async function handleDelete() {
     if (!purchase) return
-    const supplierId = purchase.supplierId
-    await purchaseRepository.remove(purchase.id)
-    await syncSupplierPurchaseMetrics(supplierId)
-    toast.success('PO dihapus')
-    setDeleteOpen(false)
+    try {
+      const supplierId = purchase.supplierId
+      await purchaseRepository.remove(purchase.id)
+      await syncSupplierPurchaseMetrics(supplierId)
+      toast.success('PO dihapus')
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   async function handleReceive() {
     if (!purchase) return
-    await receivePurchaseOrder(purchase)
-    toast.success('Barang diterima dan stok diperbarui')
+    try {
+      await receivePurchaseOrder(purchase)
+      toast.success('Barang diterima dan stok diperbarui')
+    } catch (error) {
+      toast.error(`Gagal menerima: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   async function handlePay() {
     if (!purchase || payAmount <= 0) return
-    await recordPurchasePayment(purchase.id, payAmount, payMethod, 'Pembelian')
-    toast.success('Pembayaran berhasil dicatat')
-    setPayOpen(false)
-    setPayAmount(0)
+    try {
+      await recordPurchasePayment(purchase.id, payAmount, payMethod, 'Pembelian')
+      toast.success('Pembayaran berhasil dicatat')
+      setPayOpen(false)
+      setPayAmount(0)
+    } catch (error) {
+      toast.error(`Gagal membayar: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   const remainingPay = purchase ? Math.max(0, purchase.grandTotal - (purchase.paidTotal ?? 0)) : 0

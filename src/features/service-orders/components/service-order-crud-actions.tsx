@@ -19,24 +19,32 @@ export function ServiceOrderCrudActions({ order }: { order?: LocalServiceOrder }
 
   async function handleSubmit(values: ServiceOrderFormValues) {
     if (!order) return // Only used for editing now
-    const tenantId = requireActiveTenantId()
-    const customerName = values.customerName.trim()
-    const customer = customerName
-      ? await localDb.customers.where('[tenantId+name]').equals([tenantId, customerName]).first()
-      : undefined
-    await serviceOrderRepository.upsert({
-      ...mapServiceOrderFormToRecord(values, order.id, order),
-      customerId: customer?.id,
-    })
-    toast.success('Service order diperbarui')
-    setFormOpen(false)
+    try {
+      const tenantId = requireActiveTenantId()
+      const customerName = values.customerName.trim()
+      const customer = customerName
+        ? await localDb.customers.where('[tenantId+name]').equals([tenantId, customerName]).first()
+        : undefined
+      await serviceOrderRepository.upsert({
+        ...mapServiceOrderFormToRecord(values, order.id, order),
+        customerId: customer?.id,
+      })
+      toast.success('Service order diperbarui')
+      setFormOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   async function handleDelete() {
     if (!order) return
-    await serviceOrderRepository.remove(order.id)
-    toast.success('Service order dihapus')
-    setDeleteOpen(false)
+    try {
+      await serviceOrderRepository.remove(order.id)
+      toast.success('Service order dihapus')
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   if (!order) {
