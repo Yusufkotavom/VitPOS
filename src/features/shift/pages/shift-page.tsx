@@ -36,7 +36,7 @@ export function ShiftPage() {
     if (!currentShift) return 0
     const payments = await localDb.payments.where('shiftId').equals(currentShift.id).toArray()
     // For now, assume all Tunai payments add to cash
-    const cashPayments = payments.filter(p => p.method === 'tunai' && p.status !== 'Failed' && p.status !== 'Pending')
+    const cashPayments = payments.filter(p => p.method === 'tunai' && p.status !== 'Gagal' && p.status !== 'Pending')
     const totalCashIncome = cashPayments.reduce((sum, p) => sum + p.amount, 0)
     
     // Phase 2 will deduct expenses here
