@@ -15,18 +15,25 @@ export function CategoryCrudActions({ category }: { category?: LocalProductCateg
   const isEdit = Boolean(category)
 
   async function handleSubmit(values: CategoryFormValues) {
-    const categoryId = category?.id ?? `product_category-${crypto.randomUUID()}`
-    
-    await productCategoryRepository.upsert(mapCategoryFormToRecord(values, categoryId, category))
-    toast.success(isEdit ? 'Kategori diperbarui' : 'Kategori ditambahkan')
-    setFormOpen(false)
+    try {
+      const categoryId = category?.id ?? `product_category-${crypto.randomUUID()}`
+      await productCategoryRepository.upsert(mapCategoryFormToRecord(values, categoryId, category))
+      toast.success(isEdit ? 'Kategori diperbarui' : 'Kategori ditambahkan')
+      setFormOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   async function handleDelete() {
     if (!category) return
-    await productCategoryRepository.remove(category.id)
-    toast.success('Kategori dihapus')
-    setDeleteOpen(false)
+    try {
+      await productCategoryRepository.remove(category.id)
+      toast.success('Kategori dihapus')
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   return (

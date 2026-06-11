@@ -36,65 +36,73 @@ export function ProductCrudActions({ product }: { product?: LocalProduct }) {
   }
 
   async function handleSubmit(values: ProductFormValues) {
-    const id = product?.id ?? createProductId()
-    const base = editProduct ?? product
-    const newRecord = mapProductFormToRecord(values, id, base)
-    const oldStock = base?.stock ?? 0
-    const newStock = newRecord.stock
+    try {
+      const id = product?.id ?? createProductId()
+      const base = editProduct ?? product
+      const newRecord = mapProductFormToRecord(values, id, base)
+      const oldStock = base?.stock ?? 0
+      const newStock = newRecord.stock
 
-    await productRepository.upsert(newRecord)
+      await productRepository.upsert(newRecord)
 
-    if (newStock !== oldStock && newRecord.manageStock) {
-      const diff = newStock - oldStock
-      const warehouseName = 'Gudang Utama'
-      const movementId = crypto.randomUUID()
-      const nowIso = new Date().toISOString()
+      if (newStock !== oldStock && newRecord.manageStock) {
+        const diff = newStock - oldStock
+        const warehouseName = 'Gudang Utama'
+        const movementId = crypto.randomUUID()
+        const nowIso = new Date().toISOString()
 
-      const movement = {
-        id: movementId,
-        tenantId: newRecord.tenantId,
-        productId: newRecord.id,
-        productName: newRecord.name,
-        warehouseName,
-        type: 'adjustment' as const,
-        qty: diff,
-        notes: base ? 'Update dari halaman Produk' : 'Stok awal produk',
-        syncStatus: 'pending' as const,
-        updatedAt: nowIso,
+        const movement = {
+          id: movementId,
+          tenantId: newRecord.tenantId,
+          productId: newRecord.id,
+          productName: newRecord.name,
+          warehouseName,
+          type: 'adjustment' as const,
+          qty: diff,
+          notes: base ? 'Update dari halaman Produk' : 'Stok awal produk',
+          syncStatus: 'pending' as const,
+          updatedAt: nowIso,
+        }
+
+        let status = 'Aman'
+        if (newStock <= 0) status = 'Habis'
+        else if (newStock <= 5) status = 'Stok Rendah'
+
+        const inventory = {
+          id: `${newRecord.tenantId}_${newRecord.id}_${warehouseName}`,
+          tenantId: newRecord.tenantId,
+          product: newRecord.name,
+          warehouse: warehouseName,
+          stockSystem: newStock,
+          stockSafe: 5,
+          movement: `${diff >= 0 ? '+' : ''}${diff} (adjustment)`,
+          status,
+        }
+
+        const { localDb: db } = await import('@/services/local-db/client')
+        const { stockMovementRepository } = await import('@/services/local-db/repository')
+
+        await db.stockMovements.put(movement)
+        await db.inventory.put(inventory)
+        await stockMovementRepository.upsert(movement)
       }
 
-      let status = 'Aman'
-      if (newStock <= 0) status = 'Habis'
-      else if (newStock <= 5) status = 'Stok Rendah'
-
-      const inventory = {
-        id: `${newRecord.tenantId}_${newRecord.id}_${warehouseName}`,
-        tenantId: newRecord.tenantId,
-        product: newRecord.name,
-        warehouse: warehouseName,
-        stockSystem: newStock,
-        stockSafe: 5,
-        movement: `${diff >= 0 ? '+' : ''}${diff} (adjustment)`,
-        status,
-      }
-
-      const { localDb: db } = await import('@/services/local-db/client')
-      const { stockMovementRepository } = await import('@/services/local-db/repository')
-
-      await db.stockMovements.put(movement)
-      await db.inventory.put(inventory)
-      await stockMovementRepository.upsert(movement)
+      toast.success(isEdit ? 'Produk diperbarui' : 'Produk ditambahkan')
+      setFormOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
     }
-
-    toast.success(isEdit ? 'Produk diperbarui' : 'Produk ditambahkan')
-    setFormOpen(false)
   }
 
   async function handleDelete() {
     if (!product) return
-    await productRepository.remove(product.id)
-    toast.success('Produk dihapus')
-    setDeleteOpen(false)
+    try {
+      await productRepository.remove(product.id)
+      toast.success('Produk dihapus')
+      setDeleteOpen(false)
+    } catch (error) {
+      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+    }
   }
 
   return (
