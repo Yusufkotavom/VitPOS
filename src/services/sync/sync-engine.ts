@@ -207,22 +207,36 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
     }
     await localDb.payments.put(payment)
   } else if (item.entityType === 'stock_movement') {
+    const productId = typeof payload.productId === 'string' ? payload.productId : ''
+    const qty = Number(payload.qty ?? 0)
     const movement: LocalStockMovement = {
       id: item.entityId,
       tenantId,
-      productId: typeof payload.productId === 'string' ? payload.productId : '',
+      productId,
       productName: typeof payload.productName === 'string' ? payload.productName : '',
       warehouseId: typeof payload.warehouseId === 'string' ? payload.warehouseId : undefined,
       warehouseName: typeof payload.warehouseName === 'string' ? payload.warehouseName : '',
       type: (typeof payload.type === 'string' ? payload.type : 'adjustment') as LocalStockMovement['type'],
-      qty: Number(payload.qty ?? 0),
+      qty,
       referenceType: typeof payload.referenceType === 'string' ? payload.referenceType : undefined,
       referenceId: typeof payload.referenceId === 'string' ? payload.referenceId : undefined,
       notes: typeof payload.notes === 'string' ? payload.notes : undefined,
       syncStatus: 'synced',
       updatedAt: item.updatedAt,
     }
+
+    const existingMovement = await localDb.stockMovements.get(item.entityId)
     await localDb.stockMovements.put(movement)
+
+    if (!existingMovement && productId) {
+      const product = await localDb.products.get(productId)
+      if (product && product.manageStock !== false) {
+        product.stock = Math.max(0, (product.stock ?? 0) + qty)
+        product.updatedAt = item.updatedAt
+        product.syncStatus = 'synced'
+        await localDb.products.put(product)
+      }
+    }
   } else if (item.entityType === 'customer') {
     await localDb.customers.put({
       id: item.entityId,
