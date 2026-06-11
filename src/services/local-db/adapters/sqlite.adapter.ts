@@ -29,6 +29,15 @@ class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
     return undefined;
   }
 
+  async bulkGet(ids: string[]): Promise<(T | undefined)[]> {
+    if (ids.length === 0) return [];
+    const placeholders = ids.map(() => '?').join(', ');
+    const res = await this.db.query(`SELECT * FROM ${this.tableName} WHERE id IN (${placeholders})`, ids);
+    const rows = res.values ? res.values.map(v => this.parseRow(v)) : [];
+    const map = new Map(rows.map(r => [r.id, r]));
+    return ids.map(id => map.get(id));
+  }
+
   // Minimal Dexie-like where emulation
   where(column: string) {
     return {
@@ -72,6 +81,23 @@ class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
                const delQuery = `DELETE FROM ${this.tableName} WHERE ${column} = ?`;
                await this.db.run(delQuery, [value]);
              }
+          },
+           // eslint-disable-next-line @typescript-eslint/no-explicit-any
+           filter: (fn: (item: any) => boolean) => {
+            return {
+              toArray: async () => {
+                const results = await executeQuery();
+                return results.filter(fn);
+              },
+              first: async () => {
+                const results = await executeQuery();
+                return results.find(fn);
+              },
+              count: async () => {
+                const results = await executeQuery();
+                return results.filter(fn).length;
+              }
+            };
           }
         };
       }

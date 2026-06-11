@@ -15,6 +15,7 @@ class DexieAdapterTable<T extends AnyRecord> implements AdapterTable<T> {
   constructor(source: Table<T, string>) { this.source = source }
   toArray() { return this.source.toArray() }
   get(id: string) { return this.source.get(id) }
+  bulkGet(ids: string[]) { return this.source.bulkGet(ids) }
   put(row: T) { return this.source.put(row) }
   delete(id: string) { return this.source.delete(id) }
   update(id: string, changes: Partial<T>) { return this.source.update(id, changes as unknown as UpdateSpec<T>) }

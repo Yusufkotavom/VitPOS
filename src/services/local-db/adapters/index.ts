@@ -5,6 +5,7 @@ export type AdapterTable<T extends { id: string }> = {
   delete(id: string): Promise<void>
   update(id: string, changes: Partial<T>): Promise<unknown>
   count(): Promise<number>
+  bulkGet(ids: string[]): Promise<(T | undefined)[]>
   bulkPut(rows: T[]): Promise<unknown>
   clear(): Promise<void>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -33,6 +34,9 @@ export interface LocalDbAdapter {
 }
 
 export const LOCAL_DB_TABLES = [
+  'users',
+  'tenants',
+  'tenantMembers',
   'products',
   'productCategories',
   'customers',

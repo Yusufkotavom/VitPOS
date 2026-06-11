@@ -5,6 +5,7 @@ import { id as localeID } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
 import { useSyncConflicts } from '@/features/sync/hooks/use-sync-conflicts'
 import { useSyncQueue } from '@/features/sync/hooks/use-sync-queue'
+import { useSyncRuns } from '@/features/sync/hooks/use-sync-runs'
 import { useSyncStore } from '@/features/sync/stores/sync-store'
 import { runSync } from '@/services/sync/sync-engine'
 import { DataTable } from '@/shared/components/data-table/data-table'
@@ -53,6 +54,7 @@ export function SyncPage() {
   const setCounts = useSyncStore((s) => s.setCounts)
   const { items: outbox, pendingCount, failedCount } = useSyncQueue()
   const { conflicts, openCount } = useSyncConflicts()
+  const { runs } = useSyncRuns()
   const summary = useSyncStore()
 
   useEffect(() => {
@@ -221,6 +223,65 @@ export function SyncPage() {
                 <p className="text-xs text-muted-foreground">{fmtDate(row.createdAt)}</p>
               </div>
               <StatusBadge label={row.status === 'open' ? 'Butuh diperiksa' : 'Selesai'} tone={row.status === 'open' ? 'danger' : 'success'} />
+            </div>
+          )}
+        />
+      </ContentCard>
+
+      <ContentCard title="Riwayat Sinkron" description="Log tiap kali sinkronisasi dijalankan.">
+        <DataTable
+          columns={[
+            {
+              key: 'startedAt',
+              header: 'Mulai',
+              render: (row) => fmtDate(row.startedAt),
+              sortable: true,
+            },
+            {
+              key: 'finishedAt',
+              header: 'Selesai',
+              render: (row) => fmtDate(row.finishedAt),
+              sortable: true,
+            },
+            {
+              key: 'status',
+              header: 'Status',
+              render: (row) => {
+                const label = row.status === 'success' ? 'Berhasil' : row.status === 'failed' ? 'Gagal' : 'Berjalan'
+                const tone = row.status === 'success' ? 'success' : row.status === 'failed' ? 'danger' : 'info'
+                return <StatusBadge label={label} tone={tone} />
+              },
+              sortable: true,
+            },
+            {
+              key: 'processed',
+              header: 'Diproses',
+            },
+            {
+              key: 'failed',
+              header: 'Gagal',
+            },
+            {
+              key: 'pulled',
+              header: 'Diambil',
+            },
+          ]}
+          data={runs}
+          emptyTitle="Belum ada riwayat sinkron"
+          mobileRender={(row) => (
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">{fmtDate(row.startedAt)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {row.processed} diproses
+                  {row.failed > 0 ? `, ${row.failed} gagal` : ''}
+                  {row.pulled ? `, ${row.pulled} diambil` : ''}
+                </p>
+              </div>
+              <StatusBadge
+                label={row.status === 'success' ? 'Berhasil' : row.status === 'failed' ? 'Gagal' : 'Berjalan'}
+                tone={row.status === 'success' ? 'success' : row.status === 'failed' ? 'danger' : 'info'}
+              />
             </div>
           )}
         />

@@ -1,7 +1,7 @@
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 
 export function normalizeApiBaseUrl(baseUrl: string) {
-  return baseUrl.replace(/\/$/, '')
+  return baseUrl.replace(/^["']|["']$/g, '').replace(/\/$/, '')
 }
 
 export function buildApiUrl(baseUrl: string, path: string) {

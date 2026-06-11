@@ -14,7 +14,7 @@ vi.mock('@/features/sales-orders/services/sales-order-finance.service', () => ({
 vi.mock('@/services/local-db/client', () => ({
   localDb: {
     transaction: vi.fn(),
-    salesOrders: { put: vi.fn() },
+    salesOrders: { put: vi.fn(), toArray: vi.fn(async () => []) },
     salesOrderItems: { put: vi.fn(), bulkPut: vi.fn() },
     payments: { put: vi.fn() },
     stockMovements: { put: vi.fn(), bulkPut: vi.fn() },

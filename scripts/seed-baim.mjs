@@ -1,8 +1,11 @@
 import { config } from 'dotenv'
+import { createHash } from 'node:crypto'
 import postgres from 'postgres'
 
 config({ path: '.env.local' })
 config()
+
+const BAIM_PASSWORD = process.env.BAIM_PASSWORD || 'baim123'
 
 const databaseUrl = process.env.DATABASE_URL
 
@@ -27,11 +30,13 @@ const ids = {
 const sql = postgres(databaseUrl, { prepare: false, max: 1 })
 
 try {
+  const passwordHash = createHash('sha256').update(BAIM_PASSWORD).digest('hex')
+
   await sql.begin(async (tx) => {
     await tx`
-      insert into users (id, email, name)
-      values (${ids.userId}, 'baim@kotacom.id', 'Baim Yusuf')
-      on conflict (id) do update set email = excluded.email, name = excluded.name
+      insert into users (id, email, name, password_hash)
+      values (${ids.userId}, 'baim@kotacom.id', 'Baim Yusuf', ${passwordHash})
+      on conflict (id) do update set email = excluded.email, name = excluded.name, password_hash = ${passwordHash}
     `
 
     await tx`

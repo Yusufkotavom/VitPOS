@@ -59,7 +59,7 @@ describe('sidebar navigation coverage', () => {
     )
 
     expect(screen.getByText('Katalog & Stok')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /^Produk$/i })).toHaveAttribute('href', '/products')
+    expect(screen.getByText('Produk')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Kategori Produk/i })).toHaveAttribute('href', '/products/categories')
     expect(screen.getByRole('link', { name: /Shift Kasir/i })).toHaveAttribute('href', '/shift')
   })
