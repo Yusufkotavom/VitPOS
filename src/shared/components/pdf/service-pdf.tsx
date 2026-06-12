@@ -98,7 +98,7 @@ export function ServicePDF({ data, settings }: { data: PdfServiceData; settings:
               <View style={styles.colPrice}><Text style={styles.headerText}>Harga</Text></View>
               <View style={styles.colTotal}><Text style={styles.headerText}>Subtotal</Text></View>
             </View>
-            {data.items.map((item, i) => (
+            {data.items?.map((item, i) => (
               <View key={i} style={styles.tableRow}>
                 <View style={styles.colItem}><Text>{item.name}</Text></View>
                 <View style={styles.colQty}><Text>{item.qty}</Text></View>
