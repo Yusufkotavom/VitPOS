@@ -155,6 +155,20 @@ export const posTransactionService = {
       updatedAt: nowIso,
     }
 
+    const warehouseName = 'Gudang Toko'
+    const allCartProductIds = [...new Set(cartItems.map((i) => i.productId))]
+    const cartProducts = await localDb.products.bulkGet(allCartProductIds)
+    const cartProductMap = new Map(cartProducts.filter(Boolean).map((p) => [p!.id, p!]))
+
+    for (const cartItem of cartItems) {
+      const existing = cartProductMap.get(cartItem.productId)
+      if (!existing) continue
+      if (existing.manageStock === false || existing.type !== 'Produk Fisik') continue
+      if (existing.stock < cartItem.qty) {
+        throw new Error(`Stok ${existing.name} tidak mencukupi. Tersedia: ${existing.stock}, diminta: ${cartItem.qty}`)
+      }
+    }
+
     const recipes = await localDb.recipes
       .where('tenantId').equals(tenantId)
       .filter((r) => r.status === 'Aktif')
@@ -164,19 +178,26 @@ export const posTransactionService = {
     const stockMovements: LocalStockMovement[] = []
     for (const cartItem of cartItems) {
       if (cartItem.qty <= 0) continue
-      stockMovements.push({
-        id: crypto.randomUUID(),
-        tenantId,
-        productId: cartItem.productId,
-        productName: cartItem.name,
-        warehouseName: 'Gudang Toko',
-        type: 'sale',
-        qty: -cartItem.qty,
-        referenceType: 'sale',
-        referenceId: salesOrderId,
-        syncStatus: 'pending',
-        updatedAt: nowIso,
-      })
+
+      const product = cartProductMap.get(cartItem.productId)
+      const isManaged = product && product.manageStock !== false && product.type === 'Produk Fisik'
+
+      if (isManaged) {
+        stockMovements.push({
+          id: crypto.randomUUID(),
+          tenantId,
+          productId: cartItem.productId,
+          productName: cartItem.name,
+          warehouseName,
+          type: 'sale',
+          qty: -cartItem.qty,
+          referenceType: 'sale',
+          referenceId: salesOrderId,
+          syncStatus: 'pending',
+          updatedAt: nowIso,
+        })
+      }
+
       const recipe = recipeMap.get(cartItem.productId)
       if (recipe) {
         for (const ri of recipe.items) {
@@ -186,7 +207,7 @@ export const posTransactionService = {
             tenantId,
             productId: ri.productId,
             productName: ri.productName,
-            warehouseName: 'Gudang Toko',
+            warehouseName,
             type: 'production',
             qty: -consumeQty,
             referenceType: 'sale',
@@ -237,7 +258,6 @@ export const posTransactionService = {
       })),
     ]
 
-    const warehouseName = 'Gudang Toko'
     const allProductIds = [...new Set([
       ...cartItems.map((i) => i.productId),
       ...stockMovements.filter((sm) => sm.type === 'production').map((sm) => sm.productId),
@@ -251,6 +271,7 @@ export const posTransactionService = {
     for (const sm of stockMovements) {
       const existing = productMap.get(sm.productId)
       if (!existing || existing.tenantId !== tenantId || existing.type !== 'Produk Fisik') continue
+      if (existing.manageStock === false) continue
 
       const nextStock = Math.max(0, existing.stock + sm.qty)
       productUpdates.push({ ...existing, stock: nextStock, updatedAt: nowIso, version: existing.version + 1, syncStatus: 'pending' })

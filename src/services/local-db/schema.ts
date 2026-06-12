@@ -186,6 +186,7 @@ export type LocalCash = {
   income: number
   expense: number
   status: string
+  shiftId?: string
 }
 
 export type LocalCashCategory = {

@@ -22,6 +22,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { shiftRepository } from '@/services/local-db/repository'
+import { localDb } from '@/services/local-db/client'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { useQueryClient } from '@tanstack/react-query'
@@ -49,14 +50,33 @@ export function PosPage() {
   async function handleOpenShift() {
     if (!startCash) return toast.error(t('pos.start_cash_required'))
     try {
+      const tenantId = resolveTenantId()
+      const shiftId = crypto.randomUUID()
+      const startCashAmount = parseFloat(startCash)
+      const nowIso = new Date().toISOString()
+
       await shiftRepository.upsert({
-        id: crypto.randomUUID(),
-        tenantId: resolveTenantId(),
+        id: shiftId,
+        tenantId,
         cashierName: t('shift.active_cashier'),
-        startTime: new Date().toISOString(),
-        startCash: parseFloat(startCash),
+        startTime: nowIso,
+        startCash: startCashAmount,
         status: 'open',
       })
+
+      await localDb.cash.put({
+        id: crypto.randomUUID(),
+        tenantId,
+        ref: `KAS-${shiftId.slice(0, 6)}`,
+        date: nowIso,
+        account: 'Kas Toko',
+        category: 'Modal Awal',
+        income: startCashAmount,
+        expense: 0,
+        status: 'Tercatat',
+        shiftId,
+      })
+
       toast.success(t('shift.opened'))
       setStartCash('')
       await queryClient.invalidateQueries({ queryKey: ['active-shift'] })

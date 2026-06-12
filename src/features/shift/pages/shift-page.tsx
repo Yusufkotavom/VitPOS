@@ -52,14 +52,33 @@ export function ShiftPage() {
   async function openShift() {
     if (!startCash) return toast.error('Modal awal harus diisi')
     try {
+      const tenantId = resolveTenantId()
+      const shiftId = crypto.randomUUID()
+      const startCashAmount = parseFloat(startCash)
+      const nowIso = new Date().toISOString()
+
       await shiftRepository.upsert({
-        id: crypto.randomUUID(),
-        tenantId: resolveTenantId(),
+        id: shiftId,
+        tenantId,
         cashierName: 'Kasir Aktif',
-        startTime: new Date().toISOString(),
-        startCash: parseFloat(startCash),
+        startTime: nowIso,
+        startCash: startCashAmount,
         status: 'open',
       })
+
+      await localDb.cash.put({
+        id: crypto.randomUUID(),
+        tenantId,
+        ref: `KAS-${shiftId.slice(0, 6)}`,
+        date: nowIso,
+        account: 'Kas Toko',
+        category: 'Modal Awal',
+        income: startCashAmount,
+        expense: 0,
+        status: 'Tercatat',
+        shiftId,
+      })
+
       toast.success('Shift berhasil dibuka')
       setOpenerOpen(false)
       setStartCash('')
@@ -75,14 +94,33 @@ export function ShiftPage() {
     if (!actualCash) return toast.error('Uang riil di laci harus diisi')
     try {
       const actual = parseFloat(actualCash)
+      const diff = actual - expectedCash
+      const nowIso = new Date().toISOString()
+
       await shiftRepository.upsert({
         ...currentShift,
-        endTime: new Date().toISOString(),
+        endTime: nowIso,
         expectedCash,
         actualCash: actual,
-        difference: actual - expectedCash,
+        difference: diff,
         status: 'closed',
       })
+
+      if (diff !== 0) {
+        await localDb.cash.put({
+          id: crypto.randomUUID(),
+          tenantId: currentShift.tenantId,
+          ref: `SEL-${currentShift.id.slice(0, 6)}`,
+          date: nowIso,
+          account: 'Kas Toko',
+          category: 'Selisih Kas',
+          income: diff > 0 ? diff : 0,
+          expense: diff < 0 ? Math.abs(diff) : 0,
+          status: 'Tercatat',
+          shiftId: currentShift.id,
+        })
+      }
+
       toast.success('Shift berhasil ditutup')
       setCloserOpen(false)
       setActualCash('')
