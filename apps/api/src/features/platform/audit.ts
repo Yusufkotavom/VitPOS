@@ -7,8 +7,10 @@ export type PlatformAuditAction =
   | 'tenant.subscribed' | 'tenant.cancelled'
   | 'user.role_changed' | 'user.suspended' | 'user.reactivated'
   | 'membership.role_changed'
+  | 'subscription.invoice_created' | 'subscription.payment_submitted'
+  | 'platform.billing_settings_updated' | 'platform.payment_approved' | 'platform.payment_rejected'
 
-export type PlatformAuditTargetType = 'plan' | 'tenant' | 'user' | 'membership' | 'subscription'
+export type PlatformAuditTargetType = 'plan' | 'tenant' | 'user' | 'membership' | 'subscription' | 'billing_settings' | 'subscription_payment'
 
 export async function writeAuditLog(input: {
   actorId: string

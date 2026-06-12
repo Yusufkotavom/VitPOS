@@ -24,6 +24,9 @@ import { PlanFormDialog } from '@/features/platform-admin/components/plan-form-d
 import { TenantActionDialog } from '@/features/platform-admin/components/tenant-action-dialog'
 import { UserRoleDialog } from '@/features/platform-admin/components/user-role-dialog'
 import { AuditLogList } from '@/features/platform-admin/components/audit-log-list'
+import { BillingInvoiceTable } from '@/features/platform-admin/components/billing-invoice-table'
+import { BillingPaymentQueue } from '@/features/platform-admin/components/billing-payment-queue'
+import { BillingSettingsForm } from '@/features/platform-admin/components/billing-settings-form'
 
 function subscriptionTone(status: string) {
   if (status === 'active') return 'success'
@@ -359,6 +362,66 @@ function AuditTab() {
   return <AuditLogList />
 }
 
+function BillingTab() {
+  const queryClient = useQueryClient()
+  const paymentsQuery = useQuery({ queryKey: ['platform-billing-payments'], queryFn: () => platformAdminService.listBillingPayments() })
+  const invoicesQuery = useQuery({ queryKey: ['platform-billing-invoices'], queryFn: () => platformAdminService.listBillingInvoices() })
+  const settingsQuery = useQuery({ queryKey: ['billing-settings'], queryFn: () => platformAdminService.getBillingSettings() })
+
+  const approveMutation = useMutation({
+    mutationFn: (paymentId: string) => platformAdminService.approveBillingPayment(paymentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platform-billing-payments'] })
+      queryClient.invalidateQueries({ queryKey: ['platform-billing-invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['platform-tenants'] })
+    },
+  })
+  const rejectMutation = useMutation({
+    mutationFn: ({ paymentId, reviewNote }: { paymentId: string; reviewNote: string }) => platformAdminService.rejectBillingPayment(paymentId, reviewNote),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platform-billing-payments'] })
+      queryClient.invalidateQueries({ queryKey: ['platform-billing-invoices'] })
+    },
+  })
+  const settingsMutation = useMutation({
+    mutationFn: platformAdminService.updateBillingSettings,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['billing-settings'] })
+    },
+  })
+
+  return (
+    <Tabs defaultValue="payments" className="flex flex-col gap-4">
+      <TabsList className="w-full justify-start">
+        <TabsTrigger value="payments">Pembayaran</TabsTrigger>
+        <TabsTrigger value="invoices">Tagihan</TabsTrigger>
+        <TabsTrigger value="settings">Pengaturan Billing</TabsTrigger>
+      </TabsList>
+      <TabsContent value="payments">
+        <BillingPaymentQueue
+          payments={paymentsQuery.data ?? []}
+          isBusy={approveMutation.isPending || rejectMutation.isPending}
+          onApprove={(paymentId) => approveMutation.mutate(paymentId)}
+          onReject={(paymentId, reviewNote) => rejectMutation.mutate({ paymentId, reviewNote })}
+        />
+      </TabsContent>
+      <TabsContent value="invoices">
+        <BillingInvoiceTable invoices={invoicesQuery.data ?? []} />
+      </TabsContent>
+      <TabsContent value="settings">
+        <ContentCard title="Pengaturan Billing" description="Atur kontak support, instruksi pembayaran, dan rekening transfer.">
+          <BillingSettingsForm
+            key={settingsQuery.data?.id ?? 'billing-settings-empty'}
+            settings={settingsQuery.data}
+            isSubmitting={settingsMutation.isPending}
+            onSubmit={(input) => settingsMutation.mutate(input)}
+          />
+        </ContentCard>
+      </TabsContent>
+    </Tabs>
+  )
+}
+
 export function PlatformAdminPage() {
   const tenantsQuery = useQuery({
     queryKey: ['platform-tenants'],
@@ -397,6 +460,7 @@ export function PlatformAdminPage() {
           <TabsTrigger value="overview">Ringkasan</TabsTrigger>
           <TabsTrigger value="tenants">Tenant</TabsTrigger>
           <TabsTrigger value="plans">Paket</TabsTrigger>
+          <TabsTrigger value="billing">Billing</TabsTrigger>
           <TabsTrigger value="users">User</TabsTrigger>
           <TabsTrigger value="audit">Audit Log</TabsTrigger>
         </TabsList>
@@ -409,6 +473,9 @@ export function PlatformAdminPage() {
         </TabsContent>
         <TabsContent value="plans">
           <PlansTab plans={plans} />
+        </TabsContent>
+        <TabsContent value="billing">
+          <BillingTab />
         </TabsContent>
         <TabsContent value="users">
           <UsersTab users={users} />

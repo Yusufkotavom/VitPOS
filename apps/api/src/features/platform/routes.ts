@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 import { authMiddleware } from '../auth/middleware.js'
 import { platformAdminMiddleware } from './middleware.js'
+import { platformBillingRoutes } from './billing-routes.js'
 import { writeAuditLog } from './audit.js'
 import { db } from '../../lib/db.js'
 import {
@@ -24,6 +25,7 @@ type PlatformEnv = {
 export const platformRoutes = new Hono<PlatformEnv>()
 
 platformRoutes.use('*', authMiddleware, platformAdminMiddleware)
+platformRoutes.route('/', platformBillingRoutes)
 
 // ---------- /tenants ----------
 

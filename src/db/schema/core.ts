@@ -23,8 +23,14 @@ const timestamps = {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }
 
-export const subscriptionStatusEnum = pgEnum('subscription_status', ['trial', 'active', 'past_due', 'suspended', 'cancelled'])
+export const subscriptionStatusEnum = pgEnum('subscription_status', ['trial', 'active', 'pending_payment', 'pending_approval', 'expired', 'past_due', 'suspended', 'cancelled'])
 export const billingPeriodEnum = pgEnum('billing_period', ['monthly', 'yearly'])
+export const subscriptionInvoiceTypeEnum = pgEnum('subscription_invoice_type', ['new_subscription', 'renewal', 'upgrade', 'downgrade', 'manual_adjustment'])
+export const subscriptionInvoiceStatusEnum = pgEnum('subscription_invoice_status', ['draft', 'pending_payment', 'submitted', 'paid', 'cancelled', 'expired'])
+export const subscriptionPaymentMethodEnum = pgEnum('subscription_payment_method', ['manual_transfer'])
+export const subscriptionPaymentStatusEnum = pgEnum('subscription_payment_status', ['submitted', 'approved', 'rejected'])
+export const planChangeTypeEnum = pgEnum('plan_change_type', ['upgrade', 'downgrade', 'renewal'])
+export const planChangeStatusEnum = pgEnum('plan_change_status', ['pending_payment', 'waiting_approval', 'approved', 'rejected', 'scheduled', 'applied', 'cancelled'])
 
 export const tenants = pgTable('tenants', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -80,6 +86,74 @@ export const subscriptionPlans = pgTable('subscription_plans', {
   maxUsers: integer('max_users').default(1).notNull(),
   features: jsonb('features').default({}).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
+  ...timestamps,
+})
+
+export const subscriptionInvoices = pgTable('subscription_invoices', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  invoiceNumber: varchar('invoice_number', { length: 80 }).notNull().unique(),
+  type: subscriptionInvoiceTypeEnum('type').notNull(),
+  planCode: varchar('plan_code', { length: 40 }).notNull(),
+  billingPeriod: billingPeriodEnum('billing_period').notNull(),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+  status: subscriptionInvoiceStatusEnum('status').default('draft').notNull(),
+  periodStart: timestamp('period_start', { withTimezone: true }),
+  periodEnd: timestamp('period_end', { withTimezone: true }),
+  dueAt: timestamp('due_at', { withTimezone: true }),
+  notes: text('notes'),
+  ...timestamps,
+}, (table) => [index('subscription_invoices_tenant_id_idx').on(table.tenantId), index('subscription_invoices_status_idx').on(table.status), index('subscription_invoices_due_at_idx').on(table.dueAt)])
+
+export const subscriptionPayments = pgTable('subscription_payments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  invoiceId: uuid('invoice_id').notNull().references(() => subscriptionInvoices.id),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+  method: subscriptionPaymentMethodEnum('method').default('manual_transfer').notNull(),
+  bankName: varchar('bank_name', { length: 120 }),
+  accountName: varchar('account_name', { length: 160 }),
+  referenceNumber: varchar('reference_number', { length: 120 }),
+  proofImageUrl: text('proof_image_url'),
+  proofText: text('proof_text'),
+  status: subscriptionPaymentStatusEnum('status').default('submitted').notNull(),
+  submittedByUserId: uuid('submitted_by_user_id').references(() => users.id),
+  reviewedByUserId: uuid('reviewed_by_user_id').references(() => users.id),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+  reviewNote: text('review_note'),
+  ...timestamps,
+}, (table) => [index('subscription_payments_tenant_id_idx').on(table.tenantId), index('subscription_payments_invoice_id_idx').on(table.invoiceId), index('subscription_payments_status_idx').on(table.status)])
+
+export const planChangeRequests = pgTable('plan_change_requests', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  fromPlanCode: varchar('from_plan_code', { length: 40 }).notNull(),
+  toPlanCode: varchar('to_plan_code', { length: 40 }).notNull(),
+  changeType: planChangeTypeEnum('change_type').notNull(),
+  status: planChangeStatusEnum('status').default('pending_payment').notNull(),
+  effectiveAt: timestamp('effective_at', { withTimezone: true }),
+  invoiceId: uuid('invoice_id').references(() => subscriptionInvoices.id),
+  requestedByUserId: uuid('requested_by_user_id').references(() => users.id),
+  reviewedByUserId: uuid('reviewed_by_user_id').references(() => users.id),
+  ...timestamps,
+}, (table) => [index('plan_change_requests_tenant_id_idx').on(table.tenantId), index('plan_change_requests_invoice_id_idx').on(table.invoiceId), index('plan_change_requests_status_idx').on(table.status)])
+
+export const subscriptionEvents = pgTable('subscription_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  eventType: varchar('event_type', { length: 80 }).notNull(),
+  actorUserId: uuid('actor_user_id').references(() => users.id),
+  metadata: jsonb('metadata').default({}).notNull(),
+  ...timestamps,
+}, (table) => [index('subscription_events_tenant_id_idx').on(table.tenantId), index('subscription_events_event_type_idx').on(table.eventType)])
+
+export const platformBillingSettings = pgTable('platform_billing_settings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  supportWhatsapp: varchar('support_whatsapp', { length: 120 }),
+  supportText: text('support_text'),
+  supportUrl: text('support_url'),
+  paymentInstructions: text('payment_instructions'),
+  bankAccounts: jsonb('bank_accounts').default([]).notNull(),
   ...timestamps,
 })
 

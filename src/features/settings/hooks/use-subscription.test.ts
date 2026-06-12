@@ -47,7 +47,7 @@ describe('useSubscription', () => {
     expect(result.current.daysLeft).toBeNull()
   })
 
-  it('returns isEnforced when trial expired', () => {
+  it('returns warning but not enforcement when trial expired', () => {
     useAuthStore.getState().setAuth({ id: 'u1', email: 'a@b.id', name: 'A', passwordHash: '', createdAt: '', updatedAt: '' })
     useAuthStore.getState().setActiveTenant(
       {
@@ -68,7 +68,8 @@ describe('useSubscription', () => {
 
     const { result } = renderHook(() => useSubscription())
     expect(result.current.isExpired).toBe(true)
-    expect(result.current.isEnforced).toBe(true)
+    expect(result.current.isEnforced).toBe(false)
+    expect(result.current.warningKind).toBe('expired')
     expect((result.current.daysLeft ?? 0)).toBeLessThan(0)
   })
 
@@ -93,6 +94,8 @@ describe('useSubscription', () => {
 
     const { result } = renderHook(() => useSubscription())
     expect(result.current.isEnforced).toBe(false)
+    expect(result.current.isExpiringSoon).toBe(true)
+    expect(result.current.warningKind).toBe('expiring')
     expect(result.current.daysLeft).toBeGreaterThanOrEqual(0)
   })
 

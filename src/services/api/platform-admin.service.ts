@@ -1,4 +1,5 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/services/api/client'
+import type { BillingSettings, SubscriptionEvent, SubscriptionInvoice, SubscriptionPayment } from '@/services/api/subscription.service'
 
 export type PlatformTenant = {
   id: string
@@ -107,11 +108,10 @@ export type TenantUpdateInput = {
   storageLimitMb?: number
   maxBranches?: number
   isActive?: boolean
-  subscriptionStatus?: 'trial' | 'active' | 'past_due' | 'suspended' | 'cancelled'
+  subscriptionStatus?: 'trial' | 'active' | 'pending_payment' | 'pending_approval' | 'expired' | 'past_due' | 'suspended' | 'cancelled'
 }
 
 export const platformAdminService = {
-  // Tenants
   async getTenants(): Promise<PlatformTenant[]> {
     const res = await apiGet<ListResponse<PlatformTenant>>('/platform/tenants')
     return res.items
@@ -130,7 +130,6 @@ export const platformAdminService = {
     return apiPost<{ ok: boolean }>(`/platform/tenants/${id}/reactivate`, {})
   },
 
-  // Plans
   async getPlans(includeInactive = false): Promise<PlatformPlan[]> {
     const query = includeInactive ? '?includeInactive=true' : ''
     const res = await apiGet<ListResponse<PlatformPlan>>(`/platform/plans${query}`)
@@ -146,7 +145,6 @@ export const platformAdminService = {
     return apiDelete<{ ok: boolean }>(`/platform/plans/${id}`)
   },
 
-  // Users
   async getUsers(): Promise<PlatformUser[]> {
     const res = await apiGet<ListResponse<PlatformUser>>('/platform/users')
     return res.items
@@ -161,7 +159,6 @@ export const platformAdminService = {
     return apiPatch<ItemResponse<PlatformMembership>>(`/platform/users/${userId}/memberships/${memberId}`, input)
   },
 
-  // Audit
   async getAuditLogs(opts: { limit?: number; offset?: number } = {}): Promise<{ items: PlatformAuditLog[]; total: number }> {
     const params = new URLSearchParams()
     if (opts.limit !== undefined) params.set('limit', String(opts.limit))
@@ -169,5 +166,31 @@ export const platformAdminService = {
     const qs = params.toString()
     const res = await apiGet<AuditResponse>(`/platform/audit${qs ? `?${qs}` : ''}`)
     return { items: res.items, total: res.total }
+  },
+
+  async listBillingPayments(): Promise<SubscriptionPayment[]> {
+    const res = await apiGet<ListResponse<SubscriptionPayment>>('/platform/billing/payments')
+    return res.items
+  },
+  async approveBillingPayment(paymentId: string) {
+    return apiPatch<{ ok: boolean; item: { payment: SubscriptionPayment; tenant: PlatformTenantDetail } }>(`/platform/billing/payments/${paymentId}/approve`, {})
+  },
+  async rejectBillingPayment(paymentId: string, reviewNote: string) {
+    return apiPatch<ItemResponse<SubscriptionPayment>>(`/platform/billing/payments/${paymentId}/reject`, { reviewNote })
+  },
+  async listBillingInvoices(): Promise<SubscriptionInvoice[]> {
+    const res = await apiGet<ListResponse<SubscriptionInvoice>>('/platform/billing/invoices')
+    return res.items
+  },
+  async listBillingEvents(): Promise<SubscriptionEvent[]> {
+    const res = await apiGet<ListResponse<SubscriptionEvent>>('/platform/billing/events')
+    return res.items
+  },
+  async getBillingSettings(): Promise<BillingSettings | null> {
+    const res = await apiGet<{ ok: boolean; item: BillingSettings | null }>('/subscription/billing-settings')
+    return res.item
+  },
+  async updateBillingSettings(input: BillingSettings) {
+    return apiPatch<ItemResponse<BillingSettings>>('/platform/billing/settings', input)
   },
 }

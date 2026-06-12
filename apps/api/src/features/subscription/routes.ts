@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 import { authMiddleware } from '../auth/middleware.js'
 import { writeAuditLog } from '../platform/audit.js'
+import { subscriptionBillingRoutes } from './billing.js'
 import { db } from '../../lib/db.js'
 import {
   subscriptionPlans,
@@ -16,6 +17,7 @@ type Env = { Variables: { userId: string } }
 export const subscriptionRoutes = new Hono<Env>()
 
 subscriptionRoutes.use('*', authMiddleware)
+subscriptionRoutes.route('/', subscriptionBillingRoutes)
 
 subscriptionRoutes.get('/plans', async (c) => {
   const period = c.req.query('period')

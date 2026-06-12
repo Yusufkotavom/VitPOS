@@ -3,10 +3,10 @@ export type PdfDocumentType = 'invoice' | 'service' | 'receipt' | 'payment'
 export type InvoiceThemeName = 'klasik' | 'korporat' | 'modern' | 'eksekutif'
 
 export const invoiceThemeOptions: { value: InvoiceThemeName; label: string; description: string }[] = [
-  { value: 'klasik', label: 'Klasik', description: 'Biru profesional, bersih, dan rapi' },
-  { value: 'korporat', label: 'Korporat', description: 'Navyl gelap dengan aksen emas elegan' },
-  { value: 'modern', label: 'Modern', description: 'Minimalis dengan aksen teal' },
-  { value: 'eksekutif', label: 'Eksekutif', description: 'Burgundy mewah dengan nuansa hangat' },
+  { value: 'klasik', label: 'Klasik', description: 'Blue editorial dengan hero modern dan kartu info bersih' },
+  { value: 'korporat', label: 'Korporat', description: 'Navy premium dengan aksen amber dan nuansa executive' },
+  { value: 'modern', label: 'Modern', description: 'Teal-cyan segar ala SaaS invoice masa kini' },
+  { value: 'eksekutif', label: 'Eksekutif', description: 'Burgundy luxe dengan kontras hangat dan bold' },
 ]
 
 export type PdfCompanySettings = {

@@ -2,84 +2,129 @@ import type { InvoiceThemeName } from './types'
 
 export type InvoiceThemeTokens = {
   id: InvoiceThemeName
+  pageBg: string
+  cardBg: string
+  cardSoftBg: string
   headerBg: string
   headerTextColor: string
+  headerMutedText: string
   headerAccent: string
   titleColor: string
   accentColor: string
+  accentSoft: string
   tableHeaderBg: string
   tableHeaderText: string
   tableBorderColor: string
+  bodyText: string
+  mutedText: string
   badgePaid: string
   badgeUnpaid: string
   badgePartial: string
   footerBorder: string
   sectionBorder: string
+  totalPanelBg: string
+  totalPanelBorder: string
 }
 
 export const invoiceThemes: Record<InvoiceThemeName, InvoiceThemeTokens> = {
   klasik: {
     id: 'klasik',
-    headerBg: '#ffffff',
-    headerTextColor: '#111827',
-    headerAccent: '#1e3a8a',
-    titleColor: '#1e3a8a',
+    pageBg: '#f8fbff',
+    cardBg: '#ffffff',
+    cardSoftBg: '#eef5ff',
+    headerBg: '#1d4ed8',
+    headerTextColor: '#ffffff',
+    headerMutedText: '#dbeafe',
+    headerAccent: '#60a5fa',
+    titleColor: '#ffffff',
     accentColor: '#2563eb',
-    tableHeaderBg: '#eff6ff',
-    tableHeaderText: '#1e40af',
+    accentSoft: '#bfdbfe',
+    tableHeaderBg: '#dbeafe',
+    tableHeaderText: '#1e3a8a',
     tableBorderColor: '#bfdbfe',
+    bodyText: '#1f2937',
+    mutedText: '#64748b',
     badgePaid: '#16a34a',
     badgeUnpaid: '#dc2626',
     badgePartial: '#ca8a04',
-    footerBorder: '#e5e7eb',
-    sectionBorder: '#e5e7eb',
+    footerBorder: '#cbd5e1',
+    sectionBorder: '#dbeafe',
+    totalPanelBg: '#eff6ff',
+    totalPanelBorder: '#93c5fd',
   },
   korporat: {
     id: 'korporat',
+    pageBg: '#f8fafc',
+    cardBg: '#ffffff',
+    cardSoftBg: '#fff7ed',
     headerBg: '#0f172a',
     headerTextColor: '#f8fafc',
-    headerAccent: '#d97706',
-    titleColor: '#d97706',
-    accentColor: '#f59e0b',
-    tableHeaderBg: '#fefce8',
-    tableHeaderText: '#92400e',
-    tableBorderColor: '#fde68a',
-    badgePaid: '#16a34a',
-    badgeUnpaid: '#dc2626',
+    headerMutedText: '#cbd5e1',
+    headerAccent: '#f59e0b',
+    titleColor: '#f8fafc',
+    accentColor: '#d97706',
+    accentSoft: '#fde68a',
+    tableHeaderBg: '#fff7ed',
+    tableHeaderText: '#9a3412',
+    tableBorderColor: '#fed7aa',
+    bodyText: '#1f2937',
+    mutedText: '#64748b',
+    badgePaid: '#15803d',
+    badgeUnpaid: '#b91c1c',
     badgePartial: '#d97706',
     footerBorder: '#cbd5e1',
     sectionBorder: '#e2e8f0',
+    totalPanelBg: '#fff7ed',
+    totalPanelBorder: '#fdba74',
   },
   modern: {
     id: 'modern',
-    headerBg: '#0d9488',
+    pageBg: '#f4fffd',
+    cardBg: '#ffffff',
+    cardSoftBg: '#ecfeff',
+    headerBg: '#0f766e',
     headerTextColor: '#ffffff',
-    headerAccent: '#14b8a6',
+    headerMutedText: '#ccfbf1',
+    headerAccent: '#22d3ee',
     titleColor: '#ffffff',
     accentColor: '#0d9488',
-    tableHeaderBg: '#f0fdfa',
-    tableHeaderText: '#0f766e',
+    accentSoft: '#99f6e4',
+    tableHeaderBg: '#ccfbf1',
+    tableHeaderText: '#115e59',
     tableBorderColor: '#99f6e4',
+    bodyText: '#134e4a',
+    mutedText: '#4b5563',
     badgePaid: '#16a34a',
-    badgeUnpaid: '#dc2626',
+    badgeUnpaid: '#e11d48',
     badgePartial: '#ca8a04',
-    footerBorder: '#ccfbf1',
-    sectionBorder: '#e5e7eb',
+    footerBorder: '#a7f3d0',
+    sectionBorder: '#ccfbf1',
+    totalPanelBg: '#ecfeff',
+    totalPanelBorder: '#67e8f9',
   },
   eksekutif: {
     id: 'eksekutif',
-    headerBg: '#7f1d1d',
-    headerTextColor: '#fef2f2',
-    headerAccent: '#fca5a5',
-    titleColor: '#fca5a5',
-    accentColor: '#b91c1c',
-    tableHeaderBg: '#fef2f2',
-    tableHeaderText: '#991b1b',
-    tableBorderColor: '#fecaca',
-    badgePaid: '#16a34a',
-    badgeUnpaid: '#dc2626',
-    badgePartial: '#b91c1c',
-    footerBorder: '#fecaca',
-    sectionBorder: '#fecaca',
+    pageBg: '#fff8f8',
+    cardBg: '#ffffff',
+    cardSoftBg: '#fff1f2',
+    headerBg: '#881337',
+    headerTextColor: '#fff7f7',
+    headerMutedText: '#fecdd3',
+    headerAccent: '#fb7185',
+    titleColor: '#fff7f7',
+    accentColor: '#be123c',
+    accentSoft: '#fda4af',
+    tableHeaderBg: '#ffe4e6',
+    tableHeaderText: '#9f1239',
+    tableBorderColor: '#fecdd3',
+    bodyText: '#3f1d2e',
+    mutedText: '#6b7280',
+    badgePaid: '#15803d',
+    badgeUnpaid: '#be123c',
+    badgePartial: '#ea580c',
+    footerBorder: '#fecdd3',
+    sectionBorder: '#fecdd3',
+    totalPanelBg: '#fff1f2',
+    totalPanelBorder: '#fda4af',
   },
 }

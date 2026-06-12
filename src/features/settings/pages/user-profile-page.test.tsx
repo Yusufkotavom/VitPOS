@@ -39,6 +39,8 @@ describe('UserProfilePage', () => {
       daysLeft: 120,
       isExpired: false,
       isEnforced: false,
+      isExpiringSoon: false,
+      warningKind: null,
     })
     vi.spyOn(window, 'alert').mockImplementation(() => {})
   })

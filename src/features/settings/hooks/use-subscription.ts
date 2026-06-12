@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 
-export type SubscriptionStatus = 'trial' | 'active' | 'past_due' | 'suspended' | 'cancelled' | 'free' | 'unknown'
+export type SubscriptionStatus = 'trial' | 'active' | 'pending_payment' | 'pending_approval' | 'expired' | 'past_due' | 'suspended' | 'cancelled' | 'free' | 'unknown'
 
 export type SubscriptionState = {
   planCode: string
@@ -13,6 +13,8 @@ export type SubscriptionState = {
   daysLeft: number | null
   isExpired: boolean
   isEnforced: boolean
+  isExpiringSoon: boolean
+  warningKind: 'expiring' | 'expired' | null
 }
 
 const PLAN_DISPLAY_NAMES: Record<string, string> = {
@@ -48,13 +50,11 @@ export function useSubscription(): SubscriptionState {
     const validUntilDate = planValidUntil ? new Date(planValidUntil) : null
     const isExpired = !!validUntilDate && validUntilDate.getTime() < now.getTime()
     const daysLeft = validUntilDate ? daysBetween(now, validUntilDate) : null
+    const isExpiringSoon = daysLeft !== null && daysLeft >= 0 && daysLeft <= 3
+    const warningKind: 'expiring' | 'expired' | null = daysLeft !== null && daysLeft < 0 ? 'expired' : isExpiringSoon ? 'expiring' : null
 
     let isEnforced = false
     if (effectiveStatus === 'suspended' || effectiveStatus === 'cancelled') {
-      isEnforced = true
-    } else if (effectiveStatus === 'past_due') {
-      isEnforced = true
-    } else if (effectiveStatus === 'trial' && isExpired) {
       isEnforced = true
     }
 
@@ -67,6 +67,8 @@ export function useSubscription(): SubscriptionState {
       daysLeft,
       isExpired,
       isEnforced,
+      isExpiringSoon,
+      warningKind,
     }
   }, [activeTenant])
 }

@@ -25,7 +25,7 @@ export type LocalTenant = {
   phone: string
   planCode: string
   billingPeriod?: 'monthly' | 'yearly'
-  subscriptionStatus?: 'trial' | 'active' | 'past_due' | 'suspended' | 'cancelled'
+  subscriptionStatus?: 'trial' | 'active' | 'pending_payment' | 'pending_approval' | 'expired' | 'past_due' | 'suspended' | 'cancelled'
   planValidUntil?: string
   storageLimitMb?: number
   maxBranches?: number

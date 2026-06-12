@@ -1,4 +1,6 @@
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, MessageCircle } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
@@ -10,13 +12,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { subscriptionService } from '@/services/api/subscription.service'
 
 type Props = {
   open: boolean
   status: string
   planName: string
   planValidUntil: string | null
+  warningKind?: 'expiring' | 'expired' | null
+  tenantId?: string | null
 }
 
 function formatDate(iso: string | null) {
@@ -28,44 +32,62 @@ function formatDate(iso: string | null) {
   }
 }
 
-function formatStatusLabel(status: string) {
-  switch (status) {
-    case 'trial': return 'Trial berakhir'
-    case 'past_due': return 'Tagihan tertunggak'
-    case 'suspended': return 'Ditangguhkan'
-    case 'cancelled': return 'Dibatalkan'
-    default: return status
-  }
+function dismissalKey(tenantId?: string | null) {
+  return `subscription-warning-dismissed-${tenantId ?? 'unknown'}-${new Date().toISOString().slice(0, 10)}`
 }
 
-export function SubscriptionExpiredDialog({ open, status, planName, planValidUntil }: Props) {
+function buildWhatsappUrl(value?: string | null) {
+  if (!value) return null
+  if (value.startsWith('http')) return value
+  const cleaned = value.replace(/[^0-9]/g, '')
+  return cleaned ? `https://wa.me/${cleaned}` : null
+}
+
+export function SubscriptionExpiredDialog({ open, planName, planValidUntil, warningKind = 'expired', tenantId }: Props) {
   const navigate = useNavigate()
-  const logout = useAuthStore((s) => s.logout)
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return typeof window !== 'undefined' && window.localStorage.getItem(dismissalKey(tenantId)) === '1'
+    } catch {
+      return false
+    }
+  })
 
-  function goToBilling() {
-    navigate('/settings/billing')
-  }
+  const billingSettingsQuery = useQuery({
+    queryKey: ['billing-settings'],
+    queryFn: () => subscriptionService.getBillingSettings(),
+  })
 
-  function handleLogout() {
-    logout()
-    navigate('/login')
-  }
+  const supportHref = useMemo(() => {
+    const settings = billingSettingsQuery.data
+    return buildWhatsappUrl(settings?.supportWhatsapp) ?? settings?.supportUrl ?? null
+  }, [billingSettingsQuery.data])
+
+  if (!open || dismissed) return null
 
   return (
-    <Dialog open={open} onOpenChange={() => { /* force button interaction */ }}>
-      <DialogContent
-        className="sm:max-w-md"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
-        onInteractOutside={(e) => e.preventDefault()}
-      >
+    <Dialog open={open} onOpenChange={(nextOpen) => {
+      if (!nextOpen) {
+        try {
+          window.localStorage.setItem(dismissalKey(tenantId), '1')
+        } catch {
+          // localStorage may be unavailable in private mode or tests.
+        }
+        setDismissed(true)
+      }
+    }}>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-yellow-100 text-yellow-700">
             <AlertTriangle className="size-6" />
           </div>
-          <DialogTitle className="text-center">Langganan Anda telah berakhir</DialogTitle>
+          <DialogTitle className="text-center">
+            {warningKind === 'expiring' ? 'Paket Anda akan segera berakhir' : 'Paket Anda sudah berakhir'}
+          </DialogTitle>
           <DialogDescription className="text-center">
-            Akses ke fitur operasional diblokir hingga langganan diperpanjang. Data Anda tetap aman.
+            {warningKind === 'expiring'
+              ? 'Silakan perpanjang paket agar layanan tetap aman dipakai tanpa gangguan.'
+              : 'Silakan perpanjang paket Anda. Data tetap aman dan Anda masih bisa membuka aplikasi.'}
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-3 py-3 text-sm">
@@ -74,17 +96,23 @@ export function SubscriptionExpiredDialog({ open, status, planName, planValidUnt
             <p className="font-medium">{planName}</p>
           </div>
           <div className="rounded-lg border p-3">
-            <p className="text-muted-foreground">Status</p>
-            <p className="font-medium">{formatStatusLabel(status)}</p>
-          </div>
-          <div className="col-span-2 rounded-lg border p-3">
             <p className="text-muted-foreground">Berlaku sampai</p>
             <p className="font-medium">{formatDate(planValidUntil)}</p>
           </div>
+          <div className="col-span-2 rounded-lg border p-3">
+            <p className="text-muted-foreground">Cara perpanjang</p>
+            <p className="whitespace-pre-line font-medium">{billingSettingsQuery.data?.paymentInstructions ?? 'Buka halaman billing lalu kirim bukti pembayaran untuk diperiksa admin.'}</p>
+          </div>
         </div>
         <DialogFooter className="sm:justify-stretch sm:gap-2">
-          <Button variant="outline" onClick={handleLogout} className="sm:w-full">Logout</Button>
-          <Button onClick={goToBilling} className="sm:w-full">Kelola Langganan</Button>
+          {supportHref ? (
+            <Button variant="outline" asChild className="sm:w-full">
+              <a href={supportHref} target="_blank" rel="noreferrer">
+                <MessageCircle className="mr-2 size-4" /> Hubungi Support
+              </a>
+            </Button>
+          ) : null}
+          <Button onClick={() => navigate('/settings/billing')} className="sm:w-full">Ke Billing</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
