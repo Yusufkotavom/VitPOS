@@ -4,6 +4,13 @@ Offline-first POS, CRM & Accounting untuk UKM Indonesia. Satu kode React untuk W
 
 ## Arsitektur
 
+## Documentation
+
+- [Documentation Index](docs/README.md)
+- [Architecture Docs](docs/architecture/README.md)
+- [Sync Engine](docs/SYNC_ENGINE.md)
+- [Superpowers Plans and Specs](docs/superpowers/README.md)
+
 ```text
 src/
 ├── app/              # Router, providers, navigation config

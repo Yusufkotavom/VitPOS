@@ -2,6 +2,8 @@
 
 Tanggal: 2026-06-12
 
+Related plan: [Laporan UMKM + Onboarding ATK & Printing Implementation Plan](../plans/2026-06-12-laporan-onboarding-umkm.md)
+
 ## Ringkasan
 
 Fase ini meningkatkan laporan dan onboarding agar terasa siap pakai untuk UMKM Indonesia, bukan sekadar demo. Fokus vertikal awal adalah ATK & printing. Onboarding memakai pendekatan gabungan ringan: pilih jenis usaha, isi data wajib, aktifkan template bisnis realistis, review cepat, lalu masuk dashboard yang sudah relevan.

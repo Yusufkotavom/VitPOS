@@ -1,5 +1,7 @@
 # Android Refresh UX Implementation Plan
 
+Related spec: [Android Refresh UX Design](../specs/2026-06-12-android-refresh-ux-design.md)
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add Android-friendly retry UX: global refresh provider, pull-to-refresh gesture, app error dialog, and real retry action in offline banner.

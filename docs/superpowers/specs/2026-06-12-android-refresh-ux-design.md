@@ -1,5 +1,7 @@
 # Desain: Android Refresh UX untuk Error dan Pull-to-Refresh
 
+Related plan: [Android Refresh UX Implementation Plan](../plans/2026-06-12-android-refresh-ux.md)
+
 Tanggal: 2026-06-12
 
 ## Ringkasan

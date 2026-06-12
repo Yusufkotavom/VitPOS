@@ -1,5 +1,7 @@
 # SaaS Billing, Subscription, and Super Admin Design
 
+Related plan: [SaaS Billing Super Admin Implementation Plan](../plans/2026-06-12-saas-billing-super-admin.md)
+
 Date: 2026-06-12
 Status: Approved for planning
 Scope: Manual-transfer-first SaaS billing foundation with super-admin-controlled paid activation, renewal, and plan changes.

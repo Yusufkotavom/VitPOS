@@ -1,5 +1,7 @@
 # Laporan UMKM + Onboarding ATK & Printing Implementation Plan
 
+Related spec: [Laporan Ringan dan Onboarding Siap Pakai untuk UMKM Indonesia](../specs/2026-06-12-laporan-onboarding-umkm-design.md)
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Mengubah onboarding jadi business-playbook ATK & printing dan merapikan dashboard/laporan agar terasa siap pakai untuk UMKM Indonesia.

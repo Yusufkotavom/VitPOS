@@ -1,5 +1,7 @@
 # SaaS Billing Super Admin Implementation Plan
 
+Related spec: [SaaS Billing, Subscription, and Super Admin Design](../specs/2026-06-12-saas-billing-super-admin-design.md)
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build manual-transfer SaaS billing with invoices, payment proof, super-admin approval, plan changes, expiry warning popup, and configurable support/payment settings.

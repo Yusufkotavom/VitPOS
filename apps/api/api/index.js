@@ -5,7 +5,7 @@ var __export = (target, all) => {
 };
 
 // src/app.ts
-import { Hono as Hono10 } from "hono";
+import { Hono as Hono12 } from "hono";
 import { cors } from "hono/cors";
 
 // src/features/auth/routes.ts
@@ -34,7 +34,11 @@ __export(schema_exports, {
   paymentMethods: () => paymentMethods,
   paymentStatusEnum: () => paymentStatusEnum,
   payments: () => payments,
+  planChangeRequests: () => planChangeRequests,
+  planChangeStatusEnum: () => planChangeStatusEnum,
+  planChangeTypeEnum: () => planChangeTypeEnum,
   platformAuditLogs: () => platformAuditLogs,
+  platformBillingSettings: () => platformBillingSettings,
   productCategories: () => productCategories,
   productTypeEnum: () => productTypeEnum,
   productionBatches: () => productionBatches,
@@ -66,6 +70,13 @@ __export(schema_exports, {
   shiftsRelations: () => shiftsRelations,
   stockMovementTypeEnum: () => stockMovementTypeEnum,
   stockMovements: () => stockMovements,
+  subscriptionEvents: () => subscriptionEvents,
+  subscriptionInvoiceStatusEnum: () => subscriptionInvoiceStatusEnum,
+  subscriptionInvoiceTypeEnum: () => subscriptionInvoiceTypeEnum,
+  subscriptionInvoices: () => subscriptionInvoices,
+  subscriptionPaymentMethodEnum: () => subscriptionPaymentMethodEnum,
+  subscriptionPaymentStatusEnum: () => subscriptionPaymentStatusEnum,
+  subscriptionPayments: () => subscriptionPayments,
   subscriptionPlans: () => subscriptionPlans,
   subscriptionStatusEnum: () => subscriptionStatusEnum,
   suppliers: () => suppliers,
@@ -102,8 +113,14 @@ var timestamps = {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { withTimezone: true })
 };
-var subscriptionStatusEnum = pgEnum("subscription_status", ["trial", "active", "past_due", "suspended", "cancelled"]);
+var subscriptionStatusEnum = pgEnum("subscription_status", ["trial", "active", "pending_payment", "pending_approval", "expired", "past_due", "suspended", "cancelled"]);
 var billingPeriodEnum = pgEnum("billing_period", ["monthly", "yearly"]);
+var subscriptionInvoiceTypeEnum = pgEnum("subscription_invoice_type", ["new_subscription", "renewal", "upgrade", "downgrade", "manual_adjustment"]);
+var subscriptionInvoiceStatusEnum = pgEnum("subscription_invoice_status", ["draft", "pending_payment", "submitted", "paid", "cancelled", "expired"]);
+var subscriptionPaymentMethodEnum = pgEnum("subscription_payment_method", ["manual_transfer"]);
+var subscriptionPaymentStatusEnum = pgEnum("subscription_payment_status", ["submitted", "approved", "rejected"]);
+var planChangeTypeEnum = pgEnum("plan_change_type", ["upgrade", "downgrade", "renewal"]);
+var planChangeStatusEnum = pgEnum("plan_change_status", ["pending_payment", "waiting_approval", "approved", "rejected", "scheduled", "applied", "cancelled"]);
 var tenants = pgTable("tenants", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: varchar("name", { length: 160 }).notNull(),
@@ -155,6 +172,69 @@ var subscriptionPlans = pgTable("subscription_plans", {
   maxUsers: integer("max_users").default(1).notNull(),
   features: jsonb("features").default({}).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
+  ...timestamps
+});
+var subscriptionInvoices = pgTable("subscription_invoices", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  invoiceNumber: varchar("invoice_number", { length: 80 }).notNull().unique(),
+  type: subscriptionInvoiceTypeEnum("type").notNull(),
+  planCode: varchar("plan_code", { length: 40 }).notNull(),
+  billingPeriod: billingPeriodEnum("billing_period").notNull(),
+  amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+  status: subscriptionInvoiceStatusEnum("status").default("draft").notNull(),
+  periodStart: timestamp("period_start", { withTimezone: true }),
+  periodEnd: timestamp("period_end", { withTimezone: true }),
+  dueAt: timestamp("due_at", { withTimezone: true }),
+  notes: text("notes"),
+  ...timestamps
+}, (table) => [index("subscription_invoices_tenant_id_idx").on(table.tenantId), index("subscription_invoices_status_idx").on(table.status), index("subscription_invoices_due_at_idx").on(table.dueAt)]);
+var subscriptionPayments = pgTable("subscription_payments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  invoiceId: uuid("invoice_id").notNull().references(() => subscriptionInvoices.id),
+  amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+  method: subscriptionPaymentMethodEnum("method").default("manual_transfer").notNull(),
+  bankName: varchar("bank_name", { length: 120 }),
+  accountName: varchar("account_name", { length: 160 }),
+  referenceNumber: varchar("reference_number", { length: 120 }),
+  proofImageUrl: text("proof_image_url"),
+  proofText: text("proof_text"),
+  status: subscriptionPaymentStatusEnum("status").default("submitted").notNull(),
+  submittedByUserId: uuid("submitted_by_user_id").references(() => users.id),
+  reviewedByUserId: uuid("reviewed_by_user_id").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  reviewNote: text("review_note"),
+  ...timestamps
+}, (table) => [index("subscription_payments_tenant_id_idx").on(table.tenantId), index("subscription_payments_invoice_id_idx").on(table.invoiceId), index("subscription_payments_status_idx").on(table.status)]);
+var planChangeRequests = pgTable("plan_change_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  fromPlanCode: varchar("from_plan_code", { length: 40 }).notNull(),
+  toPlanCode: varchar("to_plan_code", { length: 40 }).notNull(),
+  changeType: planChangeTypeEnum("change_type").notNull(),
+  status: planChangeStatusEnum("status").default("pending_payment").notNull(),
+  effectiveAt: timestamp("effective_at", { withTimezone: true }),
+  invoiceId: uuid("invoice_id").references(() => subscriptionInvoices.id),
+  requestedByUserId: uuid("requested_by_user_id").references(() => users.id),
+  reviewedByUserId: uuid("reviewed_by_user_id").references(() => users.id),
+  ...timestamps
+}, (table) => [index("plan_change_requests_tenant_id_idx").on(table.tenantId), index("plan_change_requests_invoice_id_idx").on(table.invoiceId), index("plan_change_requests_status_idx").on(table.status)]);
+var subscriptionEvents = pgTable("subscription_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  eventType: varchar("event_type", { length: 80 }).notNull(),
+  actorUserId: uuid("actor_user_id").references(() => users.id),
+  metadata: jsonb("metadata").default({}).notNull(),
+  ...timestamps
+}, (table) => [index("subscription_events_tenant_id_idx").on(table.tenantId), index("subscription_events_event_type_idx").on(table.eventType)]);
+var platformBillingSettings = pgTable("platform_billing_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  supportWhatsapp: varchar("support_whatsapp", { length: 120 }),
+  supportText: text("support_text"),
+  supportUrl: text("support_url"),
+  paymentInstructions: text("payment_instructions"),
+  bankAccounts: jsonb("bank_accounts").default([]).notNull(),
   ...timestamps
 });
 var platformAuditLogs = pgTable("platform_audit_logs", {
@@ -2816,9 +2896,9 @@ syncRoutes.post("/push", async (c) => {
 });
 
 // src/features/platform/routes.ts
-import { count as count2, desc as desc3, eq as eq6, sql as sql2 } from "drizzle-orm";
-import { Hono as Hono5 } from "hono";
-import { z } from "zod";
+import { count as count2, desc as desc4, eq as eq7, sql as sql2 } from "drizzle-orm";
+import { Hono as Hono6 } from "hono";
+import { z as z2 } from "zod";
 
 // src/features/platform/middleware.ts
 import { eq as eq5 } from "drizzle-orm";
@@ -2836,6 +2916,11 @@ async function platformAdminMiddleware(c, next) {
   await next();
 }
 
+// src/features/platform/billing-routes.ts
+import { desc as desc3, eq as eq6 } from "drizzle-orm";
+import { Hono as Hono5 } from "hono";
+import { z } from "zod";
+
 // src/features/platform/audit.ts
 async function writeAuditLog(input) {
   await db.insert(platformAuditLogs).values({
@@ -2848,9 +2933,104 @@ async function writeAuditLog(input) {
   });
 }
 
+// src/features/platform/billing-routes.ts
+var platformBillingRoutes = new Hono5();
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+async function writeSubscriptionEvent(input) {
+  await db.insert(subscriptionEvents).values({
+    tenantId: input.tenantId,
+    actorUserId: input.actorUserId,
+    eventType: input.eventType,
+    metadata: input.metadata ?? {}
+  });
+}
+platformBillingRoutes.get("/billing/payments", async (c) => {
+  const items = await db.select().from(subscriptionPayments).orderBy(desc3(subscriptionPayments.createdAt));
+  return c.json({ ok: true, items });
+});
+platformBillingRoutes.get("/billing/invoices", async (c) => {
+  const items = await db.select().from(subscriptionInvoices).orderBy(desc3(subscriptionInvoices.createdAt));
+  return c.json({ ok: true, items });
+});
+platformBillingRoutes.get("/billing/events", async (c) => {
+  const items = await db.select().from(subscriptionEvents).orderBy(desc3(subscriptionEvents.createdAt));
+  return c.json({ ok: true, items });
+});
+var billingSettingsSchema = z.object({
+  supportWhatsapp: z.string().max(120).nullable().optional(),
+  supportText: z.string().nullable().optional(),
+  supportUrl: z.string().nullable().optional(),
+  paymentInstructions: z.string().nullable().optional(),
+  bankAccounts: z.array(z.object({ bankName: z.string(), accountName: z.string(), accountNumber: z.string() })).default([])
+});
+platformBillingRoutes.patch("/billing/settings", async (c) => {
+  const actorId = c.get("platformAdminId");
+  const body = billingSettingsSchema.parse(await c.req.json());
+  const existing = await db.select().from(platformBillingSettings);
+  const now = /* @__PURE__ */ new Date();
+  const [item] = existing[0] ? await db.update(platformBillingSettings).set({ ...body, updatedAt: now }).where(eq6(platformBillingSettings.id, existing[0].id)).returning() : await db.insert(platformBillingSettings).values(body).returning();
+  await writeAuditLog({ actorId, action: "platform.billing_settings_updated", targetType: "billing_settings", targetId: item.id, payload: body });
+  return c.json({ ok: true, item });
+});
+platformBillingRoutes.patch("/billing/payments/:paymentId/approve", async (c) => {
+  const actorId = c.get("platformAdminId");
+  const paymentId = c.req.param("paymentId");
+  const [payment] = await db.select().from(subscriptionPayments).where(eq6(subscriptionPayments.id, paymentId));
+  if (!payment) return c.json({ ok: false, message: "Payment not found" }, 404);
+  const [invoice] = await db.select().from(subscriptionInvoices).where(eq6(subscriptionInvoices.id, payment.invoiceId));
+  if (!invoice) return c.json({ ok: false, message: "Invoice not found" }, 404);
+  const [plan] = await db.select().from(subscriptionPlans).where(eq6(subscriptionPlans.code, invoice.planCode));
+  if (!plan) return c.json({ ok: false, message: "Plan not found" }, 404);
+  const [tenant] = await db.select().from(tenants).where(eq6(tenants.id, payment.tenantId));
+  if (!tenant) return c.json({ ok: false, message: "Tenant not found" }, 404);
+  const now = /* @__PURE__ */ new Date();
+  const baseDate = tenant.planValidUntil && tenant.planValidUntil > now ? tenant.planValidUntil : now;
+  const validUntil = addDays(baseDate, plan.durationDays);
+  const [updatedPayment] = await db.update(subscriptionPayments).set({ status: "approved", reviewedByUserId: actorId, reviewedAt: now, updatedAt: now }).where(eq6(subscriptionPayments.id, payment.id)).returning();
+  await db.update(subscriptionInvoices).set({ status: "paid", updatedAt: now }).where(eq6(subscriptionInvoices.id, invoice.id)).returning();
+  const [updatedTenant] = await db.update(tenants).set({
+    planCode: plan.code,
+    billingPeriod: invoice.billingPeriod,
+    subscriptionStatus: "active",
+    planValidUntil: validUntil,
+    storageLimitMb: plan.storageLimitMb,
+    maxBranches: plan.maxBranches,
+    isActive: true,
+    updatedAt: now
+  }).where(eq6(tenants.id, payment.tenantId)).returning();
+  await db.update(planChangeRequests).set({ status: "applied", reviewedByUserId: actorId, updatedAt: now }).where(eq6(planChangeRequests.invoiceId, invoice.id)).returning();
+  await writeSubscriptionEvent({ tenantId: payment.tenantId, actorUserId: actorId, eventType: "payment.approved", metadata: { paymentId: payment.id, invoiceId: invoice.id, planCode: plan.code } });
+  await writeAuditLog({ actorId, action: "platform.payment_approved", targetType: "subscription_payment", targetId: payment.id, payload: { invoiceId: invoice.id, tenantId: payment.tenantId } });
+  return c.json({ ok: true, item: { payment: updatedPayment, tenant: updatedTenant } });
+});
+var rejectSchema = z.object({ reviewNote: z.string().min(3) });
+platformBillingRoutes.patch("/billing/payments/:paymentId/reject", async (c) => {
+  const actorId = c.get("platformAdminId");
+  const paymentId = c.req.param("paymentId");
+  const body = rejectSchema.parse(await c.req.json());
+  const now = /* @__PURE__ */ new Date();
+  const [payment] = await db.update(subscriptionPayments).set({
+    status: "rejected",
+    reviewedByUserId: actorId,
+    reviewedAt: now,
+    reviewNote: body.reviewNote,
+    updatedAt: now
+  }).where(eq6(subscriptionPayments.id, paymentId)).returning();
+  if (!payment) return c.json({ ok: false, message: "Payment not found" }, 404);
+  await db.update(subscriptionInvoices).set({ status: "pending_payment", updatedAt: now }).where(eq6(subscriptionInvoices.id, payment.invoiceId)).returning();
+  await writeSubscriptionEvent({ tenantId: payment.tenantId, actorUserId: actorId, eventType: "payment.rejected", metadata: { paymentId, reviewNote: body.reviewNote } });
+  await writeAuditLog({ actorId, action: "platform.payment_rejected", targetType: "subscription_payment", targetId: payment.id, payload: { reviewNote: body.reviewNote } });
+  return c.json({ ok: true, item: payment });
+});
+
 // src/features/platform/routes.ts
-var platformRoutes = new Hono5();
+var platformRoutes = new Hono6();
 platformRoutes.use("*", authMiddleware, platformAdminMiddleware);
+platformRoutes.route("/", platformBillingRoutes);
 platformRoutes.get("/tenants", async (c) => {
   const result = await db.select({
     id: tenants.id,
@@ -2864,12 +3044,12 @@ platformRoutes.get("/tenants", async (c) => {
     storageLimitGb: sql2`${tenants.storageLimitMb} / 1024.0`,
     maxBranches: tenants.maxBranches,
     isActive: tenants.isActive
-  }).from(tenants).leftJoin(tenantMembers, eq6(tenants.id, tenantMembers.tenantId)).leftJoin(users, eq6(tenantMembers.userId, users.id)).where(eq6(tenantMembers.role, "owner"));
+  }).from(tenants).leftJoin(tenantMembers, eq7(tenants.id, tenantMembers.tenantId)).leftJoin(users, eq7(tenantMembers.userId, users.id)).where(eq7(tenantMembers.role, "owner"));
   return c.json({ ok: true, items: result });
 });
 platformRoutes.get("/tenants/:id", async (c) => {
   const id = c.req.param("id");
-  const tenant = await db.select().from(tenants).where(eq6(tenants.id, id)).then((r) => r[0]);
+  const tenant = await db.select().from(tenants).where(eq7(tenants.id, id)).then((r) => r[0]);
   if (!tenant) return c.json({ ok: false, message: "Tenant not found" }, 404);
   const members = await db.select({
     id: tenantMembers.id,
@@ -2878,17 +3058,17 @@ platformRoutes.get("/tenants/:id", async (c) => {
     isActive: tenantMembers.isActive,
     name: users.name,
     email: users.email
-  }).from(tenantMembers).leftJoin(users, eq6(tenantMembers.userId, users.id)).where(eq6(tenantMembers.tenantId, id));
+  }).from(tenantMembers).leftJoin(users, eq7(tenantMembers.userId, users.id)).where(eq7(tenantMembers.tenantId, id));
   return c.json({ ok: true, item: tenant, members });
 });
-var updateTenantSchema = z.object({
-  planCode: z.string().min(1).max(40).optional(),
-  billingPeriod: z.enum(["monthly", "yearly"]).optional(),
-  planValidUntil: z.string().datetime().nullable().optional(),
-  storageLimitMb: z.number().int().min(0).optional(),
-  maxBranches: z.number().int().min(1).optional(),
-  isActive: z.boolean().optional(),
-  subscriptionStatus: z.enum(["trial", "active", "past_due", "suspended", "cancelled"]).optional()
+var updateTenantSchema = z2.object({
+  planCode: z2.string().min(1).max(40).optional(),
+  billingPeriod: z2.enum(["monthly", "yearly"]).optional(),
+  planValidUntil: z2.string().datetime().nullable().optional(),
+  storageLimitMb: z2.number().int().min(0).optional(),
+  maxBranches: z2.number().int().min(1).optional(),
+  isActive: z2.boolean().optional(),
+  subscriptionStatus: z2.enum(["trial", "active", "past_due", "suspended", "cancelled"]).optional()
 });
 platformRoutes.patch("/tenants/:id", async (c) => {
   const id = c.req.param("id");
@@ -2904,7 +3084,7 @@ platformRoutes.patch("/tenants/:id", async (c) => {
   if (body.planValidUntil !== void 0) {
     dbSet.planValidUntil = body.planValidUntil === null ? null : new Date(body.planValidUntil);
   }
-  const updated = await db.update(tenants).set(dbSet).where(eq6(tenants.id, id)).returning();
+  const updated = await db.update(tenants).set(dbSet).where(eq7(tenants.id, id)).returning();
   if (updated.length === 0) return c.json({ ok: false, message: "Tenant not found" }, 404);
   await writeAuditLog({
     actorId,
@@ -2918,36 +3098,36 @@ platformRoutes.patch("/tenants/:id", async (c) => {
 platformRoutes.post("/tenants/:id/suspend", async (c) => {
   const id = c.req.param("id");
   const actorId = c.get("platformAdminId");
-  await db.update(tenants).set({ isActive: false, subscriptionStatus: "suspended", updatedAt: /* @__PURE__ */ new Date() }).where(eq6(tenants.id, id));
+  await db.update(tenants).set({ isActive: false, subscriptionStatus: "suspended", updatedAt: /* @__PURE__ */ new Date() }).where(eq7(tenants.id, id));
   await writeAuditLog({ actorId, action: "tenant.suspended", targetType: "tenant", targetId: id });
   return c.json({ ok: true });
 });
 platformRoutes.post("/tenants/:id/reactivate", async (c) => {
   const id = c.req.param("id");
   const actorId = c.get("platformAdminId");
-  await db.update(tenants).set({ isActive: true, subscriptionStatus: "active", updatedAt: /* @__PURE__ */ new Date() }).where(eq6(tenants.id, id));
+  await db.update(tenants).set({ isActive: true, subscriptionStatus: "active", updatedAt: /* @__PURE__ */ new Date() }).where(eq7(tenants.id, id));
   await writeAuditLog({ actorId, action: "tenant.reactivated", targetType: "tenant", targetId: id });
   return c.json({ ok: true });
 });
 platformRoutes.get("/plans", async (c) => {
   const includeInactive = c.req.query("includeInactive") === "true";
-  const condition = includeInactive ? void 0 : eq6(subscriptionPlans.isActive, true);
+  const condition = includeInactive ? void 0 : eq7(subscriptionPlans.isActive, true);
   const items = await db.select().from(subscriptionPlans).where(condition).orderBy(subscriptionPlans.monthlyPrice);
   return c.json({ ok: true, items });
 });
-var planSchema = z.object({
-  code: z.string().min(1).max(40),
-  name: z.string().min(1).max(120),
-  billingPeriod: z.enum(["monthly", "yearly"]).optional(),
-  durationDays: z.number().int().min(1).optional(),
-  trialDays: z.number().int().min(0).optional(),
-  monthlyPrice: z.number().min(0),
-  yearlyPrice: z.number().min(0).nullable().optional(),
-  storageLimitMb: z.number().int().min(0),
-  maxBranches: z.number().int().min(1),
-  maxUsers: z.number().int().min(1),
-  features: z.record(z.string(), z.unknown()).optional(),
-  isActive: z.boolean().optional()
+var planSchema = z2.object({
+  code: z2.string().min(1).max(40),
+  name: z2.string().min(1).max(120),
+  billingPeriod: z2.enum(["monthly", "yearly"]).optional(),
+  durationDays: z2.number().int().min(1).optional(),
+  trialDays: z2.number().int().min(0).optional(),
+  monthlyPrice: z2.number().min(0),
+  yearlyPrice: z2.number().min(0).nullable().optional(),
+  storageLimitMb: z2.number().int().min(0),
+  maxBranches: z2.number().int().min(1),
+  maxUsers: z2.number().int().min(1),
+  features: z2.record(z2.string(), z2.unknown()).optional(),
+  isActive: z2.boolean().optional()
 });
 platformRoutes.post("/plans", async (c) => {
   const body = planSchema.parse(await c.req.json());
@@ -2996,7 +3176,7 @@ platformRoutes.patch("/plans/:id", async (c) => {
   if (body.maxUsers !== void 0) dbSet.maxUsers = body.maxUsers;
   if (body.features !== void 0) dbSet.features = body.features;
   if (body.isActive !== void 0) dbSet.isActive = body.isActive;
-  const updated = await db.update(subscriptionPlans).set(dbSet).where(eq6(subscriptionPlans.id, id)).returning();
+  const updated = await db.update(subscriptionPlans).set(dbSet).where(eq7(subscriptionPlans.id, id)).returning();
   if (updated.length === 0) return c.json({ ok: false, message: "Plan not found" }, 404);
   await writeAuditLog({
     actorId,
@@ -3010,7 +3190,7 @@ platformRoutes.patch("/plans/:id", async (c) => {
 platformRoutes.delete("/plans/:id", async (c) => {
   const id = c.req.param("id");
   const actorId = c.get("platformAdminId");
-  const updated = await db.update(subscriptionPlans).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq6(subscriptionPlans.id, id)).returning();
+  const updated = await db.update(subscriptionPlans).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(subscriptionPlans.id, id)).returning();
   if (updated.length === 0) return c.json({ ok: false, message: "Plan not found" }, 404);
   await writeAuditLog({ actorId, action: "plan.deleted", targetType: "plan", targetId: id });
   return c.json({ ok: true });
@@ -3023,12 +3203,12 @@ platformRoutes.get("/users", async (c) => {
     role: users.role,
     createdAt: users.createdAt,
     membershipCount: count2(tenantMembers.id)
-  }).from(users).leftJoin(tenantMembers, eq6(users.id, tenantMembers.userId)).groupBy(users.id).orderBy(desc3(users.createdAt));
+  }).from(users).leftJoin(tenantMembers, eq7(users.id, tenantMembers.userId)).groupBy(users.id).orderBy(desc4(users.createdAt));
   return c.json({ ok: true, items });
 });
 platformRoutes.get("/users/:id", async (c) => {
   const id = c.req.param("id");
-  const user = await db.select().from(users).where(eq6(users.id, id)).then((r) => r[0]);
+  const user = await db.select().from(users).where(eq7(users.id, id)).then((r) => r[0]);
   if (!user) return c.json({ ok: false, message: "User not found" }, 404);
   const memberships = await db.select({
     id: tenantMembers.id,
@@ -3036,11 +3216,11 @@ platformRoutes.get("/users/:id", async (c) => {
     role: tenantMembers.role,
     isActive: tenantMembers.isActive,
     tenantName: tenants.name
-  }).from(tenantMembers).leftJoin(tenants, eq6(tenantMembers.tenantId, tenants.id)).where(eq6(tenantMembers.userId, id));
+  }).from(tenantMembers).leftJoin(tenants, eq7(tenantMembers.tenantId, tenants.id)).where(eq7(tenantMembers.userId, id));
   return c.json({ ok: true, item: user, memberships });
 });
-var updateUserSchema = z.object({
-  role: z.enum(["user", "platform_admin"]).optional()
+var updateUserSchema = z2.object({
+  role: z2.enum(["user", "platform_admin"]).optional()
 });
 platformRoutes.patch("/users/:id", async (c) => {
   const id = c.req.param("id");
@@ -3049,7 +3229,7 @@ platformRoutes.patch("/users/:id", async (c) => {
   if (id === actorId && body.role && body.role !== "platform_admin") {
     return c.json({ ok: false, message: "Cannot demote yourself" }, 400);
   }
-  const updated = await db.update(users).set({ ...body, updatedAt: /* @__PURE__ */ new Date() }).where(eq6(users.id, id)).returning();
+  const updated = await db.update(users).set({ ...body, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(users.id, id)).returning();
   if (updated.length === 0) return c.json({ ok: false, message: "User not found" }, 404);
   await writeAuditLog({
     actorId,
@@ -3060,14 +3240,14 @@ platformRoutes.patch("/users/:id", async (c) => {
   });
   return c.json({ ok: true, item: updated[0] });
 });
-var updateMembershipSchema = z.object({
-  role: z.enum(["owner", "admin", "cashier", "staff"])
+var updateMembershipSchema = z2.object({
+  role: z2.enum(["owner", "admin", "cashier", "staff"])
 });
 platformRoutes.patch("/users/:id/memberships/:memberId", async (c) => {
   const memberId = c.req.param("memberId");
   const body = updateMembershipSchema.parse(await c.req.json());
   const actorId = c.get("platformAdminId");
-  const updated = await db.update(tenantMembers).set({ ...body, updatedAt: /* @__PURE__ */ new Date() }).where(eq6(tenantMembers.id, memberId)).returning();
+  const updated = await db.update(tenantMembers).set({ ...body, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(tenantMembers.id, memberId)).returning();
   if (updated.length === 0) return c.json({ ok: false, message: "Membership not found" }, 404);
   await writeAuditLog({
     actorId,
@@ -3090,38 +3270,209 @@ platformRoutes.get("/audit", async (c) => {
     targetId: platformAuditLogs.targetId,
     payload: platformAuditLogs.payload,
     createdAt: platformAuditLogs.createdAt
-  }).from(platformAuditLogs).leftJoin(users, eq6(platformAuditLogs.actorId, users.id)).orderBy(desc3(platformAuditLogs.createdAt)).limit(limit).offset(offset);
+  }).from(platformAuditLogs).leftJoin(users, eq7(platformAuditLogs.actorId, users.id)).orderBy(desc4(platformAuditLogs.createdAt)).limit(limit).offset(offset);
   const total = await db.select({ c: count2() }).from(platformAuditLogs).then((r) => r[0].c);
   return c.json({ ok: true, items, total });
 });
 
 // src/features/subscription/routes.ts
-import { and as and5, eq as eq7 } from "drizzle-orm";
-import { Hono as Hono6 } from "hono";
-import { z as z2 } from "zod";
-var subscriptionRoutes = new Hono6();
+import { and as and6, eq as eq9 } from "drizzle-orm";
+import { Hono as Hono8 } from "hono";
+import { z as z4 } from "zod";
+
+// src/features/subscription/billing.ts
+import { and as and5, desc as desc5, eq as eq8 } from "drizzle-orm";
+import { Hono as Hono7 } from "hono";
+import { z as z3 } from "zod";
+var subscriptionBillingRoutes = new Hono7();
+async function requireTenantOwnerOrAdmin(userId, tenantId) {
+  const rows = await db.select({ role: tenantMembers.role }).from(tenantMembers).where(and5(eq8(tenantMembers.tenantId, tenantId), eq8(tenantMembers.userId, userId), eq8(tenantMembers.isActive, true)));
+  const member = rows[0];
+  if (!member || !["owner", "admin"].includes(member.role)) {
+    return { ok: false, message: "Owner or admin only" };
+  }
+  return { ok: true, role: member.role };
+}
+function addDays2(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+function invoiceNumber() {
+  return `INV-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10).replaceAll("-", "")}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+}
+async function writeSubscriptionEvent2(input) {
+  await db.insert(subscriptionEvents).values({
+    tenantId: input.tenantId,
+    actorUserId: input.actorUserId,
+    eventType: input.eventType,
+    metadata: input.metadata ?? {}
+  });
+}
+subscriptionBillingRoutes.get("/billing-settings", async (c) => {
+  const rows = await db.select().from(platformBillingSettings);
+  return c.json({ ok: true, item: rows[0] ?? null });
+});
+subscriptionBillingRoutes.get("/tenants/:tenantId/invoices", async (c) => {
+  const tenantId = c.req.param("tenantId");
+  const userId = c.get("userId");
+  const auth = await requireTenantOwnerOrAdmin(userId, tenantId);
+  if (!auth.ok) return c.json({ ok: false, message: auth.message }, 403);
+  const items = await db.select().from(subscriptionInvoices).where(eq8(subscriptionInvoices.tenantId, tenantId)).orderBy(desc5(subscriptionInvoices.createdAt));
+  return c.json({ ok: true, items });
+});
+subscriptionBillingRoutes.get("/tenants/:tenantId/events", async (c) => {
+  const tenantId = c.req.param("tenantId");
+  const userId = c.get("userId");
+  const auth = await requireTenantOwnerOrAdmin(userId, tenantId);
+  if (!auth.ok) return c.json({ ok: false, message: auth.message }, 403);
+  const items = await db.select().from(subscriptionEvents).where(eq8(subscriptionEvents.tenantId, tenantId)).orderBy(desc5(subscriptionEvents.createdAt));
+  return c.json({ ok: true, items });
+});
+var createInvoiceSchema = z3.object({
+  type: z3.enum(["new_subscription", "renewal", "upgrade", "downgrade", "manual_adjustment"]).default("renewal"),
+  planCode: z3.string().min(1).max(40),
+  billingPeriod: z3.enum(["monthly", "yearly"]).default("monthly")
+});
+subscriptionBillingRoutes.post("/tenants/:tenantId/invoices", async (c) => {
+  const tenantId = c.req.param("tenantId");
+  const userId = c.get("userId");
+  const body = createInvoiceSchema.parse(await c.req.json());
+  const auth = await requireTenantOwnerOrAdmin(userId, tenantId);
+  if (!auth.ok) return c.json({ ok: false, message: auth.message }, 403);
+  const [plan] = await db.select().from(subscriptionPlans).where(and5(eq8(subscriptionPlans.code, body.planCode), eq8(subscriptionPlans.isActive, true)));
+  if (!plan) return c.json({ ok: false, message: "Plan not found" }, 404);
+  const now = /* @__PURE__ */ new Date();
+  const amount = body.billingPeriod === "yearly" && plan.yearlyPrice ? plan.yearlyPrice : plan.monthlyPrice;
+  const [invoice] = await db.insert(subscriptionInvoices).values({
+    tenantId,
+    invoiceNumber: invoiceNumber(),
+    type: body.type,
+    planCode: plan.code,
+    billingPeriod: body.billingPeriod,
+    amount,
+    status: "pending_payment",
+    periodStart: now,
+    periodEnd: addDays2(now, plan.durationDays),
+    dueAt: addDays2(now, 7)
+  }).returning();
+  await db.update(tenants).set({ subscriptionStatus: "pending_payment", updatedAt: now }).where(eq8(tenants.id, tenantId));
+  await writeSubscriptionEvent2({ tenantId, actorUserId: userId, eventType: "invoice.created", metadata: { invoiceId: invoice.id, planCode: plan.code } });
+  await writeAuditLog({ actorId: userId, action: "subscription.invoice_created", targetType: "subscription", targetId: tenantId, payload: { invoiceId: invoice.id } });
+  return c.json({ ok: true, item: invoice }, 201);
+});
+var submitPaymentSchema = z3.object({
+  invoiceId: z3.string().uuid(),
+  amount: z3.string().min(1),
+  bankName: z3.string().max(120).optional(),
+  accountName: z3.string().max(160).optional(),
+  referenceNumber: z3.string().max(120).optional(),
+  proofImageUrl: z3.string().url().optional(),
+  proofText: z3.string().min(3).optional()
+}).refine((value) => value.proofImageUrl || value.proofText, { message: "Isi catatan bukti bayar atau unggah bukti transfer." });
+subscriptionBillingRoutes.post("/tenants/:tenantId/payments", async (c) => {
+  const tenantId = c.req.param("tenantId");
+  const userId = c.get("userId");
+  const body = submitPaymentSchema.parse(await c.req.json());
+  const auth = await requireTenantOwnerOrAdmin(userId, tenantId);
+  if (!auth.ok) return c.json({ ok: false, message: auth.message }, 403);
+  const [invoice] = await db.select().from(subscriptionInvoices).where(and5(eq8(subscriptionInvoices.id, body.invoiceId), eq8(subscriptionInvoices.tenantId, tenantId)));
+  if (!invoice) return c.json({ ok: false, message: "Invoice not found" }, 404);
+  const now = /* @__PURE__ */ new Date();
+  const [payment] = await db.insert(subscriptionPayments).values({
+    tenantId,
+    invoiceId: body.invoiceId,
+    amount: body.amount,
+    method: "manual_transfer",
+    bankName: body.bankName,
+    accountName: body.accountName,
+    referenceNumber: body.referenceNumber,
+    proofImageUrl: body.proofImageUrl,
+    proofText: body.proofText,
+    status: "submitted",
+    submittedByUserId: userId
+  }).returning();
+  await db.update(subscriptionInvoices).set({ status: "submitted", updatedAt: now }).where(eq8(subscriptionInvoices.id, body.invoiceId));
+  await db.update(tenants).set({ subscriptionStatus: "pending_approval", updatedAt: now }).where(eq8(tenants.id, tenantId));
+  await writeSubscriptionEvent2({ tenantId, actorUserId: userId, eventType: "payment.submitted", metadata: { paymentId: payment.id, invoiceId: invoice.id } });
+  await writeAuditLog({ actorId: userId, action: "subscription.payment_submitted", targetType: "subscription", targetId: tenantId, payload: { paymentId: payment.id, invoiceId: invoice.id } });
+  return c.json({ ok: true, item: payment }, 201);
+});
+var changePlanSchema = z3.object({
+  toPlanCode: z3.string().min(1).max(40),
+  changeType: z3.enum(["upgrade", "downgrade", "renewal"]),
+  billingPeriod: z3.enum(["monthly", "yearly"]).default("monthly")
+});
+subscriptionBillingRoutes.post("/tenants/:tenantId/change-plan", async (c) => {
+  const tenantId = c.req.param("tenantId");
+  const userId = c.get("userId");
+  const body = changePlanSchema.parse(await c.req.json());
+  const auth = await requireTenantOwnerOrAdmin(userId, tenantId);
+  if (!auth.ok) return c.json({ ok: false, message: auth.message }, 403);
+  const [tenant] = await db.select().from(tenants).where(eq8(tenants.id, tenantId));
+  if (!tenant) return c.json({ ok: false, message: "Tenant not found" }, 404);
+  const [plan] = await db.select().from(subscriptionPlans).where(and5(eq8(subscriptionPlans.code, body.toPlanCode), eq8(subscriptionPlans.isActive, true)));
+  if (!plan) return c.json({ ok: false, message: "Plan not found" }, 404);
+  const now = /* @__PURE__ */ new Date();
+  let invoiceId = null;
+  let status = "pending_payment";
+  if (body.changeType === "downgrade") {
+    status = "scheduled";
+  } else {
+    const amount = body.billingPeriod === "yearly" && plan.yearlyPrice ? plan.yearlyPrice : plan.monthlyPrice;
+    const [invoice] = await db.insert(subscriptionInvoices).values({
+      tenantId,
+      invoiceNumber: invoiceNumber(),
+      type: body.changeType,
+      planCode: plan.code,
+      billingPeriod: body.billingPeriod,
+      amount,
+      status: "pending_payment",
+      periodStart: now,
+      periodEnd: addDays2(now, plan.durationDays),
+      dueAt: addDays2(now, 7)
+    }).returning();
+    invoiceId = invoice.id;
+  }
+  const [request] = await db.insert(planChangeRequests).values({
+    tenantId,
+    fromPlanCode: tenant.planCode,
+    toPlanCode: plan.code,
+    changeType: body.changeType,
+    status,
+    effectiveAt: body.changeType === "downgrade" ? tenant.planValidUntil : null,
+    invoiceId,
+    requestedByUserId: userId
+  }).returning();
+  await writeSubscriptionEvent2({ tenantId, actorUserId: userId, eventType: "plan_change.requested", metadata: { requestId: request.id, changeType: body.changeType } });
+  return c.json({ ok: true, item: request }, 201);
+});
+
+// src/features/subscription/routes.ts
+var subscriptionRoutes = new Hono8();
 subscriptionRoutes.use("*", authMiddleware);
+subscriptionRoutes.route("/", subscriptionBillingRoutes);
 subscriptionRoutes.get("/plans", async (c) => {
   const period = c.req.query("period");
-  const conditions = [eq7(subscriptionPlans.isActive, true)];
+  const conditions = [eq9(subscriptionPlans.isActive, true)];
   if (period === "monthly" || period === "yearly") {
-    conditions.push(eq7(subscriptionPlans.billingPeriod, period));
+    conditions.push(eq9(subscriptionPlans.billingPeriod, period));
   }
-  const items = await db.select().from(subscriptionPlans).where(and5(...conditions)).orderBy(subscriptionPlans.monthlyPrice);
+  const items = await db.select().from(subscriptionPlans).where(and6(...conditions)).orderBy(subscriptionPlans.monthlyPrice);
   return c.json({ ok: true, items });
 });
 subscriptionRoutes.get("/plans/:code", async (c) => {
   const code = c.req.param("code");
-  const rows = await db.select().from(subscriptionPlans).where(and5(eq7(subscriptionPlans.code, code), eq7(subscriptionPlans.isActive, true)));
+  const rows = await db.select().from(subscriptionPlans).where(and6(eq9(subscriptionPlans.code, code), eq9(subscriptionPlans.isActive, true)));
   if (rows.length === 0) return c.json({ ok: false, message: "Plan not found" }, 404);
   return c.json({ ok: true, item: rows[0] });
 });
-var subscribeSchema = z2.object({
-  planCode: z2.string().min(1).max(40),
-  billingPeriod: z2.enum(["monthly", "yearly"]).optional()
+var subscribeSchema = z4.object({
+  planCode: z4.string().min(1).max(40),
+  billingPeriod: z4.enum(["monthly", "yearly"]).optional()
 });
-async function requireTenantOwnerOrAdmin(userId, tenantId) {
-  const rows = await db.select({ role: tenantMembers.role }).from(tenantMembers).where(and5(eq7(tenantMembers.tenantId, tenantId), eq7(tenantMembers.userId, userId), eq7(tenantMembers.isActive, true)));
+async function requireTenantOwnerOrAdmin2(userId, tenantId) {
+  const rows = await db.select({ role: tenantMembers.role }).from(tenantMembers).where(and6(eq9(tenantMembers.tenantId, tenantId), eq9(tenantMembers.userId, userId), eq9(tenantMembers.isActive, true)));
   const member = rows[0];
   if (!member || !["owner", "admin"].includes(member.role)) {
     return { ok: false, message: "Owner or admin only" };
@@ -3132,13 +3483,13 @@ subscriptionRoutes.post("/tenants/:tenantId/subscribe", async (c) => {
   const tenantId = c.req.param("tenantId");
   const userId = c.get("userId");
   const body = subscribeSchema.parse(await c.req.json());
-  const planRows = await db.select().from(subscriptionPlans).where(and5(eq7(subscriptionPlans.code, body.planCode), eq7(subscriptionPlans.isActive, true)));
+  const planRows = await db.select().from(subscriptionPlans).where(and6(eq9(subscriptionPlans.code, body.planCode), eq9(subscriptionPlans.isActive, true)));
   const plan = planRows[0];
   if (!plan) return c.json({ ok: false, message: "Plan not found" }, 404);
   const billingPeriod = body.billingPeriod ?? plan.billingPeriod;
-  const tenantRows = await db.select().from(tenants).where(eq7(tenants.id, tenantId));
+  const tenantRows = await db.select().from(tenants).where(eq9(tenants.id, tenantId));
   if (tenantRows.length === 0) return c.json({ ok: false, message: "Tenant not found" }, 404);
-  const auth = await requireTenantOwnerOrAdmin(userId, tenantId);
+  const auth = await requireTenantOwnerOrAdmin2(userId, tenantId);
   if (!auth.ok) return c.json({ ok: false, message: auth.message }, 403);
   const now = /* @__PURE__ */ new Date();
   const trialDays = plan.trialDays ?? 0;
@@ -3161,7 +3512,7 @@ subscriptionRoutes.post("/tenants/:tenantId/subscribe", async (c) => {
     maxBranches: plan.maxBranches,
     isActive: true,
     updatedAt: now
-  }).where(eq7(tenants.id, tenantId)).returning();
+  }).where(eq9(tenants.id, tenantId)).returning();
   await writeAuditLog({
     actorId: userId,
     action: "tenant.subscribed",
@@ -3174,14 +3525,14 @@ subscriptionRoutes.post("/tenants/:tenantId/subscribe", async (c) => {
 subscriptionRoutes.post("/tenants/:tenantId/cancel", async (c) => {
   const tenantId = c.req.param("tenantId");
   const userId = c.get("userId");
-  const tenantRows = await db.select().from(tenants).where(eq7(tenants.id, tenantId));
+  const tenantRows = await db.select().from(tenants).where(eq9(tenants.id, tenantId));
   if (tenantRows.length === 0) return c.json({ ok: false, message: "Tenant not found" }, 404);
-  const auth = await requireTenantOwnerOrAdmin(userId, tenantId);
+  const auth = await requireTenantOwnerOrAdmin2(userId, tenantId);
   if (!auth.ok) return c.json({ ok: false, message: auth.message }, 403);
   const [updated] = await db.update(tenants).set({
     subscriptionStatus: "cancelled",
     updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq7(tenants.id, tenantId)).returning();
+  }).where(eq9(tenants.id, tenantId)).returning();
   await writeAuditLog({
     actorId: userId,
     action: "tenant.cancelled",
@@ -3193,9 +3544,9 @@ subscriptionRoutes.post("/tenants/:tenantId/cancel", async (c) => {
 });
 
 // src/features/tenants/routes.ts
-import { and as and6, eq as eq8 } from "drizzle-orm";
-import { Hono as Hono7 } from "hono";
-var tenantRoutes = new Hono7();
+import { and as and7, eq as eq10 } from "drizzle-orm";
+import { Hono as Hono9 } from "hono";
+var tenantRoutes = new Hono9();
 tenantRoutes.use("*", authMiddleware);
 tenantRoutes.get("/default-branch", async (c) => {
   const tenantId = c.req.query("tenantId");
@@ -3203,10 +3554,10 @@ tenantRoutes.get("/default-branch", async (c) => {
     return c.json({ ok: false, message: "tenantId required" }, 400);
   }
   const branch = await db.query.branches.findFirst({
-    where: and6(
-      eq8(branches.tenantId, tenantId),
-      eq8(branches.isDefault, true),
-      eq8(branches.isActive, true)
+    where: and7(
+      eq10(branches.tenantId, tenantId),
+      eq10(branches.isDefault, true),
+      eq10(branches.isActive, true)
     )
   });
   if (!branch) {
@@ -3277,7 +3628,7 @@ tenantRoutes.post("/", async (c) => {
 });
 
 // src/features/updates/routes.ts
-import { Hono as Hono8 } from "hono";
+import { Hono as Hono10 } from "hono";
 
 // src/features/updates/service.ts
 var GITHUB_RELEASES_API_URL = process.env.GITHUB_RELEASES_API_URL ?? "https://api.github.com/repos/Yusufkotavom/VitPOS/releases/latest";
@@ -3415,7 +3766,7 @@ async function resolveAppUpdate(platform, currentVersion) {
 }
 
 // src/features/updates/routes.ts
-var updateRoutes = new Hono8();
+var updateRoutes = new Hono10();
 updateRoutes.get("/latest", async (c) => {
   const platform = c.req.query("platform");
   const currentVersion = c.req.query("currentVersion");
@@ -3437,7 +3788,7 @@ updateRoutes.get("/desktop/:target/:arch/:currentVersion", async (c) => {
 });
 
 // src/features/upload/routes.ts
-import { Hono as Hono9 } from "hono";
+import { Hono as Hono11 } from "hono";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 var r2Endpoint = process.env.R2_ENDPOINT;
@@ -3450,7 +3801,7 @@ var allowedFolders = ["products", "company", "invoices", "uploads"];
 function toUploadFolder(value) {
   return allowedFolders.includes(value) ? value : "uploads";
 }
-var uploadRoutes = new Hono9();
+var uploadRoutes = new Hono11();
 uploadRoutes.post("/presign", async (c) => {
   try {
     if (!r2Endpoint || !r2AccessKey || !r2SecretKey) {
@@ -3492,7 +3843,7 @@ uploadRoutes.post("/presign", async (c) => {
 
 // src/app.ts
 function createApp() {
-  const app2 = new Hono10();
+  const app2 = new Hono12();
   app2.use("*", cors());
   app2.get("/", (c) => c.json({ message: "VitPOS API is running!" }));
   app2.route("/health", healthRoutes);
