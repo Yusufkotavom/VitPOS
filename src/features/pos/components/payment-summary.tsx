@@ -191,6 +191,7 @@ export function PaymentSummary({ onComplete, shiftId }: { onComplete?: () => voi
           <span className="text-muted-foreground">Diskon Tambahan</span>
           <Input 
             type="number"
+            inputMode="numeric"
             className="w-28 h-8 text-right bg-muted/30"
             value={store.discount || ''}
             onChange={(e) => store.setDiscount(Number(e.target.value) || 0)}

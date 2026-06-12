@@ -1,5 +1,6 @@
 import { Building2, ChevronsUpDown, ChevronRight, Store, ShoppingCart, Coffee, Monitor } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 import { sidebarNavigation } from '@/app/navigation'
 import {
@@ -31,6 +32,7 @@ const ICONS: Record<string, React.ElementType> = {
 }
 
 export function AppSidebar() {
+  const { t } = useTranslation()
   const syncSummary = useSyncStore()
   const settings = useSettings()
   
@@ -54,7 +56,7 @@ export function AppSidebar() {
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">{companyName}</span>
-                <span className="truncate text-xs text-muted-foreground">Business Suite</span>
+                <span className="truncate text-xs text-muted-foreground">{t('shared.sidebar_business_suite')}</span>
               </div>
               <ChevronsUpDown aria-hidden="true" className="ml-auto" />
             </SidebarMenuButton>
@@ -62,7 +64,7 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        {sidebarNavigation.map((group) => (
+        {sidebarNavigation(t).map((group) => (
           <SidebarGroup key={group.group}>
             <SidebarGroupLabel>{group.group}</SidebarGroupLabel>
             <SidebarGroupContent>
@@ -119,7 +121,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton>
               <Store aria-hidden="true" />
-              <span>Cabang Utama</span>
+              <span>{t('shared.sidebar_main_branch')}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Building2, Store, ShoppingCart, Coffee, Monitor } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 import { mobileNavigation } from '@/app/navigation'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
@@ -24,6 +25,7 @@ const ICONS: Record<string, React.ElementType> = {
 }
 
 export function AppLayout() {
+  const { t } = useTranslation()
   const [initialSyncDone, setInitialSyncDone] = useState(
     () => localStorage.getItem('vitpos-initial-sync-done') === 'true',
   )
@@ -65,7 +67,7 @@ export function AppLayout() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold">{companyName}</p>
-                  <p className="text-xs text-muted-foreground">Business Suite</p>
+                  <p className="text-xs text-muted-foreground">{t('shared.sidebar_business_suite')}</p>
                 </div>
               </div>
             </div>
@@ -86,7 +88,7 @@ export function AppLayout() {
 
           {!hideMobileNavigation ? (
             <nav className="fixed inset-x-0 bottom-0 z-20 grid h-16 grid-cols-5 border-t bg-background lg:hidden">
-              {mobileNavigation.map((item) => (
+              {mobileNavigation(t).map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
