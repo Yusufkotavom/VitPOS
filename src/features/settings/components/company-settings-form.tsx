@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { useSettings } from '@/features/settings/hooks/use-settings'
 import { settingRepository } from '@/services/local-db/repository'
+import { fileToDataUrl, uploadImageToR2 } from '@/services/upload.service'
 
 const ICONS = [
   { id: 'Store', component: Store },
@@ -39,6 +40,7 @@ export function CompanySettingsForm() {
   const [saving, setSaving] = useState(false)
   const hydrated = useRef(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null)
 
   useEffect(() => {
     if (hydrated.current || settings.length === 0) return
@@ -61,16 +63,17 @@ export function CompanySettingsForm() {
       toast.error('Ukuran gambar maksimal 5MB')
       return
     }
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string
-      setField('company-logo', dataUrl)
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error('Format gambar harus JPG, PNG, atau WebP')
+      return
     }
-    reader.readAsDataURL(file)
+    setPendingLogoFile(file)
+    void fileToDataUrl(file).then((dataUrl) => setField('company-logo', dataUrl))
   }
 
   function clearImage() {
     setField('company-logo', '')
+    setPendingLogoFile(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -80,14 +83,26 @@ export function CompanySettingsForm() {
     setSaving(true)
     const now = new Date().toISOString()
     try {
+      let companyLogo = values['company-logo']
+      if (pendingLogoFile) {
+        try {
+          companyLogo = await uploadImageToR2(pendingLogoFile, 'company')
+          setField('company-logo', companyLogo)
+          setPendingLogoFile(null)
+        } catch {
+          companyLogo = await fileToDataUrl(pendingLogoFile)
+          toast.warning('Gagal upload ke cloud, logo disimpan lokal. Konfigurasi R2 untuk cloud storage.')
+        }
+      }
       for (const field of fields) {
+        const value = field.id === 'company-logo' ? companyLogo : values[field.id]
         await settingRepository.upsert({
           id: field.id,
           tenantId: resolveTenantId(settings.find((setting) => setting.id === field.id)?.tenantId),
           area: 'Profil Usaha',
           setting: field.label,
-          value: values[field.id],
-          status: values[field.id].trim() ? 'Lengkap' : 'Belum Lengkap',
+          value,
+          status: value.trim() ? 'Lengkap' : 'Belum Lengkap',
           updatedAt: now,
         })
       }
@@ -143,7 +158,7 @@ export function CompanySettingsForm() {
                     )}
                   </div>
                   <div className="flex flex-col items-start gap-2">
-                    <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />
+                    <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />
                     <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                       <Upload className="mr-2 size-4" />
                       Pilih Foto
@@ -155,6 +170,9 @@ export function CompanySettingsForm() {
                     )}
                   </div>
                 </div>
+                {pendingLogoFile && (
+                  <p className="text-xs text-amber-600 font-medium">Logo baru akan diupload ke cloud saat disimpan.</p>
+                )}
               </div>
             )
           }

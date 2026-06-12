@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { useSettings } from '@/features/settings/hooks/use-settings'
 import { settingRepository } from '@/services/local-db/repository'
-import { uploadImageToR2 } from '@/services/upload.service'
+import { fileToDataUrl, uploadImageToR2 } from '@/services/upload.service'
 import { invoiceThemeOptions, type InvoiceThemeName } from '@/shared/components/pdf/types'
 import { invoiceThemes } from '@/shared/components/pdf/invoice-themes'
 
@@ -72,11 +72,7 @@ export function InvoiceSettingsForm() {
       return
     }
     setPendingLogoFile(file)
-    const reader = new FileReader()
-    reader.onload = () => {
-      setLogoUrl(reader.result as string)
-    }
-    reader.readAsDataURL(file)
+    void fileToDataUrl(file).then(setLogoUrl)
   }
 
   function handleRemoveLogo() {
@@ -115,16 +111,11 @@ export function InvoiceSettingsForm() {
 
       if (pendingLogoFile) {
         try {
-          finalLogoUrl = await uploadImageToR2(pendingLogoFile)
+          finalLogoUrl = await uploadImageToR2(pendingLogoFile, 'invoices')
           setPendingLogoFile(null)
           setLogoUrl(finalLogoUrl)
         } catch {
-          const reader = new FileReader()
-          const base64 = await new Promise<string>((resolve) => {
-            reader.onload = () => resolve(reader.result as string)
-            reader.readAsDataURL(pendingLogoFile)
-          })
-          finalLogoUrl = base64
+          finalLogoUrl = await fileToDataUrl(pendingLogoFile)
           toast.warning('Gagal upload ke cloud, logo disimpan lokal. Konfigurasi R2 untuk cloud storage.')
         }
       }

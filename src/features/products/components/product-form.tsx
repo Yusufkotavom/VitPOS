@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect, useRef, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +10,7 @@ import { CurrencyInput } from '@/shared/components/forms/currency-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCategories } from '@/features/products/hooks/use-categories'
 import { productFormSchema, productInitialValues, productStatusOptions, productTypeOptions, type ProductFormValues } from '@/features/products/schemas/product-form-schema'
+import { fileToDataUrl, uploadImageToR2 } from '@/services/upload.service'
 
 import { Image, Upload, Package, Coffee, Shirt, MonitorSmartphone, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 
@@ -42,6 +44,7 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [previewImage, setPreviewImage] = useState<string | null>(defaultValues?.imageUrl || null)
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null)
 
   useEffect(() => {
     // setPreviewImage removed to fix react-hooks/set-state-in-effect. defaultValues is handled in useState init.
@@ -55,17 +58,23 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
   function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Ukuran gambar maksimal 5MB')
+      return
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error('Format gambar harus JPG, PNG, atau WebP')
+      return
+    }
+    setPendingImageFile(file)
+    void fileToDataUrl(file).then((dataUrl) => {
       setPreviewImage(dataUrl)
       form.setValue('imageUrl', dataUrl, { shouldDirty: true })
-    }
-    reader.readAsDataURL(file)
+    })
   }
 
   function clearImage() {
+    setPendingImageFile(null)
     setPreviewImage(null)
     form.setValue('imageUrl', '', { shouldDirty: true })
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -87,8 +96,27 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
     form.setValue('wholesaleTiers', updated, { shouldDirty: true })
   }
 
+  async function handleSubmit(values: ProductFormValues) {
+    if (!pendingImageFile) {
+      await onSubmit(values)
+      return
+    }
+
+    try {
+      const imageUrl = await uploadImageToR2(pendingImageFile, 'products')
+      setPendingImageFile(null)
+      setPreviewImage(imageUrl)
+      form.setValue('imageUrl', imageUrl, { shouldDirty: true })
+      await onSubmit({ ...values, imageUrl })
+    } catch {
+      const imageUrl = await fileToDataUrl(pendingImageFile)
+      toast.warning('Gagal upload ke cloud, gambar produk disimpan lokal. Konfigurasi R2 untuk cloud storage.')
+      await onSubmit({ ...values, imageUrl })
+    }
+  }
+
   return (
-    <form className="flex flex-col gap-3" onSubmit={form.handleSubmit(onSubmit)}>
+    <form className="flex flex-col gap-3" onSubmit={form.handleSubmit(handleSubmit)}>
       <div className="space-y-2">
         <label className="text-sm font-medium">{t('products.image_label')}</label>
         <div className="flex gap-4 items-center">
@@ -102,7 +130,7 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
             </div>
           )}
           <div className="flex flex-col gap-2">
-            <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />
+            <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />
             <div className="flex gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                   <Upload className="size-4 mr-2" /> {t('common.upload')}

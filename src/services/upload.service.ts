@@ -7,10 +7,13 @@ type PresignResponse = {
   message?: string
 }
 
-export async function uploadImageToR2(file: File): Promise<string> {
+type UploadFolder = 'products' | 'company' | 'invoices' | 'uploads'
+
+export async function uploadImageToR2(file: File, folder: UploadFolder = 'uploads'): Promise<string> {
   const res = await apiPost<PresignResponse>('/upload/presign', {
     filename: file.name,
     contentType: file.type,
+    folder,
   })
 
   if (!res.ok || !res.presignedUrl) {
@@ -28,6 +31,15 @@ export async function uploadImageToR2(file: File): Promise<string> {
   }
 
   return res.publicUrl
+}
+
+export function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = () => reject(new Error('Gagal membaca file'))
+    reader.readAsDataURL(file)
+  })
 }
 
 export function isR2Configured(): boolean {

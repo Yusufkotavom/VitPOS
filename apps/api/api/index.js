@@ -3446,6 +3446,10 @@ var r2SecretKey = process.env.R2_SECRET_ACCESS_KEY;
 var bucketName = process.env.R2_BUCKET_NAME ?? "vitpos-uploads";
 var publicUrlBase = process.env.R2_PUBLIC_URL ?? "";
 var allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+var allowedFolders = ["products", "company", "invoices", "uploads"];
+function toUploadFolder(value) {
+  return allowedFolders.includes(value) ? value : "uploads";
+}
 var uploadRoutes = new Hono9();
 uploadRoutes.post("/presign", async (c) => {
   try {
@@ -3455,6 +3459,7 @@ uploadRoutes.post("/presign", async (c) => {
     const body = await c.req.json();
     const filename = (body.filename ?? "").trim();
     const contentType = (body.contentType ?? "").trim();
+    const folder = toUploadFolder(body.folder);
     if (!filename || !contentType) {
       return c.json({ ok: false, message: "filename dan contentType wajib diisi." }, 400);
     }
@@ -3470,7 +3475,7 @@ uploadRoutes.post("/presign", async (c) => {
       }
     });
     const safeName = filename.replace(/[^a-zA-Z0-9.-]/g, "_");
-    const r2Key = `logos/${crypto.randomUUID()}-${safeName}`;
+    const r2Key = `${folder}/${crypto.randomUUID()}-${safeName}`;
     const command = new PutObjectCommand({
       Bucket: bucketName,
       Key: r2Key,

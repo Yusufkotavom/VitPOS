@@ -9,6 +9,13 @@ const bucketName = process.env.R2_BUCKET_NAME ?? 'vitpos-uploads'
 const publicUrlBase = process.env.R2_PUBLIC_URL ?? ''
 
 const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
+const allowedFolders = ['products', 'company', 'invoices', 'uploads'] as const
+
+type UploadFolder = typeof allowedFolders[number]
+
+function toUploadFolder(value: unknown): UploadFolder {
+  return allowedFolders.includes(value as UploadFolder) ? value as UploadFolder : 'uploads'
+}
 
 export const uploadRoutes = new Hono()
 
@@ -21,6 +28,7 @@ uploadRoutes.post('/presign', async (c) => {
     const body = await c.req.json()
     const filename = (body.filename as string ?? '').trim()
     const contentType = (body.contentType as string ?? '').trim()
+    const folder = toUploadFolder(body.folder)
 
     if (!filename || !contentType) {
       return c.json({ ok: false, message: 'filename dan contentType wajib diisi.' }, 400)
@@ -40,7 +48,7 @@ uploadRoutes.post('/presign', async (c) => {
     })
 
     const safeName = filename.replace(/[^a-zA-Z0-9.-]/g, '_')
-    const r2Key = `logos/${crypto.randomUUID()}-${safeName}`
+    const r2Key = `${folder}/${crypto.randomUUID()}-${safeName}`
 
     const command = new PutObjectCommand({
       Bucket: bucketName,
