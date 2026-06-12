@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Printer, MessageSquare, Download, PencilIcon, XIcon, CheckIcon, Trash2Icon, CreditCard, ShieldCheck, ShieldX, PlusIcon, Search } from 'lucide-react'
 import { useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '@/shared/hooks/use-live-query'
 import { usePdf } from '@/shared/components/pdf/use-pdf'
 import type { PdfData } from '@/shared/components/pdf/types'
 import { toast } from 'sonner'

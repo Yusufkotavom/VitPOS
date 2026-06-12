@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Plus, Minus, Trash2, Search, PlusCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '@/shared/hooks/use-live-query'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 

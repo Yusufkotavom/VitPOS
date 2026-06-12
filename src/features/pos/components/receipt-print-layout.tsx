@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '@/shared/hooks/use-live-query'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { formatCurrency } from '@/lib/format-currency'
 import { localDb } from '@/services/local-db/client'
@@ -57,7 +57,7 @@ export function ReceiptPrintLayout({ order }: { order: PosOrderSummary | null })
           <h1 className="font-bold text-sm uppercase">{companyName}</h1>
           {companyAddress && <p className="text-[10px] whitespace-pre-wrap">{companyAddress}</p>}
           {companyPhone && <p className="text-[10px]">Telp: {companyPhone}</p>}
-          {receiptHeader && <p className="text-[10px] italic border-t border-dashed mt-1 pt-1">{receiptHeader}</p>}
+          {receiptHeader && <p className="text-[10px] italic border-t border-dashed mt-1 pt-1 whitespace-pre-wrap">{receiptHeader}</p>}
         </div>
 
         <div className="border-b border-dashed border-black pb-2 mb-2">

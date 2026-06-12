@@ -1,6 +1,10 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useQuery } from '@tanstack/react-query'
 import { shiftRepository } from '@/services/local-db/repository'
 
 export function useShifts() {
-  return useLiveQuery(() => shiftRepository.list(), [], [])
+  const { data = [] } = useQuery({
+    queryKey: ['shifts'],
+    queryFn: () => shiftRepository.list(),
+  })
+  return data
 }

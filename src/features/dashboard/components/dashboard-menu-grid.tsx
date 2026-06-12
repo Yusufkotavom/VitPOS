@@ -19,7 +19,7 @@ export function DashboardMenuGrid() {
       {sidebarNavigation.map((group) => {
         // Gabungkan item utama dan anak-anaknya ke dalam 1 baris
         const flatItems = group.items.reduce((acc, item) => {
-          if (item.to !== '/') acc.push(item)
+          if (item.to !== '/' && !item.items?.some((child) => child.to === item.to)) acc.push(item)
           if (item.items) acc.push(...item.items)
           return acc
         }, [] as NavigationItem[])

@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '@/shared/hooks/use-live-query'
 
 import { localDb } from '@/services/local-db/client'
 

@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { localDb } from '@/services/local-db/client'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '@/shared/hooks/use-live-query'
 import { formatCurrency } from '@/lib/format-currency'
 import { usePosStore } from '@/features/pos/stores/pos-store'
 import { toast } from 'sonner'

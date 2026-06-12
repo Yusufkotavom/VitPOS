@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { parseDigits } from '@/features/catalog/lib/formatters'
+import { toDateInput } from '@/lib/date'
 import type { LocalServiceOrder } from '@/services/local-db/schema'
 
 export const serviceOrderStatusOptions = ['Diterima', 'Dikerjakan', 'Selesai', 'Diambil', 'Batal'] as const
@@ -48,7 +49,7 @@ export function mapServiceOrderRecordToFormValues(order: LocalServiceOrder): Ser
     code: order.code,
     customerName: order.customerName,
     description: order.description,
-    date: order.date,
+    date: toDateInput(order.date),
     cost: String(order.cost),
     status: order.status,
   }

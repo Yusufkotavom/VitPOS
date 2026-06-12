@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { parseDigits } from '@/features/catalog/lib/formatters'
+import { toDateInput } from '@/lib/date'
 import type { LocalPurchase, LocalPurchaseItem } from '@/services/local-db/schema'
 
 export const purchaseStatusOptions = ['Draft', 'Dikirim', 'Diterima', 'Batal'] as const
@@ -70,7 +71,7 @@ export function mapPurchaseRecordToFormValues(purchase: LocalPurchase): Purchase
   return {
     code: purchase.code,
     supplierName: purchase.supplierName,
-    date: purchase.date,
+    date: toDateInput(purchase.date),
     status: purchase.status,
     items: purchase.items.length > 0
       ? purchase.items.map((item) => ({ name: item.name, qty: String(item.qty), unitPrice: String(item.unitPrice) }))

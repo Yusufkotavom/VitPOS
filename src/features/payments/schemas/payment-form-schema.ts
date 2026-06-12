@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { parseDigits } from '@/features/catalog/lib/formatters'
+import { toDateInput } from '@/lib/date'
 import type { LocalPayment } from '@/services/local-db/schema'
 
 export const paymentMethodOptions = ['tunai', 'qris', 'kartu', 'transfer', 'e-wallet', 'piutang'] as const
@@ -61,7 +62,7 @@ export function mapPaymentRecordToFormValues(payment: LocalPayment): PaymentForm
     source: payment.source,
     method: payment.method as PaymentFormValues['method'],
     amount: String(payment.amount),
-    date: payment.date,
+    date: toDateInput(payment.date),
     status: payment.status,
   }
 }

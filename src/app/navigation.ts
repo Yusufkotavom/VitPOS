@@ -65,6 +65,7 @@ export const sidebarNavigation: SidebarNavigationGroup[] = [
         label: appLabels.products,
         icon: Package,
         items: [
+          { to: '/products', label: 'Daftar Produk', icon: Package },
           { to: '/products/categories', label: 'Kategori Produk', icon: Package },
           { to: '/products/recipes', label: 'Resep / BOM', icon: Package },
         ],

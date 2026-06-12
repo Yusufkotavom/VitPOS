@@ -25,10 +25,25 @@ async fn export_to_file(filename: String, content: String) -> Result<String, Str
     Err(format!("Export not yet implemented. File: {}, Size: {}", filename, content.len()))
 }
 
+#[tauri::command]
+async fn open_file_native(path: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        let win_path = path.replace("/", "\\");
+        std::process::Command::new("explorer")
+            .arg(&win_path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .plugin(
             tauri_plugin_sql::Builder::new()
                 .add_migrations(
@@ -53,7 +68,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             sqlite_health,
             print_receipt,
-            export_to_file
+            export_to_file,
+            open_file_native
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

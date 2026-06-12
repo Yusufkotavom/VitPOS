@@ -130,6 +130,9 @@ export function ProductCrudActions({ product }: { product?: LocalProduct }) {
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{isEdit ? 'Ubah produk' : 'Tambah produk'}</DialogTitle>
+            <DialogDescription className="sr-only">
+              Isi formulir di bawah ini untuk mengelola detail produk.
+            </DialogDescription>
           </DialogHeader>
           <ProductForm key={product?.id ?? 'new'} defaultValues={defaultValues} submitLabel={isEdit ? 'Simpan perubahan' : 'Simpan produk'} onCancel={handleFormClose} onSubmit={handleSubmit} />
         </DialogContent>

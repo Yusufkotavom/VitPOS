@@ -262,17 +262,7 @@ class TauriSqlAdapterImpl implements LocalDbAdapter {
 
   async runInTransaction<T>(_mode: StorageTransactionMode, _tableNames: string[], scope: () => Promise<T>): Promise<T> {
     if (!this.db) throw new Error('Database not initialized')
-    try {
-      await this.db.execute('BEGIN TRANSACTION')
-      const result = await scope()
-      await this.db.execute('COMMIT')
-      return result
-    } catch (error) {
-      if (this.db) {
-        await this.db.execute('ROLLBACK')
-      }
-      throw error
-    }
+    return await scope()
   }
 }
 

@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { parseDigits } from '@/features/catalog/lib/formatters'
+import { toDateInput } from '@/lib/date'
 import type { LocalSalesOrder, LocalSalesOrderItem } from '@/services/local-db/schema'
 
 export const salesOrderStatusOptions = ['Draft', 'Lunas', 'Sebagian', 'Belum Bayar', 'Batal'] as const
@@ -87,7 +88,7 @@ export function mapSalesOrderRecordToFormValues(order: LocalSalesOrder): SalesOr
   return {
     code: order.code,
     customerName: order.customerName,
-    date: order.date,
+    date: toDateInput(order.date),
     discountTotal: String(order.discountTotal),
     taxTotal: String(order.taxTotal),
     status: order.status,

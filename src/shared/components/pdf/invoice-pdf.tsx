@@ -136,7 +136,7 @@ export function InvoicePDF({ data, settings }: { data: PdfInvoiceData; settings:
                 <Text>{fmt(remaining)}</Text>
               </View>
             )}
-            {data.summary.change && data.summary.change > 0 && (
+            {data.summary.change != null && data.summary.change > 0 && (
               <View style={baseStyles.totalsRow}>
                 <Text>Kembali</Text>
                 <Text>{fmt(data.summary.change)}</Text>

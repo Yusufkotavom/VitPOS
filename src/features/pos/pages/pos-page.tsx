@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { shiftRepository } from '@/services/local-db/repository'
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
+import { useQueryClient } from '@tanstack/react-query'
 
 export function PosPage() {
   const syncSummary = useSyncStore()
@@ -30,6 +31,7 @@ export function PosPage() {
   const hasItems = totals.itemCount > 0
   const activeShift = useActiveShift()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
   const [isDrafting, setIsDraftingState] = useState(false)
   const isDraftingRef = useRef(false)
@@ -51,6 +53,7 @@ export function PosPage() {
       })
       toast.success('Shift berhasil dibuka')
       setStartCash('')
+      await queryClient.invalidateQueries({ queryKey: ['active-shift'] })
     } catch (error) {
       toast.error(`Gagal buka shift: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
     }

@@ -84,7 +84,7 @@ export function AppSidebar() {
                               {item.items.map((child) => (
                                 <SidebarMenuSubItem key={child.to}>
                                   <SidebarMenuSubButton asChild>
-                                    <NavLink to={child.to} end={child.to === '/settings'}>
+                                    <NavLink to={child.to} end={['/settings', '/products', '/cash', '/reports'].includes(child.to)}>
                                       <child.icon aria-hidden="true" />
                                       <span>{child.label}</span>
                                     </NavLink>

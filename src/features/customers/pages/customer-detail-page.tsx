@@ -2,7 +2,7 @@ import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, PencilIcon, XIcon, CheckIcon, Trash2Icon } from 'lucide-react'
 import { useState, useMemo } from 'react'
 import { toast } from 'sonner'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '@/shared/hooks/use-live-query'
 
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'

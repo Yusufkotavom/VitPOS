@@ -1815,7 +1815,7 @@ async function applySetting(db2, ctx, entityId, mutationType, payload) {
     return;
   }
   const now = /* @__PURE__ */ new Date();
-  const settingKey = payload.key ?? payload.setting ?? entityId;
+  const settingKey = payload.key ?? payload.id ?? payload.setting ?? entityId;
   const area = payload.area ?? "general";
   const existing = await db2.query.settings.findFirst({
     where: and3(eq3(settings.tenantId, ctx.tenantId), eq3(settings.key, settingKey))
@@ -2235,6 +2235,18 @@ async function applyMutation(db2, ctx, entityType, entityId, mutationType, paylo
 }
 
 // src/features/sync/routes.ts
+var LEGACY_COMPANY_SETTING_KEYS = {
+  "Ikon Usaha": "company-icon",
+  "Logo Perusahaan": "company-logo",
+  "Nama Usaha": "company-name",
+  "Nomor Telepon": "company-phone",
+  "Alamat Usaha": "company-address",
+  "NPWP / NIB": "company-tax-number"
+};
+function normalizeSettingKey(key, area) {
+  if (area === "Profil Usaha") return LEGACY_COMPANY_SETTING_KEYS[key] ?? key;
+  return key;
+}
 var syncRoutes = new Hono4();
 syncRoutes.use("*", authMiddleware);
 syncRoutes.get("/pull", async (c) => {
@@ -2541,8 +2553,9 @@ syncRoutes.get("/pull", async (c) => {
       entityType: "setting",
       mutationType: "update",
       payload: {
-        id: row.key,
-        key: row.key,
+        id: normalizeSettingKey(row.key, row.area),
+        key: normalizeSettingKey(row.key, row.area),
+        setting: row.key,
         area: row.area,
         value: row.value,
         status: row.status

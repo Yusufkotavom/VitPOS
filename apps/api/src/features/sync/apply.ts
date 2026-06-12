@@ -35,6 +35,20 @@ type ApplyContext = {
   branchId?: string | null
 }
 
+const LEGACY_COMPANY_SETTING_KEYS: Record<string, string> = {
+  'Ikon Usaha': 'company-icon',
+  'Logo Perusahaan': 'company-logo',
+  'Nama Usaha': 'company-name',
+  'Nomor Telepon': 'company-phone',
+  'Alamat Usaha': 'company-address',
+  'NPWP / NIB': 'company-tax-number',
+}
+
+function normalizeSettingKey(key: string, area: string) {
+  if (area === 'Profil Usaha') return LEGACY_COMPANY_SETTING_KEYS[key] ?? key
+  return key
+}
+
 type ProductPayload = {
   name?: string
   category?: string
@@ -739,8 +753,9 @@ async function applySetting(db: AppDb, ctx: ApplyContext, entityId: string, muta
   }
 
   const now = new Date()
-  const settingKey = payload.key ?? payload.id ?? payload.setting ?? entityId
+  const rawKey = payload.key ?? payload.id ?? payload.setting ?? entityId
   const area = payload.area ?? 'general'
+  const settingKey = normalizeSettingKey(rawKey, area)
 
   const existing = await db.query.settings.findFirst({
     where: and(eq(settings.tenantId, ctx.tenantId), eq(settings.key, settingKey)),

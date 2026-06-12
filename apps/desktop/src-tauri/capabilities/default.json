@@ -4,9 +4,31 @@
   "description": "Desktop capability for shell, SQL, updater, and process access",
   "windows": ["main"],
   "permissions": [
-    "shell:allow-open",
+    {
+      "identifier": "shell:allow-open",
+      "allow": [
+        {
+          "args": ".*"
+        }
+      ]
+    },
     "sql:default",
+    "sql:allow-execute",
+    "sql:allow-select",
+    "sql:allow-load",
+    "sql:allow-close",
     "updater:default",
-    "process:default"
+    "process:default",
+    "dialog:default",
+    "dialog:allow-save",
+    "dialog:allow-message",
+    "fs:default",
+    "fs:allow-write-text-file",
+    "fs:allow-write-file",
+    "fs:allow-exists",
+    "fs:allow-mkdir",
+    "fs:scope-appdata-recursive",
+    "core:path:allow-resolve-directory",
+    "core:path:allow-join"
   ]
 }

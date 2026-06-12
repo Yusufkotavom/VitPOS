@@ -1,6 +1,7 @@
 import { Printer, MessageCircle, Plus, FileText } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { formatCurrency } from '@/lib/format-currency'
 import { type PosOrderSummary } from '@/features/pos/types/pos-order.types'
 import { Link } from 'react-router-dom'
@@ -11,6 +12,7 @@ export type PosSuccessDialogProps = {
   order: PosOrderSummary | null
   detailRoute?: string
   onPrint: () => void
+  onPrintSalesOrder?: () => void
   onWhatsApp: () => void
   onNewSale: () => void
 }
@@ -21,6 +23,7 @@ export function PosSuccessDialog({
   order,
   detailRoute,
   onPrint,
+  onPrintSalesOrder,
   onWhatsApp,
   onNewSale,
 }: PosSuccessDialogProps) {
@@ -64,12 +67,28 @@ export function PosSuccessDialog({
 
         <DialogFooter className="flex-col gap-2 sm:flex-col sm:justify-start">
           <div className="grid grid-cols-2 gap-2 w-full">
-            <Button variant="outline" onClick={onPrint} className="w-full">
-              <Printer data-icon="inline-start" />
-              Cetak Struk
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="w-full">
+                  <Printer data-icon="inline-start" className="mr-2 h-4 w-4" />
+                  Cetak
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48">
+                <DropdownMenuItem onClick={onPrint}>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Struk (Thermal)
+                </DropdownMenuItem>
+                {onPrintSalesOrder && (
+                  <DropdownMenuItem onClick={onPrintSalesOrder}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Sales Order (A4)
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button variant="outline" onClick={onWhatsApp} className="w-full text-emerald-600 hover:text-emerald-700">
-              <MessageCircle data-icon="inline-start" />
+              <MessageCircle data-icon="inline-start" className="mr-2 h-4 w-4" />
               WhatsApp
             </Button>
           </div>

@@ -1,3 +1,4 @@
+import { toDateInput } from '@/lib/date'
 import { localDb } from '@/services/local-db/client'
 import { DEMO_TENANT_ID } from '@/services/local-db/seeds'
 import { baimRuntime } from '@/lib/baim-runtime'
@@ -188,7 +189,7 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
       code: typeof payload.orderNumber === 'string' ? payload.orderNumber : typeof payload.code === 'string' ? payload.code : '',
       customerId: typeof payload.customerId === 'string' ? payload.customerId : existing?.customerId,
       customerName: typeof payload.customerName === 'string' ? payload.customerName : existing?.customerName ?? 'Umum',
-      date: typeof payload.date === 'string' ? payload.date : existing?.date ?? '',
+      date: typeof payload.date === 'string' ? toDateInput(payload.date) : existing?.date ?? '',
       subtotal: Number(payload.subtotal ?? 0),
       discountTotal: Number(payload.discountTotal ?? 0),
       taxTotal: Number(payload.taxTotal ?? 0),
@@ -238,7 +239,7 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
       source: typeof payload.source === 'string' ? payload.source : existingPayment?.source ?? 'cloud',
       method: normalizePaymentMethod(payload.method),
       amount: Number(payload.amount ?? 0),
-      date: typeof payload.date === 'string' ? payload.date : existingPayment?.date ?? '',
+      date: typeof payload.date === 'string' ? toDateInput(payload.date) : existingPayment?.date ?? '',
       status: SERVER_TO_LOCAL_PAYMENT_STATUS[rawStatus] ?? existingPayment?.status ?? 'Pending',
       syncStatus: 'synced',
       version: typeof payload.version === 'number' ? payload.version : 1,
@@ -295,7 +296,7 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
       id: item.entityId,
       tenantId,
       ref: typeof payload.ref === 'string' ? payload.ref : '',
-      date: typeof payload.date === 'string' ? payload.date : '',
+      date: typeof payload.date === 'string' ? toDateInput(payload.date) : '',
       account: typeof payload.account === 'string' ? payload.account : '',
       category: typeof payload.category === 'string' ? payload.category : '',
       income: Number(payload.income ?? 0),
@@ -371,7 +372,7 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
       code: typeof payload.code === 'string' ? payload.code : '',
       supplierId: typeof payload.supplierId === 'string' ? payload.supplierId : undefined,
       supplierName: typeof payload.supplierName === 'string' ? payload.supplierName : '',
-      date: typeof payload.date === 'string' ? payload.date : '',
+      date: typeof payload.date === 'string' ? toDateInput(payload.date) : '',
       subtotal: Number(payload.subtotal ?? 0),
       grandTotal: Number(payload.grandTotal ?? 0),
       paidTotal: Number(payload.paidTotal ?? 0),
@@ -393,7 +394,7 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
       code: typeof payload.code === 'string' ? payload.code : '',
       type: (typeof payload.type === 'string' ? payload.type : 'Penjualan') as LocalReturn['type'],
       referenceCode: typeof payload.referenceCode === 'string' ? payload.referenceCode : '',
-      date: typeof payload.date === 'string' ? payload.date : '',
+      date: typeof payload.date === 'string' ? toDateInput(payload.date) : '',
       total: Number(payload.total ?? 0),
       status: (typeof payload.status === 'string' ? payload.status : 'Draft') as LocalReturn['status'],
       items: Array.isArray(payload.items) ? payload.items : [],
@@ -416,7 +417,7 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
         customerId: typeof payload.customerId === 'string' ? payload.customerId : existingSo?.customerId,
         customerName: typeof payload.customerName === 'string' ? payload.customerName : existingSo?.customerName ?? 'Umum',
         description: typeof payload.description === 'string' ? payload.description : existingSo?.description ?? '',
-        date: typeof payload.date === 'string' ? payload.date : existingSo?.date ?? '',
+        date: typeof payload.date === 'string' ? toDateInput(payload.date) : existingSo?.date ?? '',
         cost: Number(payload.cost ?? existingSo?.cost ?? 0),
         paidTotal: Number(payload.paidTotal ?? existingSo?.paidTotal ?? 0),
         status: SERVER_TO_LOCAL_SERVICE_STATUS[rawStatus] ?? existingSo?.status ?? 'Diterima',
@@ -485,7 +486,7 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
         productId: typeof payload.productId === 'string' ? payload.productId : existingPb?.productId ?? '',
         productName: typeof payload.productName === 'string' ? payload.productName : existingPb?.productName ?? '',
         batchQty: Number(payload.batchQty ?? existingPb?.batchQty ?? 1),
-        date: typeof payload.date === 'string' ? payload.date : existingPb?.date ?? new Date().toISOString().slice(0, 10),
+        date: typeof payload.date === 'string' ? toDateInput(payload.date) : existingPb?.date ?? new Date().toISOString().slice(0, 10),
         syncStatus: 'synced',
         version: typeof payload.version === 'number' ? payload.version : 1,
         updatedAt: item.updatedAt,
@@ -497,6 +498,8 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
 export async function applyPullItems(items: SyncPullItem[], tenantId: string) {
   const issues: string[] = []
 
+  const sortedItems = [...items].sort((a, b) => (a.updatedAt > b.updatedAt ? 1 : -1))
+
   await localDb.transaction(
     'rw',
     [
@@ -507,7 +510,7 @@ export async function applyPullItems(items: SyncPullItem[], tenantId: string) {
       localDb.productionBatches,
     ],
     async () => {
-      for (const item of items) {
+      for (const item of sortedItems) {
         await applyPullItem(item, tenantId)
 
         if (item.entityType === 'sale') {

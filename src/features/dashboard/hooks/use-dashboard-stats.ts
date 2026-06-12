@@ -1,4 +1,4 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '@/shared/hooks/use-live-query'
 
 import { buildDashboardStats } from '@/features/dashboard/hooks/dashboard-stats'
 import { salesOrderRepository, inventoryRepository, customerRepository } from '@/services/local-db/repository'

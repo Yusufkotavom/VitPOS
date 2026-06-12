@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { parseDigits } from '@/features/catalog/lib/formatters'
+import { toDateInput } from '@/lib/date'
 import type { LocalReturn, LocalReturnItem } from '@/services/local-db/schema'
 
 export const returnTypeOptions = ['Penjualan', 'Pembelian'] as const
@@ -73,7 +74,7 @@ export function mapReturnRecordToFormValues(ret: LocalReturn): ReturnFormValues 
     code: ret.code,
     type: ret.type,
     referenceCode: ret.referenceCode,
-    date: ret.date,
+    date: toDateInput(ret.date),
     status: ret.status,
     items: ret.items.length > 0
       ? ret.items.map((item) => ({ name: item.name, qty: String(item.qty), unitPrice: String(item.unitPrice) }))
