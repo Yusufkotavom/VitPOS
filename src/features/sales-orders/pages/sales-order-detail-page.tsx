@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Printer, MessageSquare, Download, CreditCard, PlusIcon, Trash2Icon, PencilIcon, XIcon, CheckIcon, Search } from 'lucide-react'
+import { ArrowLeft, Printer, MessageSquare, Download, CreditCard, PlusIcon, Trash2Icon, PencilIcon, XIcon, CheckIcon, Search, FileText } from 'lucide-react'
 import { useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useLiveQuery } from '@/shared/hooks/use-live-query'
 import { usePdf } from '@/shared/components/pdf/use-pdf'
 import type { PdfData } from '@/shared/components/pdf/types'
 import { toast } from 'sonner'
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/format-currency'
@@ -24,6 +25,9 @@ import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { DataTable } from '@/shared/components/data-table/data-table'
+import { ReceiptPrintLayout } from '@/features/pos/components/receipt-print-layout'
+import type { PosOrderSummary } from '@/features/pos/types/pos-order.types'
+import { printPage } from '@/lib/print'
 
 function tone(status: string) {
   if (status === 'Lunas') return 'success'
@@ -234,12 +238,50 @@ export function SalesOrderDetailPage() {
 
   const editSubtotal = editItems.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.unitPrice) || 0), 0)
 
+  const receiptOrder: PosOrderSummary | null = order ? {
+    id: order.id,
+    code: order.code,
+    date: new Date(order.date),
+    subtotal: order.subtotal,
+    tax: order.taxTotal,
+    discount: order.discountTotal,
+    total: order.grandTotal,
+    paymentMethod: order.payments?.[0]?.method || 'tunai',
+    amountPaid: order.paidTotal,
+    change: Math.max(0, order.paidTotal - order.grandTotal),
+    items: order.items.map(i => ({
+      productId: i.productId,
+      name: i.name,
+      qty: i.qty,
+      price: i.unitPrice,
+      subtotal: i.subtotal,
+    })),
+    customerId: order.customerId,
+    customerName: order.customerName,
+    cashierName: 'Kasir',
+  } : null
+
   const actionButtons = (
     <div className="flex flex-wrap items-center gap-2">
-      <Button variant="outline" size="sm" onClick={() => invoiceData && printPdf(invoiceData)}>
-        <Printer className="mr-2 h-4 w-4" />
-        Print
-      </Button>
+      {receiptOrder && <ReceiptPrintLayout order={receiptOrder} />}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm">
+            <Printer className="mr-2 h-4 w-4" />
+            Print
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={printPage}>
+            <Printer className="mr-2 h-4 w-4" />
+            Struk (Thermal)
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => invoiceData && printPdf(invoiceData)}>
+            <FileText className="mr-2 h-4 w-4" />
+            Sales Order (A4)
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <Button variant="outline" size="sm" onClick={() => invoiceData && downloadPdf(invoiceData, `Invoice-${order?.code || 'download'}`)}>
         <Download className="mr-2 h-4 w-4" />
         PDF

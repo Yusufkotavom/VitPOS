@@ -16,6 +16,8 @@ import type { LocalPaymentMethod } from '@/services/local-db/schema'
 import { usePdf } from '@/shared/components/pdf/use-pdf'
 import type { PdfData } from '@/shared/components/pdf/types'
 import { User } from 'lucide-react'
+import { ReceiptPrintLayout } from './receipt-print-layout'
+import { printPage } from '@/lib/print'
 
 const defaultMethods = [
   { id: 'tunai', name: 'Tunai' },
@@ -35,24 +37,7 @@ export function PaymentSummary({ onComplete, shiftId }: { onComplete?: () => voi
   const [isProcessing, setIsProcessingState] = useState(false)
   const isProcessingRef = useRef(false)
   const setProcessing = (v: boolean) => { isProcessingRef.current = v; setIsProcessingState(v) }
-  const { downloadPdf } = usePdf()
-
-  const receiptData: PdfData | null = successOrder ? {
-    type: 'receipt',
-    code: successOrder.code,
-    date: new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(successOrder.date),
-    cashierName: successOrder.cashierName || 'Kasir',
-    customer: { name: successOrder.customerName ?? 'Umum' },
-    items: successOrder.items.map(i => ({ name: i.name, qty: i.qty, price: i.price, subtotal: i.subtotal })),
-    summary: {
-      subtotal: successOrder.subtotal,
-      discount: successOrder.discount,
-      grandTotal: successOrder.total,
-      paidTotal: successOrder.amountPaid,
-      status: successOrder.amountPaid >= successOrder.total ? 'Lunas' : 'Sebagian',
-    },
-    paymentMethod: successOrder.paymentMethod,
-  } : null
+  const { printPdf } = usePdf()
 
   const setPaidAmount = usePosStore(s => s.setPaidAmount)
   useEffect(() => {
@@ -94,8 +79,29 @@ export function PaymentSummary({ onComplete, shiftId }: { onComplete?: () => voi
   }
 
   async function handlePrint() {
-    if (!successOrder || !receiptData) return
-    await downloadPdf(receiptData, `struk-${successOrder.code}`)
+    if (!successOrder) return
+    printPage()
+  }
+
+  async function handlePrintSalesOrder() {
+    if (!successOrder) return
+    const invoiceData: PdfData = {
+      type: 'invoice',
+      code: successOrder.code,
+      date: new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(successOrder.date),
+      customer: { name: successOrder.customerName ?? 'Umum' },
+      items: successOrder.items.map(i => ({ name: i.name, qty: i.qty, price: i.price, subtotal: i.subtotal })),
+      summary: {
+        subtotal: successOrder.subtotal,
+        discount: successOrder.discount,
+        grandTotal: successOrder.total,
+        paidTotal: successOrder.amountPaid,
+        change: successOrder.change,
+        status: successOrder.amountPaid >= successOrder.total ? 'Lunas' : 'Sebagian',
+      },
+      notes: '',
+    }
+    printPdf(invoiceData)
   }
 
   async function handleWhatsApp() {
@@ -145,6 +151,7 @@ export function PaymentSummary({ onComplete, shiftId }: { onComplete?: () => voi
         }}
         order={successOrder}
         onPrint={handlePrint}
+        onPrintSalesOrder={handlePrintSalesOrder}
         onWhatsApp={handleWhatsApp}
         onNewSale={() => {
           setSuccessOrder(null)
@@ -263,6 +270,8 @@ export function PaymentSummary({ onComplete, shiftId }: { onComplete?: () => voi
       <Button size="lg" className="h-14 text-lg font-semibold w-full mt-2" disabled={store.cartItems.length === 0 || isProcessing} onClick={handleCheckout}>
         {isProcessing ? 'Memproses...' : selectedMethodObj?.qrImageUrl ? 'Verifikasi & Selesaikan' : 'Selesaikan Pembayaran'}
       </Button>
+
+      {successOrder && <ReceiptPrintLayout order={successOrder} />}
     </div>
   )
 }

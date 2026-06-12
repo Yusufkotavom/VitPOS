@@ -40,12 +40,25 @@ function createLazyTableProxy(tableName: string): AdapterTable<{ id: string }> {
 
       if (prop in tbl) {
         const val = (tbl as Record<string, unknown>)[prop as string]
-        if (typeof val === 'function') return val.bind(tbl)
+        if (typeof val === 'function') {
+          if (['put', 'delete', 'update', 'bulkPut', 'clear'].includes(prop as string)) {
+            return async (...args: unknown[]) => {
+              const res = await (val.bind(tbl) as (...args: unknown[]) => Promise<unknown>)(...args)
+              window.dispatchEvent(new CustomEvent('vitpos:db-mutate', { detail: { table: tableName, action: prop } }))
+              return res
+            }
+          }
+          return val.bind(tbl)
+        }
         return val
       }
 
       if (prop === 'add') {
-        return (item: unknown) => tbl.put(item as never)
+        return async (item: unknown) => {
+          const res = await tbl.put(item as never)
+          window.dispatchEvent(new CustomEvent('vitpos:db-mutate', { detail: { table: tableName, action: 'add' } }))
+          return res
+        }
       }
 
       if (prop === 'orderBy') {

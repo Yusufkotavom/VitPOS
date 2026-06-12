@@ -8,6 +8,7 @@ import { bootstrapLocalDb } from '@/services/local-db/bootstrap'
 import { isCapacitorRuntime } from '@/features/updates/lib/update-runtime'
 
 import { ThemeProvider } from '@/components/theme-provider'
+import '@/lib/i18n'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,7 +50,7 @@ export function AppProviders({ children }: PropsWithChildren) {
         <TooltipProvider>
           {children}
           <UpdateAnnouncer />
-          <Toaster richColors position="top-right" />
+          <Toaster richColors closeButton position="top-right" />
         </TooltipProvider>
       </QueryClientProvider>
     </ThemeProvider>

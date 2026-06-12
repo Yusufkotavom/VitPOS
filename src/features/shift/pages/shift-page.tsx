@@ -8,8 +8,9 @@ import { shiftRepository } from '@/services/local-db/repository'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { EmptyState } from '@/shared/components/feedback/empty-state'
 import { useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { localDb } from '@/services/local-db/client'
+import type { LocalPayment } from '@/services/local-db/schema'
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ export function ShiftPage() {
   const shifts = useShifts()
   const currentShift = shifts.find((shift) => shift.status === 'open')
   const closedShifts = shifts.filter((shift) => shift.status === 'closed')
+  const queryClient = useQueryClient()
 
   const [isOpenerOpen, setOpenerOpen] = useState(false)
   const [isCloserOpen, setCloserOpen] = useState(false)
@@ -32,16 +34,20 @@ export function ShiftPage() {
   const [actualCash, setActualCash] = useState('')
 
   // Calculate expected cash dynamically
-  const expectedCash = useLiveQuery(async () => {
-    if (!currentShift) return 0
-    const payments = await localDb.payments.where('shiftId').equals(currentShift.id).toArray()
-    // For now, assume all Tunai payments add to cash
-    const cashPayments = payments.filter(p => p.method === 'tunai' && p.status !== 'Gagal' && p.status !== 'Pending')
-    const totalCashIncome = cashPayments.reduce((sum, p) => sum + p.amount, 0)
-    
-    // Phase 2 will deduct expenses here
-    return currentShift.startCash + totalCashIncome
-  }, [currentShift?.id, currentShift?.startCash], currentShift?.startCash ?? 0)
+  const { data: expectedCash = currentShift?.startCash ?? 0 } = useQuery({
+    queryKey: ['expectedCash', currentShift?.id, currentShift?.startCash],
+    queryFn: async () => {
+      if (!currentShift) return 0
+      const payments = await localDb.payments.where('shiftId').equals(currentShift.id).toArray()
+      // For now, assume all Tunai payments add to cash
+      const cashPayments = payments.filter((p: LocalPayment) => p.method === 'tunai' && p.status !== 'Gagal' && p.status !== 'Pending')
+      const totalCashIncome = cashPayments.reduce((sum: number, p: LocalPayment) => sum + p.amount, 0)
+      
+      // Phase 2 will deduct expenses here
+      return currentShift.startCash + totalCashIncome
+    },
+    enabled: !!currentShift,
+  })
 
   async function openShift() {
     if (!startCash) return toast.error('Modal awal harus diisi')
@@ -57,6 +63,8 @@ export function ShiftPage() {
       toast.success('Shift berhasil dibuka')
       setOpenerOpen(false)
       setStartCash('')
+      await queryClient.invalidateQueries({ queryKey: ['shifts'] })
+      await queryClient.invalidateQueries({ queryKey: ['active-shift'] })
     } catch (error) {
       toast.error(`Gagal buka shift: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
     }
@@ -78,6 +86,8 @@ export function ShiftPage() {
       toast.success('Shift berhasil ditutup')
       setCloserOpen(false)
       setActualCash('')
+      await queryClient.invalidateQueries({ queryKey: ['shifts'] })
+      await queryClient.invalidateQueries({ queryKey: ['active-shift'] })
     } catch (error) {
       toast.error(`Gagal tutup shift: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
     }
