@@ -4,6 +4,9 @@ import { apiGet, buildTenantQuery } from '@/services/api/client'
 export type BalanceSheetData = {
   assets: {
     cashOnHand: number
+    bankAccounts: number
+    ewallets: number
+    otherAssets: { method: string; total: number }[]
     accountsReceivable: number
     inventoryValue: number
     inventoryDetail: { productId: string; stock: number; unitCost: number; value: number }[]

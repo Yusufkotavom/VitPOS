@@ -20,14 +20,21 @@ const styles = StyleSheet.create({
   problemText: { fontSize: 7, color: '#6b7280', lineHeight: 1.6 },
   tableHeader: { flexDirection: 'row', backgroundColor: '#f3f4f6', borderBottomWidth: 1, borderBottomColor: '#d1d5db', paddingVertical: 6, paddingHorizontal: 8, fontWeight: 'bold' },
   tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#e5e7eb', paddingVertical: 6, paddingHorizontal: 8 },
-  colDesc: { width: '70%' },
-  colCost: { width: '30%', textAlign: 'right' },
+  colItem: { width: '45%' },
+  colQty: { width: '12%', textAlign: 'center' },
+  colPrice: { width: '20%', textAlign: 'right' },
+  colTotal: { width: '23%', textAlign: 'right' },
+  colDesc: { width: '60%' },
+  colCost: { width: '40%', textAlign: 'right' },
   headerText: { fontWeight: 'bold', color: '#374151' },
   totalsSection: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10 },
   totalsTable: { width: '40%' },
   totalsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
   totalsRowBold: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderTopColor: '#d1d5db', fontWeight: 'bold', fontSize: 10, color: '#111827' },
   statusBadge: { fontSize: 8, color: '#6b7280', marginTop: 4 },
+  warrantyBox: { backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', borderRadius: 4, padding: 8, marginBottom: 15 },
+  warrantyActive: { fontSize: 8, color: '#92400e' },
+  warrantyExpired: { fontSize: 8, color: '#dc2626' },
   footer: { position: 'absolute', bottom: 30, left: 40, right: 40, borderTopWidth: 1, borderTopColor: '#e5e7eb', paddingTop: 10, textAlign: 'center', color: '#9ca3af', fontSize: 8 },
 })
 
@@ -36,7 +43,9 @@ function fmt(n: number) {
 }
 
 export function ServicePDF({ data, settings }: { data: PdfServiceData; settings: PdfCompanySettings }) {
+  const itemsCost = data.items?.reduce((s, i) => s + i.subtotal, 0) ?? 0
   const remaining = Math.max(0, data.cost - data.summary.paidTotal)
+  const showItemsTable = data.items && data.items.length > 0
 
   return (
     <Document>
@@ -69,18 +78,53 @@ export function ServicePDF({ data, settings }: { data: PdfServiceData; settings:
               <Text style={styles.problemText}>{data.problem}</Text>
             </View>
           </View>
+
+          {data.warranty && (
+            <View style={[styles.warrantyBox, data.warranty.isExpired ? { backgroundColor: '#fef2f2', borderColor: '#fecaca' } : {}]}>
+              <Text style={data.warranty.isExpired ? styles.warrantyExpired : styles.warrantyActive}>
+                {data.warranty.isExpired ? 'GARANSI KADALUARSA' : 'GARANSI AKTIF'} — {data.warranty.value} {data.warranty.unit}
+                {'\n'}Berlaku sampai: {new Date(data.warranty.endDate).toLocaleDateString('id-ID', { dateStyle: 'long' })}
+              </Text>
+            </View>
+          )}
         </View>
 
-        <View style={{ marginBottom: 10 }}>
-          <View style={styles.tableHeader}>
-            <View style={styles.colDesc}><Text style={styles.headerText}>Deskripsi</Text></View>
-            <View style={styles.colCost}><Text style={styles.headerText}>Biaya</Text></View>
+        {showItemsTable ? (
+          <View style={{ marginBottom: 10 }}>
+            <Text style={styles.sectionTitle}>Item / Jasa</Text>
+            <View style={[styles.tableHeader, { marginTop: 5 }]}>
+              <View style={styles.colItem}><Text style={styles.headerText}>Item</Text></View>
+              <View style={styles.colQty}><Text style={styles.headerText}>Qty</Text></View>
+              <View style={styles.colPrice}><Text style={styles.headerText}>Harga</Text></View>
+              <View style={styles.colTotal}><Text style={styles.headerText}>Subtotal</Text></View>
+            </View>
+            {data.items.map((item, i) => (
+              <View key={i} style={styles.tableRow}>
+                <View style={styles.colItem}><Text>{item.name}</Text></View>
+                <View style={styles.colQty}><Text>{item.qty}</Text></View>
+                <View style={styles.colPrice}><Text>{fmt(item.price)}</Text></View>
+                <View style={styles.colTotal}><Text>{fmt(item.subtotal)}</Text></View>
+              </View>
+            ))}
+            <View style={[styles.tableRow, { backgroundColor: '#f9fafb' }]}>
+              <View style={styles.colItem}><Text style={{ fontWeight: 'bold' }}>Total Item</Text></View>
+              <View style={styles.colQty}></View>
+              <View style={styles.colPrice}></View>
+              <View style={styles.colTotal}><Text style={{ fontWeight: 'bold' }}>{fmt(itemsCost)}</Text></View>
+            </View>
           </View>
-          <View style={styles.tableRow}>
-            <View style={styles.colDesc}><Text>Jasa Servis - {data.device}</Text></View>
-            <View style={styles.colCost}><Text>{fmt(data.cost)}</Text></View>
+        ) : (
+          <View style={{ marginBottom: 10 }}>
+            <View style={styles.tableHeader}>
+              <View style={styles.colDesc}><Text style={styles.headerText}>Deskripsi</Text></View>
+              <View style={styles.colCost}><Text style={styles.headerText}>Biaya</Text></View>
+            </View>
+            <View style={styles.tableRow}>
+              <View style={styles.colDesc}><Text>Jasa Servis - {data.device}</Text></View>
+              <View style={styles.colCost}><Text>{fmt(data.cost)}</Text></View>
+            </View>
           </View>
-        </View>
+        )}
 
         <View style={styles.totalsSection}>
           <View style={styles.totalsTable}>
@@ -94,15 +138,33 @@ export function ServicePDF({ data, settings }: { data: PdfServiceData; settings:
             </View>
             {remaining > 0 && (
               <View style={styles.totalsRowBold}>
-                <Text>Sisa</Text>
+                <Text>Sisa Tagihan</Text>
                 <Text>{fmt(remaining)}</Text>
               </View>
             )}
           </View>
         </View>
 
+        {data.payments && data.payments.length > 0 && (
+          <View style={{ marginTop: 20 }}>
+            <Text style={styles.sectionTitle}>Riwayat Pembayaran</Text>
+            <View style={[styles.tableHeader, { marginTop: 5 }]}>
+              <View style={styles.colDesc}><Text style={styles.headerText}>Tanggal</Text></View>
+              <View style={{ width: '30%' }}><Text style={styles.headerText}>Metode</Text></View>
+              <View style={styles.colCost}><Text style={styles.headerText}>Nominal</Text></View>
+            </View>
+            {data.payments.map((p, i) => (
+              <View key={i} style={styles.tableRow}>
+                <View style={styles.colDesc}><Text>{p.date}</Text></View>
+                <View style={{ width: '30%' }}><Text style={{ textTransform: 'capitalize' }}>{p.method}</Text></View>
+                <View style={styles.colCost}><Text>{fmt(p.amount)}</Text></View>
+              </View>
+            ))}
+          </View>
+        )}
+
         <View style={styles.footer}>
-          <Text>Terima kasih atas kepercayaan Anda.</Text>
+          <Text>{settings.receiptFooter || 'Terima kasih atas kepercayaan Anda.'}</Text>
         </View>
       </Page>
     </Document>

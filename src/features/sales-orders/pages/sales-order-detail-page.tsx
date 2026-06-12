@@ -77,6 +77,7 @@ export function SalesOrderDetailPage() {
       status: order.status,
     },
     notes: order.notes || '',
+    payments: order.payments?.map(p => ({ method: p.method, amount: p.amount, date: p.date })),
   } : null
 
   if (isLoading) {

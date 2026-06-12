@@ -20,13 +20,16 @@ export function ProfitLossPage() {
     if (!data) return
     const rows = [
       { id: '1', akun: 'Pendapatan Penjualan', nilai: data.salesRevenue },
+      ...data.salesByMethod.map((s, i) => ({ id: `1a${i}`, akun: `  Penjualan: ${s.method.toUpperCase()}`, nilai: s.total })),
       { id: '2', akun: 'Pendapatan Service', nilai: data.serviceRevenue },
       { id: '3', akun: 'Total Pendapatan', nilai: data.totalRevenue },
       { id: '4', akun: 'HPP (Harga Pokok Penjualan)', nilai: -data.cogs },
+      ...data.salesByMethod.map((s, i) => ({ id: `4a${i}`, akun: `  HPP: ${s.method.toUpperCase()}`, nilai: -s.cogs })),
       { id: '5', akun: 'Laba Kotor', nilai: data.grossProfit },
+      ...data.incomes.map((e, i) => ({ id: `i${i}`, akun: `  Pendapatan Lain: ${e.category}`, nilai: e.total })),
+      { id: '7', akun: 'Total Pendapatan Lain', nilai: data.otherIncome },
       ...data.expenses.map((e, i) => ({ id: `e${i}`, akun: `  Beban: ${e.category}`, nilai: -e.total })),
       { id: '6', akun: 'Total Beban', nilai: -data.totalExpenses },
-      { id: '7', akun: 'Pendapatan Lain', nilai: data.otherIncome },
       { id: '8', akun: 'Laba Bersih', nilai: data.netProfit },
     ]
     exportToCsv(`laba-rugi-${params.from ?? 'awal'}-${params.to ?? 'akhir'}.csv`, [
@@ -72,9 +75,15 @@ export function ProfitLossPage() {
                     <TableCell colSpan={2} className="py-2 font-semibold">PENDAPATAN</TableCell>
                   </TableRow>
                   <TableRow className="border-b">
-                    <TableCell className="py-2">Penjualan ({data.salesOrderCount} order)</TableCell>
+                    <TableCell className="py-2">Total Penjualan ({data.salesOrderCount} order)</TableCell>
                     <TableCell className="py-2 text-right font-semibold">{formatCurrency(data.salesRevenue)}</TableCell>
                   </TableRow>
+                  {data.salesByMethod.map((s) => (
+                    <TableRow key={s.method} className="border-b text-sm">
+                      <TableCell className="py-1 text-muted-foreground pl-6">Penjualan ({s.method.toUpperCase()})</TableCell>
+                      <TableCell className="py-1 text-right text-muted-foreground">{formatCurrency(s.total)}</TableCell>
+                    </TableRow>
+                  ))}
                   <TableRow className="border-b">
                     <TableCell className="py-2">Service ({data.serviceOrderCount} order)</TableCell>
                     <TableCell className="py-2 text-right font-semibold">{formatCurrency(data.serviceRevenue)}</TableCell>
@@ -96,9 +105,15 @@ export function ProfitLossPage() {
                     <TableCell colSpan={2} className="py-2 font-semibold">HARGA POKOK PENJUALAN (HPP)</TableCell>
                   </TableRow>
                   <TableRow className="border-b">
-                    <TableCell className="py-2">HPP dari {data.salesOrderCount} penjualan</TableCell>
+                    <TableCell className="py-2">Total HPP dari {data.salesOrderCount} penjualan</TableCell>
                     <TableCell className="py-2 text-right font-semibold">{formatCurrency(data.cogs)}</TableCell>
                   </TableRow>
+                  {data.salesByMethod.map((s) => (
+                    <TableRow key={s.method} className="border-b text-sm">
+                      <TableCell className="py-1 text-muted-foreground pl-6">HPP Penjualan ({s.method.toUpperCase()})</TableCell>
+                      <TableCell className="py-1 text-right text-muted-foreground">{formatCurrency(s.cogs)}</TableCell>
+                    </TableRow>
+                  ))}
                   <TableRow className="font-bold">
                     <TableCell className="py-2">Laba Kotor</TableCell>
                     <TableCell className={`py-2 text-right ${data.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(data.grossProfit)}</TableCell>
@@ -108,13 +123,37 @@ export function ProfitLossPage() {
             </CardContent>
           </Card>
 
+          {data.incomes.length > 0 && (
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableBody>
+                    <TableRow className="border-b bg-muted/50">
+                      <TableCell colSpan={2} className="py-2 font-semibold">PENDAPATAN LAIN (KAS)</TableCell>
+                    </TableRow>
+                    {data.incomes.map((e, i) => (
+                      <TableRow key={i} className="border-b last:border-0">
+                        <TableCell className="py-2">{e.category}</TableCell>
+                        <TableCell className="py-2 text-right font-semibold text-green-600">{formatCurrency(e.total)}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="font-bold">
+                      <TableCell className="py-2">Total Pendapatan Lain</TableCell>
+                      <TableCell className="py-2 text-right text-green-600">{formatCurrency(data.otherIncome)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+
           {data.expenses.length > 0 && (
             <Card>
               <CardContent className="p-0">
                 <Table>
                   <TableBody>
                     <TableRow className="border-b bg-muted/50">
-                      <TableCell colSpan={2} className="py-2 font-semibold">BEBAN OPERASIONAL</TableCell>
+                      <TableCell colSpan={2} className="py-2 font-semibold">BEBAN OPERASIONAL (KAS)</TableCell>
                     </TableRow>
                     {data.expenses.map((e, i) => (
                       <TableRow key={i} className="border-b last:border-0">
@@ -170,11 +209,6 @@ export function ProfitLossPage() {
                     <TableCell className="py-2 text-lg font-bold">Net Profit</TableCell>
                     <TableCell className={`py-2 text-right text-lg font-bold ${data.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(data.netProfit)}</TableCell>
                   </TableRow>
-                  {data.otherIncome > 0 && (
-                    <TableRow>
-                      <TableCell colSpan={2} className="py-1 text-xs text-muted-foreground">Termasuk pendapatan lain: {formatCurrency(data.otherIncome)}</TableCell>
-                    </TableRow>
-                  )}
                 </TableBody>
               </Table>
             </CardContent>

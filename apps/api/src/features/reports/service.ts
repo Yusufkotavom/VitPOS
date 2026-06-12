@@ -143,11 +143,15 @@ export async function getProfitLoss(db: AppDb, input: ReportInput) {
     .where(and(...cashFilters, eq(cashCategories.type, 'expense'), sql`${cash.expense} > 0`))
     .groupBy(cashCategories.name)
 
-  const [incomeRow] = await db
-    .select({ total: sum(cash.income) })
+  const incomeRows = await db
+    .select({
+      category: cashCategories.name,
+      total: sum(cash.income),
+    })
     .from(cash)
     .leftJoin(cashCategories, eq(cash.categoryId, cashCategories.id))
     .where(and(...cashFilters, eq(cashCategories.type, 'income'), sql`${cash.income} > 0`))
+    .groupBy(cashCategories.name)
 
   const payFilters = [eq(payments.tenantId, tenantId), eq(payments.status, 'success')]
   if (input.branchId) payFilters.push(eq(payments.branchId, input.branchId))
@@ -161,13 +165,27 @@ export async function getProfitLoss(db: AppDb, input: ReportInput) {
     .groupBy(payments.method)
     .orderBy(payments.method)
 
+  // Calculate sales revenue & COGS by payment method
+  const salesByMethodRows = await db
+    .select({
+      method: payments.method,
+      amount: sum(payments.amount),
+      cogs: sum(sql`${salesOrderItems.qty} * COALESCE(${products.costPrice}, 0)`),
+    })
+    .from(payments)
+    .innerJoin(salesOrders, eq(payments.salesOrderId, salesOrders.id))
+    .innerJoin(salesOrderItems, eq(salesOrders.id, salesOrderItems.salesOrderId))
+    .leftJoin(products, eq(salesOrderItems.productId, products.id))
+    .where(and(...payFilters))
+    .groupBy(payments.method)
+
   const salesRevenue = n(salesRev?.revenue)
   const serviceRevenue = n(svcRev?.revenue)
   const totalRevenue = salesRevenue + serviceRevenue
   const cogs = n(cogsRow?.cogs as string | null)
   const grossProfit = totalRevenue - cogs
   const totalExpenses = expenseRows.reduce((s, r) => s + n(r.total), 0)
-  const otherIncome = n(incomeRow?.total)
+  const otherIncome = incomeRows.reduce((s, r) => s + n(r.total), 0)
   const netProfit = grossProfit - totalExpenses + otherIncome
 
   return {
@@ -180,12 +198,18 @@ export async function getProfitLoss(db: AppDb, input: ReportInput) {
     grossProfit,
     expenses: expenseRows.map((r) => ({ category: r.category ?? 'Lainnya', total: n(r.total) })),
     totalExpenses,
+    incomes: incomeRows.map((r) => ({ category: r.category ?? 'Lainnya', total: n(r.total) })),
     otherIncome,
     netProfit,
     paymentBreakdown: paymentBreakdown.map((r) => ({
       method: r.method,
       total: n(r.total),
       count: Number(r.count ?? 0),
+    })),
+    salesByMethod: salesByMethodRows.map((r) => ({
+      method: r.method,
+      total: n(r.amount),
+      cogs: n(r.cogs as string | null),
     })),
   }
 }
@@ -207,7 +231,30 @@ export async function getBalanceSheet(db: AppDb, input: ReportInput) {
     .from(cash)
     .where(and(...cashFilters))
 
-  const cashOnHand = n(cashRow?.totalIncome) - n(cashRow?.totalExpense)
+  const paymentFilters = [eq(payments.tenantId, tenantId), eq(payments.status, 'success')]
+  if (input.branchId) paymentFilters.push(eq(payments.branchId, input.branchId))
+  if (input.to) paymentFilters.push(lte(payments.createdAt, new Date(input.to)))
+
+  const paymentRows = await db
+    .select({
+      method: payments.method,
+      total: sum(payments.amount),
+    })
+    .from(payments)
+    .where(and(...paymentFilters))
+    .groupBy(payments.method)
+
+  let cashOnHand = n(cashRow?.totalIncome) - n(cashRow?.totalExpense)
+  let bankAccounts = 0
+  let ewallets = 0
+  const otherAssets = []
+
+  for (const p of paymentRows) {
+    if (p.method === 'cash') cashOnHand += n(p.total)
+    else if (p.method === 'transfer' || p.method === 'card') bankAccounts += n(p.total)
+    else if (p.method === 'ewallet' || p.method === 'qris') ewallets += n(p.total)
+    else otherAssets.push({ method: p.method, total: n(p.total) })
+  }
 
   const arFilters = [eq(salesOrders.tenantId, tenantId), ne(salesOrders.status, 'cancelled')]
   if (input.branchId) arFilters.push(eq(salesOrders.branchId, input.branchId))
@@ -250,7 +297,7 @@ export async function getBalanceSheet(db: AppDb, input: ReportInput) {
     return { productId: r.productId, stock: Math.max(0, stock), unitCost, value }
   })
 
-  const totalAssets = cashOnHand + accountsReceivable + inventoryValue
+  const totalAssets = cashOnHand + bankAccounts + ewallets + otherAssets.reduce((s, r) => s + r.total, 0) + accountsReceivable + inventoryValue
 
   const supplierFilters = [eq(suppliers.tenantId, tenantId)]
   const [payableRow] = await db
@@ -305,6 +352,9 @@ export async function getBalanceSheet(db: AppDb, input: ReportInput) {
   return {
     assets: {
       cashOnHand,
+      bankAccounts,
+      ewallets,
+      otherAssets,
       accountsReceivable,
       inventoryValue,
       inventoryDetail,

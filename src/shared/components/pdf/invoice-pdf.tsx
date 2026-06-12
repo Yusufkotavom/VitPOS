@@ -137,6 +137,24 @@ export function InvoicePDF({ data, settings }: { data: PdfInvoiceData; settings:
           </View>
         </View>
 
+        {data.payments && data.payments.length > 0 && (
+          <View style={{ marginTop: 20 }}>
+            <Text style={styles.termsTitle}>Riwayat Pembayaran</Text>
+            <View style={[styles.tableHeader, { marginTop: 5 }]}>
+              <View style={{ width: '40%' }}><Text style={styles.headerText}>Tanggal</Text></View>
+              <View style={{ width: '30%' }}><Text style={styles.headerText}>Metode</Text></View>
+              <View style={{ width: '30%', textAlign: 'right' }}><Text style={styles.headerText}>Nominal</Text></View>
+            </View>
+            {data.payments.map((p, i) => (
+              <View key={i} style={styles.tableRow}>
+                <View style={{ width: '40%' }}><Text>{p.date}</Text></View>
+                <View style={{ width: '30%' }}><Text style={{ textTransform: 'capitalize' }}>{p.method}</Text></View>
+                <View style={{ width: '30%', textAlign: 'right' }}><Text>{fmt(p.amount)}</Text></View>
+              </View>
+            ))}
+          </View>
+        )}
+
         {(data.notes || settings.invoiceTerm) && (
           <View style={styles.termsContainer}>
             <Text style={styles.termsTitle}>Catatan</Text>

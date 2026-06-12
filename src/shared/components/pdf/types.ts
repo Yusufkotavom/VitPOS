@@ -31,6 +31,19 @@ export type PdfSummary = {
   status: string
 }
 
+export type PdfPaymentRow = {
+  method: string
+  amount: number
+  date: string
+}
+
+export type PdfWarrantyInfo = {
+  value: number
+  unit: string
+  isExpired: boolean
+  endDate: string
+}
+
 export type PdfInvoiceData = {
   type: 'invoice'
   code: string
@@ -39,6 +52,7 @@ export type PdfInvoiceData = {
   items: PdfLineItem[]
   summary: PdfSummary
   notes: string
+  payments?: PdfPaymentRow[]
 }
 
 export type PdfServiceData = {
@@ -50,6 +64,9 @@ export type PdfServiceData = {
   problem: string
   cost: number
   summary: PdfSummary
+  items?: PdfLineItem[]
+  warranty?: PdfWarrantyInfo
+  payments?: PdfPaymentRow[]
 }
 
 export type PdfReceiptData = {

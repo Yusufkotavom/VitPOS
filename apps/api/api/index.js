@@ -857,19 +857,27 @@ async function getProfitLoss(db2, input) {
     category: cashCategories.name,
     total: sum(cash.expense)
   }).from(cash).leftJoin(cashCategories, eq2(cash.categoryId, cashCategories.id)).where(and2(...cashFilters, eq2(cashCategories.type, "expense"), sql`${cash.expense} > 0`)).groupBy(cashCategories.name);
-  const [incomeRow] = await db2.select({ total: sum(cash.income) }).from(cash).leftJoin(cashCategories, eq2(cash.categoryId, cashCategories.id)).where(and2(...cashFilters, eq2(cashCategories.type, "income"), sql`${cash.income} > 0`));
+  const incomeRows = await db2.select({
+    category: cashCategories.name,
+    total: sum(cash.income)
+  }).from(cash).leftJoin(cashCategories, eq2(cash.categoryId, cashCategories.id)).where(and2(...cashFilters, eq2(cashCategories.type, "income"), sql`${cash.income} > 0`)).groupBy(cashCategories.name);
   const payFilters = [eq2(payments.tenantId, tenantId), eq2(payments.status, "success")];
   if (input.branchId) payFilters.push(eq2(payments.branchId, input.branchId));
   if (input.from) payFilters.push(gte(payments.createdAt, new Date(input.from)));
   if (input.to) payFilters.push(lte(payments.createdAt, new Date(input.to)));
   const paymentBreakdown = await db2.select({ method: payments.method, total: sum(payments.amount), count: count(payments.id) }).from(payments).where(and2(...payFilters)).groupBy(payments.method).orderBy(payments.method);
+  const salesByMethodRows = await db2.select({
+    method: payments.method,
+    amount: sum(payments.amount),
+    cogs: sum(sql`${salesOrderItems.qty} * COALESCE(${products.costPrice}, 0)`)
+  }).from(payments).innerJoin(salesOrders, eq2(payments.salesOrderId, salesOrders.id)).innerJoin(salesOrderItems, eq2(salesOrders.id, salesOrderItems.salesOrderId)).leftJoin(products, eq2(salesOrderItems.productId, products.id)).where(and2(...payFilters)).groupBy(payments.method);
   const salesRevenue = n(salesRev?.revenue);
   const serviceRevenue = n(svcRev?.revenue);
   const totalRevenue = salesRevenue + serviceRevenue;
   const cogs = n(cogsRow?.cogs);
   const grossProfit = totalRevenue - cogs;
   const totalExpenses = expenseRows.reduce((s, r) => s + n(r.total), 0);
-  const otherIncome = n(incomeRow?.total);
+  const otherIncome = incomeRows.reduce((s, r) => s + n(r.total), 0);
   const netProfit = grossProfit - totalExpenses + otherIncome;
   return {
     salesRevenue,
@@ -881,12 +889,18 @@ async function getProfitLoss(db2, input) {
     grossProfit,
     expenses: expenseRows.map((r) => ({ category: r.category ?? "Lainnya", total: n(r.total) })),
     totalExpenses,
+    incomes: incomeRows.map((r) => ({ category: r.category ?? "Lainnya", total: n(r.total) })),
     otherIncome,
     netProfit,
     paymentBreakdown: paymentBreakdown.map((r) => ({
       method: r.method,
       total: n(r.total),
       count: Number(r.count ?? 0)
+    })),
+    salesByMethod: salesByMethodRows.map((r) => ({
+      method: r.method,
+      total: n(r.amount),
+      cogs: n(r.cogs)
     }))
   };
 }
@@ -899,7 +913,23 @@ async function getBalanceSheet(db2, input) {
     totalIncome: sum(cash.income),
     totalExpense: sum(cash.expense)
   }).from(cash).where(and2(...cashFilters));
-  const cashOnHand = n(cashRow?.totalIncome) - n(cashRow?.totalExpense);
+  const paymentFilters = [eq2(payments.tenantId, tenantId), eq2(payments.status, "success")];
+  if (input.branchId) paymentFilters.push(eq2(payments.branchId, input.branchId));
+  if (input.to) paymentFilters.push(lte(payments.createdAt, new Date(input.to)));
+  const paymentRows = await db2.select({
+    method: payments.method,
+    total: sum(payments.amount)
+  }).from(payments).where(and2(...paymentFilters)).groupBy(payments.method);
+  let cashOnHand = n(cashRow?.totalIncome) - n(cashRow?.totalExpense);
+  let bankAccounts = 0;
+  let ewallets = 0;
+  const otherAssets = [];
+  for (const p of paymentRows) {
+    if (p.method === "cash") cashOnHand += n(p.total);
+    else if (p.method === "transfer" || p.method === "card") bankAccounts += n(p.total);
+    else if (p.method === "ewallet" || p.method === "qris") ewallets += n(p.total);
+    else otherAssets.push({ method: p.method, total: n(p.total) });
+  }
   const arFilters = [eq2(salesOrders.tenantId, tenantId), ne(salesOrders.status, "cancelled")];
   if (input.branchId) arFilters.push(eq2(salesOrders.branchId, input.branchId));
   if (input.to) arFilters.push(lte(salesOrders.createdAt, new Date(input.to)));
@@ -925,7 +955,7 @@ async function getBalanceSheet(db2, input) {
     inventoryValue += value;
     return { productId: r.productId, stock: Math.max(0, stock), unitCost, value };
   });
-  const totalAssets = cashOnHand + accountsReceivable + inventoryValue;
+  const totalAssets = cashOnHand + bankAccounts + ewallets + otherAssets.reduce((s, r) => s + r.total, 0) + accountsReceivable + inventoryValue;
   const supplierFilters = [eq2(suppliers.tenantId, tenantId)];
   const [payableRow] = await db2.select({ total: sum(suppliers.payable) }).from(suppliers).where(and2(...supplierFilters));
   const accountsPayable = n(payableRow?.total);
@@ -943,6 +973,9 @@ async function getBalanceSheet(db2, input) {
   return {
     assets: {
       cashOnHand,
+      bankAccounts,
+      ewallets,
+      otherAssets,
       accountsReceivable,
       inventoryValue,
       inventoryDetail,

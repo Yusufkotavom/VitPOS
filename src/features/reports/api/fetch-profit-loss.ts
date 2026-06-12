@@ -11,9 +11,11 @@ export type ProfitLossData = {
   grossProfit: number
   expenses: { category: string; total: number }[]
   totalExpenses: number
+  incomes: { category: string; total: number }[]
   otherIncome: number
   netProfit: number
   paymentBreakdown: { method: string; total: number; count: number }[]
+  salesByMethod: { method: string; total: number; cogs: number }[]
 }
 
 export async function fetchProfitLoss(params?: { from?: string; to?: string }) {

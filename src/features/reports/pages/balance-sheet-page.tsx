@@ -20,6 +20,9 @@ export function BalanceSheetPage() {
     const rows = [
       { id: '1', akun: 'ASET', nilai: '' },
       { id: '2', akun: '  Kas', nilai: String(data.assets.cashOnHand) },
+      { id: '2a', akun: '  Rekening Bank', nilai: String(data.assets.bankAccounts) },
+      { id: '2b', akun: '  E-Wallet & QRIS', nilai: String(data.assets.ewallets) },
+      ...data.assets.otherAssets.map((asset, i) => ({ id: `2c${i}`, akun: `  Aset Lain (${asset.method})`, nilai: String(asset.total) })),
       { id: '3', akun: '  Piutang Usaha', nilai: String(data.assets.accountsReceivable) },
       { id: '4', akun: '  Persediaan', nilai: String(data.assets.inventoryValue) },
       { id: '5', akun: 'Total Aset', nilai: String(data.assets.totalAssets) },
@@ -78,6 +81,20 @@ export function BalanceSheetPage() {
                     <TableCell className="py-2">Kas</TableCell>
                     <TableCell className="py-2 text-right font-semibold">{formatCurrency(data.assets.cashOnHand)}</TableCell>
                   </TableRow>
+                  <TableRow className="border-b">
+                    <TableCell className="py-2">Rekening Bank</TableCell>
+                    <TableCell className="py-2 text-right font-semibold">{formatCurrency(data.assets.bankAccounts)}</TableCell>
+                  </TableRow>
+                  <TableRow className="border-b">
+                    <TableCell className="py-2">E-Wallet & QRIS</TableCell>
+                    <TableCell className="py-2 text-right font-semibold">{formatCurrency(data.assets.ewallets)}</TableCell>
+                  </TableRow>
+                  {data.assets.otherAssets.map((asset, i) => (
+                    <TableRow key={i} className="border-b">
+                      <TableCell className="py-2 capitalize">Aset Lain ({asset.method})</TableCell>
+                      <TableCell className="py-2 text-right font-semibold">{formatCurrency(asset.total)}</TableCell>
+                    </TableRow>
+                  ))}
                   <TableRow className="border-b">
                     <TableCell className="py-2">Piutang Usaha</TableCell>
                     <TableCell className="py-2 text-right font-semibold">{formatCurrency(data.assets.accountsReceivable)}</TableCell>

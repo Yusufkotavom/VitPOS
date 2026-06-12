@@ -99,6 +99,14 @@ export function ServiceOrderDetailPage() {
       paidTotal: totalPaid,
       status: remaining <= 0 ? 'Lunas' : 'Sebagian',
     },
+    items: order.items?.map(i => ({ name: i.name, qty: i.qty, price: i.price, subtotal: i.subtotal })),
+    warranty: order.hasWarranty && order.warrantyEndDate ? {
+      value: order.warrantyValue ?? 0,
+      unit: order.warrantyUnit ?? 'hari',
+      isExpired: isWarrantyExpired(order.warrantyEndDate),
+      endDate: order.warrantyEndDate,
+    } : undefined,
+    payments: payments?.map(p => ({ method: p.method, amount: p.amount, date: p.date })),
   } : null
 
   if (isLoading) {
