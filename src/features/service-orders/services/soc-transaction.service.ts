@@ -214,19 +214,28 @@ export const socTransactionService = {
       })
     }
 
-    await localDb.transaction('rw', [localDb.serviceOrders, localDb.payments, localDb.stockMovements, localDb.products, localDb.inventory, localDb.outbox], async () => {
-      await localDb.serviceOrders.put(serviceOrder)
-      if (payment) await localDb.payments.put(payment)
-      if (stockMovements.length > 0) await localDb.stockMovements.bulkPut(stockMovements)
-      for (const product of productUpdates) {
-        await productRepository.upsert(product)
-      }
-      if (inventoryRows.length > 0) await localDb.inventory.bulkPut(inventoryRows)
-      if (outboxPayload.length > 0) await localDb.outbox.bulkPut(outboxPayload)
-    })
+    try {
+      await localDb.transaction('rw', [localDb.serviceOrders, localDb.payments, localDb.stockMovements, localDb.products, localDb.inventory, localDb.outbox], async () => {
+        await localDb.serviceOrders.put(serviceOrder)
+        if (payment) await localDb.payments.put(payment)
+        if (stockMovements.length > 0) await localDb.stockMovements.bulkPut(stockMovements)
+        for (const product of productUpdates) {
+          await productRepository.upsert(product)
+        }
+        if (inventoryRows.length > 0) await localDb.inventory.bulkPut(inventoryRows)
+        if (outboxPayload.length > 0) await localDb.outbox.bulkPut(outboxPayload)
+      })
+    } catch (err) {
+      console.error('[SOC] Transaction failed:', err)
+      throw err
+    }
 
     if (customerId) {
-      await syncCustomerSalesMetrics(customerId, tenantId)
+      try {
+        await syncCustomerSalesMetrics(customerId, tenantId)
+      } catch (err) {
+        console.error('[SOC] syncCustomerSalesMetrics failed (non-critical):', err)
+      }
     }
 
     return { serviceOrderId, paymentId, code: serviceOrder.code, serviceOrder, payment }

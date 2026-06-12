@@ -182,7 +182,19 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
       paidTotal: Number(payload.paidTotal ?? 0),
       notes: typeof payload.notes === 'string' ? payload.notes : existing?.notes,
       status: SERVER_TO_LOCAL_SALE_STATUS[rawStatus] ?? existing?.status ?? 'Draft',
-      items: Array.isArray(payload.items) ? payload.items : existing?.items ?? [],
+      items: Array.isArray(payload.items) ? payload.items.map((rawItem) => {
+        const itemPayload = isRecord(rawItem) ? rawItem : {}
+        return {
+          id: typeof itemPayload.id === 'string' ? itemPayload.id : createId('sale-item'),
+          tenantId,
+          salesOrderId: item.entityId,
+          productId: typeof itemPayload.productId === 'string' ? itemPayload.productId : '',
+          name: typeof itemPayload.name === 'string' ? itemPayload.name : '',
+          qty: Number(itemPayload.qty ?? 0),
+          unitPrice: Number(itemPayload.unitPrice ?? 0),
+          subtotal: Number(itemPayload.subtotal ?? 0),
+        }
+      }) : existing?.items ?? [],
       syncStatus: 'synced',
       version: typeof payload.version === 'number' ? payload.version : 1,
       updatedAt: item.updatedAt,
@@ -190,7 +202,7 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
     await localDb.salesOrders.put(order)
     if (Array.isArray(payload.items)) {
       await localDb.salesOrderItems.where('salesOrderId').equals(item.entityId).delete()
-      await localDb.salesOrderItems.bulkPut(payload.items)
+      await localDb.salesOrderItems.bulkPut(order.items)
     }
   } else if (item.entityType === 'payment') {
     const salesOrderId = typeof payload.salesOrderId === 'string' ? payload.salesOrderId : undefined
@@ -391,9 +403,27 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
         cost: Number(payload.cost ?? existingSo?.cost ?? 0),
         paidTotal: Number(payload.paidTotal ?? existingSo?.paidTotal ?? 0),
         status: SERVER_TO_LOCAL_SERVICE_STATUS[rawStatus] ?? existingSo?.status ?? 'Diterima',
-        items: Array.isArray(payload.items) ? payload.items : existingSo?.items,
+        items: Array.isArray(payload.items) ? payload.items.map((rawItem) => {
+          const itemPayload = isRecord(rawItem) ? rawItem : {}
+          return {
+            productId: typeof itemPayload.productId === 'string' ? itemPayload.productId : '',
+            name: typeof itemPayload.name === 'string' ? itemPayload.name : '',
+            qty: Number(itemPayload.qty ?? 0),
+            price: Number(itemPayload.price ?? itemPayload.unitPrice ?? 0),
+            subtotal: Number(itemPayload.subtotal ?? 0),
+          }
+        }) : existingSo?.items,
         notes: typeof payload.notes === 'string' ? payload.notes : existingSo?.notes,
-        timeline: existingSo?.timeline,
+        timeline: Array.isArray(payload.timeline) ? payload.timeline.map((rawItem) => {
+          const itemPayload = isRecord(rawItem) ? rawItem : {}
+          return {
+            id: typeof itemPayload.id === 'string' ? itemPayload.id : crypto.randomUUID(),
+            status: typeof itemPayload.status === 'string' ? itemPayload.status : '',
+            date: typeof itemPayload.date === 'string' ? itemPayload.date : item.updatedAt,
+            note: typeof itemPayload.note === 'string' ? itemPayload.note : '',
+            type: (typeof itemPayload.type === 'string' ? itemPayload.type : undefined) as 'status' | 'warranty' | undefined,
+          }
+        }) : existingSo?.timeline,
         hasWarranty: existingSo?.hasWarranty,
         warrantyValue: existingSo?.warrantyValue,
         warrantyUnit: existingSo?.warrantyUnit,
@@ -448,22 +478,44 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
   }
 
 export async function applyPullItems(items: SyncPullItem[], tenantId: string) {
+  const issues: string[] = []
+
   await localDb.transaction(
     'rw',
     [
-      localDb.products, localDb.customers, localDb.salesOrders, localDb.payments,
+      localDb.products, localDb.customers, localDb.salesOrders, localDb.salesOrderItems, localDb.payments,
       localDb.stockMovements, localDb.cash, localDb.productCategories, localDb.cashCategories,
-      localDb.settings, localDb.shifts, localDb.suppliers, localDb.purchases,
-      localDb.returns, localDb.serviceOrders, localDb.paymentMethods, localDb.recipes,
+      localDb.settings, localDb.shifts, localDb.suppliers, localDb.purchases, localDb.purchaseItems,
+      localDb.returns, localDb.returnItems, localDb.serviceOrders, localDb.paymentMethods, localDb.recipes,
       localDb.productionBatches,
     ],
     async () => {
       for (const item of items) {
         await applyPullItem(item, tenantId)
+
+        if (item.entityType === 'sale') {
+          const payload = isRecord(item.payload) ? item.payload : null
+          if (!payload || !Array.isArray(payload.items) || payload.items.length === 0) {
+            issues.push(`sale:${item.entityId}:missing-items`)
+          }
+          if (!payload || typeof payload.date !== 'string' || payload.date.length === 0) {
+            issues.push(`sale:${item.entityId}:missing-date`)
+          }
+        }
+
+        if (item.entityType === 'payment') {
+          const payload = isRecord(item.payload) ? item.payload : null
+          if (!payload || typeof payload.date !== 'string' || payload.date.length === 0) {
+            issues.push(`payment:${item.entityId}:missing-date`)
+          }
+        }
       }
     },
   )
+
+  return issues
 }
+
 
 export async function runSync() {
   const syncContext = await resolveSyncContext()
@@ -492,7 +544,7 @@ export async function runSync() {
 
   if (accepted.length === 0) {
     const pullResponse = await apiGet<SyncPullResponse>('/sync/pull', buildTenantQuery(syncContext)).catch(() => ({ ok: true as const, cursor: null, items: [] }))
-    await applyPullItems(pullResponse.items, tenantId)
+    const pullIssues = await applyPullItems(pullResponse.items, tenantId)
 
     await localDb.syncRuns.update(runId, {
       finishedAt: new Date().toISOString(),
@@ -500,6 +552,7 @@ export async function runSync() {
       processed,
       failed,
       pulled: pullResponse.items.length,
+      pullSummary: pullIssues.length > 0 ? pullIssues.join(', ') : undefined,
     })
 
     return { processed, failed, pulled: pullResponse.items.length }
@@ -557,7 +610,7 @@ export async function runSync() {
   }
 
   const pullResponse = await apiGet<SyncPullResponse>('/sync/pull', buildTenantQuery(syncContext)).catch(() => ({ ok: true as const, cursor: null, items: [] }))
-  await applyPullItems(pullResponse.items, tenantId)
+  const pullIssues = await applyPullItems(pullResponse.items, tenantId)
 
   await localDb.syncRuns.update(runId, {
     finishedAt: new Date().toISOString(),
@@ -565,6 +618,7 @@ export async function runSync() {
     processed,
     failed,
     pulled: pullResponse.items.length,
+    pullSummary: pullIssues.length > 0 ? pullIssues.join(', ') : undefined,
   })
 
   return { processed, failed, pulled: pullResponse.items.length }

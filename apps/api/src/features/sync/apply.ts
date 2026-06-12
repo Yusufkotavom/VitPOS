@@ -503,6 +503,22 @@ type ServiceOrderPayload = {
   cost?: number | string
   paidTotal?: number | string
   status?: string
+  items?: Array<{
+    id?: string
+    productId?: string
+    name?: string
+    qty?: number | string
+    price?: number | string
+    unitPrice?: number | string
+    subtotal?: number | string
+  }>
+  timeline?: Array<{
+    id?: string
+    status?: string
+    date?: string
+    note?: string
+    type?: string
+  }>
 }
 
 type PaymentMethodPayload = {
@@ -969,6 +985,21 @@ async function applyServiceOrder(db: AppDb, ctx: ApplyContext, entityId: string,
       date: payload.date ? new Date(payload.date) : now,
       cost: toNumeric(payload.cost),
       paidTotal: toNumeric(payload.paidTotal),
+      items: (payload.items ?? []).map((item) => ({
+        id: item.id ?? crypto.randomUUID(),
+        productId: item.productId ?? null,
+        name: item.name ?? '',
+        qty: toNumeric(item.qty),
+        price: toNumeric(item.price ?? item.unitPrice),
+        subtotal: toNumeric(item.subtotal),
+      })),
+      timeline: (payload.timeline ?? []).map((item) => ({
+        id: item.id ?? crypto.randomUUID(),
+        status: item.status ?? '',
+        date: item.date ?? now.toISOString(),
+        note: item.note ?? '',
+        type: item.type,
+      })),
       status: mapClientServiceOrderStatus(payload.status),
       syncStatus: 'synced',
       version: 1,
@@ -982,6 +1013,21 @@ async function applyServiceOrder(db: AppDb, ctx: ApplyContext, entityId: string,
         description: payload.description ?? null,
         cost: toNumeric(payload.cost),
         paidTotal: toNumeric(payload.paidTotal),
+        items: (payload.items ?? []).map((item) => ({
+          id: item.id ?? crypto.randomUUID(),
+          productId: item.productId ?? null,
+          name: item.name ?? '',
+          qty: toNumeric(item.qty),
+          price: toNumeric(item.price ?? item.unitPrice),
+          subtotal: toNumeric(item.subtotal),
+        })),
+        timeline: (payload.timeline ?? []).map((item) => ({
+          id: item.id ?? crypto.randomUUID(),
+          status: item.status ?? '',
+          date: item.date ?? now.toISOString(),
+          note: item.note ?? '',
+          type: item.type,
+        })),
         status: mapClientServiceOrderStatus(payload.status),
         syncStatus: 'synced',
         updatedAt: now,

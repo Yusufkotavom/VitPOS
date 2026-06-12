@@ -9,6 +9,7 @@ import { platformRoutes } from './features/platform/routes.js'
 import { subscriptionRoutes } from './features/subscription/routes.js'
 import { tenantRoutes } from './features/tenants/routes.js'
 import { updateRoutes } from './features/updates/routes.js'
+import { uploadRoutes } from './features/upload/routes.js'
 
 export function createApp() {
   const app = new Hono()
@@ -26,6 +27,7 @@ export function createApp() {
   app.route('/api/v1/subscription', subscriptionRoutes)
   app.route('/api/v1/tenants', tenantRoutes)
   app.route('/api/v1/updates', updateRoutes)
+  app.route('/api/v1/upload', uploadRoutes)
 
   app.onError((error, c) => {
     return c.json({ ok: false, message: error.message }, 500)

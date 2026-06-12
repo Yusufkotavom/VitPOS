@@ -413,6 +413,8 @@ export type SyncRun = {
   processed: number
   failed: number
   pulled?: number
+  errorMessage?: string
+  pullSummary?: string
 }
 
 export type { ConflictResolution, ConflictStatus, OutboxItem, OutboxStatus, SyncEntityType, SyncMutationType }

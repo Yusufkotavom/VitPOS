@@ -360,6 +360,8 @@ export const serviceOrders = pgTable('service_orders', {
   date: timestamp('date', { withTimezone: true }).defaultNow().notNull(),
   cost: numeric('cost', { precision: 14, scale: 2 }).default('0').notNull(),
   paidTotal: numeric('paid_total', { precision: 14, scale: 2 }).default('0').notNull(),
+  items: jsonb('items').default([]).notNull(),
+  timeline: jsonb('timeline').default([]).notNull(),
   status: serviceOrderStatusEnum('status').default('received').notNull(),
   syncStatus: syncStatusEnum('sync_status').default('synced').notNull(),
   version: integer('version').default(1).notNull(),
@@ -475,4 +477,16 @@ export const serviceOrdersRelations = relations(serviceOrders, ({ one }) => ({
   tenant: one(tenants, { fields: [serviceOrders.tenantId], references: [tenants.id] }),
   branch: one(branches, { fields: [serviceOrders.branchId], references: [branches.id] }),
   customer: one(customers, { fields: [serviceOrders.customerId], references: [customers.id] }),
+}))
+
+export const salesOrderItemsRelations = relations(salesOrderItems, ({ one }) => ({
+  salesOrder: one(salesOrders, { fields: [salesOrderItems.salesOrderId], references: [salesOrders.id] }),
+}))
+
+export const purchaseItemsRelations = relations(purchaseItems, ({ one }) => ({
+  purchase: one(purchases, { fields: [purchaseItems.purchaseId], references: [purchases.id] }),
+}))
+
+export const returnItemsRelations = relations(returnItems, ({ one }) => ({
+  returnOrder: one(returns, { fields: [returnItems.returnId], references: [returns.id] }),
 }))

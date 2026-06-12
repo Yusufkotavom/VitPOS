@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { LayoutGrid, List, Filter } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { formatDateTime } from '@/lib/date'
 import { formatCurrency } from '@/lib/format-currency'
 import { useSalesOrders } from '@/features/sales-orders/hooks/use-sales-orders'
 import { DataTable } from '@/shared/components/data-table/data-table'
@@ -50,7 +51,7 @@ function SalesOrderCard({ row }: { row: ReturnType<typeof useSalesOrders>[number
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div className="rounded-xl bg-muted/40 p-3">
             <p className="text-xs text-muted-foreground">Tanggal</p>
-            <p className="mt-1 font-medium">{row.date}</p>
+            <p className="mt-1 font-medium">{formatDateTime(row.date)}</p>
           </div>
           <div className="rounded-xl bg-muted/40 p-3">
             <p className="text-xs text-muted-foreground">Pembayaran</p>
@@ -80,9 +81,9 @@ export function SalesOrdersPage() {
   const [search, setSearch] = useState('')
   const activeView = view
 
-  const filtered = orderRows.filter(row =>
-    !search || [row.code, row.customerName, row.date].some(f => f.toLowerCase().includes(search.toLowerCase()))
-  )
+  const filtered = orderRows
+    .filter(row => !search || [row.code, row.customerName, row.date].some(f => f.toLowerCase().includes(search.toLowerCase())))
+    .toSorted((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
   return (
     <PageShell title="Pesanan Penjualan" description="Invoice, pembayaran, piutang, print, PDF, dan WhatsApp." actions={
@@ -152,7 +153,7 @@ export function SalesOrdersPage() {
               columns={[
                 { key: 'code', header: 'Invoice', sortable: true, render: (row) => <Link to={`/sales-orders/${row.id}`} className="font-medium text-primary hover:underline">{row.code}</Link> },
                 { key: 'customerName', header: 'Pelanggan', sortable: true },
-              { key: 'date', header: 'Tanggal', sortable: true },
+              { key: 'date', header: 'Tanggal', sortable: true, render: (row) => formatDateTime(row.date) },
               { key: 'grandTotal', header: 'Total', sortable: true, render: (row) => formatCurrency(row.grandTotal) },
               { key: 'paidTotal', header: 'Dibayar', render: (row) => formatCurrency(row.paidTotal) },
               { key: 'status', header: 'Status', render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },

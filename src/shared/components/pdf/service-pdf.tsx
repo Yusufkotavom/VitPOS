@@ -1,5 +1,6 @@
 import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
 import { formatCurrency } from '@/lib/format-currency'
+import { formatDateTime } from '@/lib/date'
 import type { PdfServiceData, PdfCompanySettings } from './types'
 
 const styles = StyleSheet.create({
@@ -59,7 +60,7 @@ export function ServicePDF({ data, settings }: { data: PdfServiceData; settings:
           <View style={styles.metaSection}>
             <Text style={styles.title}>SERVICE ORDER</Text>
             <Text style={styles.metaText}>{data.code}</Text>
-            <Text style={styles.metaText}>{data.date}</Text>
+            <Text style={styles.metaText}>{formatDateTime(data.date)}</Text>
             <Text style={styles.statusBadge}>Status: {data.summary.status}</Text>
           </View>
         </View>
@@ -155,7 +156,7 @@ export function ServicePDF({ data, settings }: { data: PdfServiceData; settings:
             </View>
             {data.payments.map((p, i) => (
               <View key={i} style={styles.tableRow}>
-                <View style={styles.colDesc}><Text>{p.date}</Text></View>
+                <View style={styles.colDesc}><Text>{formatDateTime(p.date)}</Text></View>
                 <View style={{ width: '30%' }}><Text style={{ textTransform: 'capitalize' }}>{p.method}</Text></View>
                 <View style={styles.colCost}><Text>{fmt(p.amount)}</Text></View>
               </View>

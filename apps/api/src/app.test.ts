@@ -1,4 +1,8 @@
+import { config } from 'dotenv'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+
+config({ path: '.env.local' })
+config()
 
 import { createApp } from './app'
 
@@ -84,6 +88,67 @@ describe('createApp', () => {
       expect(response.status).toBe(400)
       expect(body).toEqual({ ok: false, message: 'mutations required' })
     })
+
+    it('returns service order items and timeline in pull payload after sync push', async () => {
+      const app = createApp()
+      const tenantId = 'bc84f249-78f6-4b62-a9a9-b5f84ca98c11'
+      const branchId = 'eda41760-b27e-4eeb-a625-814719c58c6c'
+      const serviceOrderId = crypto.randomUUID()
+      const customerId = '881d6bfd-4c1e-4201-aef3-d40c15a2b92b'
+
+      const pushResponse = await app.request('/api/v1/sync/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-user-id': 'test-user' },
+        body: JSON.stringify({
+          tenantId,
+          branchId,
+          deviceId: 'test-device',
+          mutations: [
+            {
+              clientMutationId: crypto.randomUUID(),
+              entityType: 'service_order',
+              entityId: serviceOrderId,
+              mutationType: 'create',
+              payload: {
+                id: serviceOrderId,
+                code: 'SRV-TDD-0001',
+                customerId,
+                customerName: 'Yusuf Bahtiyar',
+                description: 'Tes sync service order',
+                date: '2026-06-12T00:00:00.000Z',
+                cost: 12345,
+                paidTotal: 12345,
+                status: 'Diterima',
+                items: [
+                  { id: crypto.randomUUID(), productId: '384ba7fe-7061-4cd7-9c56-e0aea9580615', name: 'Jasa Bongkar', qty: 1, price: 12345, subtotal: 12345 },
+                ],
+                timeline: [
+                  { id: crypto.randomUUID(), status: 'Diterima', date: '2026-06-12T00:00:00.000Z', note: 'Service order dibuat' },
+                ],
+              },
+            },
+          ],
+        }),
+      })
+
+      expect(pushResponse.status).toBe(200)
+
+      const pullResponse = await app.request(`/api/v1/sync/pull?tenantId=${tenantId}&branchId=${branchId}`, {
+        headers: { 'x-user-id': 'test-user' },
+      })
+      const pullBody = await pullResponse.json() as { items?: Array<{ entityType: string; entityId: string; payload: { items?: unknown[]; timeline?: unknown[] } }>; message?: string }
+
+      expect(pullResponse.status).toBe(200)
+      expect(pullBody).not.toEqual(expect.objectContaining({ ok: false }))
+      expect(pullBody.items).toBeDefined()
+      const serviceOrder = pullBody.items?.find((item) => item.entityType === 'service_order' && item.entityId === serviceOrderId)
+      expect(serviceOrder?.payload.items).toEqual([
+        expect.objectContaining({ name: 'Jasa Bongkar', qty: 1, subtotal: 12345 }),
+      ])
+      expect(serviceOrder?.payload.timeline).toEqual([
+        expect.objectContaining({ status: 'Diterima', note: 'Service order dibuat' }),
+      ])
+    }, 15000)
   })
 
   describe('auth endpoints', () => {

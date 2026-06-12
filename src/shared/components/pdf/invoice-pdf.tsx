@@ -1,5 +1,6 @@
 import { Document, Page, StyleSheet, Text, View, Image } from '@react-pdf/renderer'
 import { formatCurrency } from '@/lib/format-currency'
+import { formatDateTime } from '@/lib/date'
 import type { PdfInvoiceData, PdfCompanySettings } from './types'
 import type { InvoiceThemeTokens } from './invoice-themes'
 import { invoiceThemes } from './invoice-themes'
@@ -77,7 +78,7 @@ export function InvoicePDF({ data, settings }: { data: PdfInvoiceData; settings:
           <View style={baseStyles.invoiceMeta}>
             <Text style={[baseStyles.invoiceTitle, { color: theme.titleColor }]}>INVOICE</Text>
             <Text style={[baseStyles.metaText, { color: theme.headerTextColor === '#ffffff' || theme.headerTextColor === '#f8fafc' || theme.headerTextColor === '#fef2f2' ? '#cbd5e1' : '#4b5563' }]}>{data.code}</Text>
-            <Text style={[baseStyles.metaText, { color: theme.headerTextColor === '#ffffff' || theme.headerTextColor === '#f8fafc' || theme.headerTextColor === '#fef2f2' ? '#cbd5e1' : '#4b5563' }]}>{data.date}</Text>
+            <Text style={[baseStyles.metaText, { color: theme.headerTextColor === '#ffffff' || theme.headerTextColor === '#f8fafc' || theme.headerTextColor === '#fef2f2' ? '#cbd5e1' : '#4b5563' }]}>{formatDateTime(data.date)}</Text>
           </View>
         </View>
 
@@ -154,7 +155,7 @@ export function InvoicePDF({ data, settings }: { data: PdfInvoiceData; settings:
             </View>
             {data.payments.map((p, i) => (
               <View key={i} style={[baseStyles.paymentRow, { borderBottomColor: theme.tableBorderColor }]}>
-                <View style={{ width: '40%' }}><Text>{p.date}</Text></View>
+                <View style={{ width: '40%' }}><Text>{formatDateTime(p.date)}</Text></View>
                 <View style={{ width: '30%' }}><Text style={{ textTransform: 'capitalize' }}>{p.method}</Text></View>
                 <View style={{ width: '30%', textAlign: 'right' }}><Text>{fmt(p.amount)}</Text></View>
               </View>

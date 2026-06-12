@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatCurrency } from '@/lib/format-currency'
+import { formatDateTime } from '@/lib/date'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { useServiceOrder } from '@/features/service-orders/hooks/use-service-order'
 import { serviceOrderRepository } from '@/services/local-db/repository'
@@ -87,7 +88,7 @@ export function ServiceOrderDetailPage() {
   const serviceData: PdfData | null = order ? {
     type: 'service',
     code: order.code,
-    date: order.date,
+    date: formatDateTime(order.date),
     customer: { name: order.customerName },
     device: order.description.split('\n')[0] || order.description,
     problem: order.description,
@@ -106,7 +107,7 @@ export function ServiceOrderDetailPage() {
       isExpired: isWarrantyExpired(order.warrantyEndDate),
       endDate: order.warrantyEndDate,
     } : undefined,
-    payments: payments?.map(p => ({ method: p.method, amount: p.amount, date: p.date })),
+    payments: payments?.map(p => ({ method: p.method, amount: p.amount, date: formatDateTime(p.date) })),
   } : null
 
   if (isLoading) {
@@ -290,7 +291,7 @@ export function ServiceOrderDetailPage() {
       status: order.status,
       cost: formatCurrency(order.cost),
       estimated_completion: order.estimatedCompletion ? new Date(order.estimatedCompletion).toLocaleDateString('id-ID', { dateStyle: 'long' }) : '-',
-      date: order.date,
+      date: formatDateTime(order.date),
       total: formatCurrency(order.cost),
       paid: formatCurrency(totalPaid),
       remaining: formatCurrency(remaining),

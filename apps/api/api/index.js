@@ -5,7 +5,7 @@ var __export = (target, all) => {
 };
 
 // src/app.ts
-import { Hono as Hono9 } from "hono";
+import { Hono as Hono10 } from "hono";
 import { cors } from "hono/cors";
 
 // src/features/auth/routes.ts
@@ -40,17 +40,20 @@ __export(schema_exports, {
   productionBatches: () => productionBatches,
   products: () => products,
   purchaseItems: () => purchaseItems,
+  purchaseItemsRelations: () => purchaseItemsRelations,
   purchaseStatusEnum: () => purchaseStatusEnum,
   purchases: () => purchases,
   purchasesRelations: () => purchasesRelations,
   recipeStatusEnum: () => recipeStatusEnum,
   recipes: () => recipes,
   returnItems: () => returnItems,
+  returnItemsRelations: () => returnItemsRelations,
   returnStatusEnum: () => returnStatusEnum,
   returnTypeEnum: () => returnTypeEnum,
   returns: () => returns,
   returnsRelations: () => returnsRelations,
   salesOrderItems: () => salesOrderItems,
+  salesOrderItemsRelations: () => salesOrderItemsRelations,
   salesOrders: () => salesOrders,
   salesOrdersRelations: () => salesOrdersRelations,
   serviceOrderStatusEnum: () => serviceOrderStatusEnum,
@@ -412,6 +415,8 @@ var serviceOrders = pgTable("service_orders", {
   date: timestamp("date", { withTimezone: true }).defaultNow().notNull(),
   cost: numeric("cost", { precision: 14, scale: 2 }).default("0").notNull(),
   paidTotal: numeric("paid_total", { precision: 14, scale: 2 }).default("0").notNull(),
+  items: jsonb("items").default([]).notNull(),
+  timeline: jsonb("timeline").default([]).notNull(),
   status: serviceOrderStatusEnum("status").default("received").notNull(),
   syncStatus: syncStatusEnum("sync_status").default("synced").notNull(),
   version: integer("version").default(1).notNull(),
@@ -513,6 +518,15 @@ var serviceOrdersRelations = relations(serviceOrders, ({ one }) => ({
   tenant: one(tenants, { fields: [serviceOrders.tenantId], references: [tenants.id] }),
   branch: one(branches, { fields: [serviceOrders.branchId], references: [branches.id] }),
   customer: one(customers, { fields: [serviceOrders.customerId], references: [customers.id] })
+}));
+var salesOrderItemsRelations = relations(salesOrderItems, ({ one }) => ({
+  salesOrder: one(salesOrders, { fields: [salesOrderItems.salesOrderId], references: [salesOrders.id] })
+}));
+var purchaseItemsRelations = relations(purchaseItems, ({ one }) => ({
+  purchase: one(purchases, { fields: [purchaseItems.purchaseId], references: [purchases.id] })
+}));
+var returnItemsRelations = relations(returnItems, ({ one }) => ({
+  returnOrder: one(returns, { fields: [returnItems.returnId], references: [returns.id] })
 }));
 
 // src/lib/env.ts
@@ -2014,6 +2028,21 @@ async function applyServiceOrder(db2, ctx, entityId, mutationType, payload) {
     date: payload.date ? new Date(payload.date) : now,
     cost: toNumeric(payload.cost),
     paidTotal: toNumeric(payload.paidTotal),
+    items: (payload.items ?? []).map((item) => ({
+      id: item.id ?? crypto.randomUUID(),
+      productId: item.productId ?? null,
+      name: item.name ?? "",
+      qty: toNumeric(item.qty),
+      price: toNumeric(item.price ?? item.unitPrice),
+      subtotal: toNumeric(item.subtotal)
+    })),
+    timeline: (payload.timeline ?? []).map((item) => ({
+      id: item.id ?? crypto.randomUUID(),
+      status: item.status ?? "",
+      date: item.date ?? now.toISOString(),
+      note: item.note ?? "",
+      type: item.type
+    })),
     status: mapClientServiceOrderStatus(payload.status),
     syncStatus: "synced",
     version: 1,
@@ -2026,6 +2055,21 @@ async function applyServiceOrder(db2, ctx, entityId, mutationType, payload) {
       description: payload.description ?? null,
       cost: toNumeric(payload.cost),
       paidTotal: toNumeric(payload.paidTotal),
+      items: (payload.items ?? []).map((item) => ({
+        id: item.id ?? crypto.randomUUID(),
+        productId: item.productId ?? null,
+        name: item.name ?? "",
+        qty: toNumeric(item.qty),
+        price: toNumeric(item.price ?? item.unitPrice),
+        subtotal: toNumeric(item.subtotal)
+      })),
+      timeline: (payload.timeline ?? []).map((item) => ({
+        id: item.id ?? crypto.randomUUID(),
+        status: item.status ?? "",
+        date: item.date ?? now.toISOString(),
+        note: item.note ?? "",
+        type: item.type
+      })),
       status: mapClientServiceOrderStatus(payload.status),
       syncStatus: "synced",
       updatedAt: now
@@ -2214,7 +2258,8 @@ syncRoutes.get("/pull", async (c) => {
   const saleRows = await db.query.salesOrders.findMany({
     where: and4(eq4(salesOrders.tenantId, parsed.value.tenantId), isNull(salesOrders.deletedAt), saleBranchFilter, saleSinceFilter),
     orderBy: [desc2(salesOrders.updatedAt)],
-    limit: 100
+    limit: 100,
+    with: { items: true }
   });
   const saleCustomerIds = [...new Set(saleRows.filter((r) => r.customerId).map((r) => r.customerId))];
   const saleCustomerRows = saleCustomerIds.length > 0 ? await db.query.customers.findMany({ where: (c2, { inArray: inArray2 }) => inArray2(c2.id, saleCustomerIds) }) : [];
@@ -2282,14 +2327,16 @@ syncRoutes.get("/pull", async (c) => {
   const purchaseRows = await db.query.purchases.findMany({
     where: and4(eq4(purchases.tenantId, parsed.value.tenantId), purchaseBranchFilter, purchaseSinceFilter),
     orderBy: [desc2(purchases.updatedAt)],
-    limit: 100
+    limit: 100,
+    with: { items: true }
   });
   const returnBranchFilter = parsed.value.branchId ? eq4(returns.branchId, parsed.value.branchId) : void 0;
   const returnSinceFilter = parsed.value.since ? gte2(returns.updatedAt, parsed.value.since) : void 0;
   const returnRows = await db.query.returns.findMany({
     where: and4(eq4(returns.tenantId, parsed.value.tenantId), returnBranchFilter, returnSinceFilter),
     orderBy: [desc2(returns.updatedAt)],
-    limit: 100
+    limit: 100,
+    with: { items: true }
   });
   const serviceOrderBranchFilter = parsed.value.branchId ? eq4(serviceOrders.branchId, parsed.value.branchId) : void 0;
   const serviceOrderSinceFilter = parsed.value.since ? gte2(serviceOrders.updatedAt, parsed.value.since) : void 0;
@@ -2362,8 +2409,18 @@ syncRoutes.get("/pull", async (c) => {
         taxTotal: Number(row.taxTotal),
         grandTotal: Number(row.grandTotal),
         paidTotal: Number(row.paidTotal),
+        date: row.createdAt.toISOString(),
         notes: row.notes,
-        version: row.version
+        version: row.version,
+        items: row.items.map((i) => ({
+          id: i.id,
+          productId: i.productId,
+          name: i.name,
+          qty: Number(i.qty),
+          unitPrice: Number(i.unitPrice),
+          discountTotal: Number(i.discountTotal),
+          subtotal: Number(i.subtotal)
+        }))
       },
       transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
       serverSyncStatus: row.syncStatus,
@@ -2384,6 +2441,7 @@ syncRoutes.get("/pull", async (c) => {
         source: row.source,
         method: row.method,
         amount: Number(row.amount),
+        date: row.createdAt.toISOString(),
         status: row.status
       },
       transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
@@ -2545,7 +2603,15 @@ syncRoutes.get("/pull", async (c) => {
         subtotal: Number(row.subtotal),
         grandTotal: Number(row.grandTotal),
         status: row.status,
-        version: row.version
+        version: row.version,
+        items: row.items.map((i) => ({
+          id: i.id,
+          productId: i.productId,
+          name: i.name,
+          qty: Number(i.qty),
+          unitPrice: Number(i.unitPrice),
+          subtotal: Number(i.subtotal)
+        }))
       },
       transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
       serverSyncStatus: row.syncStatus,
@@ -2564,7 +2630,15 @@ syncRoutes.get("/pull", async (c) => {
         date: row.date.toISOString(),
         total: Number(row.total),
         status: row.status,
-        version: row.version
+        version: row.version,
+        items: row.items.map((i) => ({
+          id: i.id,
+          productId: i.productId,
+          name: i.name,
+          qty: Number(i.qty),
+          unitPrice: Number(i.unitPrice),
+          subtotal: Number(i.subtotal)
+        }))
       },
       transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
       serverSyncStatus: row.syncStatus,
@@ -2584,6 +2658,13 @@ syncRoutes.get("/pull", async (c) => {
         date: row.date.toISOString(),
         cost: Number(row.cost),
         paidTotal: Number(row.paidTotal),
+        items: Array.isArray(row.items) ? row.items.map((item) => ({
+          ...typeof item === "object" && item !== null ? item : {},
+          qty: Number(item.qty ?? 0),
+          price: Number(item.price ?? item.unitPrice ?? 0),
+          subtotal: Number(item.subtotal ?? 0)
+        })) : [],
+        timeline: Array.isArray(row.timeline) ? row.timeline : [],
         status: row.status,
         version: row.version
       },
@@ -3329,9 +3410,58 @@ updateRoutes.get("/desktop/:target/:arch/:currentVersion", async (c) => {
   return c.json(payload);
 });
 
+// src/features/upload/routes.ts
+import { Hono as Hono9 } from "hono";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+var r2Endpoint = process.env.R2_ENDPOINT;
+var r2AccessKey = process.env.R2_ACCESS_KEY_ID;
+var r2SecretKey = process.env.R2_SECRET_ACCESS_KEY;
+var bucketName = process.env.R2_BUCKET_NAME ?? "vitpos-uploads";
+var publicUrlBase = process.env.R2_PUBLIC_URL ?? "";
+var allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+var uploadRoutes = new Hono9();
+uploadRoutes.post("/presign", async (c) => {
+  try {
+    if (!r2Endpoint || !r2AccessKey || !r2SecretKey) {
+      return c.json({ ok: false, message: "R2 tidak dikonfigurasi. Hubungi admin." }, 501);
+    }
+    const body = await c.req.json();
+    const filename = (body.filename ?? "").trim();
+    const contentType = (body.contentType ?? "").trim();
+    if (!filename || !contentType) {
+      return c.json({ ok: false, message: "filename dan contentType wajib diisi." }, 400);
+    }
+    if (!allowedTypes.includes(contentType)) {
+      return c.json({ ok: false, message: "Tipe file tidak didukung. Gunakan JPG, PNG, atau WebP." }, 400);
+    }
+    const r2Client = new S3Client({
+      region: "auto",
+      endpoint: r2Endpoint,
+      credentials: {
+        accessKeyId: r2AccessKey,
+        secretAccessKey: r2SecretKey
+      }
+    });
+    const safeName = filename.replace(/[^a-zA-Z0-9.-]/g, "_");
+    const r2Key = `logos/${crypto.randomUUID()}-${safeName}`;
+    const command = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: r2Key,
+      ContentType: contentType
+    });
+    const presignedUrl = await getSignedUrl(r2Client, command, { expiresIn: 300 });
+    const publicUrl = publicUrlBase ? `${publicUrlBase.replace(/\/$/, "")}/${r2Key}` : presignedUrl.split("?")[0];
+    return c.json({ ok: true, presignedUrl, publicUrl, key: r2Key });
+  } catch (error) {
+    console.error("R2 presign error:", error);
+    return c.json({ ok: false, message: "Gagal membuat URL upload. Periksa konfigurasi R2." }, 500);
+  }
+});
+
 // src/app.ts
 function createApp() {
-  const app2 = new Hono9();
+  const app2 = new Hono10();
   app2.use("*", cors());
   app2.get("/", (c) => c.json({ message: "VitPOS API is running!" }));
   app2.route("/health", healthRoutes);
@@ -3343,6 +3473,7 @@ function createApp() {
   app2.route("/api/v1/subscription", subscriptionRoutes);
   app2.route("/api/v1/tenants", tenantRoutes);
   app2.route("/api/v1/updates", updateRoutes);
+  app2.route("/api/v1/upload", uploadRoutes);
   app2.onError((error, c) => {
     return c.json({ ok: false, message: error.message }, 500);
   });

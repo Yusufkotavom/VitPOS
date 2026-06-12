@@ -5,6 +5,7 @@ import { Toaster } from 'sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { UpdateAnnouncer } from '@/features/updates/components/update-announcer'
 import { bootstrapLocalDb } from '@/services/local-db/bootstrap'
+import { isCapacitorRuntime } from '@/features/updates/lib/update-runtime'
 
 import { ThemeProvider } from '@/components/theme-provider'
 
@@ -20,6 +21,26 @@ const queryClient = new QueryClient({
 export function AppProviders({ children }: PropsWithChildren) {
   useEffect(() => {
     void bootstrapLocalDb()
+  }, [])
+
+  useEffect(() => {
+    if (!isCapacitorRuntime()) return
+
+    let cleanup: (() => void) | undefined
+
+    import('@capacitor/app').then(({ App }) => {
+      App.addListener('backButton', ({ canGoBack }) => {
+        if (canGoBack) {
+          window.history.back()
+        }
+      })
+
+      cleanup = () => {
+        App.removeAllListeners()
+      }
+    })
+
+    return () => cleanup?.()
   }, [])
 
   return (

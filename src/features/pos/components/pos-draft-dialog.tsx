@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { localDb } from '@/services/local-db/client'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -18,7 +18,10 @@ export function PosDraftDialog({ open, onOpenChange }: PosDraftDialogProps) {
   const store = usePosStore()
 
   const drafts = useLiveQuery(
-    () => localDb.salesOrders.where('status').equals('Draft').reverse().sortBy('date'),
+    async () => {
+      const rows = await localDb.salesOrders.where('status').equals('Draft').toArray()
+      return rows.sort((a, b) => b.date.localeCompare(a.date))
+    },
     []
   )
 
@@ -70,6 +73,7 @@ export function PosDraftDialog({ open, onOpenChange }: PosDraftDialogProps) {
       <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Pesanan Tertunda (Draft)</DialogTitle>
+          <DialogDescription>Pilih draft untuk dilanjutkan di kasir.</DialogDescription>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto py-4">
           {!drafts || drafts.length === 0 ? (

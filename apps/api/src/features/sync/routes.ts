@@ -63,6 +63,7 @@ syncRoutes.get('/pull', async (c) => {
     where: and(eq(salesOrders.tenantId, parsed.value.tenantId), isNull(salesOrders.deletedAt), saleBranchFilter, saleSinceFilter),
     orderBy: [desc(salesOrders.updatedAt)],
     limit: 100,
+    with: { items: true },
   })
 
   const saleCustomerIds = [...new Set(saleRows.filter((r) => r.customerId).map((r) => r.customerId!))]
@@ -144,6 +145,7 @@ syncRoutes.get('/pull', async (c) => {
     where: and(eq(purchases.tenantId, parsed.value.tenantId), purchaseBranchFilter, purchaseSinceFilter),
     orderBy: [desc(purchases.updatedAt)],
     limit: 100,
+    with: { items: true },
   })
 
   const returnBranchFilter = parsed.value.branchId ? eq(returns.branchId, parsed.value.branchId) : undefined
@@ -152,6 +154,7 @@ syncRoutes.get('/pull', async (c) => {
     where: and(eq(returns.tenantId, parsed.value.tenantId), returnBranchFilter, returnSinceFilter),
     orderBy: [desc(returns.updatedAt)],
     limit: 100,
+    with: { items: true },
   })
 
   const serviceOrderBranchFilter = parsed.value.branchId ? eq(serviceOrders.branchId, parsed.value.branchId) : undefined
@@ -229,8 +232,18 @@ syncRoutes.get('/pull', async (c) => {
         taxTotal: Number(row.taxTotal),
         grandTotal: Number(row.grandTotal),
         paidTotal: Number(row.paidTotal),
+        date: row.createdAt.toISOString(),
         notes: row.notes,
         version: row.version,
+        items: row.items.map((i) => ({
+          id: i.id,
+          productId: i.productId,
+          name: i.name,
+          qty: Number(i.qty),
+          unitPrice: Number(i.unitPrice),
+          discountTotal: Number(i.discountTotal),
+          subtotal: Number(i.subtotal),
+        })),
       },
       transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
       serverSyncStatus: row.syncStatus,
@@ -251,6 +264,7 @@ syncRoutes.get('/pull', async (c) => {
         source: row.source,
         method: row.method,
         amount: Number(row.amount),
+        date: row.createdAt.toISOString(),
         status: row.status,
       },
       transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
@@ -413,6 +427,14 @@ syncRoutes.get('/pull', async (c) => {
         grandTotal: Number(row.grandTotal),
         status: row.status,
         version: row.version,
+        items: row.items.map((i) => ({
+          id: i.id,
+          productId: i.productId,
+          name: i.name,
+          qty: Number(i.qty),
+          unitPrice: Number(i.unitPrice),
+          subtotal: Number(i.subtotal),
+        })),
       },
       transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
       serverSyncStatus: row.syncStatus,
@@ -432,6 +454,14 @@ syncRoutes.get('/pull', async (c) => {
         total: Number(row.total),
         status: row.status,
         version: row.version,
+        items: row.items.map((i) => ({
+          id: i.id,
+          productId: i.productId,
+          name: i.name,
+          qty: Number(i.qty),
+          unitPrice: Number(i.unitPrice),
+          subtotal: Number(i.subtotal),
+        })),
       },
       transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
       serverSyncStatus: row.syncStatus,
@@ -451,6 +481,13 @@ syncRoutes.get('/pull', async (c) => {
         date: row.date.toISOString(),
         cost: Number(row.cost),
         paidTotal: Number(row.paidTotal),
+        items: Array.isArray(row.items) ? row.items.map((item) => ({
+          ...(typeof item === 'object' && item !== null ? item : {}),
+          qty: Number((item as { qty?: unknown }).qty ?? 0),
+          price: Number((item as { price?: unknown; unitPrice?: unknown }).price ?? (item as { unitPrice?: unknown }).unitPrice ?? 0),
+          subtotal: Number((item as { subtotal?: unknown }).subtotal ?? 0),
+        })) : [],
+        timeline: Array.isArray(row.timeline) ? row.timeline : [],
         status: row.status,
         version: row.version,
       },

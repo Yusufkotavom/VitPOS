@@ -1,5 +1,6 @@
 import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
 import { formatCurrency } from '@/lib/format-currency'
+import { formatDateTime } from '@/lib/date'
 import type { PdfPaymentData, PdfCompanySettings } from './types'
 
 const styles = StyleSheet.create({
@@ -50,7 +51,7 @@ export function PaymentPDF({ data, settings }: { data: PdfPaymentData; settings:
             <Text style={styles.detailText}>No Invoice: {data.invoiceCode}</Text>
           </View>
           <View style={styles.paymentDetails}>
-            <Text style={styles.detailText}>Tanggal: {data.date}</Text>
+            <Text style={styles.detailText}>Tanggal: {formatDateTime(data.date)}</Text>
             <Text style={styles.detailText}>Metode: {data.method}</Text>
             <Text style={styles.detailText}>Status: {data.status}</Text>
           </View>

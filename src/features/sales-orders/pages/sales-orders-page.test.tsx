@@ -23,7 +23,7 @@ const orderRows: LocalSalesOrder[] = [
     tenantId: 'tenant-1',
     code: 'INV-001',
     customerName: 'PT Maju',
-    date: '2026-06-08',
+    date: '2026-06-08T10:15:00.000Z',
     subtotal: 100000,
     discountTotal: 5000,
     taxTotal: 10000,
@@ -34,6 +34,23 @@ const orderRows: LocalSalesOrder[] = [
     syncStatus: 'pending',
     version: 1,
     updatedAt: '2026-06-08T00:00:00.000Z',
+  },
+  {
+    id: 'so-2',
+    tenantId: 'tenant-1',
+    code: 'INV-002',
+    customerName: 'CV Baru',
+    date: '2026-06-12T15:13:44.424Z',
+    subtotal: 200000,
+    discountTotal: 0,
+    taxTotal: 0,
+    grandTotal: 200000,
+    paidTotal: 200000,
+    status: 'Lunas',
+    items: [],
+    syncStatus: 'pending',
+    version: 1,
+    updatedAt: '2026-06-12T00:00:00.000Z',
   },
 ]
 
@@ -59,11 +76,26 @@ describe('SalesOrdersPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Card View' }))
 
-    // Now uses the mobile responsive inline render, not separate explicit view.
-    // So the data table headers shouldn't be there on mobile view if we toggled the *whole* component state?
-    // Wait, the new code sets `view` to 'card', which mounts card explicitly instead of DataTable.
-    // Let's look for standard text inside our card component render
     expect(screen.getByText('INV-001')).toBeInTheDocument()
     expect(screen.queryByRole('columnheader', { name: 'Invoice' })).not.toBeInTheDocument()
+  })
+
+  it('shows newest invoice first and formats date for table and card views', () => {
+    render(
+      <MemoryRouter>
+        <SalesOrdersPage />
+      </MemoryRouter>
+    )
+
+    const invoiceLinks = screen.getAllByRole('link', { name: /INV-00[12]/ })
+    expect(invoiceLinks[0]).toHaveTextContent('INV-002')
+    expect(invoiceLinks[1]).toHaveTextContent('INV-001')
+
+    expect(screen.getByText('12 Jun 2026, 15:13')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Card View' }))
+
+    expect(screen.getByText('8 Jun 2026, 10:15')).toBeInTheDocument()
+    expect(screen.getByText('12 Jun 2026, 15:13')).toBeInTheDocument()
   })
 })

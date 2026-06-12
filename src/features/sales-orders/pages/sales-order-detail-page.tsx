@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/format-currency'
-import { formatDate } from '@/lib/date'
+import { formatDate, formatDateTime } from '@/lib/date'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { useSalesOrder } from '@/features/sales-orders/hooks/use-sales-order'
 import { deleteSalesOrder, recordSalesOrderPayment } from '@/features/sales-orders/services/sales-order-finance.service'
@@ -65,7 +65,7 @@ export function SalesOrderDetailPage() {
   const invoiceData: PdfData | null = order ? {
     type: 'invoice',
     code: order.code,
-    date: order.date,
+    date: formatDateTime(order.date),
     customer: { name: order.customerName, phone: invoiceCustomer?.phone },
     items: order.items?.map(i => ({ name: i.name, qty: i.qty, price: i.unitPrice, subtotal: i.subtotal })) || [],
     summary: {
@@ -77,7 +77,7 @@ export function SalesOrderDetailPage() {
       status: order.status,
     },
     notes: order.notes || '',
-    payments: order.payments?.map(p => ({ method: p.method, amount: p.amount, date: p.date })),
+    payments: order.payments?.map(p => ({ method: p.method, amount: p.amount, date: formatDateTime(p.date) })),
   } : null
 
   if (isLoading) {
@@ -199,7 +199,7 @@ export function SalesOrderDetailPage() {
 
     const text = await messageTemplateService.render('invoice', {
       code: order.code,
-      date: order.date,
+      date: formatDateTime(order.date),
       customer_name: order.customerName,
       items,
       total,

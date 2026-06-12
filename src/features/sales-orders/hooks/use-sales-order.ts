@@ -11,7 +11,8 @@ export function useSalesOrder(id?: string) {
       const tenantId = requireActiveTenantId()
       const order = await localDb.salesOrders.get(id)
       if (!order || order.tenantId !== tenantId) return null
-      const items = Array.isArray(order.items) ? order.items : []
+      const tableItems = await localDb.salesOrderItems.where('salesOrderId').equals(order.id).toArray()
+      const items = tableItems.length > 0 ? tableItems : Array.isArray(order.items) ? order.items : []
       const payments = await localDb.payments.where('tenantId').equals(tenantId).toArray()
       const paymentHistory = payments
         .filter((payment) => payment.salesOrderId === order.id)

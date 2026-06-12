@@ -46,8 +46,8 @@ export const posTransactionService = {
     const draftId = crypto.randomUUID()
     const nowIso = new Date().toISOString()
 
-    const draftItems: LocalSalesOrderItem[] = cartItems.map((cartItem) => ({
-      id: newId('soi'),
+      const draftItems: LocalSalesOrderItem[] = cartItems.map((cartItem) => ({
+      id: crypto.randomUUID(),
       tenantId,
       salesOrderId: draftId,
       productId: cartItem.productId,
@@ -103,10 +103,10 @@ export const posTransactionService = {
     const tenantId = requireActiveTenantId()
     const nowIso = new Date().toISOString()
     const salesOrderId = crypto.randomUUID()
-    const paymentId = newId('pay')
+    const paymentId = crypto.randomUUID()
 
     const items: LocalSalesOrderItem[] = cartItems.map((cartItem) => ({
-      id: newId('soi'),
+      id: crypto.randomUUID(),
       tenantId,
       salesOrderId,
       productId: cartItem.productId,
@@ -165,7 +165,7 @@ export const posTransactionService = {
     for (const cartItem of cartItems) {
       if (cartItem.qty <= 0) continue
       stockMovements.push({
-        id: newId('sm'),
+        id: crypto.randomUUID(),
         tenantId,
         productId: cartItem.productId,
         productName: cartItem.name,
@@ -182,7 +182,7 @@ export const posTransactionService = {
         for (const ri of recipe.items) {
           const consumeQty = (ri.qty / recipe.batchYield) * cartItem.qty
           stockMovements.push({
-            id: newId('sm'),
+            id: crypto.randomUUID(),
             tenantId,
             productId: ri.productId,
             productName: ri.productName,
@@ -272,19 +272,28 @@ export const posTransactionService = {
       })
     }
 
-    await localDb.transaction('rw', [localDb.salesOrders, localDb.salesOrderItems, localDb.payments, localDb.stockMovements, localDb.products, localDb.inventory, localDb.outbox], async () => {
-      await localDb.salesOrders.put(salesOrder)
-      if (items.length > 0) await localDb.salesOrderItems.bulkPut(items)
-      await localDb.payments.put(payment)
-      if (stockMovements.length > 0) await localDb.stockMovements.bulkPut(stockMovements)
-      for (const product of productUpdates) {
-        await productRepository.upsert(product)
-      }
-      if (inventoryRows.length > 0) await localDb.inventory.bulkPut(inventoryRows)
-      if (outboxPayload.length > 0) await localDb.outbox.bulkPut(outboxPayload)
-    })
+    try {
+      await localDb.transaction('rw', [localDb.salesOrders, localDb.salesOrderItems, localDb.payments, localDb.stockMovements, localDb.products, localDb.inventory, localDb.outbox], async () => {
+        await localDb.salesOrders.put(salesOrder)
+        if (items.length > 0) await localDb.salesOrderItems.bulkPut(items)
+        await localDb.payments.put(payment)
+        if (stockMovements.length > 0) await localDb.stockMovements.bulkPut(stockMovements)
+        for (const product of productUpdates) {
+          await productRepository.upsert(product)
+        }
+        if (inventoryRows.length > 0) await localDb.inventory.bulkPut(inventoryRows)
+        if (outboxPayload.length > 0) await localDb.outbox.bulkPut(outboxPayload)
+      })
+    } catch (err) {
+      console.error('[POS] Transaction failed:', err)
+      throw err
+    }
 
-    await syncCustomerSalesMetrics(customerId ?? undefined, tenantId)
+    try {
+      await syncCustomerSalesMetrics(customerId ?? undefined, tenantId)
+    } catch (err) {
+      console.error('[POS] syncCustomerSalesMetrics failed (non-critical):', err)
+    }
 
     return { salesOrderId, paymentId, code: salesOrder.code }
   }

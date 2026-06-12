@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { useSettings } from '@/features/settings/hooks/use-settings'
 import { settingRepository } from '@/services/local-db/repository'
+import { uploadImageToR2 } from '@/services/upload.service'
 import { invoiceThemeOptions, type InvoiceThemeName } from '@/shared/components/pdf/types'
 import { invoiceThemes } from '@/shared/components/pdf/invoice-themes'
 
@@ -25,6 +26,10 @@ function emptyValues(): FormValues {
   return fields.reduce((acc, field) => ({ ...acc, [field.id]: '' }), {} as FormValues)
 }
 
+function isHttpUrl(str: string) {
+  return str.startsWith('http://') || str.startsWith('https://')
+}
+
 export function InvoiceSettingsForm() {
   const rawSettings = useSettings()
   const settings = useMemo(() => rawSettings ?? [], [rawSettings])
@@ -33,7 +38,8 @@ export function InvoiceSettingsForm() {
   const hydrated = useRef(false)
 
   const [theme, setTheme] = useState<InvoiceThemeName>('klasik')
-  const [logoPreview, setLogoPreview] = useState<string | null>(null)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -49,7 +55,7 @@ export function InvoiceSettingsForm() {
       setTheme(themeRaw as InvoiceThemeName)
     }
     const savedLogo = settings.find((s) => s.id === 'invoice-logo')?.value
-    if (savedLogo) setLogoPreview(savedLogo)
+    if (savedLogo) setLogoUrl(savedLogo)
 
     hydrated.current = true
   }, [settings])
@@ -65,15 +71,17 @@ export function InvoiceSettingsForm() {
       toast.error('Ukuran logo maksimal 2MB')
       return
     }
+    setPendingLogoFile(file)
     const reader = new FileReader()
     reader.onload = () => {
-      setLogoPreview(reader.result as string)
+      setLogoUrl(reader.result as string)
     }
     reader.readAsDataURL(file)
   }
 
   function handleRemoveLogo() {
-    setLogoPreview(null)
+    setLogoUrl(null)
+    setPendingLogoFile(null)
     if (logoInputRef.current) logoInputRef.current.value = ''
   }
 
@@ -103,14 +111,32 @@ export function InvoiceSettingsForm() {
         updatedAt: now,
       })
 
-      if (logoPreview !== null) {
+      let finalLogoUrl = logoUrl
+
+      if (pendingLogoFile) {
+        try {
+          finalLogoUrl = await uploadImageToR2(pendingLogoFile)
+          setPendingLogoFile(null)
+          setLogoUrl(finalLogoUrl)
+        } catch {
+          const reader = new FileReader()
+          const base64 = await new Promise<string>((resolve) => {
+            reader.onload = () => resolve(reader.result as string)
+            reader.readAsDataURL(pendingLogoFile)
+          })
+          finalLogoUrl = base64
+          toast.warning('Gagal upload ke cloud, logo disimpan lokal. Konfigurasi R2 untuk cloud storage.')
+        }
+      }
+
+      if (finalLogoUrl) {
         await settingRepository.upsert({
           id: 'invoice-logo',
           tenantId: resolveTenantId(settings.find((s) => s.id === 'invoice-logo')?.tenantId),
           area: 'Invoice & Struk',
           setting: 'Logo Invoice',
-          value: logoPreview,
-          status: logoPreview ? 'Lengkap' : 'Belum Lengkap',
+          value: finalLogoUrl,
+          status: 'Lengkap',
           updatedAt: now,
         })
       } else if (settings.find((s) => s.id === 'invoice-logo')?.value) {
@@ -125,7 +151,7 @@ export function InvoiceSettingsForm() {
     }
   }
 
-
+  const logoPreviewUrl = logoUrl && isHttpUrl(logoUrl) ? logoUrl : logoUrl
 
   return (
     <div className="rounded-2xl border bg-background p-5 shadow-sm">
@@ -168,11 +194,12 @@ export function InvoiceSettingsForm() {
 
       <div className="mb-6 space-y-3 rounded-xl border p-4">
         <Label className="text-sm font-medium">Logo Perusahaan</Label>
-        <p className="text-xs text-muted-foreground mb-1">Upload logo untuk ditampilkan di invoice A4. Maks 2MB, format JPG/PNG.</p>
+        <p className="text-xs text-muted-foreground mb-1">Upload logo untuk ditampilkan di invoice A4. Maks 2MB, format JPG/PNG/WebP.</p>
+        <p className="text-xs text-muted-foreground mb-3">Otomatis tersimpan di Cloudflare R2 jika dikonfigurasi, atau lokal jika offline.</p>
         <div className="flex items-center gap-4">
           <div className="flex h-16 w-40 items-center justify-center rounded-lg border bg-muted/20 overflow-hidden">
-            {logoPreview ? (
-              <img src={logoPreview} alt="Logo preview" className="max-h-full max-w-full object-contain p-1" />
+            {logoUrl ? (
+              <img src={logoPreviewUrl ?? undefined} alt="Logo preview" className="max-h-full max-w-full object-contain p-1" />
             ) : (
               <span className="text-[10px] text-muted-foreground">Belum ada logo</span>
             )}
@@ -187,15 +214,18 @@ export function InvoiceSettingsForm() {
               id="logo-upload"
             />
             <Button variant="outline" size="sm" type="button" onClick={() => logoInputRef.current?.click()}>
-              {logoPreview ? 'Ganti Logo' : 'Pilih Logo'}
+              {logoUrl ? 'Ganti Logo' : 'Pilih Logo'}
             </Button>
-            {logoPreview && (
+            {logoUrl && (
               <Button variant="ghost" size="sm" type="button" onClick={handleRemoveLogo} className="text-destructive">
                 Hapus Logo
               </Button>
             )}
           </div>
         </div>
+        {pendingLogoFile && (
+          <p className="text-xs text-amber-600 font-medium">Logo baru akan diupload ke cloud saat disimpan.</p>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

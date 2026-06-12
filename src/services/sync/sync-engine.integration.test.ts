@@ -84,4 +84,27 @@ describe('runSync integration', () => {
     expect(outbox).toHaveLength(2)
     expect(outbox.every((item) => item.status === 'synced')).toBe(true)
   }, 15000)
+
+  it('pulls sales order items and payment dates for cross-browser detail view', async () => {
+    await localDb.outbox.clear()
+
+    const result = await runSync()
+    const order = await localDb.salesOrders.toArray().then((rows) => rows.find((row) => row.code === 'INV-240608-001'))
+
+    expect(result.failed).toBe(0)
+    expect(order).toBeTruthy()
+    expect(order?.date).toBeTruthy()
+
+    const items = await localDb.salesOrderItems.where('salesOrderId').equals(order!.id).toArray()
+    expect(items.length).toBeGreaterThan(0)
+    expect(items[0]).toEqual(expect.objectContaining({
+      tenantId: DEMO_TENANT_ID,
+      salesOrderId: order!.id,
+      name: expect.any(String),
+    }))
+
+    const payments = await localDb.payments.where('[tenantId+salesOrderId]').equals([DEMO_TENANT_ID, order!.id]).toArray()
+    expect(payments.length).toBeGreaterThan(0)
+    expect(payments[0]?.date).toBeTruthy()
+  }, 15000)
 })

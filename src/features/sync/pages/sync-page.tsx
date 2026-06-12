@@ -428,6 +428,11 @@ export function SyncPage() {
               key: 'pulled',
               header: 'Diambil',
             },
+            {
+              key: 'pullSummary',
+              header: 'Detail Pull',
+              render: (row) => row.pullSummary || '—',
+            },
           ]}
           data={runs}
           emptyTitle="Belum ada riwayat sinkron"

@@ -1,5 +1,6 @@
 import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
 import { formatCurrency } from '@/lib/format-currency'
+import { formatDateTime } from '@/lib/date'
 import type { PdfReceiptData, PdfCompanySettings } from './types'
 
 const styles = StyleSheet.create({
@@ -38,7 +39,7 @@ export function ReceiptPDF({ data, settings }: { data: PdfReceiptData; settings:
         <View style={styles.divider} />
 
         <View style={styles.headerRow}>
-          <Text>{data.date}</Text>
+          <Text>{formatDateTime(data.date)}</Text>
           <Text>Kasir: {data.cashierName}</Text>
         </View>
         <View style={styles.headerRow}>

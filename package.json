@@ -4,7 +4,9 @@
   "version": "1.1.1",
   "type": "module",
   "workspaces": [
-    "apps/api"
+    "apps/api",
+    "apps/desktop",
+    "apps/mobile"
   ],
   "scripts": {
     "dev": "concurrently -n api,web -c cyan,magenta \"npm run api:dev\" \"vite\"",
@@ -19,6 +21,10 @@
     "api:build": "npm run build --prefix apps/api",
     "api:check": "npm run api:test && npm run api:typecheck && npm run api:build",
     "desktop:check": "npm run check --prefix apps/desktop",
+    "tauri": "dotenv -e .env -- tauri",
+    "tauri:dev": "dotenv -e .env -- tauri dev",
+    "tauri:build": "dotenv -e .env -- tauri build",
+    "tauri:info": "dotenv -e .env -- tauri info",
     "mobile:check": "npm run check --prefix apps/mobile",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -85,6 +91,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "concurrently": "^10.0.3",
     "dotenv": "^17.4.2",
+    "dotenv-cli": "^11.0.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",

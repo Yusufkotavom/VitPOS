@@ -38,6 +38,31 @@ export function partitionSyncMutations(items: SyncMutationRecord[]) {
     rejected.push({ item, message: 'ID lokal belum kompatibel sinkron. Simpan ulang data ini.' })
   }
 
+  const priority: Record<string, number> = {
+    setting: 1,
+    customer: 2,
+    supplier: 2,
+    product_category: 3,
+    cash_category: 3,
+    product: 4,
+    recipe: 4,
+    shift: 5,
+    sale: 6,
+    purchase: 6,
+    return: 6,
+    service_order: 6,
+    payment: 7,
+    cash: 7,
+    stock_movement: 8,
+    production_batch: 8,
+  }
+
+  accepted.sort((a, b) => {
+    const pA = priority[a.entityType] ?? 99
+    const pB = priority[b.entityType] ?? 99
+    return pA - pB
+  })
+
   return { accepted, rejected }
 }
 
