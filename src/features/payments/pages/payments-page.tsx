@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { LayoutGrid, List, Filter } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -19,6 +20,7 @@ function tone(status: string) {
 }
 
 export function PaymentsPage() {
+  const { t } = useTranslation()
   const payments = usePayments()
   const [view, setView] = useState<'list' | 'card'>('list')
   const [search, setSearch] = useState('')
@@ -62,7 +64,9 @@ export function PaymentsPage() {
               size="icon"
               onClick={() => setView('list')}
               className="h-7 w-7"
-              title="List View"
+              title={t('common.list_view')}
+              aria-label={t('common.list_view')}
+              aria-pressed={view === 'list'}
             >
               <List className="h-4 w-4" />
             </Button>
@@ -71,7 +75,9 @@ export function PaymentsPage() {
               size="icon"
               onClick={() => setView('card')}
               className="h-7 w-7"
-              title="Card View"
+              title={t('common.card_view')}
+              aria-label={t('common.card_view')}
+              aria-pressed={view === 'card'}
             >
               <LayoutGrid className="h-4 w-4" />
             </Button>

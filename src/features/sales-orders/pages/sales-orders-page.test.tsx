@@ -6,6 +6,20 @@ import { SalesOrdersPage } from '@/features/sales-orders/pages/sales-orders-page
 import type { LocalSalesOrder } from '@/services/local-db/schema'
 
 const mockUseSalesOrders = vi.fn<() => LocalSalesOrder[]>()
+let isDesktop = true
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      const dict: Record<string, string> = {
+        'common.list_view': 'List View',
+        'common.card_view': 'Card View',
+      }
+
+      return dict[key] ?? key
+    },
+  }),
+}))
 
 vi.mock('@/features/sales-orders/hooks/use-sales-orders', () => ({
   useSalesOrders: () => mockUseSalesOrders(),
@@ -15,7 +29,7 @@ beforeEach(() => {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     value: vi.fn().mockImplementation((query: string) => ({
-      matches: true,
+      matches: query === '(min-width: 768px)' ? isDesktop : false,
       media: query,
       onchange: null,
       addEventListener: vi.fn(),
@@ -72,6 +86,7 @@ const orderRows: LocalSalesOrder[] = [
 
 describe('SalesOrdersPage', () => {
   beforeEach(() => {
+    isDesktop = true
     mockUseSalesOrders.mockReset()
     mockUseSalesOrders.mockReturnValue(orderRows)
   })
@@ -113,5 +128,23 @@ describe('SalesOrdersPage', () => {
 
     expect(screen.getByText('8 Jun 2026, 10:15')).toBeInTheDocument()
     expect(screen.getByText('12 Jun 2026, 15:13')).toBeInTheDocument()
+  })
+
+  it('keeps list and card toggle available on mobile', () => {
+    isDesktop = false
+
+    render(
+      <MemoryRouter>
+        <SalesOrdersPage />
+      </MemoryRouter>
+    )
+
+    expect(screen.getByRole('button', { name: 'List View' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Card View' })).toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: 'Invoice' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'List View' }))
+
+    expect(screen.getByRole('columnheader', { name: 'Invoice' })).toBeInTheDocument()
   })
 })

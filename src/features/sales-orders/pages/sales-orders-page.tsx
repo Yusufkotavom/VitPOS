@@ -2,6 +2,7 @@ import { Input } from '@/components/ui/input'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { LayoutGrid, List, Filter } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { formatDateTime } from '@/lib/date'
@@ -13,7 +14,6 @@ import { StatusBadge } from '@/shared/components/display/status-badge'
 import { EmptyState } from '@/shared/components/feedback/empty-state'
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useMediaQuery } from '@/hooks/use-media-query'
 
 function tone(status: string) {
   if (status === 'Lunas') return 'success'
@@ -77,11 +77,13 @@ function SalesOrderCard({ row }: { row: ReturnType<typeof useSalesOrders>[number
 }
 
 export function SalesOrdersPage() {
+  const { t } = useTranslation()
   const orderRows = useSalesOrders()
-  const isDesktop = useMediaQuery('(min-width: 768px)')
-  const [view, setView] = useState<'list' | 'card'>('list')
+  const [view, setView] = useState<'list' | 'card'>(() =>
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches ? 'list' : 'card'
+  )
   const [search, setSearch] = useState('')
-  const activeView = isDesktop ? view : 'card'
+  const activeView = view
 
   const filtered = orderRows
     .filter(row => !search || [row.code, row.customerName, row.date].some(f => f.toLowerCase().includes(search.toLowerCase())))
@@ -127,28 +129,30 @@ export function SalesOrdersPage() {
             </div>
           </div>
 
-          {isDesktop && (
-            <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-1 shrink-0">
-              <Button
-                variant={activeView === 'list' ? 'secondary' : 'ghost'}
-                size="icon"
-                onClick={() => setView('list')}
-                className="h-7 w-7"
-                title="List View"
-              >
-                <List className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={activeView === 'card' ? 'secondary' : 'ghost'}
-                size="icon"
-                onClick={() => setView('card')}
-                className="h-7 w-7"
-                title="Card View"
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-1 shrink-0">
+            <Button
+              variant={activeView === 'list' ? 'secondary' : 'ghost'}
+              size="icon"
+              onClick={() => setView('list')}
+              className="h-7 w-7"
+              title={t('common.list_view')}
+              aria-label={t('common.list_view')}
+              aria-pressed={activeView === 'list'}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={activeView === 'card' ? 'secondary' : 'ghost'}
+              size="icon"
+              onClick={() => setView('card')}
+              className="h-7 w-7"
+              title={t('common.card_view')}
+              aria-label={t('common.card_view')}
+              aria-pressed={activeView === 'card'}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {activeView === 'list' ? (

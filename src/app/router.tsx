@@ -5,6 +5,7 @@ import { AppLayout } from '@/shared/components/layout/app-layout'
 import { AuthGuard } from '@/features/auth/components/auth-guard'
 import { PlatformAdminGuard } from '@/features/auth/components/platform-admin-guard'
 import { LoadingState } from '@/shared/components/feedback/loading-state'
+import { NotFoundPage } from '@/shared/components/feedback/not-found-page'
 
 const DashboardPage = lazy(() => import('@/features/dashboard/pages/dashboard-page').then(pick('DashboardPage')))
 const PosPage = lazy(() => import('@/features/pos/pages/pos-page').then(pick('PosPage')))
@@ -111,6 +112,7 @@ export const router = createBrowserRouter([
       { path: 'settings/templates', element: routeElement(MessageTemplatesPage) },
       { path: 'sync', element: routeElement(SyncPage) },
       { path: 'shift', element: routeElement(ShiftPage) },
+      { path: '*', element: <NotFoundPage /> },
     ],
   },
   {

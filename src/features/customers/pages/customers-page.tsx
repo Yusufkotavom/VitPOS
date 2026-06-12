@@ -77,6 +77,8 @@ export function CustomersPage() {
               onClick={() => setView('list')}
               className="h-7 w-7"
               title={t('common.list_view')}
+              aria-label={t('common.list_view')}
+              aria-pressed={view === 'list'}
             >
               <List className="h-4 w-4" />
             </Button>
@@ -86,6 +88,8 @@ export function CustomersPage() {
               onClick={() => setView('card')}
               className="h-7 w-7"
               title={t('common.card_view')}
+              aria-label={t('common.card_view')}
+              aria-pressed={view === 'card'}
             >
               <LayoutGrid className="h-4 w-4" />
             </Button>

@@ -1,6 +1,8 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 
+import { getInitialLanguage } from '@/lib/i18n/language'
+
 const id = {
   nav: {
     group_utama: 'Utama',
@@ -809,6 +811,16 @@ const id = {
     form_select_placeholder: 'Pilih...',
     sidebar_business_suite: 'Business Suite',
     sidebar_main_branch: 'Cabang Utama',
+    language_switcher_label: 'Bahasa',
+    language_id: 'Bahasa Indonesia',
+    language_en: 'English',
+  },
+  errors: {
+    not_found_code: '404',
+    not_found_title: 'Halaman tidak ditemukan',
+    not_found_description: 'Halaman yang Anda cari mungkin dipindahkan, dihapus, atau alamatnya salah.',
+    not_found_go_dashboard: 'Ke Dashboard',
+    not_found_open_pos: 'Buka POS',
   },
   user_menu: {
     default_name: 'Pengguna',
@@ -1633,6 +1645,16 @@ const en = {
     form_select_placeholder: 'Select...',
     sidebar_business_suite: 'Business Suite',
     sidebar_main_branch: 'Main Branch',
+    language_switcher_label: 'Language',
+    language_id: 'Bahasa Indonesia',
+    language_en: 'English',
+  },
+  errors: {
+    not_found_code: '404',
+    not_found_title: 'Page not found',
+    not_found_description: 'The page you are looking for may have been moved, deleted, or the address is incorrect.',
+    not_found_go_dashboard: 'Go to Dashboard',
+    not_found_open_pos: 'Open POS',
   },
   user_menu: {
     default_name: 'User',
@@ -1654,7 +1676,7 @@ void i18n.use(initReactI18next).init({
     id: { translation: id },
     en: { translation: en },
   },
-  lng: 'id',
+  lng: getInitialLanguage(),
   fallbackLng: 'id',
   interpolation: {
     escapeValue: false,
