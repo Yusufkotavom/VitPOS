@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { LayoutGrid, List, Filter, Image as ImageIcon, Package, Coffee, Shirt, MonitorSmartphone, Download, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -51,6 +52,7 @@ function displayStock(product: { type: string; stock: number; manageStock?: bool
 }
 
 export function ProductsPage() {
+  const { t } = useTranslation()
   const productRows = useProducts()
   const isDesktop = useMediaQuery('(min-width: 768px)')
   const [view, setView] = useState<'list' | 'card'>('list')
@@ -71,10 +73,10 @@ export function ProductsPage() {
   const hasActiveFilter = filterType !== 'all' || filterStatus !== 'all'
 
   return (
-    <PageShell title="Barang & Jasa" description="Kelola produk fisik, jasa, harga grosir, gambar, dan stok." actions={<ProductCrudActions />}>
+    <PageShell title={t('products.title')} description={t('products.description')} actions={<ProductCrudActions />}>
       <ContentCard>
         <div className="mb-4 flex flex-col gap-2 border-b pb-4 sm:flex-row sm:items-center">
-          <Input placeholder="Cari barang..." value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-64" />
+          <Input placeholder={t('common.search')} value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-64" />
 
           <div className="flex flex-wrap items-center gap-2 sm:ml-auto sm:flex-nowrap">
             <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
@@ -84,44 +86,44 @@ export function ProductsPage() {
               </Button>
               <DialogContent className="max-w-xs">
                 <DialogHeader>
-                  <DialogTitle>Filter</DialogTitle>
+                  <DialogTitle>{t('common.filter')}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Jenis</label>
+                    <label className="text-sm font-medium">{t('common.type')}</label>
                     <Select value={filterType} onValueChange={setFilterType}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Pilih..." />
+                        <SelectValue placeholder={t('shared.form_select_placeholder')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Semua</SelectItem>
-                        <SelectItem value="Produk Fisik">Barang</SelectItem>
-                        <SelectItem value="Jasa">Jasa</SelectItem>
+                        <SelectItem value="all">{t('common.all')}</SelectItem>
+                        <SelectItem value="Produk Fisik">{t('common.goods') || 'Barang'}</SelectItem>
+                        <SelectItem value="Jasa">{t('common.service') || 'Jasa'}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Status</label>
+                    <label className="text-sm font-medium">{t('common.status')}</label>
                     <Select value={filterStatus} onValueChange={setFilterStatus}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Pilih..." />
+                        <SelectValue placeholder={t('shared.form_select_placeholder')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Semua</SelectItem>
-                        <SelectItem value="Aktif">Aktif</SelectItem>
-                        <SelectItem value="Draft">Draft</SelectItem>
-                        <SelectItem value="Arsip">Arsip</SelectItem>
+                        <SelectItem value="all">{t('common.all')}</SelectItem>
+                        <SelectItem value="Aktif">{t('common.active')}</SelectItem>
+                        <SelectItem value="Draft">{t('products.status_draft')}</SelectItem>
+                        <SelectItem value="Arsip">{t('common.archive') || 'Arsip'}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="flex gap-2 pt-2">
                     {hasActiveFilter && (
                       <Button variant="outline" className="flex-1" onClick={() => { setFilterType('all'); setFilterStatus('all') }}>
-                        Reset
+                        {t('common.reset')}
                       </Button>
                     )}
                     <Button className="flex-1" onClick={() => setFilterOpen(false)}>
-                      Tutup
+                      {t('common.close')}
                     </Button>
                   </div>
                 </div>
@@ -134,11 +136,11 @@ export function ProductsPage() {
               className="h-9 gap-1.5 shrink-0"
               onClick={() => {
                 exportProducts(productRows)
-                toast.success('CSV produk berhasil diexport')
+                toast.success(t('products.export_success'))
               }}
             >
               <Download className="h-4 w-4" />
-              <span className="hidden sm:inline">Export</span>
+              <span className="hidden sm:inline">{t('common.export')}</span>
             </Button>
 
             <Button
@@ -148,7 +150,7 @@ export function ProductsPage() {
               onClick={() => setImportOpen(true)}
             >
               <Upload className="h-4 w-4" />
-              <span className="hidden sm:inline">Import</span>
+              <span className="hidden sm:inline">{t('common.import')}</span>
             </Button>
 
             {isDesktop && (
@@ -180,11 +182,11 @@ export function ProductsPage() {
           <DataTable
             columns={[
               { key: 'image', header: '', render: (row) => <ProductMedia imageUrl={row.imageUrl} iconName={row.icon} className="size-10 rounded-md" /> },
-              { key: 'name', header: 'Nama' },
-              { key: 'category', header: 'Kategori' },
-              { key: 'type', header: 'Jenis' },
-              { key: 'costPrice', header: 'HPP', render: (row) => formatCurrency(row.costPrice ?? 0) },
-              { key: 'price', header: 'Harga Jual', render: (row) => {
+              { key: 'name', header: t('common.name') },
+              { key: 'category', header: t('common.category') },
+              { key: 'type', header: t('common.type') },
+              { key: 'costPrice', header: t('common.cost_price') || 'HPP', render: (row) => formatCurrency(row.costPrice ?? 0) },
+              { key: 'price', header: t('common.sell_price') || 'Harga Jual', render: (row) => {
                 if (row.wholesaleTiers && row.wholesaleTiers.length > 0) {
                   const tierLabels = row.wholesaleTiers
                     .sort((a: { minQty: number }, b: { minQty: number }) => a.minQty - b.minQty)
@@ -193,20 +195,20 @@ export function ProductsPage() {
                   return (
                     <div className="flex flex-col">
                       <span>{formatCurrency(row.price)}</span>
-                      <span className="text-xs text-muted-foreground">Grosir: {tierLabels}</span>
+                      <span className="text-xs text-muted-foreground">{t('products.wholesale_label') || 'Grosir:'} {tierLabels}</span>
                     </div>
                   )
                 }
                 return row.wholesalePrice ? `${formatCurrency(row.price)} / Grosir ${formatCurrency(row.wholesalePrice)}` : formatCurrency(row.price)
               }},
               { key: 'stock', header: 'Stok', render: (row) => displayStock(row) },
-              { key: 'status', header: 'Status', render: (row) => <StatusBadge label={row.status} tone={statusTone(row.status)} /> },
-              { key: 'actions', header: 'Aksi', render: (row) => <ProductCrudActions product={row} /> },
+              { key: 'status', header: t('common.status'), render: (row) => <StatusBadge label={row.status} tone={statusTone(row.status)} /> },
+              { key: 'actions', header: t('common.actions'), render: (row) => <ProductCrudActions product={row} /> },
             ]}
             data={filtered}
           />
         ) : filtered.length === 0 ? (
-          <EmptyState title="Belum ada barang atau jasa" description="Barang dan jasa akan muncul di sini setelah tersedia." />
+          <EmptyState title={t('products.empty')} description={t('products.add_description')} />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {filtered.map((row) => (

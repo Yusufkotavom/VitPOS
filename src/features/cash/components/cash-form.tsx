@@ -15,6 +15,7 @@ import {
 } from '@/features/cash/schemas/cash-form-schema'
 import { FormSelect } from '@/shared/components/form/form-select'
 import { FormSection } from '@/shared/components/forms/form-section'
+import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
 
 export function CashForm({
   defaultValues,
@@ -38,6 +39,8 @@ export function CashForm({
 
   const errors = form.formState.errors
   const type = useWatch({ control: form.control, name: 'type' })
+  const dbMethods = usePaymentMethods()
+  const activeMethods = dbMethods && dbMethods.length > 0 ? dbMethods.filter(m => m.status === 'Aktif').map(m => m.name) : [...cashAccountOptions]
 
   return (
     <form className="flex flex-col gap-4 p-4" onSubmit={form.handleSubmit(onSubmit)}>
@@ -54,7 +57,7 @@ export function CashForm({
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Akun kas
-          <FormSelect control={form.control} name="account" options={cashAccountOptions.map(o => ({ label: o, value: o }))} />
+          <FormSelect control={form.control} name="account" options={activeMethods.map(o => ({ label: o, value: o }))} />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Kategori

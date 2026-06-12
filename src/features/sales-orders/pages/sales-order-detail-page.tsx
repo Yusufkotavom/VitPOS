@@ -22,6 +22,7 @@ import { salesOrderRepository } from '@/services/local-db/repository'
 import { localDb } from '@/services/local-db/client'
 import { messageTemplateService } from '@/services/message-template.service'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
+import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { DataTable } from '@/shared/components/data-table/data-table'
@@ -57,9 +58,18 @@ export function SalesOrderDetailPage() {
 
   const [payOpen, setPayOpen] = useState(false)
   const [payAmount, setPayAmount] = useState('')
-  const [payMethod, setPayMethod] = useState('tunai')
+  const [payMethod, setPayMethod] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
   const { downloadPdf, printPdf } = usePdf()
+
+  const dbMethods = usePaymentMethods()
+  const activeMethods = dbMethods && dbMethods.length > 0 
+    ? dbMethods.filter(m => m.status === 'Aktif') 
+    : [
+        { id: 'tunai', name: 'Tunai' },
+        { id: 'qris', name: 'QRIS' },
+        { id: 'transfer', name: 'Transfer' }
+      ]
 
   const invoiceCustomer = useLiveQuery(
     () => order?.customerId ? localDb.customers.get(order.customerId) : undefined,
@@ -158,8 +168,9 @@ export function SalesOrderDetailPage() {
     if (!order) return
     const amount = Number(payAmount) || 0
     if (amount <= 0) return toast.error('Nominal pembayaran harus lebih dari 0')
+    const methodToUse = payMethod || (activeMethods[0]?.name.toLowerCase()) || 'tunai'
     try {
-      await recordSalesOrderPayment(order.id, amount, payMethod as 'tunai' | 'qris' | 'kartu' | 'transfer' | 'e-wallet' | 'piutang')
+      await recordSalesOrderPayment(order.id, amount, methodToUse as 'tunai' | 'qris' | 'kartu' | 'transfer' | 'e-wallet' | 'piutang')
       toast.success(`Pembayaran Rp ${amount.toLocaleString('id-ID')} diterima`)
       setPayOpen(false)
       setPayAmount('')
@@ -536,16 +547,14 @@ export function SalesOrderDetailPage() {
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium">Metode</label>
-              <Select value={payMethod} onValueChange={setPayMethod}>
+              <Select value={payMethod || activeMethods[0]?.name.toLowerCase()} onValueChange={setPayMethod}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Pilih metode" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="tunai">Tunai</SelectItem>
-                  <SelectItem value="qris">QRIS</SelectItem>
-                  <SelectItem value="kartu">Kartu</SelectItem>
-                  <SelectItem value="transfer">Transfer</SelectItem>
-                  <SelectItem value="e-wallet">E-Wallet</SelectItem>
+                  {activeMethods.map((m: { id: string; name: string }) => (
+                    <SelectItem key={m.id} value={m.name.toLowerCase()}>{m.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

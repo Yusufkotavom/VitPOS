@@ -12,9 +12,9 @@ describe('icon-only action button accessibility', () => {
   it('names POS cart icon-only actions', () => {
     const source = read('src/features/pos/components/cart-panel.tsx')
 
-    expect(source).toContain('aria-label={`Hapus ${item.name} dari keranjang`}')
-    expect(source).toContain('aria-label={`Kurangi jumlah ${item.name}`}')
-    expect(source).toContain('aria-label={`Tambah jumlah ${item.name}`}')
+    expect(source).toContain("aria-label={t('pos.remove_from_cart', { name: item.name })}")
+    expect(source).toContain("aria-label={t('pos.decrease_qty', { name: item.name })}")
+    expect(source).toContain("aria-label={t('pos.increase_qty', { name: item.name })}")
   })
 
   it('names line item remove buttons', () => {

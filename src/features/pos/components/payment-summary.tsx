@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
+import { useTranslation } from 'react-i18next'
 import { formatCurrency } from '@/lib/format-currency'
 import { selectPosTotals, usePosStore } from '@/features/pos/stores/pos-store'
 import { posTransactionService } from '@/features/pos/services/pos-transaction.service'
@@ -26,6 +27,7 @@ const defaultMethods = [
 ]
 
 export function PaymentSummary({ onComplete, shiftId }: { onComplete?: () => void, shiftId?: string }) {
+  const { t } = useTranslation()
   const store = usePosStore()
   const totals = selectPosTotals(store)
   const dbMethods = usePaymentMethods()
@@ -71,7 +73,7 @@ export function PaymentSummary({ onComplete, shiftId }: { onComplete?: () => voi
       })
       store.clearCart()
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Gagal mencatat pembayaran'
+      const message = error instanceof Error ? error.message : t('common.error_generic')
       toast.error(message)
     } finally {
       setProcessing(false)
@@ -165,7 +167,7 @@ export function PaymentSummary({ onComplete, shiftId }: { onComplete?: () => voi
       </div>
 
       <div className="space-y-3">
-        <h3 className="font-medium text-sm text-muted-foreground">Detail Pesanan</h3>
+        <h3 className="font-medium text-sm text-muted-foreground">{t('pos.order_detail')}</h3>
         <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
           {store.cartItems.map(item => (
             <div key={item.productId} className="flex justify-between text-sm">
@@ -184,11 +186,11 @@ export function PaymentSummary({ onComplete, shiftId }: { onComplete?: () => voi
 
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Subtotal</span>
+          <span className="text-muted-foreground">{t('pos.subtotal')}</span>
           <span>{formatCurrency(totals.subtotal)}</span>
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-muted-foreground">Diskon Tambahan</span>
+          <span className="text-muted-foreground">{t('pos.additional_discount')}</span>
           <Input 
             type="number"
             inputMode="numeric"
@@ -199,13 +201,13 @@ export function PaymentSummary({ onComplete, shiftId }: { onComplete?: () => voi
           />
         </div>
         <div className="flex justify-between text-xl font-bold pt-2">
-          <span>Total</span>
+          <span>{t('common.total')}</span>
           <span className="text-primary">{formatCurrency(totals.total)}</span>
         </div>
       </div>
 
       <div className="space-y-3 pt-2">
-        <label className="text-sm font-medium">Metode Pembayaran</label>
+        <label className="text-sm font-medium">{t('pos.payment_method_select')}</label>
         <div className="grid grid-cols-3 gap-2">
           {activeMethods.map((method: { id: string; name: string }) => (
             <Button
@@ -231,7 +233,7 @@ export function PaymentSummary({ onComplete, shiftId }: { onComplete?: () => voi
                 className="w-48 h-48 object-contain"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
-                  e.currentTarget.parentElement!.innerHTML = '<div class="w-48 h-48 flex items-center justify-center bg-muted/30 text-muted-foreground text-xs text-center rounded">Gambar<br/>Gagal Dimuat</div>';
+                  e.currentTarget.parentElement!.innerHTML = `<div class="w-48 h-48 flex items-center justify-center bg-muted/30 text-muted-foreground text-xs text-center rounded">${t('pos.image_load_failed')}</div>`;
                 }}
               />
             </div>
@@ -245,7 +247,7 @@ export function PaymentSummary({ onComplete, shiftId }: { onComplete?: () => voi
       )}
 
       <div className="space-y-3 p-4 border rounded-2xl bg-muted/10">
-        <label className="text-sm font-medium">Uang Diterima / Dibayar</label>
+        <label className="text-sm font-medium">{t('pos.paid_amount_label')}</label>
         <Input
           inputMode="numeric"
           placeholder={`Minimal ${formatCurrency(totals.total)}`}
@@ -256,12 +258,12 @@ export function PaymentSummary({ onComplete, shiftId }: { onComplete?: () => voi
         <div className="flex justify-between items-center text-sm pt-2">
           {store.paidAmount > 0 && store.paidAmount < totals.total ? (
             <>
-              <span className="text-destructive font-medium">Kurang Bayar (DP)</span>
+              <span className="text-destructive font-medium">{t('pos.shortfall')}</span>
               <span className="text-destructive font-bold">{formatCurrency(totals.total - store.paidAmount)}</span>
             </>
           ) : (
             <>
-              <span className="text-muted-foreground">Kembalian</span>
+              <span className="text-muted-foreground">{t('pos.change_due')}</span>
               <span className="text-lg font-bold text-success">{formatCurrency(Math.max((store.paidAmount || totals.total) - totals.total, 0))}</span>
             </>
           )}
@@ -269,7 +271,7 @@ export function PaymentSummary({ onComplete, shiftId }: { onComplete?: () => voi
       </div>
 
       <Button size="lg" className="h-14 text-lg font-semibold w-full mt-2" disabled={store.cartItems.length === 0 || isProcessing} onClick={handleCheckout}>
-        {isProcessing ? 'Memproses...' : selectedMethodObj?.qrImageUrl ? 'Verifikasi & Selesaikan' : 'Selesaikan Pembayaran'}
+        {isProcessing ? t('pos.processing') : selectedMethodObj?.qrImageUrl ? t('pos.verify_complete') : t('pos.complete_payment')}
       </Button>
 
       {successOrder && <ReceiptPrintLayout order={successOrder} />}

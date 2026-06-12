@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { HeldSaleBanner } from '@/features/pos/components/held-sale-banner'
@@ -27,6 +28,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useMediaQuery } from '@/hooks/use-media-query'
 
 export function PosPage() {
+  const { t } = useTranslation()
   const syncSummary = useSyncStore()
   const store = usePosStore()
   const totals = selectPosTotals(store)
@@ -45,26 +47,26 @@ export function PosPage() {
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
 
   async function handleOpenShift() {
-    if (!startCash) return toast.error('Modal awal harus diisi')
+    if (!startCash) return toast.error(t('pos.start_cash_required'))
     try {
       await shiftRepository.upsert({
         id: crypto.randomUUID(),
         tenantId: resolveTenantId(),
-        cashierName: 'Kasir Aktif',
+        cashierName: t('shift.active_cashier'),
         startTime: new Date().toISOString(),
         startCash: parseFloat(startCash),
         status: 'open',
       })
-      toast.success('Shift berhasil dibuka')
+      toast.success(t('shift.opened'))
       setStartCash('')
       await queryClient.invalidateQueries({ queryKey: ['active-shift'] })
     } catch (error) {
-      toast.error(`Gagal buka shift: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(`${t('pos.shift_open_failed')}${error instanceof Error ? error.message : t('common.error_generic')}`)
     }
   }
 
   if (activeShift === undefined) {
-    return <div className="flex h-[100dvh] items-center justify-center text-muted-foreground">Memeriksa sesi kasir...</div>
+    return <div className="flex h-[100dvh] items-center justify-center text-muted-foreground">{t('pos.checking_session')}</div>
   }
 
   async function handleDraft() {
@@ -72,10 +74,10 @@ export function PosPage() {
     setDrafting(true)
     try {
       await posTransactionService.saveDraft(store.cartItems, totals, store.discount, store.customerName, store.customerId, activeShift?.id)
-      toast.success('Draft berhasil disimpan')
+      toast.success(t('pos.draft_saved'))
       store.clearCart()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Gagal menyimpan draft')
+      toast.error(error instanceof Error ? error.message : t('pos.draft_save_failed'))
     } finally {
       setDrafting(false)
     }
@@ -89,13 +91,13 @@ export function PosPage() {
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
-        <span className="font-semibold text-sm">Kembali</span>
+        <span className="font-semibold text-sm">{t('common.back')}</span>
       </div>
       <header className="px-4 py-2 md:py-4">
         <div className="mx-auto grid max-w-screen-2xl gap-3 md:grid-cols-2">
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs font-medium text-muted-foreground">Pelanggan</p>
+              <p className="text-xs font-medium text-muted-foreground">{t('pos.customer')}</p>
               <div className="flex items-center gap-1 text-muted-foreground">
                 <TooltipProvider>
                   <Tooltip>
@@ -105,7 +107,7 @@ export function PosPage() {
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Status Shift</p>
+                      <p>{t('pos.check_shift')}</p>
                     </TooltipContent>
                   </Tooltip>
                   <Tooltip>
@@ -115,7 +117,7 @@ export function PosPage() {
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Daftar Draft</p>
+                      <p>{t('pos.draft_list')}</p>
                     </TooltipContent>
                   </Tooltip>
                   <Tooltip>
@@ -125,7 +127,7 @@ export function PosPage() {
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Daftar Service</p>
+                      <p>{t('pos.service_list')}</p>
                     </TooltipContent>
                   </Tooltip>
                   <Tooltip>
@@ -135,7 +137,7 @@ export function PosPage() {
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Buat Service Baru</p>
+                      <p>{t('pos.new_service')}</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -144,7 +146,7 @@ export function PosPage() {
             <PosCustomerSelect />
           </div>
           <div>
-            <p className="mb-2 text-xs font-medium text-muted-foreground">Produk</p>
+            <p className="mb-2 text-xs font-medium text-muted-foreground">{t('nav.products')}</p>
             <ProductSearch />
           </div>
         </div>
@@ -165,9 +167,9 @@ export function PosPage() {
         {/* Kanan: Keranjang (Desktop) */}
         <aside className="hidden w-[400px] flex-col border-l bg-background xl:flex">
           <div className="flex items-center justify-between border-b px-4 py-3">
-            <h2 className="font-semibold">Keranjang</h2>
+            <h2 className="font-semibold">{t('pos.cart')}</h2>
             <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-              {totals.itemCount} item
+              {t('pos.item_count', { count: totals.itemCount })}
             </span>
           </div>
           <div className="flex-1 overflow-y-auto p-4">
@@ -175,15 +177,15 @@ export function PosPage() {
           </div>
           <div className="border-t p-4 space-y-3">
             <div className="flex justify-between font-medium">
-              <span className="text-muted-foreground">Total</span>
+              <span className="text-muted-foreground">{t('common.total')}</span>
               <span className="text-xl font-bold">{formatCurrency(totals.total)}</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <Button variant="outline" disabled={!hasItems || isDrafting} onClick={handleDraft}>
-                {isDrafting ? 'Menyimpan...' : 'Simpan Draft'}
+                {isDrafting ? t('pos.saving') : t('pos.save_draft')}
               </Button>
               <Button disabled={!hasItems} onClick={() => setIsPaymentOpen(true)}>
-                Bayar
+                {t('pos.submit_payment')}
               </Button>
             </div>
           </div>
@@ -194,14 +196,14 @@ export function PosPage() {
       <div className="border-t bg-background p-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] xl:hidden z-20 sticky bottom-0">
         <div className="mx-auto flex items-center gap-3">
           <div className="flex-1 cursor-pointer" onClick={() => setIsMobileCartOpen(true)}>
-            <p className="text-xs text-muted-foreground">{totals.itemCount} item <span className="underline ml-1">Lihat Detail</span></p>
+            <p className="text-xs text-muted-foreground">{t('pos.item_count', { count: totals.itemCount })} <span className="underline ml-1">{t('pos.see_detail')}</span></p>
             <p className="text-lg font-bold">{formatCurrency(totals.total)}</p>
           </div>
           <Button variant="outline" size="sm" disabled={!hasItems || isDrafting} onClick={handleDraft}>
-            {isDrafting ? '...' : 'Draft'}
+            {isDrafting ? '...' : t('pos.draft_short')}
           </Button>
           <Button size="lg" className="min-w-32" disabled={!hasItems} onClick={() => setIsPaymentOpen(true)}>
-            Bayar
+            {t('pos.submit_payment')}
           </Button>
         </div>
       </div>
@@ -210,7 +212,7 @@ export function PosPage() {
         <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
           <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
             <DialogHeader>
-              <DialogTitle>Pembayaran</DialogTitle>
+              <DialogTitle>{t('pos.payment')}</DialogTitle>
             </DialogHeader>
             <div className="py-2">
               <PaymentSummary onComplete={() => setIsPaymentOpen(false)} shiftId={activeShift?.id} />
@@ -221,7 +223,7 @@ export function PosPage() {
         <Drawer open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
           <DrawerContent className="h-[90vh]">
             <DrawerHeader className="border-b text-left">
-              <DrawerTitle>Pembayaran</DrawerTitle>
+              <DrawerTitle>{t('pos.payment')}</DrawerTitle>
             </DrawerHeader>
             <div className="flex-1 overflow-y-auto p-4">
               <PaymentSummary onComplete={() => setIsPaymentOpen(false)} shiftId={activeShift?.id} />
@@ -237,26 +239,26 @@ export function PosPage() {
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-orange-100">
                 <LockIcon className="h-8 w-8 text-orange-600" />
               </div>
-              <DialogTitle className="text-center text-xl">Sesi Kasir Belum Dibuka</DialogTitle>
+              <DialogTitle className="text-center text-xl">{t('pos.cashier_session_closed')}</DialogTitle>
               <DialogDescription className="text-center">
-                Masukkan modal awal uang kasir (Start Cash) sebelum mulai transaksi.
+                {t('pos.enter_start_cash')}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="space-y-2">
-                <Label>Modal Awal Kasir (Rp)</Label>
+                <Label>{t('pos.start_cash_label')}</Label>
                 <Input
                   type="number"
                   inputMode="numeric"
                   value={startCash}
                   onChange={(e) => setStartCash(e.target.value)}
-                  placeholder="Contoh: 500000"
+                  placeholder={t('pos.example_cash')}
                   autoFocus
                 />
               </div>
             </div>
             <DialogFooter className="sm:justify-center">
-              <Button size="lg" className="w-full sm:w-auto" onClick={handleOpenShift}>Buka Shift Sekarang</Button>
+              <Button size="lg" className="w-full sm:w-auto" onClick={handleOpenShift}>{t('pos.open_shift_now')}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -267,24 +269,24 @@ export function PosPage() {
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-orange-100">
                 <LockIcon className="h-8 w-8 text-orange-600" />
               </div>
-              <DrawerTitle className="text-center text-xl">Sesi Kasir Belum Dibuka</DrawerTitle>
+              <DrawerTitle className="text-center text-xl">{t('pos.cashier_session_closed')}</DrawerTitle>
               <DrawerDescription className="text-center">
-                Masukkan modal awal uang kasir (Start Cash) sebelum mulai transaksi.
+                {t('pos.enter_start_cash')}
               </DrawerDescription>
             </DrawerHeader>
             <div className="p-4 space-y-4">
               <div className="space-y-2">
-                <Label>Modal Awal Kasir (Rp)</Label>
+                <Label>{t('pos.start_cash_label')}</Label>
                 <Input
                   type="number"
                   inputMode="numeric"
                   value={startCash}
                   onChange={(e) => setStartCash(e.target.value)}
-                  placeholder="Contoh: 500000"
+                  placeholder={t('pos.example_cash')}
                   autoFocus
                 />
               </div>
-              <Button size="lg" className="w-full" onClick={handleOpenShift}>Buka Shift Sekarang</Button>
+              <Button size="lg" className="w-full" onClick={handleOpenShift}>{t('pos.open_shift_now')}</Button>
             </div>
           </DrawerContent>
         </Drawer>
@@ -294,22 +296,22 @@ export function PosPage() {
       <Drawer open={isMobileCartOpen} onOpenChange={setIsMobileCartOpen}>
         <DrawerContent className="h-[85vh]">
           <DrawerHeader className="border-b">
-            <DrawerTitle>Keranjang ({totals.itemCount} item)</DrawerTitle>
+            <DrawerTitle>{t('pos.cart')} ({t('pos.item_count', { count: totals.itemCount })})</DrawerTitle>
           </DrawerHeader>
           <div className="flex-1 overflow-y-auto p-4">
             <CartPanel />
           </div>
           <div className="border-t p-4 space-y-3 bg-background">
             <div className="flex justify-between font-medium">
-              <span className="text-muted-foreground">Total</span>
+              <span className="text-muted-foreground">{t('common.total')}</span>
               <span className="text-xl font-bold">{formatCurrency(totals.total)}</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <Button variant="outline" disabled={!hasItems || isDrafting} onClick={() => { setIsMobileCartOpen(false); handleDraft(); }}>
-                {isDrafting ? 'Menyimpan...' : 'Simpan Draft'}
+                {isDrafting ? t('pos.saving') : t('pos.save_draft')}
               </Button>
               <Button disabled={!hasItems} onClick={() => { setIsMobileCartOpen(false); setIsPaymentOpen(true); }}>
-                Bayar
+                {t('pos.submit_payment')}
               </Button>
             </div>
           </div>

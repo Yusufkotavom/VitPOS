@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from '@/components/ui/combobox'
@@ -20,12 +21,13 @@ import { createCustomerId } from '@/features/catalog/lib/entity-id'
 import { customerRepository } from '@/services/local-db/repository'
 
 export function PosCustomerSelect() {
+  const { t } = useTranslation()
   const customerName = usePosStore(state => state.customerName)
   const setCustomer = usePosStore(state => state.setCustomer)
   const localCustomers = useCustomers()
   const [isAddOpen, setIsAddOpen] = useState(false)
 
-  const activeCustomers = localCustomers.filter(c => c.status === 'Aktif')
+  const activeCustomers = localCustomers.filter(c => c.status === t('common.active'))
 
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerFormSchema),
@@ -48,11 +50,11 @@ export function PosCustomerSelect() {
       const id = createCustomerId()
       await customerRepository.upsert(mapCustomerFormToRecord(values, id))
       setCustomer(id, values.name.trim())
-      toast.success('Pelanggan ditambahkan')
+      toast.success(t('customers.added'))
       setIsAddOpen(false)
       form.reset()
     } catch (error) {
-      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(error instanceof Error ? error.message : t('common.error_generic'))
     }
   }
 
@@ -65,7 +67,7 @@ export function PosCustomerSelect() {
           <ComboboxInput placeholder="Cari / Pilih Pelanggan (Umum)" />
           <ComboboxContent>
             {activeCustomers.length === 0 ? (
-              <ComboboxEmpty>Belum ada pelanggan.</ComboboxEmpty>
+              <ComboboxEmpty>{t('customers.none')}</ComboboxEmpty>
             ) : (
               <ComboboxList>
                 {(item: unknown) => {
@@ -92,12 +94,12 @@ export function PosCustomerSelect() {
         <DialogContent className="sm:max-w-sm">
           <form onSubmit={form.handleSubmit(handleAddSave)}>
             <DialogHeader>
-              <DialogTitle>Tambah Pelanggan Baru</DialogTitle>
-              <DialogDescription>Simpan lokal lebih dulu. Outbox sinkron jalan otomatis.</DialogDescription>
+              <DialogTitle>{t('customers.add_new')}</DialogTitle>
+              <DialogDescription>{t('common.save_local_first')}</DialogDescription>
             </DialogHeader>
             <FieldGroup>
               <Field data-invalid={!!errors.name}>
-                <Label htmlFor="name">Nama</Label>
+                <Label htmlFor="name">{t('common.name')}</Label>
                 <Input id="name" {...form.register('name')} aria-invalid={!!errors.name} autoFocus />
               </Field>
               <Field data-invalid={!!errors.phone}>
@@ -105,18 +107,18 @@ export function PosCustomerSelect() {
                 <Input id="phone" {...form.register('phone')} aria-invalid={!!errors.phone} />
               </Field>
               <Field data-invalid={!!errors.city}>
-                <Label htmlFor="city">Alamat</Label>
+                <Label htmlFor="city">{t('common.address')}</Label>
                 <Textarea id="city" {...form.register('city')} aria-invalid={!!errors.city} className="min-h-[3.5rem]" />
               </Field>
               <Field>
-                <Label htmlFor="status">Status</Label>
+                <Label htmlFor="status">{t('common.status')}</Label>
                 <Controller
                   name="status"
                   control={form.control}
                   render={({ field }) => (
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <SelectTrigger id="status">
-                        <SelectValue placeholder="Pilih status" />
+                        <SelectValue placeholder={t('common.select_status')} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
@@ -132,9 +134,9 @@ export function PosCustomerSelect() {
             </FieldGroup>
             <DialogFooter>
               <DialogClose asChild>
-                <Button variant="outline" type="button">Batal</Button>
+                <Button variant="outline" type="button">{t('common.cancel')}</Button>
               </DialogClose>
-              <Button type="submit" disabled={form.formState.isSubmitting}>Tambah</Button>
+              <Button type="submit" disabled={form.formState.isSubmitting}>{t('common.add')}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

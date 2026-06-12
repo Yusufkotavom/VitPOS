@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect, useRef, useState } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +27,7 @@ type ProductFormProps = {
 }
 
 export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: ProductFormProps) {
+  const { t } = useTranslation()
   const categoryRows = useCategories()
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productFormSchema),
@@ -301,7 +303,7 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
       )}
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end pt-2">
-        <Button type="button" variant="outline" onClick={onCancel}>Batal</Button>
+        <Button type="button" variant="outline" onClick={onCancel}>{t('common.cancel')}</Button>
         <Button type="submit" disabled={form.formState.isSubmitting}>{submitLabel}</Button>
       </div>
     </form>

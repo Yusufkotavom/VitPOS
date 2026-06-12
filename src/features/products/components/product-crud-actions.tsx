@@ -2,6 +2,7 @@ import { PencilIcon, PlusIcon, Trash2Icon, Settings2, BookOpen } from 'lucide-re
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog'
@@ -13,6 +14,7 @@ import { localDb } from '@/services/local-db/client'
 import type { LocalProduct } from '@/services/local-db/schema'
 
 export function ProductCrudActions({ product }: { product?: LocalProduct }) {
+  const { t } = useTranslation()
   const [formOpen, setFormOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [editProduct, setEditProduct] = useState<LocalProduct | undefined>()
@@ -47,7 +49,7 @@ export function ProductCrudActions({ product }: { product?: LocalProduct }) {
 
       if (newStock !== oldStock && newRecord.manageStock) {
         const diff = newStock - oldStock
-        const warehouseName = 'Gudang Utama'
+        const warehouseName = t('products.default_warehouse')
         const movementId = crypto.randomUUID()
         const nowIso = new Date().toISOString()
 
@@ -87,10 +89,10 @@ export function ProductCrudActions({ product }: { product?: LocalProduct }) {
         await stockMovementRepository.upsert(movement)
       }
 
-      toast.success(isEdit ? 'Produk diperbarui' : 'Produk ditambahkan')
+      toast.success(isEdit ? t('products.updated') : t('products.added'))
       setFormOpen(false)
     } catch (error) {
-      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(error instanceof Error ? error.message : t('common.error_generic'))
     }
   }
 
@@ -98,10 +100,10 @@ export function ProductCrudActions({ product }: { product?: LocalProduct }) {
     if (!product) return
     try {
       await productRepository.remove(product.id)
-      toast.success('Produk dihapus')
+      toast.success(t('products.deleted'))
       setDeleteOpen(false)
     } catch (error) {
-      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(error instanceof Error ? error.message : t('common.error_generic'))
     }
   }
 
@@ -109,48 +111,48 @@ export function ProductCrudActions({ product }: { product?: LocalProduct }) {
     <div className="flex flex-wrap gap-2">
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         {product ? (
-          <Button variant="outline" size="sm" onClick={handleEditClick}><PencilIcon data-icon="inline-start" />Ubah</Button>
+          <Button variant="outline" size="sm" onClick={handleEditClick}><PencilIcon data-icon="inline-start" />{t('common.edit')}</Button>
         ) : (
-          <Button onClick={() => { setEditProduct(undefined); setFormOpen(true); }}><PlusIcon data-icon="inline-start" />Tambah Produk</Button>
+          <Button onClick={() => { setEditProduct(undefined); setFormOpen(true); }}><PlusIcon data-icon="inline-start" />{t('products.add')}</Button>
         )}
         {!product && (
           <>
             <Button variant="outline" asChild>
               <Link to="/products/categories">
-                <Settings2 data-icon="inline-start" /> Kelola Kategori
+                <Settings2 data-icon="inline-start" /> {t('categories.manage')}
               </Link>
             </Button>
             <Button variant="outline" asChild>
               <Link to="/products/recipes">
-                <BookOpen data-icon="inline-start" /> Resep / BOM
+                <BookOpen data-icon="inline-start" /> {t('nav.resep_bom')}
               </Link>
             </Button>
           </>
         )}
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{isEdit ? 'Ubah produk' : 'Tambah produk'}</DialogTitle>
+            <DialogTitle>{isEdit ? t('products.edit_title') : t('products.add_title')}</DialogTitle>
             <DialogDescription className="sr-only">
-              Isi formulir di bawah ini untuk mengelola detail produk.
+              {t('products.add_description')}
             </DialogDescription>
           </DialogHeader>
-          <ProductForm key={product?.id ?? 'new'} defaultValues={defaultValues} submitLabel={isEdit ? 'Simpan perubahan' : 'Simpan produk'} onCancel={handleFormClose} onSubmit={handleSubmit} />
+          <ProductForm key={product?.id ?? 'new'} defaultValues={defaultValues} submitLabel={isEdit ? t('common.save_changes') : t('products.save')} onCancel={handleFormClose} onSubmit={handleSubmit} />
         </DialogContent>
       </Dialog>
       {product ? (
         <>
-          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />Hapus</Button>
+          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />{t('common.delete')}</Button>
           <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Hapus produk</DialogTitle>
-                <DialogDescription>Produk {product.name} akan dihapus dari data lokal dan masuk antrean sinkron.</DialogDescription>
+                <DialogTitle>{t('products.delete_title')}</DialogTitle>
+                <DialogDescription>{t('products.delete_confirm')}</DialogDescription>
               </DialogHeader>
               <DialogFooter>
                 <DialogClose asChild>
-                  <Button variant="outline">Batal</Button>
+                  <Button variant="outline">{t('common.cancel')}</Button>
                 </DialogClose>
-                <Button variant="destructive" onClick={handleDelete}>Hapus produk</Button>
+                <Button variant="destructive" onClick={handleDelete}>{t('products.delete_confirm')}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
