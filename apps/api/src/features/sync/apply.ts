@@ -739,7 +739,7 @@ async function applySetting(db: AppDb, ctx: ApplyContext, entityId: string, muta
   }
 
   const now = new Date()
-  const settingKey = payload.key ?? payload.setting ?? entityId
+  const settingKey = payload.key ?? payload.id ?? payload.setting ?? entityId
   const area = payload.area ?? 'general'
 
   const existing = await db.query.settings.findFirst({

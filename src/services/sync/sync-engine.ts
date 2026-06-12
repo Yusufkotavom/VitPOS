@@ -59,6 +59,20 @@ const SERVER_TO_LOCAL_SERVICE_STATUS: Record<string, LocalServiceOrder['status']
   cancelled: 'Batal',
 }
 
+const LEGACY_COMPANY_SETTING_KEYS: Record<string, string> = {
+  'Ikon Usaha': 'company-icon',
+  'Logo Perusahaan': 'company-logo',
+  'Nama Usaha': 'company-name',
+  'Nomor Telepon': 'company-phone',
+  'Alamat Usaha': 'company-address',
+  'NPWP / NIB': 'company-tax-number',
+}
+
+function normalizeSettingKey(key: string, area: string) {
+  if (area === 'Profil Usaha') return LEGACY_COMPANY_SETTING_KEYS[key] ?? key
+  return key
+}
+
 function normalizePaymentMethod(serverMethod: unknown): PosPaymentMethodCode {
   if (typeof serverMethod !== 'string') return 'tunai'
   return SERVER_TO_LOCAL_PAYMENT_METHOD[serverMethod] ?? (serverMethod as PosPaymentMethodCode)
@@ -311,11 +325,14 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
       updatedAt: item.updatedAt,
     })
   } else if (item.entityType === 'setting') {
+    const area = typeof payload.area === 'string' ? payload.area : 'general'
+    const rawKey = typeof payload.key === 'string' ? payload.key : typeof payload.id === 'string' ? payload.id : item.entityId
+    const normalizedKey = normalizeSettingKey(rawKey, area)
     await localDb.settings.put({
-      id: typeof payload.key === 'string' ? payload.key : item.entityId,
+      id: normalizedKey,
       tenantId,
-      area: typeof payload.area === 'string' ? payload.area : 'general',
-      setting: typeof payload.key === 'string' ? payload.key : '',
+      area,
+      setting: typeof payload.setting === 'string' ? payload.setting : rawKey,
       value: typeof payload.value === 'string' ? payload.value : '',
       updatedAt: item.updatedAt,
       status: typeof payload.status === 'string' ? payload.status : 'active',

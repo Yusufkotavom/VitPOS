@@ -1,4 +1,4 @@
-import { productRepository } from '@/services/local-db/repository'
+import { productRepository, productCategoryRepository } from '@/services/local-db/repository'
 import { createProductId } from '@/features/catalog/lib/entity-id'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import type { LocalProduct, ProductStatus, ProductType, WholesaleTier } from '@/services/local-db/schema'
@@ -136,11 +136,29 @@ export async function executeImport(
   let updated = 0
   let failed = 0
 
+  const existingCategories = await productCategoryRepository.list(tenantId)
+  const categoryNames = new Set(existingCategories.map(c => c.name.toLowerCase()))
+
   for (const row of rows) {
     if (!row.valid) { failed++; continue }
     try {
       const base = row.action === 'update' ? existingMap.get(row.id) : undefined
       const record = rowToRecord(row, tenantId, base)
+
+      const catName = record.category
+      if (catName && catName !== 'Umum' && !categoryNames.has(catName.toLowerCase())) {
+        categoryNames.add(catName.toLowerCase())
+        await productCategoryRepository.upsert({
+          id: `cat-${crypto.randomUUID()}`,
+          tenantId,
+          name: catName,
+          status: 'Aktif',
+          syncStatus: 'pending',
+          version: 1,
+          updatedAt: new Date().toISOString()
+        })
+      }
+
       await productRepository.upsert(record)
       if (row.action === 'update') {
         updated++

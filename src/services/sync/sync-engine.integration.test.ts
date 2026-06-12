@@ -7,7 +7,7 @@ import { createApp } from '../../../apps/api/src/app'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { localDb } from '@/services/local-db/client'
 import { DEMO_TENANT_ID, seedLocalDemoData, demoOutboxItems } from '@/services/local-db/seeds'
-import { runSync } from '@/services/sync/sync-engine'
+import { applyPullItems, runSync } from '@/services/sync/sync-engine'
 
 config({ path: '.env.local' })
 config()
@@ -107,4 +107,33 @@ describe('runSync integration', () => {
     expect(payments.length).toBeGreaterThan(0)
     expect(payments[0]?.date).toBeTruthy()
   }, 15000)
+
+  it('maps legacy company setting labels to machine keys during pull', async () => {
+    await applyPullItems([
+      {
+        id: crypto.randomUUID(),
+        entityId: crypto.randomUUID(),
+        entityType: 'setting',
+        mutationType: 'update',
+        transportStatus: 'applied',
+        serverSyncStatus: 'synced',
+        updatedAt: new Date().toISOString(),
+        payload: {
+          id: 'Nama Usaha',
+          key: 'Nama Usaha',
+          area: 'Profil Usaha',
+          value: 'KOTACOM',
+          status: 'Lengkap',
+        },
+      },
+    ], DEMO_TENANT_ID)
+
+    const setting = await localDb.settings.get('company-name')
+    expect(setting).toEqual(expect.objectContaining({
+      id: 'company-name',
+      area: 'Profil Usaha',
+      setting: 'Nama Usaha',
+      value: 'KOTACOM',
+    }))
+  })
 })

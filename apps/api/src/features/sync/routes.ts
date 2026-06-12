@@ -33,6 +33,20 @@ import {
   suppliers,
 } from '../../../../../src/db/schema/index.js'
 
+const LEGACY_COMPANY_SETTING_KEYS: Record<string, string> = {
+  'Ikon Usaha': 'company-icon',
+  'Logo Perusahaan': 'company-logo',
+  'Nama Usaha': 'company-name',
+  'Nomor Telepon': 'company-phone',
+  'Alamat Usaha': 'company-address',
+  'NPWP / NIB': 'company-tax-number',
+}
+
+function normalizeSettingKey(key: string, area: string) {
+  if (area === 'Profil Usaha') return LEGACY_COMPANY_SETTING_KEYS[key] ?? key
+  return key
+}
+
 export const syncRoutes = new Hono()
 
 syncRoutes.use('*', authMiddleware)
@@ -364,8 +378,9 @@ syncRoutes.get('/pull', async (c) => {
       entityType: 'setting',
       mutationType: 'update',
       payload: {
-        id: row.key,
-        key: row.key,
+        id: normalizeSettingKey(row.key, row.area),
+        key: normalizeSettingKey(row.key, row.area),
+        setting: row.key,
         area: row.area,
         value: row.value,
         status: row.status,
