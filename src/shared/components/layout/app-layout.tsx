@@ -10,12 +10,16 @@ import { useSyncStore } from '@/features/sync/stores/sync-store'
 import { useSettings } from '@/features/settings/hooks/use-settings'
 import { SubscriptionGate } from '@/features/billing/components/subscription-gate'
 import { cn } from '@/lib/utils'
+import { AppErrorDialog } from '@/shared/components/feedback/app-error-dialog'
+import { PullToRefresh } from '@/shared/components/feedback/pull-to-refresh'
 import { AppSidebar } from '@/shared/components/layout/app-sidebar'
+import { LanguageSwitcher } from '@/shared/components/nav/language-switcher'
 import { OfflineBanner } from '@/shared/components/sync/offline-banner'
 import { InitialSyncScreen } from '@/shared/components/sync/initial-sync-screen'
 import { SyncIndicator } from '@/shared/components/sync/sync-indicator'
 import { ThemeToggle } from '@/shared/components/nav/theme-toggle'
 import { UserMenu } from '@/shared/components/nav/user-menu'
+import { useRefresh } from '@/shared/providers/refresh-provider'
 
 const ICONS: Record<string, React.ElementType> = {
   Store,
@@ -34,6 +38,7 @@ export function AppLayout() {
   const syncSummary = useSyncStore()
   const settings = useSettings()
   const location = useLocation()
+  const { isRefreshing, lastError, clearError, refreshAll } = useRefresh()
 
   if (!initialSyncDone) {
     return <InitialSyncScreen onDone={() => setInitialSyncDone(true)} />
@@ -73,18 +78,22 @@ export function AppLayout() {
             </div>
             <div className="ml-auto flex items-center gap-2">
               <SyncIndicator summary={syncSummary} />
+              <LanguageSwitcher />
               <ThemeToggle />
               <UserMenu />
             </div>
           </header>
 
-          <main className="min-h-[calc(100vh-4rem)] px-4 py-4 pb-24 lg:px-6 lg:pb-6">
-            <div className="mb-4">
-              <OfflineBanner visible={!syncSummary.isOnline} />
-            </div>
-            <SubscriptionGate />
-            <Outlet />
-          </main>
+          <PullToRefresh isRefreshing={isRefreshing} onRefresh={refreshAll}>
+            <main className="min-h-[calc(100vh-4rem)] px-4 py-4 pb-24 lg:px-6 lg:pb-6">
+              <div className="mb-4">
+                <OfflineBanner visible={!syncSummary.isOnline} />
+              </div>
+              <SubscriptionGate />
+              <Outlet />
+            </main>
+          </PullToRefresh>
+          <AppErrorDialog open={Boolean(lastError)} error={lastError} isRetrying={isRefreshing} onOpenChange={(open) => { if (!open) clearError() }} onRetry={refreshAll} />
 
           {!hideMobileNavigation ? (
             <nav className="fixed inset-x-0 bottom-0 z-20 grid h-16 grid-cols-5 border-t bg-background lg:hidden">

@@ -6,6 +6,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { UpdateAnnouncer } from '@/features/updates/components/update-announcer'
 import { bootstrapLocalDb } from '@/services/local-db/bootstrap'
 import { isCapacitorRuntime } from '@/features/updates/lib/update-runtime'
+import { RefreshProvider } from '@/shared/providers/refresh-provider'
 
 import { ThemeProvider } from '@/components/theme-provider'
 import '@/lib/i18n'
@@ -47,11 +48,13 @@ export function AppProviders({ children }: PropsWithChildren) {
   return (
     <ThemeProvider defaultTheme="system" storageKey="vitpos-theme">
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          {children}
-          <UpdateAnnouncer />
-          <Toaster richColors closeButton position="top-right" />
-        </TooltipProvider>
+        <RefreshProvider>
+          <TooltipProvider>
+            {children}
+            <UpdateAnnouncer />
+            <Toaster richColors closeButton position="top-right" />
+          </TooltipProvider>
+        </RefreshProvider>
       </QueryClientProvider>
     </ThemeProvider>
   )
