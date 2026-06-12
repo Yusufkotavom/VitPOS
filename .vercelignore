@@ -1,0 +1,12 @@
+.git/
+node_modules/
+dist/
+coverage/
+test-results/
+.codegraph/
+.vercel/
+.env
+.env.*
+*.log
+*.sock
+apps/api/api/
