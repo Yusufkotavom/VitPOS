@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { PencilIcon, PlusIcon, Trash2Icon, CreditCard } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -18,6 +19,7 @@ import { formatCurrency } from '@/lib/format-currency'
 import type { LocalPurchase } from '@/services/local-db/schema'
 
 export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) {
+  const { t } = useTranslation()
   const [formOpen, setFormOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
@@ -46,10 +48,10 @@ export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) 
       await purchaseRepository.upsert(nextPurchase)
       await syncSupplierPurchaseMetrics(purchase?.supplierId)
       await syncSupplierPurchaseMetrics(nextPurchase.supplierId)
-      toast.success(isEdit ? 'PO diperbarui' : 'PO dibuat')
+      toast.success(isEdit ? t('purchases.updated') : t('purchases.created'))
       setFormOpen(false)
     } catch (error) {
-      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.save_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -59,10 +61,10 @@ export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) 
       const supplierId = purchase.supplierId
       await purchaseRepository.remove(purchase.id)
       await syncSupplierPurchaseMetrics(supplierId)
-      toast.success('PO dihapus')
+      toast.success(t('purchases.deleted'))
       setDeleteOpen(false)
     } catch (error) {
-      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.delete_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -70,9 +72,9 @@ export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) 
     if (!purchase) return
     try {
       await receivePurchaseOrder(purchase)
-      toast.success('Barang diterima dan stok diperbarui')
+      toast.success(t('purchases.received_and_stock_updated'))
     } catch (error) {
-      toast.error(`Gagal menerima: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('purchases.receive_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -80,11 +82,11 @@ export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) 
     if (!purchase || payAmount <= 0) return
     try {
       await recordPurchasePayment(purchase.id, payAmount, payMethod, 'Pembelian')
-      toast.success('Pembayaran berhasil dicatat')
+      toast.success(t('purchases.payment_recorded'))
       setPayOpen(false)
       setPayAmount(0)
     } catch (error) {
-      toast.error(`Gagal membayar: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.payment_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -94,56 +96,56 @@ export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) 
     <div className="flex flex-wrap gap-2">
       <Sheet open={formOpen} onOpenChange={setFormOpen}>
         <SheetTrigger asChild>
-          {purchase ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />Ubah</Button> : <Button><PlusIcon data-icon="inline-start" />Buat PO</Button>}
+          {purchase ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />{t('common.edit')}</Button> : <Button><PlusIcon data-icon="inline-start" />{t('purchases.create')}</Button>}
         </SheetTrigger>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
           <SheetHeader>
-            <SheetTitle>{isEdit ? 'Ubah purchase order' : 'Buat purchase order'}</SheetTitle>
-            <SheetDescription>PO tersimpan lokal dulu, lalu masuk antrean sinkron.</SheetDescription>
+            <SheetTitle>{isEdit ? t('purchases.edit_title') : t('purchases.create_title')}</SheetTitle>
+            <SheetDescription>{t('purchases.form_sheet_description')}</SheetDescription>
           </SheetHeader>
-          <PurchaseForm defaultValues={purchase ? mapPurchaseRecordToFormValues(purchase) : undefined} submitLabel={isEdit ? 'Simpan perubahan' : 'Buat PO'} onCancel={() => setFormOpen(false)} onSubmit={handleSubmit} />
+          <PurchaseForm defaultValues={purchase ? mapPurchaseRecordToFormValues(purchase) : undefined} submitLabel={isEdit ? t('common.save_changes') : t('purchases.create')} onCancel={() => setFormOpen(false)} onSubmit={handleSubmit} />
         </SheetContent>
       </Sheet>
       {purchase ? (
         <>
-          {purchase.status !== 'Diterima' && purchase.status !== 'Batal' ? <Button size="sm" onClick={handleReceive}>Terima Barang</Button> : null}
-          {remainingPay > 0 && purchase.status === 'Diterima' ? <Button size="sm" onClick={() => { setPayAmount(remainingPay); setPayOpen(true) }}><CreditCard data-icon="inline-start" />Bayar</Button> : null}
-          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />Hapus</Button>
+          {purchase.status !== 'Diterima' && purchase.status !== 'Batal' ? <Button size="sm" onClick={handleReceive}>{t('purchases.receive_goods')}</Button> : null}
+          {remainingPay > 0 && purchase.status === 'Diterima' ? <Button size="sm" onClick={() => { setPayAmount(remainingPay); setPayOpen(true) }}><CreditCard data-icon="inline-start" />{t('common.pay')}</Button> : null}
+          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />{t('common.delete')}</Button>
           <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Hapus purchase order</DialogTitle>
-                <DialogDescription>PO {purchase.code} akan dihapus dari data lokal dan masuk antrean sinkron.</DialogDescription>
+                <DialogTitle>{t('purchases.delete_title')}</DialogTitle>
+                <DialogDescription>{t('purchases.delete_description', { code: purchase.code })}</DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setDeleteOpen(false)}>Batal</Button>
-                <Button variant="destructive" onClick={handleDelete}>Hapus PO</Button>
+                <Button variant="outline" onClick={() => setDeleteOpen(false)}>{t('common.cancel')}</Button>
+                <Button variant="destructive" onClick={handleDelete}>{t('purchases.delete_confirm')}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
           <Dialog open={payOpen} onOpenChange={setPayOpen}>
             <DialogContent className="sm:max-w-sm">
               <DialogHeader>
-                <DialogTitle>Bayar ke Supplier</DialogTitle>
-                <DialogDescription>PO {purchase?.code} - Sisa tagihan {formatCurrency(remainingPay)}</DialogDescription>
+                <DialogTitle>{t('purchases.pay_supplier_title')}</DialogTitle>
+                <DialogDescription>{t('purchases.pay_supplier_description', { code: purchase?.code, amount: formatCurrency(remainingPay) })}</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div>
-                  <label className="text-sm font-medium">Metode</label>
+                  <label className="text-sm font-medium">{t('common.method')}</label>
                   <Select value={payMethod} onValueChange={setPayMethod}>
                     <SelectTrigger className="w-full mt-1">
-                      <SelectValue placeholder="Pilih..." />
+                      <SelectValue placeholder={t('common.select_placeholder')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="tunai">Tunai</SelectItem>
-                      <SelectItem value="transfer">Transfer</SelectItem>
-                      <SelectItem value="kartu">Kartu</SelectItem>
-                      <SelectItem value="qris">QRIS</SelectItem>
+                      <SelectItem value="tunai">{t('payment.method_cash')}</SelectItem>
+                      <SelectItem value="transfer">{t('payment.method_transfer')}</SelectItem>
+                      <SelectItem value="kartu">{t('payment.method_card')}</SelectItem>
+                      <SelectItem value="qris">{t('payment.method_qris')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Nominal</label>
+                  <label className="text-sm font-medium">{t('common.amount')}</label>
                   <Input
                     type="number"
                     value={payAmount || ''}
@@ -153,8 +155,8 @@ export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) 
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setPayOpen(false)}>Batal</Button>
-                <Button onClick={handlePay} disabled={payAmount <= 0}>Bayar</Button>
+                <Button variant="outline" onClick={() => setPayOpen(false)}>{t('common.cancel')}</Button>
+                <Button onClick={handlePay} disabled={payAmount <= 0}>{t('common.pay')}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

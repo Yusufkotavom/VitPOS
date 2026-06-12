@@ -1,5 +1,6 @@
 import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -10,6 +11,7 @@ import { returnRepository } from '@/services/local-db/repository'
 import type { LocalReturn } from '@/services/local-db/schema'
 
 export function ReturnCrudActions({ ret }: { ret?: LocalReturn }) {
+  const { t } = useTranslation()
   const [formOpen, setFormOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const isEdit = Boolean(ret)
@@ -31,10 +33,10 @@ export function ReturnCrudActions({ ret }: { ret?: LocalReturn }) {
 
       const finalValues = { ...values, code: finalCode }
       await returnRepository.upsert(mapReturnFormToRecord(finalValues, id, ret))
-      toast.success(isEdit ? 'Retur diperbarui' : 'Retur dibuat')
+      toast.success(isEdit ? t('returns.updated') : t('returns.created'))
       setFormOpen(false)
     } catch (error) {
-      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.save_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -42,10 +44,10 @@ export function ReturnCrudActions({ ret }: { ret?: LocalReturn }) {
     if (!ret) return
     try {
       await returnRepository.remove(ret.id)
-      toast.success('Retur dihapus')
+      toast.success(t('returns.deleted'))
       setDeleteOpen(false)
     } catch (error) {
-      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.delete_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -53,28 +55,28 @@ export function ReturnCrudActions({ ret }: { ret?: LocalReturn }) {
     <div className="flex flex-wrap gap-2">
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogTrigger asChild>
-          {ret ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />Ubah</Button> : <Button><PlusIcon data-icon="inline-start" />Buat Retur</Button>}
+          {ret ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />{t('common.edit')}</Button> : <Button><PlusIcon data-icon="inline-start" />{t('returns.create')}</Button>}
         </DialogTrigger>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{isEdit ? 'Ubah retur' : 'Buat retur baru'}</DialogTitle>
-            <DialogDescription>Retur tersimpan lokal dulu, lalu masuk antrean sinkron.</DialogDescription>
+            <DialogTitle>{isEdit ? t('returns.edit_title') : t('returns.create_title')}</DialogTitle>
+            <DialogDescription>{t('returns.save_local_description')}</DialogDescription>
           </DialogHeader>
-          <ReturnForm defaultValues={ret ? mapReturnRecordToFormValues(ret) : undefined} submitLabel={isEdit ? 'Simpan perubahan' : 'Buat retur'} onCancel={() => setFormOpen(false)} onSubmit={handleSubmit} />
+          <ReturnForm defaultValues={ret ? mapReturnRecordToFormValues(ret) : undefined} submitLabel={isEdit ? t('common.save_changes') : t('returns.create')} onCancel={() => setFormOpen(false)} onSubmit={handleSubmit} />
         </DialogContent>
       </Dialog>
       {ret ? (
         <>
-          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />Hapus</Button>
+          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />{t('common.delete')}</Button>
           <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Hapus retur</DialogTitle>
-                <DialogDescription>Retur {ret.code} akan dihapus dari data lokal dan masuk antrean sinkron.</DialogDescription>
+                <DialogTitle>{t('returns.delete_title')}</DialogTitle>
+                <DialogDescription>{t('returns.delete_description', { code: ret.code })}</DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setDeleteOpen(false)}>Batal</Button>
-                <Button variant="destructive" onClick={handleDelete}>Hapus retur</Button>
+                <Button variant="outline" onClick={() => setDeleteOpen(false)}>{t('common.cancel')}</Button>
+                <Button variant="destructive" onClick={handleDelete}>{t('returns.delete_confirm')}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

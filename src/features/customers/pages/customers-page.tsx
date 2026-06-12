@@ -1,5 +1,6 @@
 import { Input } from '@/components/ui/input'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { LayoutGrid, List, Filter } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -19,6 +20,7 @@ function tone(status: string) {
 }
 
 export function CustomersPage() {
+  const { t } = useTranslation()
   const customerRows = useCustomers()
   const [view, setView] = useState<'list' | 'card'>('list')
   const [search, setSearch] = useState('')
@@ -34,10 +36,10 @@ export function CustomersPage() {
   const paginated = filtered.slice(0, parseInt(pageSize))
 
   return (
-    <PageShell title="Pelanggan" description="Kelola pelanggan aktif, histori belanja, dan piutang." actions={<CustomerCrudActions />}>
+    <PageShell title={t('customers.title')} description={t('customers.description')} actions={<CustomerCrudActions />}>
       <ContentCard>
         <div className="mb-4 flex flex-row items-center gap-2 border-b pb-4">
-          <Input placeholder="Cari pelanggan..." value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-64" />
+          <Input placeholder={t('customers.search_placeholder')} value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-64" />
           
           <div className="relative flex items-center group shrink-0">
             <Button variant="outline" size="icon" className="h-9 w-9">
@@ -47,22 +49,22 @@ export function CustomersPage() {
             <div className="absolute top-full right-0 mt-2 hidden group-hover:flex flex-col gap-2 rounded-md border bg-popover p-2 shadow-md z-10 w-48">
               <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Pilih..." />
+                  <SelectValue placeholder={t('common.select_placeholder')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Semua Status</SelectItem>
-                  <SelectItem value="Aktif">Aktif</SelectItem>
-                  <SelectItem value="Piutang">Piutang</SelectItem>
+                  <SelectItem value="all">{t('common.all_statuses')}</SelectItem>
+                  <SelectItem value="Aktif">{t('common.active')}</SelectItem>
+                  <SelectItem value="Piutang">{t('customers.receivable')}</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={pageSize} onValueChange={setPageSize}>
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Pilih..." />
+                  <SelectValue placeholder={t('common.select_placeholder')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="20">20 / halaman</SelectItem>
-                  <SelectItem value="50">50 / halaman</SelectItem>
-                  <SelectItem value="100">100 / halaman</SelectItem>
+                  <SelectItem value="20">{t('common.page_size', { count: 20 })}</SelectItem>
+                  <SelectItem value="50">{t('common.page_size', { count: 50 })}</SelectItem>
+                  <SelectItem value="100">{t('common.page_size', { count: 100 })}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -74,7 +76,7 @@ export function CustomersPage() {
               size="icon"
               onClick={() => setView('list')}
               className="h-7 w-7"
-              title="List View"
+              title={t('common.list_view')}
             >
               <List className="h-4 w-4" />
             </Button>
@@ -83,7 +85,7 @@ export function CustomersPage() {
               size="icon"
               onClick={() => setView('card')}
               className="h-7 w-7"
-              title="Card View"
+              title={t('common.card_view')}
             >
               <LayoutGrid className="h-4 w-4" />
             </Button>
@@ -94,17 +96,17 @@ export function CustomersPage() {
           <DataTable
             data={paginated}
             columns={[
-              { key: 'name', header: 'Pelanggan', sortable: true, render: (row) => <Link to={`/customers/${row.id}`} className="font-medium text-primary hover:underline">{row.name}</Link> },
-              { key: 'phone', header: 'WhatsApp' },
-              { key: 'city', header: 'Kota', sortable: true },
-              { key: 'receivable', header: 'Piutang', sortable: true, render: (row) => formatCurrency(row.receivable) },
-              { key: 'orders', header: 'Order', sortable: true, render: (row) => String(row.orders) },
-              { key: 'status', header: 'Status', render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
-              { key: 'actions', header: 'Aksi', render: (row) => <CustomerCrudActions customer={row} /> },
+              { key: 'name', header: t('customers.customer'), sortable: true, render: (row) => <Link to={`/customers/${row.id}`} className="font-medium text-primary hover:underline">{row.name}</Link> },
+              { key: 'phone', header: t('common.whatsapp') },
+              { key: 'city', header: t('common.city'), sortable: true },
+              { key: 'receivable', header: t('customers.receivable'), sortable: true, render: (row) => formatCurrency(row.receivable) },
+              { key: 'orders', header: t('common.order'), sortable: true, render: (row) => String(row.orders) },
+              { key: 'status', header: t('common.status'), render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
+              { key: 'actions', header: t('common.actions'), render: (row) => <CustomerCrudActions customer={row} /> },
             ]}
           />
         ) : paginated.length === 0 ? (
-          <p className="text-center text-muted-foreground py-12">Belum ada pelanggan</p>
+          <p className="text-center text-muted-foreground py-12">{t('customers.empty')}</p>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {paginated.map((row) => (
@@ -120,10 +122,10 @@ export function CustomersPage() {
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <div className="rounded-xl bg-muted/40 px-3 py-1 text-xs">
-                    Piutang <span className="font-medium text-foreground">{formatCurrency(row.receivable)}</span>
+                    {t('customers.receivable')} <span className="font-medium text-foreground">{formatCurrency(row.receivable)}</span>
                   </div>
                   <div className="rounded-xl bg-muted/40 px-3 py-1 text-xs">
-                    <span className="font-medium text-foreground">{row.orders}</span> order
+                    <span className="font-medium text-foreground">{row.orders}</span> {t('common.order_count', { count: row.orders })}
                   </div>
                 </div>
                 <div className="mt-2 border-t pt-2">

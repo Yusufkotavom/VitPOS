@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { LayoutGrid, List, Filter } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -16,6 +17,7 @@ function statusTone(status: string) {
 }
 
 export function CategoriesPage() {
+  const { t } = useTranslation()
   const categoryRows = useCategories()
   const [view, setView] = useState<'list' | 'card'>('list')
   const [search, setSearch] = useState('')
@@ -25,12 +27,12 @@ export function CategoriesPage() {
   )
 
   return (
-    <PageShell title="Kategori" description="Kelola kategori barang dan jasa." actions={<CategoryCrudActions />}>
-      <ContentCard title="Daftar Kategori" description="Tampilkan kategori dalam bentuk table atau card.">
+    <PageShell title={t('categories.title')} description={t('categories.description')} actions={<CategoryCrudActions />}>
+      <ContentCard title={t('categories.list')} description={t('categories.list_description')}>
         <div className="mb-4 flex flex-row items-center gap-2 border-b pb-4">
           <input
             type="text"
-            placeholder="Cari kategori..."
+            placeholder={t('categories.search_placeholder')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -42,21 +44,21 @@ export function CategoriesPage() {
             <div className="absolute top-full right-0 mt-2 hidden group-hover:flex flex-col gap-2 rounded-md border bg-popover p-2 shadow-md z-10 w-48">
               <Select>
                 <SelectTrigger>
-                  <SelectValue placeholder="Status" />
+                  <SelectValue placeholder={t('common.select_status')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Aktif">Aktif</SelectItem>
-                  <SelectItem value="Nonaktif">Nonaktif</SelectItem>
+                  <SelectItem value="Aktif">{t('common.active')}</SelectItem>
+                  <SelectItem value="Nonaktif">{t('common.inactive')}</SelectItem>
                 </SelectContent>
               </Select>
               <Select>
                 <SelectTrigger>
-                  <SelectValue placeholder="20 / halaman" />
+                  <SelectValue placeholder={t('common.per_page', { count: 20 })} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="20">20 / halaman</SelectItem>
-                  <SelectItem value="50">50 / halaman</SelectItem>
-                  <SelectItem value="100">100 / halaman</SelectItem>
+                  <SelectItem value="20">{t('common.per_page', { count: 20 })}</SelectItem>
+                  <SelectItem value="50">{t('common.per_page', { count: 50 })}</SelectItem>
+                  <SelectItem value="100">{t('common.per_page', { count: 100 })}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -67,7 +69,7 @@ export function CategoriesPage() {
               size="icon"
               onClick={() => setView('list')}
               className="h-7 w-7"
-              title="List View"
+              title={t('common.list_view')}
             >
               <List className="h-4 w-4" />
             </Button>
@@ -76,7 +78,7 @@ export function CategoriesPage() {
               size="icon"
               onClick={() => setView('card')}
               className="h-7 w-7"
-              title="Card View"
+              title={t('common.card_view')}
             >
               <LayoutGrid className="h-4 w-4" />
             </Button>
@@ -86,16 +88,16 @@ export function CategoriesPage() {
           <DataTable
             data={filtered}
             columns={[
-              { key: 'name', header: 'Nama', sortable: true },
-              { key: 'description', header: 'Deskripsi', render: (row) => row.description || '-' },
-              { key: 'status', header: 'Status', render: (row) => <StatusBadge label={row.status} tone={statusTone(row.status)} /> },
-              { key: 'actions', header: 'Aksi', render: (row) => <CategoryCrudActions category={row} /> },
+              { key: 'name', header: t('common.name'), sortable: true },
+              { key: 'description', header: t('common.description'), render: (row) => row.description || '-' },
+              { key: 'status', header: t('common.status'), render: (row) => <StatusBadge label={row.status} tone={statusTone(row.status)} /> },
+              { key: 'actions', header: t('common.actions'), render: (row) => <CategoryCrudActions category={row} /> },
             ]}
           />
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {filtered.length === 0 ? (
-              <p className="text-center text-muted-foreground py-12 col-span-full">Belum ada kategori</p>
+              <p className="text-center text-muted-foreground py-12 col-span-full">{t('categories.empty')}</p>
             ) : (
               filtered.map((row) => (
                 <div key={row.id} className="rounded-2xl border bg-background p-5 shadow-sm">

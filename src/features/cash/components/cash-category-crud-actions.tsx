@@ -1,5 +1,6 @@
 import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -16,6 +17,7 @@ import { cashCategoryRepository } from '@/services/local-db/repository'
 import type { LocalCashCategory } from '@/services/local-db/schema'
 
 export function CashCategoryCrudActions({ category }: { category?: LocalCashCategory }) {
+  const { t } = useTranslation()
   const [formOpen, setFormOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const isEdit = Boolean(category)
@@ -47,10 +49,10 @@ export function CashCategoryCrudActions({ category }: { category?: LocalCashCate
         version: (category?.version ?? 0) + 1,
         updatedAt: now,
       })
-      toast.success(isEdit ? 'Kategori diperbarui' : 'Kategori ditambahkan')
+      toast.success(isEdit ? t('cash.category_updated') : t('cash.category_added'))
       setFormOpen(false)
     } catch (error) {
-      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.save_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -58,10 +60,10 @@ export function CashCategoryCrudActions({ category }: { category?: LocalCashCate
     if (!category) return
     try {
       await cashCategoryRepository.remove(category.id)
-      toast.success('Kategori dihapus')
+      toast.success(t('cash.category_deleted'))
       setDeleteOpen(false)
     } catch (error) {
-      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.delete_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -72,29 +74,29 @@ export function CashCategoryCrudActions({ category }: { category?: LocalCashCate
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogTrigger asChild>
           {category
-            ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />Ubah</Button>
-            : <Button size="sm"><PlusIcon data-icon="inline-start" />Tambah</Button>}
+            ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />{t('common.edit')}</Button>
+            : <Button size="sm"><PlusIcon data-icon="inline-start" />{t('common.add')}</Button>}
         </DialogTrigger>
         <DialogContent className="sm:max-w-sm">
           <form onSubmit={form.handleSubmit(handleSubmit)}>
             <DialogHeader>
-              <DialogTitle>{isEdit ? 'Ubah kategori' : 'Tambah kategori'}</DialogTitle>
-              <DialogDescription>Kategori untuk pemasukan atau pengeluaran kas.</DialogDescription>
+              <DialogTitle>{isEdit ? t('cash.edit_category') : t('cash.add_category')}</DialogTitle>
+              <DialogDescription>{t('cash.category_description')}</DialogDescription>
             </DialogHeader>
             <FieldGroup>
               <Field data-invalid={!!errors.name}>
-                <Label htmlFor="name">Nama Kategori</Label>
+                <Label htmlFor="name">{t('cash.category_name')}</Label>
                 <Input id="name" {...form.register('name')} aria-invalid={!!errors.name} placeholder="Penjualan" />
               </Field>
               <Field>
-                <Label htmlFor="type">Tipe</Label>
+                <Label htmlFor="type">{t('common.type')}</Label>
                 <Controller
                   name="type"
                   control={form.control}
                   render={({ field }) => (
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <SelectTrigger id="type">
-                        <SelectValue placeholder="Pilih tipe" />
+                        <SelectValue placeholder={t('common.select_placeholder')} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
@@ -108,19 +110,19 @@ export function CashCategoryCrudActions({ category }: { category?: LocalCashCate
                 />
               </Field>
               <Field>
-                <Label htmlFor="category-status">Status</Label>
+                <Label htmlFor="category-status">{t('common.status')}</Label>
                 <Controller
                   name="status"
                   control={form.control}
                   render={({ field }) => (
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <SelectTrigger id="category-status">
-                        <SelectValue placeholder="Pilih status" />
+                        <SelectValue placeholder={t('common.select_status')} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          <SelectItem value="Aktif">Aktif</SelectItem>
-                          <SelectItem value="Nonaktif">Nonaktif</SelectItem>
+                          <SelectItem value="Aktif">{t('common.active')}</SelectItem>
+                          <SelectItem value="Nonaktif">{t('common.inactive')}</SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>
@@ -130,10 +132,10 @@ export function CashCategoryCrudActions({ category }: { category?: LocalCashCate
             </FieldGroup>
             <DialogFooter>
               <DialogClose asChild>
-                <Button variant="outline" type="button">Batal</Button>
+                <Button variant="outline" type="button">{t('common.cancel')}</Button>
               </DialogClose>
               <Button type="submit" disabled={form.formState.isSubmitting}>
-                {isEdit ? 'Simpan' : 'Tambah'}
+                {isEdit ? t('common.save') : t('common.add')}
               </Button>
             </DialogFooter>
           </form>
@@ -141,16 +143,16 @@ export function CashCategoryCrudActions({ category }: { category?: LocalCashCate
       </Dialog>
       {category ? (
         <>
-          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />Hapus</Button>
+          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />{t('common.delete')}</Button>
           <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Hapus kategori</DialogTitle>
+                <DialogTitle>{t('cash.delete_category_title')}</DialogTitle>
                 <DialogDescription>Kategori {category.name} akan dihapus dari data lokal dan masuk antrean sinkron.</DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setDeleteOpen(false)}>Batal</Button>
-                <Button variant="destructive" onClick={handleDelete}>Hapus kategori</Button>
+                <Button variant="outline" onClick={() => setDeleteOpen(false)}>{t('common.cancel')}</Button>
+                <Button variant="destructive" onClick={handleDelete}>{t('cash.delete_category_confirm')}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

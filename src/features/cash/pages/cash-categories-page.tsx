@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeft } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -11,6 +12,7 @@ import { StatusBadge } from '@/shared/components/display/status-badge'
 import { PageShell } from '@/shared/components/layout/page-shell'
 
 export function CashCategoriesPage() {
+  const { t } = useTranslation()
   const categories = useCashCategories()
   const [search, setSearch] = useState('')
 
@@ -20,14 +22,14 @@ export function CashCategoriesPage() {
 
   return (
     <PageShell
-      title="Kategori Kas"
-      description="Kelola kategori pemasukan dan pengeluaran."
+      title={t('cash.categories_title')}
+      description={t('cash.categories_description')}
       actions={
         <>
           <Button variant="outline" size="sm" asChild>
             <Link to="/cash">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Kembali
+              {t('common.back')}
             </Link>
           </Button>
           <CashCategoryCrudActions />
@@ -38,7 +40,7 @@ export function CashCategoriesPage() {
         <div className="mb-4 border-b pb-4">
           <input
             type="text"
-            placeholder="Cari kategori..."
+            placeholder={t('common.search')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -47,16 +49,16 @@ export function CashCategoriesPage() {
         <DataTable
           data={filtered}
           columns={[
-            { key: 'name', header: 'Nama', sortable: true },
-            { key: 'type', header: 'Tipe', render: (row) => (
+            { key: 'name', header: t('common.name'), sortable: true },
+            { key: 'type', header: t('common.type'), render: (row) => (
               <StatusBadge label={row.type} tone={row.type === 'Pemasukan' ? 'success' : 'danger'} />
             )},
-            { key: 'status', header: 'Status', render: (row) => (
+            { key: 'status', header: t('common.status'), render: (row) => (
               <StatusBadge label={row.status} tone={row.status === 'Aktif' ? 'success' : 'neutral'} />
             )},
-            { key: 'actions', header: 'Aksi', render: (row) => <CashCategoryCrudActions category={row} /> },
+            { key: 'actions', header: t('common.actions'), render: (row) => <CashCategoryCrudActions category={row} /> },
           ]}
-          emptyTitle="Belum ada kategori"
+          emptyTitle={t('cash.categories_empty')}
         />
       </ContentCard>
     </PageShell>

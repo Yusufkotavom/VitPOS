@@ -1,5 +1,6 @@
 import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -17,6 +18,7 @@ import { supplierRepository } from '@/services/local-db/repository'
 import type { LocalSupplier } from '@/services/local-db/schema'
 
 export function SupplierCrudActions({ supplier }: { supplier?: LocalSupplier }) {
+  const { t } = useTranslation()
   const [formOpen, setFormOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const isEdit = Boolean(supplier)
@@ -34,10 +36,10 @@ export function SupplierCrudActions({ supplier }: { supplier?: LocalSupplier }) 
     try {
       const id = supplier?.id ?? crypto.randomUUID()
       await supplierRepository.upsert(mapSupplierFormToRecord(values, id, supplier))
-      toast.success(isEdit ? 'Supplier diperbarui' : 'Supplier ditambahkan')
+      toast.success(isEdit ? t('suppliers.updated') : t('suppliers.added'))
       setFormOpen(false)
     } catch (error) {
-      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.save_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -45,10 +47,10 @@ export function SupplierCrudActions({ supplier }: { supplier?: LocalSupplier }) 
     if (!supplier) return
     try {
       await supplierRepository.remove(supplier.id)
-      toast.success('Supplier dihapus')
+      toast.success(t('suppliers.deleted'))
       setDeleteOpen(false)
     } catch (error) {
-      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.delete_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -58,36 +60,36 @@ export function SupplierCrudActions({ supplier }: { supplier?: LocalSupplier }) 
     <div className="flex flex-wrap gap-2">
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogTrigger asChild>
-          {supplier ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />Ubah</Button> : <Button><PlusIcon data-icon="inline-start" />Tambah Supplier</Button>}
+          {supplier ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />{t('common.edit')}</Button> : <Button><PlusIcon data-icon="inline-start" />{t('suppliers.add')}</Button>}
         </DialogTrigger>
         <DialogContent className="sm:max-w-sm">
           <form onSubmit={form.handleSubmit(handleSubmit)}>
             <DialogHeader>
-              <DialogTitle>{isEdit ? 'Ubah supplier' : 'Tambah supplier'}</DialogTitle>
-              <DialogDescription>Simpan lokal lebih dulu. Outbox sinkron jalan otomatis.</DialogDescription>
+              <DialogTitle>{isEdit ? t('suppliers.edit_title') : t('suppliers.add_title')}</DialogTitle>
+              <DialogDescription>{t('suppliers.save_local_description')}</DialogDescription>
             </DialogHeader>
             <FieldGroup>
               <Field data-invalid={!!errors.name}>
-                <Label htmlFor="name">Nama</Label>
+                <Label htmlFor="name">{t('common.name')}</Label>
                 <Input id="name" {...form.register('name')} aria-invalid={!!errors.name} />
               </Field>
               <Field data-invalid={!!errors.phone}>
-                <Label htmlFor="phone">Telepon</Label>
+                <Label htmlFor="phone">{t('common.phone')}</Label>
                 <Input id="phone" {...form.register('phone')} aria-invalid={!!errors.phone} />
               </Field>
               <Field data-invalid={!!errors.city}>
-                <Label htmlFor="city">Alamat</Label>
+                <Label htmlFor="city">{t('common.address')}</Label>
                 <Textarea id="city" {...form.register('city')} aria-invalid={!!errors.city} className="min-h-[3.5rem]" />
               </Field>
               <Field>
-                <Label htmlFor="status">Status</Label>
+                <Label htmlFor="status">{t('common.status')}</Label>
                 <Controller
                   name="status"
                   control={form.control}
                   render={({ field }) => (
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <SelectTrigger id="status">
-                        <SelectValue placeholder="Pilih status" />
+                        <SelectValue placeholder={t('common.select_status')} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
@@ -103,10 +105,10 @@ export function SupplierCrudActions({ supplier }: { supplier?: LocalSupplier }) 
             </FieldGroup>
             <DialogFooter>
               <DialogClose asChild>
-                <Button variant="outline" type="button">Batal</Button>
+                <Button variant="outline" type="button">{t('common.cancel')}</Button>
               </DialogClose>
               <Button type="submit" disabled={form.formState.isSubmitting}>
-                {isEdit ? 'Simpan' : 'Tambah'}
+                {isEdit ? t('common.save') : t('common.add')}
               </Button>
             </DialogFooter>
           </form>
@@ -114,16 +116,16 @@ export function SupplierCrudActions({ supplier }: { supplier?: LocalSupplier }) 
       </Dialog>
       {supplier ? (
         <>
-          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />Hapus</Button>
+          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />{t('common.delete')}</Button>
           <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Hapus supplier</DialogTitle>
-                <DialogDescription>Supplier {supplier.name} akan dihapus dari data lokal dan masuk antrean sinkron.</DialogDescription>
+                <DialogTitle>{t('suppliers.delete_title')}</DialogTitle>
+                <DialogDescription>{t('suppliers.delete_warning', { name: supplier.name })}</DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setDeleteOpen(false)}>Batal</Button>
-                <Button variant="destructive" onClick={handleDelete}>Hapus supplier</Button>
+                <Button variant="outline" onClick={() => setDeleteOpen(false)}>{t('common.cancel')}</Button>
+                <Button variant="destructive" onClick={handleDelete}>{t('suppliers.delete_confirm')}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

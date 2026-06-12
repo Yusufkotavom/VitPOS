@@ -90,7 +90,7 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
   return (
     <form className="flex flex-col gap-3" onSubmit={form.handleSubmit(onSubmit)}>
       <div className="space-y-2">
-        <label className="text-sm font-medium">Gambar Produk</label>
+        <label className="text-sm font-medium">{t('products.image_label')}</label>
         <div className="flex gap-4 items-center">
           {previewImage ? (
             <div className="relative size-16 rounded-lg border overflow-hidden">
@@ -104,14 +104,14 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
           <div className="flex flex-col gap-2">
             <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />
             <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-                <Upload className="size-4 mr-2" /> Upload
-              </Button>
-              {previewImage && (
-                <Button type="button" variant="ghost" size="sm" className="text-destructive h-8" onClick={clearImage}>
-                  Hapus
+                <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="size-4 mr-2" /> {t('common.upload')}
                 </Button>
-              )}
+                {previewImage && (
+                  <Button type="button" variant="ghost" size="sm" className="text-destructive h-8" onClick={clearImage}>
+                    {t('common.delete')}
+                  </Button>
+                )}
             </div>
           </div>
         </div>
@@ -132,21 +132,21 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">Nama produk</label>
-        <Input aria-invalid={Boolean(errors.name)} {...form.register('name')} placeholder="Kopi Arabika" />
+        <label className="text-sm font-medium">{t('products.name_label')}</label>
+        <Input aria-invalid={Boolean(errors.name)} {...form.register('name')} placeholder={t('products.name_placeholder')} />
         {errors.name ? <span className="text-xs text-destructive">{errors.name.message}</span> : null}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
-          <label className="text-sm font-medium">Kategori</label>
+          <label className="text-sm font-medium">{t('common.category')}</label>
           <Controller
             control={form.control}
             name="category"
             render={({ field }) => (
               <Select value={field.value} onValueChange={field.onChange}>
                 <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Pilih Kategori" />
+                  <SelectValue placeholder={t('products.category_placeholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {Array.from(new Set(categoryOptions)).map((option) => (
@@ -159,14 +159,14 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
           {errors.category ? <span className="text-xs text-destructive">{errors.category.message}</span> : null}
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium">Jenis</label>
+          <label className="text-sm font-medium">{t('common.type')}</label>
           <Controller
             control={form.control}
             name="type"
             render={({ field }) => (
               <Select value={field.value} onValueChange={field.onChange}>
                 <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Pilih Jenis" />
+                  <SelectValue placeholder={t('products.type_placeholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {productTypeOptions.map((option) => (
@@ -181,35 +181,35 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
-          <label className="text-sm font-medium">Harga Jual</label>
+          <label className="text-sm font-medium">{t('products.selling_price')}</label>
           <Controller
             control={form.control}
             name="price"
             render={({ field }) => (
-              <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.price)} value={field.value} onChange={field.onChange} placeholder="18000" />
+              <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.price)} value={field.value} onChange={field.onChange} placeholder={t('products.price_placeholder')} />
             )}
           />
           {errors.price ? <span className="text-xs text-destructive">{errors.price.message}</span> : null}
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium">Modal / HPP</label>
+          <label className="text-sm font-medium">{t('products.cost_price')}</label>
           <Controller
             control={form.control}
             name="costPrice"
             render={({ field }) => (
-              <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.costPrice)} value={field.value} onChange={field.onChange} placeholder="12000" />
+              <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.costPrice)} value={field.value} onChange={field.onChange} placeholder={t('products.cost_price_placeholder')} />
             )}
           />
         </div>
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium">Harga Grosir (Opsional)</label>
+          <label className="text-sm font-medium">{t('products.wholesale_price_label')}</label>
         <Controller
           control={form.control}
           name="wholesalePrice"
           render={({ field }) => (
-            <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.wholesalePrice)} value={field.value} onChange={field.onChange} placeholder="15000" />
+            <CurrencyInput prefix="Rp" aria-invalid={Boolean(errors.wholesalePrice)} value={field.value} onChange={field.onChange} placeholder={t('products.wholesale_price_placeholder')} />
           )}
         />
       </div>
@@ -220,31 +220,31 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
           onClick={() => setWholesaleOpen(!wholesaleOpen)}
           className="flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium hover:bg-muted/50 rounded-lg"
         >
-          Harga Grosir Bertingkat
+          {t('products.wholesale_tiers')}
           {wholesaleOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
         </button>
         {wholesaleOpen && (
           <div className="px-3 pb-3 space-y-2">
-            <p className="text-xs text-muted-foreground">Harga otomatis menyesuaikan jumlah pembelian.</p>
+            <p className="text-xs text-muted-foreground">{t('products.wholesale_tiers_description')}</p>
             {wholesaleTiers.map((tier, index) => (
               <div key={index} className="flex items-center gap-2">
                 <div className="flex-1">
-                  <label className="text-xs text-muted-foreground">Min. Qty</label>
+                  <label className="text-xs text-muted-foreground">{t('products.min_qty')}</label>
                   <Input
                     type="number"
                     min="1"
-                    placeholder="10"
+                    placeholder={t('products.min_qty_placeholder')}
                     className="h-8 text-sm"
                     value={tier.minQty}
                     onChange={(e) => updateTier(index, 'minQty', e.target.value)}
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="text-xs text-muted-foreground">Harga Grosir</label>
+                  <label className="text-xs text-muted-foreground">{t('products.wholesale_price')}</label>
                   <Input
                     type="number"
                     min="0"
-                    placeholder="9000"
+                    placeholder={t('products.tier_price_placeholder')}
                     className="h-8 text-sm"
                     value={tier.price}
                     onChange={(e) => updateTier(index, 'price', e.target.value)}
@@ -260,7 +260,7 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
               </div>
             ))}
             <Button type="button" variant="outline" size="sm" className="w-full gap-1" onClick={addTier}>
-              <Plus className="size-3.5" /> Tambah Tier
+              <Plus className="size-3.5" /> {t('products.add_tier')}
             </Button>
           </div>
         )}
@@ -268,14 +268,14 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
 
       <div className="grid grid-cols-2 gap-3 items-end">
         <div className="space-y-2">
-          <label className="text-sm font-medium">Status</label>
+          <label className="text-sm font-medium">{t('common.status')}</label>
           <Controller
             control={form.control}
             name="status"
             render={({ field }) => (
               <Select value={field.value} onValueChange={field.onChange}>
                 <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Pilih Status" />
+                  <SelectValue placeholder={t('common.select_status')} />
                 </SelectTrigger>
                 <SelectContent>
                   {productStatusOptions.map((option) => (
@@ -289,15 +289,15 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-sm font-medium h-9">
             <input type="checkbox" disabled={isService} {...form.register('manageStock')} className="size-4 rounded border-input" />
-            Kelola Stok
+            {t('products.manage_stock')}
           </label>
         </div>
       </div>
 
       {isStockManaged && (
         <div className="space-y-2">
-          <label className="text-sm font-medium">Stok Tersedia</label>
-          <Input aria-invalid={Boolean(errors.stock)} inputMode="numeric" {...form.register('stock')} placeholder="24" />
+          <label className="text-sm font-medium">{t('products.available_stock')}</label>
+          <Input aria-invalid={Boolean(errors.stock)} inputMode="numeric" {...form.register('stock')} placeholder={t('products.stock_placeholder')} />
           {errors.stock ? <span className="text-xs text-destructive">{errors.stock.message}</span> : null}
         </div>
       )}

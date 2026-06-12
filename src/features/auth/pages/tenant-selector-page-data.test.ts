@@ -41,6 +41,16 @@ describe('tenant selector page data logic', () => {
       updatedAt: '',
     })
 
+    await localDb.settings.put({
+      id: `${tenantId}:default-branch-id`,
+      tenantId,
+      area: 'System',
+      setting: 'default_branch_id',
+      value: 'b1',
+      status: 'Aktif',
+      updatedAt: new Date().toISOString(),
+    })
+
     // Render
     render(
       createElement(MemoryRouter, { initialEntries: ['/tenants'] },

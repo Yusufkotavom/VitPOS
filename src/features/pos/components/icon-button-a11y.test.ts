@@ -18,15 +18,15 @@ describe('icon-only action button accessibility', () => {
   })
 
   it('names line item remove buttons', () => {
-    const files = [
-      'src/features/sales-orders/components/sales-order-form.tsx',
-      'src/features/purchases/components/purchase-form.tsx',
-      'src/features/returns/components/return-form.tsx',
-    ]
+    const filePatterns: Record<string, string> = {
+      'src/features/sales-orders/components/sales-order-form.tsx': "t('sales_orders.remove_item', { index: index + 1 })",
+      'src/features/purchases/components/purchase-form.tsx': "t('purchases.remove_item', { index: index + 1 })",
+      'src/features/returns/components/return-form.tsx': 'aria-label={`Hapus item ${index + 1}`}',
+    }
 
-    for (const file of files) {
+    for (const [file, pattern] of Object.entries(filePatterns)) {
       const source = read(file)
-      expect(source).toContain('aria-label={`Hapus item ${index + 1}`}')
+      expect(source).toContain(pattern)
     }
   })
 })

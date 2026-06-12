@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { formatCurrency } from '@/lib/format-currency'
 import { PurchaseCrudActions } from '@/features/purchases/components/purchase-crud-actions'
@@ -15,20 +16,21 @@ function tone(status: string) {
 }
 
 export function PurchasesPage() {
+  const { t } = useTranslation()
   const purchaseRows = usePurchases()
 
   return (
-    <PageShell title="Pembelian" description="Purchase order, penerimaan barang, dan hutang supplier." actions={<PurchaseCrudActions />}>
-      <ContentCard title="Daftar Purchase Order" description="PO tersimpan lokal dulu, lalu masuk antrean sinkron.">
+    <PageShell title={t('nav.pembelian')} description={t('purchases.page_description')} actions={<PurchaseCrudActions />}>
+      <ContentCard title={t('purchases.list_title')} description={t('purchases.list_description')}>
         <DataTable
           data={purchaseRows}
-          emptyTitle="Belum ada purchase order"
+          emptyTitle={t('purchases.empty')}
           columns={[
             { key: 'code', header: 'PO', render: (row) => <Link to={`/purchases/${row.id}`} className="font-medium text-primary hover:underline">{row.code}</Link> },
-            { key: 'supplierName', header: 'Supplier' },
-            { key: 'date', header: 'Tanggal' },
-            { key: 'grandTotal', header: 'Total', render: (row) => formatCurrency(row.grandTotal) },
-            { key: 'status', header: 'Status', render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
+            { key: 'supplierName', header: t('common.supplier') },
+            { key: 'date', header: t('common.date') },
+            { key: 'grandTotal', header: t('common.total'), render: (row) => formatCurrency(row.grandTotal) },
+            { key: 'status', header: t('common.status'), render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
           ]}
           mobileRender={(row) => (
             <Link to={`/purchases/${row.id}`} className="flex flex-col gap-3 group">

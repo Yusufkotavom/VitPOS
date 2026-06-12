@@ -11,6 +11,22 @@ vi.mock('@/features/sales-orders/hooks/use-sales-orders', () => ({
   useSalesOrders: () => mockUseSalesOrders(),
 }))
 
+beforeEach(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: true,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  })
+})
+
 vi.mock('@/features/sales-orders/components/sales-order-crud-actions', () => ({
   SalesOrderCrudActions: ({ order }: { order?: LocalSalesOrder }) => (
     <button type="button">{order ? `Aksi ${order.code}` : 'Buat Invoice'}</button>

@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { sidebarNavigation } from '@/app/navigation'
+import type { TFunction } from 'i18next'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AppSidebar } from '@/shared/components/layout/app-sidebar'
@@ -86,7 +87,7 @@ describe('sidebar navigation coverage', () => {
   })
 
   it('includes grouped entries for all major operational routes', () => {
-    const nav = sidebarNavigation(mockT)
+    const nav = sidebarNavigation(mockT as TFunction)
     const allItems = nav.flatMap((group) => group.items.flatMap((item) => [item, ...(item.items ?? [])]))
     const routes = allItems.map((item) => item.to)
 

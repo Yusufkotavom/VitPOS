@@ -227,15 +227,15 @@ export function ProductsPage() {
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div className="flex flex-col bg-muted/30 p-2 rounded-lg">
-                        <span className="text-muted-foreground text-xs mb-0.5">Modal / HPP</span>
+                        <span className="text-muted-foreground text-xs mb-0.5">{t('products.cost_price')}</span>
                         <span className="font-medium">{formatCurrency(row.costPrice ?? 0)}</span>
                       </div>
                       <div className="flex flex-col bg-muted/30 p-2 rounded-lg">
-                        <span className="text-muted-foreground text-xs mb-0.5">Harga Jual</span>
+                        <span className="text-muted-foreground text-xs mb-0.5">{t('products.selling_price')}</span>
                         <span className="font-medium">{formatCurrency(row.price)}</span>
                       </div>
                       <div className="flex flex-col bg-muted/30 p-2 rounded-lg col-span-2">
-                        <span className="text-muted-foreground text-xs mb-0.5">Sisa Stok</span>
+                        <span className="text-muted-foreground text-xs mb-0.5">{t('inventory.stock_per_warehouse') || 'Sisa Stok'}</span>
                         <span className="font-medium">{displayStock(row)}</span>
                       </div>
                     </div>

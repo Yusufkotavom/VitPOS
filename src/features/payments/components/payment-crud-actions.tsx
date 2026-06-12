@@ -1,5 +1,6 @@
 import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -22,6 +23,7 @@ import { paymentRepository } from '@/services/local-db/repository'
 import type { LocalPayment } from '@/services/local-db/schema'
 
 export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
+  const { t } = useTranslation()
   const salesOrders = useSalesOrders()
   const serviceOrders = useServiceOrders()
   const purchases = usePurchases()
@@ -64,10 +66,10 @@ export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
       if (nextPayment.purchaseId) {
         await syncPurchasePaymentSummary(nextPayment.purchaseId)
       }
-      toast.success(isEdit ? 'Pembayaran diperbarui' : 'Pembayaran dicatat')
+      toast.success(isEdit ? t('payments.updated') : t('payments.recorded'))
       setFormOpen(false)
     } catch (error) {
-      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.save_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -83,10 +85,10 @@ export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
       } else {
         await paymentRepository.remove(payment.id)
       }
-      toast.success('Pembayaran dihapus')
+      toast.success(t('payments.deleted'))
       setDeleteOpen(false)
     } catch (error) {
-      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.delete_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -97,13 +99,13 @@ export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogTrigger asChild>
           {payment
-            ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />Ubah</Button>
-            : <Button><PlusIcon data-icon="inline-start" />Record Payment</Button>}
+            ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />{t('common.edit')}</Button>
+            : <Button><PlusIcon data-icon="inline-start" />{t('payments.record')}</Button>}
         </DialogTrigger>
         <DialogContent className="sm:max-w-sm max-h-[90vh] overflow-y-auto">
           <form onSubmit={form.handleSubmit(handleSubmit)}>
             <DialogHeader>
-              <DialogTitle>{isEdit ? 'Ubah pembayaran' : 'Catat pembayaran'}</DialogTitle>
+              <DialogTitle>{isEdit ? t('payments.edit_title') : t('payments.record_title')}</DialogTitle>
               <DialogDescription>Pembayaran tersimpan lokal dulu, lalu masuk antrean sinkron.</DialogDescription>
             </DialogHeader>
             <FieldGroup>
@@ -113,7 +115,7 @@ export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
               </Field>
               <Field data-invalid={!!errors.source}>
                 <Label htmlFor="source">Sumber</Label>
-                <Input id="source" {...form.register('source')} aria-invalid={!!errors.source} placeholder="Nama pelanggan / invoice" />
+                <Input id="source" {...form.register('source')} aria-invalid={!!errors.source} placeholder={t('payments.source_placeholder')} />
               </Field>
               <Field>
                 <Label htmlFor="salesOrderId">Link Invoice</Label>
@@ -123,7 +125,7 @@ export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
                   render={({ field }) => (
                     <Select onValueChange={(value) => field.onChange(value === 'none' ? '' : value)} defaultValue={field.value || 'none'}>
                       <SelectTrigger id="salesOrderId">
-                        <SelectValue placeholder="Pilih invoice" />
+                        <SelectValue placeholder={t('common.select_placeholder')} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
@@ -145,7 +147,7 @@ export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
                   render={({ field }) => (
                     <Select onValueChange={(value) => field.onChange(value === 'none' ? '' : value)} defaultValue={field.value || 'none'}>
                       <SelectTrigger id="serviceOrderId">
-                        <SelectValue placeholder="Pilih service order" />
+                        <SelectValue placeholder={t('common.select_placeholder')} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
@@ -167,7 +169,7 @@ export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
                   render={({ field }) => (
                     <Select onValueChange={(value) => field.onChange(value === 'none' ? '' : value)} defaultValue={field.value || 'none'}>
                       <SelectTrigger id="purchaseId">
-                        <SelectValue placeholder="Pilih PO" />
+                        <SelectValue placeholder={t('common.select_placeholder')} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
@@ -182,14 +184,14 @@ export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
                 />
               </Field>
               <Field>
-                <Label htmlFor="method">Metode Bayar</Label>
+                <Label htmlFor="method">{t('payments.payment_method')}</Label>
                 <Controller
                   name="method"
                   control={form.control}
                   render={({ field }) => (
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <SelectTrigger id="method">
-                        <SelectValue placeholder="Pilih metode" />
+                        <SelectValue placeholder={t('common.select_placeholder')} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
@@ -203,22 +205,22 @@ export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
                 />
               </Field>
               <Field data-invalid={!!errors.date}>
-                <Label htmlFor="date">Tanggal</Label>
+                <Label htmlFor="date">{t('common.date')}</Label>
                 <Input id="date" type="date" {...form.register('date')} aria-invalid={!!errors.date} />
               </Field>
               <Field data-invalid={!!errors.amount}>
-                <Label htmlFor="amount">Nominal</Label>
+                <Label htmlFor="amount">{t('common.amount')}</Label>
                 <Input id="amount" inputMode="numeric" {...form.register('amount')} aria-invalid={!!errors.amount} placeholder="0" />
               </Field>
               <Field>
-                <Label htmlFor="status">Status</Label>
+                <Label htmlFor="status">{t('common.status')}</Label>
                 <Controller
                   name="status"
                   control={form.control}
                   render={({ field }) => (
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <SelectTrigger id="status">
-                        <SelectValue placeholder="Pilih status" />
+                        <SelectValue placeholder={t('common.select_status')} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
@@ -234,10 +236,10 @@ export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
             </FieldGroup>
             <DialogFooter>
               <DialogClose asChild>
-                <Button variant="outline" type="button">Batal</Button>
+                <Button variant="outline" type="button">{t('common.cancel')}</Button>
               </DialogClose>
               <Button type="submit" disabled={form.formState.isSubmitting}>
-                {isEdit ? 'Simpan' : 'Catat'}
+                {isEdit ? t('common.save') : t('payments.record')}
               </Button>
             </DialogFooter>
           </form>
@@ -245,16 +247,16 @@ export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
       </Dialog>
       {payment ? (
         <>
-          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />Hapus</Button>
+          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />{t('common.delete')}</Button>
           <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Hapus pembayaran</DialogTitle>
+                <DialogTitle>{t('payments.delete_title')}</DialogTitle>
                 <DialogDescription>Pembayaran {payment.ref} akan dihapus dari data lokal dan masuk antrean sinkron.</DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setDeleteOpen(false)}>Batal</Button>
-                <Button variant="destructive" onClick={handleDelete}>Hapus pembayaran</Button>
+                <Button variant="outline" onClick={() => setDeleteOpen(false)}>{t('common.cancel')}</Button>
+                <Button variant="destructive" onClick={handleDelete}>{t('payments.delete_confirm')}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

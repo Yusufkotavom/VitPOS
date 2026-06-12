@@ -1,6 +1,7 @@
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, PencilIcon, XIcon, CheckIcon, Trash2Icon } from 'lucide-react'
 import { useState, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useLiveQuery } from '@/shared/hooks/use-live-query'
 
@@ -38,6 +39,7 @@ type OrderRow = {
 }
 
 export function CustomerDetailPage() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const activeTenantId = useAuthStore((state) => state.activeTenant?.id)
 
@@ -104,7 +106,7 @@ export function CustomerDetailPage() {
 
   if (isLoading) {
     return (
-      <PageShell title="Loading..." description="">
+      <PageShell title={t('common.loading')} description="">
         <div className="space-y-4">
           <Skeleton className="h-8 w-1/3" />
           <Skeleton className="h-32 w-full" />
@@ -116,11 +118,11 @@ export function CustomerDetailPage() {
 
   if (!customer) {
     return (
-      <PageShell title="Tidak Ditemukan" description="Pelanggan tidak ditemukan">
+      <PageShell title={t('common.not_found')} description={t('customers.not_found')}>
         <Button asChild variant="outline">
           <Link to="/customers">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Kembali ke Daftar
+            {t('common.back_to_list')}
           </Link>
         </Button>
       </PageShell>
@@ -153,10 +155,10 @@ export function CustomerDetailPage() {
       updated.version = customer.version + 1
       updated.updatedAt = new Date().toISOString()
       await customerRepository.upsert(updated)
-      toast.success('Pelanggan diperbarui')
+      toast.success(t('customers.updated'))
       setEditing(false)
     } catch (error) {
-      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.save_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -164,10 +166,10 @@ export function CustomerDetailPage() {
     if (!customer) return
     try {
       await customerRepository.remove(customer.id)
-      toast.success('Pelanggan dihapus')
+      toast.success(t('customers.deleted'))
       setDeleteOpen(false)
     } catch (error) {
-      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.delete_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -180,29 +182,29 @@ export function CustomerDetailPage() {
           <Button variant="outline" size="sm" asChild>
             <Link to="/customers">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Kembali
+              {t('common.back')}
             </Link>
           </Button>
           {editing ? (
             <>
               <Button variant="outline" size="sm" onClick={cancelEditing}>
                 <XIcon className="mr-2 h-4 w-4" />
-                Batal
+                {t('common.cancel')}
               </Button>
               <Button size="sm" onClick={saveEditing}>
                 <CheckIcon className="mr-2 h-4 w-4" />
-                Simpan
+                {t('common.save')}
               </Button>
             </>
           ) : (
             <>
               <Button variant="outline" size="sm" onClick={startEditing}>
                 <PencilIcon className="mr-2 h-4 w-4" />
-                Ubah
+                {t('common.edit')}
               </Button>
               <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
                 <Trash2Icon className="mr-2 h-4 w-4" />
-                Hapus
+                {t('common.delete')}
               </Button>
             </>
           )}
@@ -212,11 +214,11 @@ export function CustomerDetailPage() {
       <div className="grid gap-6 md:grid-cols-3">
         <div className="space-y-6 md:col-span-2 min-w-0">
           <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Info Pelanggan</h3>
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">{t('customers.info')}</h3>
             <div className="rounded-lg border p-4 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Nama</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t('common.name')}</p>
                   {editing ? (
                     <Input value={editName} onChange={e => setEditName(e.target.value)} className="h-8 text-sm" />
                   ) : (
@@ -224,7 +226,7 @@ export function CustomerDetailPage() {
                   )}
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">WhatsApp</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t('common.whatsapp')}</p>
                   {editing ? (
                     <Input value={editPhone} onChange={e => setEditPhone(e.target.value)} className="h-8 text-sm" />
                   ) : (
@@ -234,7 +236,7 @@ export function CustomerDetailPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Alamat</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t('common.address')}</p>
                   {editing ? (
                     <Textarea value={editCity} onChange={e => setEditCity(e.target.value)} className="min-h-[3.5rem]" />
                   ) : (
@@ -242,11 +244,11 @@ export function CustomerDetailPage() {
                   )}
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Status</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t('common.status')}</p>
                   {editing ? (
                     <Select value={editStatus} onValueChange={setEditStatus}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Pilih status" />
+                        <SelectValue placeholder={t('common.select_status')} />
                       </SelectTrigger>
                       <SelectContent>
                         {customerStatusOptions.map(opt => (
@@ -263,13 +265,13 @@ export function CustomerDetailPage() {
           </div>
 
           <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Riwayat Order</h3>
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">{t('customers.order_history')}</h3>
             <div className="overflow-x-auto">
               <div className="min-w-[600px]">
                 <DataTable
                   data={orders}
                   columns={[
-                    { key: 'code', header: 'Kode', sortable: true, render: (row: OrderRow) => (
+                    { key: 'code', header: t('common.code'), sortable: true, render: (row: OrderRow) => (
                       <Link
                         to={row.type === 'Penjualan' ? `/sales-orders/${row.id}` : `/service-orders/${row.id}`}
                         className="font-medium text-primary hover:underline"
@@ -277,16 +279,16 @@ export function CustomerDetailPage() {
                         {row.code}
                       </Link>
                     )},
-                    { key: 'date', header: 'Tanggal', sortable: true, render: (row: OrderRow) => formatDate(row.date) },
-                    { key: 'type', header: 'Tipe', render: (row: OrderRow) => (
+                    { key: 'date', header: t('common.date'), sortable: true, render: (row: OrderRow) => formatDate(row.date) },
+                    { key: 'type', header: t('common.type'), render: (row: OrderRow) => (
                       <StatusBadge label={row.type} tone={row.type === 'Penjualan' ? 'info' : 'warning'} />
                     )},
-                    { key: 'total', header: 'Total', sortable: true, render: (row: OrderRow) => formatCurrency(row.total) },
-                    { key: 'status', header: 'Status', render: (row: OrderRow) => (
+                    { key: 'total', header: t('common.total'), sortable: true, render: (row: OrderRow) => formatCurrency(row.total) },
+                    { key: 'status', header: t('common.status'), render: (row: OrderRow) => (
                       <StatusBadge label={row.status} tone={tone(row.status)} />
                     )},
                   ]}
-                  emptyTitle="Belum ada transaksi"
+                  emptyTitle={t('customers.no_transactions')}
                 />
               </div>
             </div>
@@ -296,15 +298,15 @@ export function CustomerDetailPage() {
         <div className="space-y-4">
           <div className="rounded-lg border p-4 space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Status</span>
+              <span className="text-sm text-muted-foreground">{t('common.status')}</span>
               <StatusBadge label={customer.status} tone={customer.status === 'Aktif' ? 'success' : customer.status === 'Piutang' ? 'warning' : 'neutral'} />
             </div>
             <div className="flex justify-between items-center pt-2 border-t">
-              <span className="text-sm text-muted-foreground">Total Order</span>
+              <span className="text-sm text-muted-foreground">{t('customers.total_orders')}</span>
               <span className="font-semibold">{orders.length}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Total Piutang</span>
+              <span className="text-sm text-muted-foreground">{t('customers.total_receivable')}</span>
               <span className="font-bold text-red-600">{formatCurrency(calculatedReceivable)}</span>
             </div>
           </div>
@@ -314,12 +316,12 @@ export function CustomerDetailPage() {
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Hapus pelanggan</DialogTitle>
-            <DialogDescription>Pelanggan {customer.name} akan dihapus dari data lokal dan masuk antrean sinkron.</DialogDescription>
+            <DialogTitle>{t('customers.delete_title')}</DialogTitle>
+            <DialogDescription>{t('customers.delete_warning', { name: customer.name })}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Batal</Button>
-            <Button variant="destructive" onClick={handleDelete}>Hapus pelanggan</Button>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>{t('common.cancel')}</Button>
+            <Button variant="destructive" onClick={handleDelete}>{t('customers.delete_confirm')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

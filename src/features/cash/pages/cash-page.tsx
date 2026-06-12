@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { LayoutGrid, List, Filter } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -26,6 +27,7 @@ export function CashPage() {
   const [filterAccount, setFilterAccount] = useState('all')
   const [filterCategory, setFilterCategory] = useState('all')
   const [pageSize, setPageSize] = useState('20')
+  const { t } = useTranslation()
 
   const getCategoryName = (id: string) => categories.find(c => c.id === id)?.name ?? id
 
@@ -43,14 +45,14 @@ export function CashPage() {
   const balance = totalIncome - totalExpense
 
   return (
-    <PageShell title="Kas & Bank" description="Pemasukan, pengeluaran, dan mutasi kas." actions={<CashCrudActions />}>
+    <PageShell title={t('nav.cash_bank')} description={t('cash.description')} actions={<CashCrudActions />}>
       <section className="grid gap-3 md:grid-cols-3 mb-6">
         <article className="rounded-2xl border bg-background p-4 shadow-sm">
-          <p className="text-xs text-muted-foreground">Total masuk</p>
+          <p className="text-xs text-muted-foreground">{t('cash.income')}</p>
           <p className="mt-2 text-2xl font-semibold text-emerald-600">{formatCurrency(totalIncome)}</p>
         </article>
         <article className="rounded-2xl border bg-background p-4 shadow-sm">
-          <p className="text-xs text-muted-foreground">Total keluar</p>
+          <p className="text-xs text-muted-foreground">{t('cash.expense')}</p>
           <p className="mt-2 text-2xl font-semibold text-rose-600">{formatCurrency(totalExpense)}</p>
         </article>
         <article className="rounded-2xl border bg-background p-4 shadow-sm">
@@ -58,11 +60,11 @@ export function CashPage() {
           <p className="mt-2 text-2xl font-semibold">{formatCurrency(balance)}</p>
         </article>
       </section>
-      <ContentCard title="Mutasi Kas" description="Catat pemasukan dan pengeluaran manual bisnis.">
+      <ContentCard title={t('cash.transactions')} description={t('cash.description')}>
         <div className="mb-4 flex flex-row items-center gap-2 border-b pb-4">
           <input
             type="text"
-            placeholder="Cari transaksi..."
+            placeholder={t('common.search')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -74,10 +76,10 @@ export function CashPage() {
             <div className="absolute top-full right-0 mt-2 hidden group-hover:flex flex-col gap-2 rounded-md border bg-popover p-2 shadow-md z-10 w-48">
               <Select value={filterAccount} onValueChange={setFilterAccount}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Semua Akun" />
+                  <SelectValue placeholder={t('cash.all_accounts')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Semua Akun</SelectItem>
+                  <SelectItem value="all">{t('cash.all_accounts')}</SelectItem>
                   {Array.from(new Set(cash.map(c => c.account))).map(acc => (
                     <SelectItem key={acc} value={acc}>{acc}</SelectItem>
                   ))}
@@ -85,10 +87,10 @@ export function CashPage() {
               </Select>
               <Select value={filterCategory} onValueChange={setFilterCategory}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Kategori" />
+                  <SelectValue placeholder={t('common.category')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Semua Kategori</SelectItem>
+                  <SelectItem value="all">{t('cash.all_categories')}</SelectItem>
                   {Array.from(new Set(cash.map(c => c.category))).filter(Boolean).map(cat => (
                     <SelectItem key={cat} value={cat}>{getCategoryName(cat)}</SelectItem>
                   ))}
@@ -96,12 +98,12 @@ export function CashPage() {
               </Select>
               <Select value={pageSize} onValueChange={setPageSize}>
                 <SelectTrigger>
-                  <SelectValue placeholder="20 / halaman" />
+                  <SelectValue placeholder={t('common.per_page', { count: 20 })} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="20">20 / halaman</SelectItem>
-                  <SelectItem value="50">50 / halaman</SelectItem>
-                  <SelectItem value="100">100 / halaman</SelectItem>
+                  <SelectItem value="20">{t('common.per_page', { count: 20 })}</SelectItem>
+                  <SelectItem value="50">{t('common.per_page', { count: 50 })}</SelectItem>
+                  <SelectItem value="100">{t('common.per_page', { count: 100 })}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -112,7 +114,7 @@ export function CashPage() {
               size="icon"
               onClick={() => setView('list')}
               className="h-7 w-7"
-              title="List View"
+              title={t('common.list_view')}
             >
               <List className="h-4 w-4" />
             </Button>
@@ -121,7 +123,7 @@ export function CashPage() {
               size="icon"
               onClick={() => setView('card')}
               className="h-7 w-7"
-              title="Card View"
+              title={t('common.card_view')}
             >
               <LayoutGrid className="h-4 w-4" />
             </Button>
@@ -132,19 +134,19 @@ export function CashPage() {
             data={paginated}
             columns={[
               { key: 'ref', header: 'Ref', sortable: true },
-              { key: 'date', header: 'Tanggal', sortable: true },
+              { key: 'date', header: t('common.date'), sortable: true },
               { key: 'account', header: 'Akun', sortable: true },
-              { key: 'category', header: 'Kategori', sortable: true, render: (row) => getCategoryName(row.category) },
-              { key: 'income', header: 'Masuk', render: (row) => row.income > 0 ? <span className="font-medium text-emerald-600">{formatCurrency(row.income)}</span> : '-' },
-              { key: 'expense', header: 'Keluar', render: (row) => row.expense > 0 ? <span className="font-medium text-rose-600">{formatCurrency(row.expense)}</span> : '-' },
-              { key: 'status', header: 'Status', render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
-              { key: 'actions', header: 'Aksi', render: (row) => <CashCrudActions cash={row} /> },
+              { key: 'category', header: t('common.category'), sortable: true, render: (row) => getCategoryName(row.category) },
+              { key: 'income', header: t('cash.income'), render: (row) => row.income > 0 ? <span className="font-medium text-emerald-600">{formatCurrency(row.income)}</span> : '-' },
+              { key: 'expense', header: t('cash.expense'), render: (row) => row.expense > 0 ? <span className="font-medium text-rose-600">{formatCurrency(row.expense)}</span> : '-' },
+              { key: 'status', header: t('common.status'), render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
+              { key: 'actions', header: t('common.actions'), render: (row) => <CashCrudActions cash={row} /> },
             ]}
           />
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {paginated.length === 0 ? (
-              <p className="text-center text-muted-foreground py-12 col-span-full">Belum ada transaksi</p>
+              <p className="text-center text-muted-foreground py-12 col-span-full">{t('cash.empty')}</p>
             ) : (
               paginated.map((row) => (
                 <div key={row.id} className="rounded-2xl border bg-background p-5 shadow-sm">
@@ -156,8 +158,8 @@ export function CashPage() {
                     <StatusBadge label={row.status} tone={tone(row.status)} />
                   </div>
                   <div className="flex items-center justify-between text-sm mb-3">
-                    {row.income > 0 ? <span className="font-medium text-emerald-600">Masuk {formatCurrency(row.income)}</span> : null}
-                    {row.expense > 0 ? <span className="font-medium text-rose-600">Keluar {formatCurrency(row.expense)}</span> : null}
+                    {row.income > 0 ? <span className="font-medium text-emerald-600">{t('cash.income')} {formatCurrency(row.income)}</span> : null}
+                    {row.expense > 0 ? <span className="font-medium text-rose-600">{t('cash.expense')} {formatCurrency(row.expense)}</span> : null}
                   </div>
                   <p className="text-xs text-muted-foreground">{row.date}</p>
                   <div className="mt-3 pt-3 border-t">

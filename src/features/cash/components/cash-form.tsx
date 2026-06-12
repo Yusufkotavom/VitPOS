@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect } from 'react'
 import { useForm, useWatch, Controller } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,6 +29,7 @@ export function CashForm({
   onCancel: () => void
   onSubmit: (values: CashFormValues) => Promise<void>
 }) {
+  const { t } = useTranslation()
   const form = useForm<CashFormValues>({
     resolver: zodResolver(cashFormSchema),
     defaultValues: defaultValues ?? cashInitialValues,
@@ -44,15 +46,15 @@ export function CashForm({
 
   return (
     <form className="flex flex-col gap-4 p-4" onSubmit={form.handleSubmit(onSubmit)}>
-      <FormSection title="Info transaksi" description="Nomor referensi, tanggal, dan akun kas.">
+      <FormSection title={t('cash.transaction_info')} description={t('cash.transaction_info_description')}>
         <label className="flex flex-col gap-1 text-sm font-medium">
           Nomor referensi
           <Input aria-invalid={Boolean(errors.ref)} {...form.register('ref')} placeholder="KAS-004" />
           {errors.ref ? <span className="text-xs text-destructive">{errors.ref.message}</span> : null}
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Tanggal
-          <Input aria-invalid={Boolean(errors.date)} {...form.register('date')} placeholder="8 Juni 2026" />
+          {t('common.date')}
+          <Input aria-invalid={Boolean(errors.date)} {...form.register('date')} placeholder={t('common.select_date')} />
           {errors.date ? <span className="text-xs text-destructive">{errors.date.message}</span> : null}
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
@@ -60,7 +62,7 @@ export function CashForm({
           <FormSelect control={form.control} name="account" options={activeMethods.map(o => ({ label: o, value: o }))} />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Kategori
+          {t('common.category')}
           <Input aria-invalid={Boolean(errors.category)} {...form.register('category')} placeholder="Penjualan" />
           {errors.category ? <span className="text-xs text-destructive">{errors.category.message}</span> : null}
         </label>
@@ -82,12 +84,12 @@ export function CashForm({
           {errors.amount ? <span className="text-xs text-destructive">{errors.amount.message}</span> : null}
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
-          Status
+          {t('common.status')}
           <FormSelect control={form.control} name="status" options={cashStatusOptions.map(o => ({ label: o, value: o }))} />
         </label>
       </FormSection>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="outline" onClick={onCancel}>Batal</Button>
+        <Button type="button" variant="outline" onClick={onCancel}>{t('common.cancel')}</Button>
         <Button type="submit" disabled={form.formState.isSubmitting}>{submitLabel}</Button>
       </div>
     </form>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -14,6 +15,7 @@ import { serviceOrderRepository } from '@/services/local-db/repository'
 import type { LocalServiceOrder } from '@/services/local-db/schema'
 
 export function ServiceOrderCrudActions({ order }: { order?: LocalServiceOrder }) {
+  const { t } = useTranslation()
   const [formOpen, setFormOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
 
@@ -29,10 +31,10 @@ export function ServiceOrderCrudActions({ order }: { order?: LocalServiceOrder }
         ...mapServiceOrderFormToRecord(values, order.id, order),
         customerId: customer?.id,
       })
-      toast.success('Service order diperbarui')
+      toast.success(t('service_orders.updated'))
       setFormOpen(false)
     } catch (error) {
-      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.save_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -40,10 +42,10 @@ export function ServiceOrderCrudActions({ order }: { order?: LocalServiceOrder }
     if (!order) return
     try {
       await serviceOrderRepository.remove(order.id)
-      toast.success('Service order dihapus')
+      toast.success(t('service_orders.deleted'))
       setDeleteOpen(false)
     } catch (error) {
-      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.delete_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -51,7 +53,7 @@ export function ServiceOrderCrudActions({ order }: { order?: LocalServiceOrder }
     return (
       <Button asChild>
         <Link to="/service-orders/create">
-          <PlusIcon data-icon="inline-start" className="mr-2 h-4 w-4" /> Buat Service Order
+          <PlusIcon data-icon="inline-start" className="mr-2 h-4 w-4" /> {t('service_orders.create')}
         </Link>
       </Button>
     )
@@ -61,26 +63,26 @@ export function ServiceOrderCrudActions({ order }: { order?: LocalServiceOrder }
     <div className="flex flex-wrap gap-2">
       <Sheet open={formOpen} onOpenChange={setFormOpen}>
         <SheetTrigger asChild>
-          <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" className="mr-2 h-4 w-4" />Ubah</Button>
+          <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" className="mr-2 h-4 w-4" />{t('common.edit')}</Button>
         </SheetTrigger>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
           <SheetHeader>
-            <SheetTitle>Ubah service order</SheetTitle>
-            <SheetDescription>Service order tersimpan lokal dulu, lalu masuk antrean sinkron.</SheetDescription>
+            <SheetTitle>{t('service_orders.edit_title')}</SheetTitle>
+            <SheetDescription>{t('service_orders.save_local_description')}</SheetDescription>
           </SheetHeader>
-          <ServiceOrderForm defaultValues={mapServiceOrderRecordToFormValues(order)} submitLabel="Simpan perubahan" onCancel={() => setFormOpen(false)} onSubmit={handleSubmit} />
+          <ServiceOrderForm defaultValues={mapServiceOrderRecordToFormValues(order)} submitLabel={t('common.save_changes')} onCancel={() => setFormOpen(false)} onSubmit={handleSubmit} />
         </SheetContent>
       </Sheet>
-      <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" className="mr-2 h-4 w-4" />Hapus</Button>
+      <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" className="mr-2 h-4 w-4" />{t('common.delete')}</Button>
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Hapus service order</DialogTitle>
-            <DialogDescription>Service order {order.code} akan dihapus dari data lokal dan masuk antrean sinkron.</DialogDescription>
+            <DialogTitle>{t('service_orders.delete_title')}</DialogTitle>
+            <DialogDescription>{t('service_orders.delete_description', { code: order.code })}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Batal</Button>
-            <Button variant="destructive" onClick={handleDelete}>Hapus service order</Button>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>{t('common.cancel')}</Button>
+            <Button variant="destructive" onClick={handleDelete}>{t('service_orders.delete_confirm')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

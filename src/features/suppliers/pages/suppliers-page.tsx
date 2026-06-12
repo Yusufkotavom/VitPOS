@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { LayoutGrid, List, Filter } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -18,6 +19,7 @@ function tone(status: string) {
 }
 
 export function SuppliersPage() {
+  const { t } = useTranslation()
   const supplierRows = useSuppliers()
   const [view, setView] = useState<'list' | 'card'>('list')
   const [search, setSearch] = useState('')
@@ -27,12 +29,12 @@ export function SuppliersPage() {
   )
 
   return (
-    <PageShell title="Supplier" description="Kontak supplier, hutang, dan histori." actions={<SupplierCrudActions />}>
-      <ContentCard title="Daftar Supplier" description="Tampilkan supplier dalam bentuk table atau card.">
+    <PageShell title={t('suppliers.title')} description={t('suppliers.page_description')} actions={<SupplierCrudActions />}>
+      <ContentCard title={t('suppliers.list_title')} description={t('suppliers.list_description')}>
         <div className="mb-4 flex flex-row items-center gap-2 border-b pb-4">
           <input
             type="text"
-            placeholder="Cari supplier..."
+            placeholder={t('suppliers.search_placeholder')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="flex h-9 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -44,21 +46,21 @@ export function SuppliersPage() {
             <div className="absolute top-full right-0 mt-2 hidden group-hover:flex flex-col gap-2 rounded-md border bg-popover p-2 shadow-md z-10 w-48">
               <Select>
                 <SelectTrigger>
-                  <SelectValue placeholder="Status" />
+                  <SelectValue placeholder={t('common.select_status')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Aktif">Aktif</SelectItem>
-                  <SelectItem value="Hutang">Hutang</SelectItem>
+                  <SelectItem value="Aktif">{t('common.active')}</SelectItem>
+                  <SelectItem value="Hutang">{t('suppliers.payable')}</SelectItem>
                 </SelectContent>
               </Select>
               <Select>
                 <SelectTrigger>
-                  <SelectValue placeholder="20 / halaman" />
+                  <SelectValue placeholder={t('common.per_page', { count: 20 })} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="20">20 / halaman</SelectItem>
-                  <SelectItem value="50">50 / halaman</SelectItem>
-                  <SelectItem value="100">100 / halaman</SelectItem>
+                  <SelectItem value="20">{t('common.per_page', { count: 20 })}</SelectItem>
+                  <SelectItem value="50">{t('common.per_page', { count: 50 })}</SelectItem>
+                  <SelectItem value="100">{t('common.per_page', { count: 100 })}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -69,7 +71,7 @@ export function SuppliersPage() {
               size="icon"
               onClick={() => setView('list')}
               className="h-7 w-7"
-              title="List View"
+              title={t('common.list_view')}
             >
               <List className="h-4 w-4" />
             </Button>
@@ -78,7 +80,7 @@ export function SuppliersPage() {
               size="icon"
               onClick={() => setView('card')}
               className="h-7 w-7"
-              title="Card View"
+              title={t('common.card_view')}
             >
               <LayoutGrid className="h-4 w-4" />
             </Button>
@@ -88,19 +90,19 @@ export function SuppliersPage() {
           <DataTable
             data={filtered}
             columns={[
-              { key: 'name', header: 'Supplier', sortable: true },
-              { key: 'phone', header: 'Telepon' },
-              { key: 'city', header: 'Alamat', sortable: true },
-              { key: 'payable', header: 'Hutang', sortable: true, render: (row) => <span className={row.payable > 0 ? 'font-medium text-rose-600' : ''}>{formatCurrency(row.payable)}</span> },
-              { key: 'orders', header: 'Order', sortable: true, render: (row) => String(row.orders) },
-              { key: 'status', header: 'Status', render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
-              { key: 'actions', header: 'Aksi', render: (row) => <SupplierCrudActions supplier={row} /> },
+              { key: 'name', header: t('suppliers.supplier'), sortable: true },
+              { key: 'phone', header: t('common.phone') },
+              { key: 'city', header: t('common.address'), sortable: true },
+              { key: 'payable', header: t('suppliers.payable'), sortable: true, render: (row) => <span className={row.payable > 0 ? 'font-medium text-rose-600' : ''}>{formatCurrency(row.payable)}</span> },
+              { key: 'orders', header: t('common.order'), sortable: true, render: (row) => String(row.orders) },
+              { key: 'status', header: t('common.status'), render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
+              { key: 'actions', header: t('common.actions'), render: (row) => <SupplierCrudActions supplier={row} /> },
             ]}
           />
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {filtered.length === 0 ? (
-              <p className="text-center text-muted-foreground py-12 col-span-full">Belum ada supplier</p>
+              <p className="text-center text-muted-foreground py-12 col-span-full">{t('suppliers.empty')}</p>
             ) : (
               filtered.map((row) => (
                 <div key={row.id} className="rounded-2xl border bg-background p-5 shadow-sm">
@@ -113,8 +115,8 @@ export function SuppliersPage() {
                     <StatusBadge label={row.status} tone={tone(row.status)} />
                   </div>
                   <div className="flex items-center justify-between text-sm mb-2">
-                    <span>Hutang <span className={row.payable > 0 ? 'font-semibold text-rose-600' : ''}>{formatCurrency(row.payable)}</span></span>
-                    <span>{row.orders} order</span>
+                    <span>{t('suppliers.payable')} <span className={row.payable > 0 ? 'font-semibold text-rose-600' : ''}>{formatCurrency(row.payable)}</span></span>
+                    <span>{t('common.order_count', { count: row.orders })}</span>
                   </div>
                   <div className="mt-3 pt-3 border-t">
                     <SupplierCrudActions supplier={row} />

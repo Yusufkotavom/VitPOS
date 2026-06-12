@@ -1,6 +1,6 @@
 import { Printer, MessageCircle, Plus, FileText } from 'lucide-react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter } from '@/components/ui/drawer'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { Button } from '@/components/ui/button'
 import { useTranslation } from 'react-i18next'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -31,9 +31,8 @@ export function PosSuccessDialog({
   onNewSale,
 }: PosSuccessDialogProps) {
   const { t } = useTranslation()
-  if (!order) return null
-
   const isDesktop = useMediaQuery('(min-width: 768px)')
+  if (!order) return null
 
   const Content = (
     <>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Printer, MessageSquare, Download, CreditCard, PlusIcon, Trash2Icon, PencilIcon, XIcon, CheckIcon, Search } from 'lucide-react'
 import { useState } from 'react'
@@ -37,6 +38,7 @@ function tone(status: string) {
 type EditableItem = { id: string; name: string; qty: string; unitPrice: string }
 
 export function PurchaseDetailPage() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const tenantId = requireActiveTenantId()
   const { data: order, isLoading, refetch } = usePurchase(id)
@@ -131,11 +133,11 @@ export function PurchaseDetailPage() {
         version: order.version + 1,
         updatedAt: new Date().toISOString(),
       })
-      toast.success('Item diperbarui')
+      toast.success(t('purchases.items_updated'))
       setEditing(false)
       refetch()
     } catch (error) {
-      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.save_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -154,15 +156,15 @@ export function PurchaseDetailPage() {
   async function handleReceivePayment() {
     if (!order) return
     const amount = Number(payAmount) || 0
-    if (amount <= 0) return toast.error('Nominal pembayaran harus lebih dari 0')
+    if (amount <= 0) return toast.error(t('purchases.payment_must_be_positive'))
     try {
       await recordPurchasePayment(order.id, amount, payMethod, 'Pembelian')
-      toast.success(`Pembayaran Rp ${amount.toLocaleString('id-ID')} diterima`)
+      toast.success(t('purchases.payment_received', { amount: amount.toLocaleString('id-ID') }))
       setPayOpen(false)
       setPayAmount('')
       refetch()
     } catch (error) {
-      toast.error(`Gagal memproses pembayaran: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.payment_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -174,23 +176,23 @@ export function PurchaseDetailPage() {
       if (supplierId) {
         await syncSupplierPurchaseMetrics(supplierId)
       }
-      toast.success('PO dihapus')
+      toast.success(t('purchases.deleted'))
       setDeleteOpen(false)
     } catch (error) {
-      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.delete_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
   async function handleWhatsApp() {
     if (!order) return
     if (!order.supplierId) {
-      toast.error('Supplier tidak memiliki nomor WhatsApp')
+      toast.error(t('purchases.supplier_no_whatsapp'))
       return
     }
     const customer = await localDb.suppliers.get(order.supplierId)
     const phone = customer?.phone
     if (!phone) {
-      toast.error('Nomor WhatsApp supplier tidak ditemukan')
+      toast.error(t('purchases.supplier_whatsapp_not_found'))
       return
     }
 
@@ -221,11 +223,11 @@ export function PurchaseDetailPage() {
 
   if (!order) {
     return (
-      <PageShell title="Tidak Ditemukan" description="Purchase Order tidak ditemukan">
+      <PageShell title={t('common.not_found')} description={t('purchases.not_found')}>
         <Button asChild variant="outline">
           <Link to="/purchases">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Kembali ke Daftar
+            {t('common.back_to_list')}
           </Link>
         </Button>
       </PageShell>
@@ -245,22 +247,22 @@ export function PurchaseDetailPage() {
         <Button variant="outline" size="sm" onClick={async () => {
           try {
             await receivePurchaseOrder(order)
-            toast.success('Barang diterima')
+            toast.success(t('purchases.goods_received'))
             refetch()
           } catch(error) {
-            toast.error(error instanceof Error ? error.message : 'Terjadi kesalahan')
+            toast.error(t('purchases.receive_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
           }
         }}>
-          Terima Barang
+          {t('purchases.receive_goods')}
         </Button>
       )}
       <Button variant="outline" size="sm" onClick={() => invoiceData && printPdf(invoiceData)}>
         <Printer className="mr-2 h-4 w-4" />
-        Print
+        {t('common.print')}
       </Button>
       <Button variant="outline" size="sm" onClick={() => invoiceData && downloadPdf(invoiceData, `PO-${order?.code || 'download'}`)}>
         <Download className="mr-2 h-4 w-4" />
-        PDF
+        {t('common.pdf')}
       </Button>
       <Button variant="outline" size="sm" className="text-green-600 hover:text-green-700" onClick={handleWhatsApp}>
         <MessageSquare className="mr-2 h-4 w-4" />
@@ -270,22 +272,22 @@ export function PurchaseDetailPage() {
         <>
           <Button variant="outline" size="sm" onClick={cancelEditing}>
             <XIcon className="mr-2 h-4 w-4" />
-            Batal
+            {t('common.cancel')}
           </Button>
           <Button size="sm" onClick={saveEditing}>
             <CheckIcon className="mr-2 h-4 w-4" />
-            Simpan
+            {t('common.save')}
           </Button>
         </>
       ) : (
         <>
           <Button variant="outline" size="sm" onClick={startEditing}>
             <PencilIcon className="mr-2 h-4 w-4" />
-            Ubah
+            {t('common.edit')}
           </Button>
           <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
             <Trash2Icon className="mr-2 h-4 w-4" />
-            Hapus
+            {t('common.delete')}
           </Button>
         </>
       )}
@@ -301,17 +303,17 @@ export function PurchaseDetailPage() {
       <div className="grid gap-6 md:grid-cols-3">
         <div className="space-y-6 md:col-span-2">
           <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Item Pesanan</h3>
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">{t('purchases.item_header')}</h3>
             {editing ? (
               <div className="flex flex-col gap-3">
                 <div className="hidden sm:block rounded-lg border overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/40">
-                        <TableHead>Nama</TableHead>
-                        <TableHead className="text-right w-20">Qty</TableHead>
-                        <TableHead className="text-right w-28">Harga</TableHead>
-                        <TableHead className="text-right w-28">Subtotal</TableHead>
+                        <TableHead>{t('common.name')}</TableHead>
+                        <TableHead className="text-right w-20">{t('common.qty')}</TableHead>
+                        <TableHead className="text-right w-28">{t('common.price')}</TableHead>
+                        <TableHead className="text-right w-28">{t('common.subtotal')}</TableHead>
                         <TableHead className="w-10"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -319,7 +321,7 @@ export function PurchaseDetailPage() {
                       {editItems.map((item, idx) => (
                         <TableRow key={item.id}>
                           <TableCell className="py-1.5 px-2">
-                            <Input value={item.name} onChange={e => updateItem(idx, 'name', e.target.value)} placeholder="Nama produk" className="h-8 text-sm" />
+                            <Input value={item.name} onChange={e => updateItem(idx, 'name', e.target.value)} placeholder={t('purchases.item_name_placeholder')} className="h-8 text-sm" />
                           </TableCell>
                           <TableCell className="py-1.5 px-2">
                             <Input value={item.qty} onChange={e => updateItem(idx, 'qty', e.target.value)} inputMode="numeric" className="h-8 text-sm text-right" />
@@ -346,26 +348,26 @@ export function PurchaseDetailPage() {
                     return (
                       <div key={item.id} className="rounded-xl border bg-muted/20 p-3 space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-muted-foreground">Item {idx + 1}</span>
+                          <span className="text-xs font-medium text-muted-foreground">{t('purchases.item_number', { index: idx + 1 })}</span>
                           {editItems.length > 1 && (
                             <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeItem(idx)}>
                               <Trash2Icon className="h-3.5 w-3.5 text-destructive" />
                             </Button>
                           )}
                         </div>
-                        <Input value={item.name} onChange={e => updateItem(idx, 'name', e.target.value)} placeholder="Nama produk" className="h-8 text-sm" />
+                        <Input value={item.name} onChange={e => updateItem(idx, 'name', e.target.value)} placeholder={t('purchases.item_name_placeholder')} className="h-8 text-sm" />
                         <div className="grid grid-cols-2 gap-2">
                           <div className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">Qty</span>
+                            <span className="text-xs text-muted-foreground">{t('common.qty')}</span>
                             <Input value={item.qty} onChange={e => updateItem(idx, 'qty', e.target.value)} inputMode="numeric" className="h-8 text-sm" />
                           </div>
                           <div className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">Harga</span>
+                            <span className="text-xs text-muted-foreground">{t('common.price')}</span>
                             <Input value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)} inputMode="numeric" className="h-8 text-sm" />
                           </div>
                         </div>
                         <div className="flex justify-between items-center pt-1">
-                          <span className="text-xs text-muted-foreground">Subtotal</span>
+                          <span className="text-xs text-muted-foreground">{t('common.subtotal')}</span>
                           <span className="text-sm font-medium">{itemSubtotal > 0 ? formatCurrency(itemSubtotal) : '-'}</span>
                         </div>
                       </div>
@@ -375,17 +377,17 @@ export function PurchaseDetailPage() {
                 <Dialog open={isProductModalOpen} onOpenChange={setIsProductModalOpen}>
                   <DialogTrigger asChild>
                     <Button type="button" variant="ghost" size="sm" className="self-start">
-                      <PlusIcon className="mr-1 h-3.5 w-3.5" />Tambah Produk
+                      <PlusIcon className="mr-1 h-3.5 w-3.5" />{t('purchases.add_product')}
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col">
                     <DialogHeader>
-                      <DialogTitle>Pilih Produk</DialogTitle>
+                      <DialogTitle>{t('purchases.select_product_title')}</DialogTitle>
                     </DialogHeader>
                     <div className="relative mt-2">
                       <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
-                        placeholder="Cari produk..."
+                        placeholder={t('purchases.search_product_placeholder')}
                         className="pl-8"
                         value={productSearch}
                         onChange={(e) => setProductSearch(e.target.value)}
@@ -403,16 +405,16 @@ export function PurchaseDetailPage() {
                             variant="outline"
                             onClick={() => {
                               setEditItems(prev => [...prev, { id: crypto.randomUUID(), name: p.name, qty: '1', unitPrice: String(p.price) }])
-                              toast.success(`${p.name} ditambahkan`)
+                              toast.success(t('purchases.product_added_toast', { name: p.name }))
                               setIsProductModalOpen(false)
                             }}
                           >
-                            Tambah
+                            {t('common.add')}
                           </Button>
                         </div>
                       ))}
                       {filteredProducts.length === 0 && (
-                        <p className="text-center text-sm text-muted-foreground py-8">Tidak ada produk ditemukan</p>
+                        <p className="text-center text-sm text-muted-foreground py-8">{t('purchases.no_products')}</p>
                       )}
                     </div>
                     <DialogFooter>
@@ -420,7 +422,7 @@ export function PurchaseDetailPage() {
                         addItem()
                         setIsProductModalOpen(false)
                       }}>
-                        + Tambah Item Manual
+                        {t('purchases.add_manual_item')}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -430,25 +432,25 @@ export function PurchaseDetailPage() {
               <DataTable
                 data={order.items?.map((i: OrderItem, idx: number) => ({ ...i, id: String(idx) })) || []}
                 columns={[
-                  { key: 'name', header: 'Item' },
-                  { key: 'unitPrice', header: 'Harga', render: (row: OrderItem) => formatCurrency(row.unitPrice) },
-                  { key: 'qty', header: 'Qty' },
-                  { key: 'subtotal', header: 'Subtotal', render: (row: OrderItem) => formatCurrency(row.subtotal) },
+                  { key: 'name', header: t('purchases.item_header') },
+                  { key: 'unitPrice', header: t('common.price'), render: (row: OrderItem) => formatCurrency(row.unitPrice) },
+                  { key: 'qty', header: t('common.qty') },
+                  { key: 'subtotal', header: t('common.subtotal'), render: (row: OrderItem) => formatCurrency(row.subtotal) },
                 ]}
-                emptyTitle="Belum ada item"
+                emptyTitle={t('purchases.no_items')}
               />
             )}
           </div>
 
           <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Pembayaran</h3>
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">{t('purchases.payment')}</h3>
             <DataTable
               data={order.payments?.map((p: PaymentRow, idx: number) => ({ ...p, id: String(idx) })) || []}
-              emptyTitle="Belum ada pembayaran"
+              emptyTitle={t('purchases.no_payments')}
               columns={[
-                { key: 'date', header: 'Tanggal', render: (row: PaymentRow) => formatDate(row.date) },
-                { key: 'method', header: 'Metode', render: (row: PaymentRow) => <span className="capitalize">{row.method}</span> },
-                { key: 'amount', header: 'Nominal', render: (row: PaymentRow) => formatCurrency(row.amount) },
+                { key: 'date', header: t('common.date'), render: (row: PaymentRow) => formatDate(row.date) },
+                { key: 'method', header: t('common.method'), render: (row: PaymentRow) => <span className="capitalize">{row.method}</span> },
+                { key: 'amount', header: t('common.amount'), render: (row: PaymentRow) => formatCurrency(row.amount) },
               ]}
             />
           </div>
@@ -457,25 +459,25 @@ export function PurchaseDetailPage() {
         <div className="space-y-4">
           <div className="rounded-lg border p-4 space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Status</span>
+              <span className="text-sm text-muted-foreground">{t('common.status')}</span>
               <StatusBadge label={order.status} tone={tone(order.status)} />
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Subtotal</span>
+              <span className="text-sm text-muted-foreground">{t('common.subtotal')}</span>
               <span className="font-medium">{formatCurrency(editing ? editSubtotal : order.subtotal)}</span>
             </div>
             <div className="flex justify-between items-center pt-2 border-t">
-              <span className="font-medium">Total</span>
+              <span className="font-medium">{t('common.total')}</span>
               <span className="font-semibold text-lg">{formatCurrency(editing ? editSubtotal : order.grandTotal)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Dibayar</span>
+              <span className="text-sm text-muted-foreground">{t('purchases.paid_label')}</span>
               <span className="font-semibold text-green-600">{formatCurrency(order.paidTotal)}</span>
             </div>
             <div className="flex justify-between items-center pt-2 border-t">
-              <span className="font-medium">{isPaid ? 'Status' : 'Sisa Tagihan'}</span>
+              <span className="font-medium">{isPaid ? t('common.status') : t('purchases.remaining_label')}</span>
               {isPaid ? (
-                <StatusBadge label="Lunas" tone="success" />
+                <StatusBadge label={t('common.paid')} tone="success" />
               ) : (
                 <span className="font-bold text-red-600 text-lg">{formatCurrency(shortage)}</span>
               )}
@@ -484,7 +486,7 @@ export function PurchaseDetailPage() {
             {shortage > 0 && (
               <Button className="w-full" onClick={() => setPayOpen(true)}>
                 <CreditCard className="mr-2 h-4 w-4" />
-                Bayar ke Supplier
+                {t('purchases.pay_supplier')}
               </Button>
             )}
           </div>
@@ -494,38 +496,38 @@ export function PurchaseDetailPage() {
       <Dialog open={payOpen} onOpenChange={setPayOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Bayar ke Supplier</DialogTitle>
-            <DialogDescription>Invoice {order.code} - Sisa tagihan {formatCurrency(shortage)}</DialogDescription>
+            <DialogTitle>{t('purchases.pay_supplier_title')}</DialogTitle>
+            <DialogDescription>{t('purchases.pay_supplier_description', { code: order.code, amount: formatCurrency(shortage) })}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">Metode</label>
+              <label className="text-sm font-medium">{t('common.method')}</label>
               <Select value={payMethod} onValueChange={setPayMethod}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Pilih metode" />
+                  <SelectValue placeholder={t('purchases.select_method_placeholder')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="tunai">Tunai</SelectItem>
-                  <SelectItem value="qris">QRIS</SelectItem>
-                  <SelectItem value="kartu">Kartu</SelectItem>
-                  <SelectItem value="transfer">Transfer</SelectItem>
-                  <SelectItem value="e-wallet">E-Wallet</SelectItem>
+                  <SelectItem value="tunai">{t('payment.method_cash')}</SelectItem>
+                  <SelectItem value="qris">{t('payment.method_qris')}</SelectItem>
+                  <SelectItem value="kartu">{t('payment.method_card')}</SelectItem>
+                  <SelectItem value="transfer">{t('payment.method_transfer')}</SelectItem>
+                  <SelectItem value="e-wallet">{t('payment.method_ewallet')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium">Nominal</label>
+              <label className="text-sm font-medium">{t('common.amount')}</label>
               <Input
                 inputMode="numeric"
                 value={payAmount}
                 onChange={e => setPayAmount(e.target.value)}
-                placeholder={`Maksimal ${formatCurrency(shortage)}`}
+                placeholder={t('purchases.max_amount', { amount: formatCurrency(shortage) })}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPayOpen(false)}>Batal</Button>
-            <Button onClick={handleReceivePayment}>Bayar</Button>
+            <Button variant="outline" onClick={() => setPayOpen(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleReceivePayment}>{t('common.pay')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -533,12 +535,12 @@ export function PurchaseDetailPage() {
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Hapus PO</DialogTitle>
-            <DialogDescription>Invoice {order.code} akan dihapus dari data lokal dan masuk antrean sinkron.</DialogDescription>
+            <DialogTitle>{t('purchases.delete_title')}</DialogTitle>
+            <DialogDescription>{t('purchases.delete_description', { code: order.code })}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Batal</Button>
-            <Button variant="destructive" onClick={handleDelete}>Hapus PO</Button>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>{t('common.cancel')}</Button>
+            <Button variant="destructive" onClick={handleDelete}>{t('purchases.delete_confirm')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

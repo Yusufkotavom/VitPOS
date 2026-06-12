@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Printer, MessageSquare, Download, PencilIcon, XIcon, CheckIcon, Trash2Icon, CreditCard, ShieldCheck, ShieldX, PlusIcon, Search } from 'lucide-react'
 import { useState } from 'react'
@@ -39,6 +40,7 @@ type EditableItem = { id: string; name: string; qty: string; unitPrice: string; 
 export function ServiceOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { data: order, isLoading, refetch } = useServiceOrder(id)
+  const { t } = useTranslation()
   const tenantId = requireActiveTenantId()
   
   // Data Pembayaran
@@ -48,9 +50,9 @@ export function ServiceOrderDetailPage() {
   
   const paymentMethods = usePaymentMethods()
   const activeMethods = paymentMethods && paymentMethods.length > 0 ? paymentMethods.filter(m => m.status === 'Aktif') : [
-    { id: 'tunai', name: 'Tunai' },
-    { id: 'qris', name: 'QRIS' },
-    { id: 'transfer', name: 'Transfer' },
+    { id: 'tunai', name: t('payment.method_cash') },
+    { id: 'qris', name: t('payment.method_qris') },
+    { id: 'transfer', name: t('payment.method_transfer') },
   ]
 
   const totalPaid = payments?.reduce((acc, p) => acc + p.amount, 0) || 0
@@ -112,7 +114,7 @@ export function ServiceOrderDetailPage() {
 
   if (isLoading) {
     return (
-      <PageShell title="Loading..." description="">
+      <PageShell title={t('common.loading')} description="">
         <div className="space-y-4">
           <Skeleton className="h-8 w-1/3" />
           <Skeleton className="h-32 w-full" />
@@ -238,11 +240,11 @@ export function ServiceOrderDetailPage() {
         version: order.version + 1,
         updatedAt: nowIso,
       })
-      toast.success('Service order diperbarui')
+      toast.success(t('service_orders.updated'))
       setEditing(false)
       refetch()
     } catch (error) {
-      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.save_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -250,10 +252,10 @@ export function ServiceOrderDetailPage() {
     if (!order) return
     try {
       await serviceOrderRepository.remove(order.id)
-      toast.success('Service order dihapus')
+      toast.success(t('service_orders.deleted'))
       setDeleteOpen(false)
     } catch (error) {
-      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.delete_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -261,10 +263,10 @@ export function ServiceOrderDetailPage() {
     if (!order || payAmount <= 0) return
     try {
       await recordServiceOrderPayment(order.id, payAmount, payMethod, 'Service Order', tenantId)
-      toast.success('Pembayaran berhasil ditambahkan')
+      toast.success(t('service_orders.payment_added'))
       setPaymentOpen(false)
     } catch (error) {
-      toast.error(`Gagal menambah pembayaran: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.save_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -275,7 +277,7 @@ export function ServiceOrderDetailPage() {
       : (await localDb.customers.where('[tenantId+name]').equals([tenantId, order.customerName]).toArray())[0]
     const phone = customer?.tenantId === tenantId ? customer.phone : ''
     if (!phone) {
-      toast.error('Nomor WhatsApp pelanggan tidak ditemukan')
+      toast.error(t('service_orders.whatsapp_not_found'))
       return
     }
 
@@ -306,11 +308,11 @@ export function ServiceOrderDetailPage() {
 
   if (!order) {
     return (
-      <PageShell title="Tidak Ditemukan" description="Service Order tidak ditemukan">
+      <PageShell title={t('common.not_found')} description={t('service_orders.not_found')}>
         <Button asChild variant="outline">
           <Link to="/service-orders">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Kembali ke Daftar
+            {t('common.back_to_list')}
           </Link>
         </Button>
       </PageShell>
@@ -325,11 +327,11 @@ export function ServiceOrderDetailPage() {
         <>
           <Button variant="outline" size="sm" onClick={() => serviceData && printPdf(serviceData)}>
             <Printer className="mr-2 h-4 w-4" />
-            Print
+            {t('common.print')}
           </Button>
           <Button variant="outline" size="sm" onClick={() => serviceData && downloadPdf(serviceData, `Service-${order?.code || 'download'}`)}>
             <Download className="mr-2 h-4 w-4" />
-            PDF
+            {t('common.pdf')}
           </Button>
           <Button variant="outline" size="sm" className="text-green-600 hover:text-green-700" onClick={handleWhatsApp}>
             <MessageSquare className="mr-2 h-4 w-4" />
@@ -339,22 +341,22 @@ export function ServiceOrderDetailPage() {
             <>
               <Button variant="outline" size="sm" onClick={cancelEditing}>
                 <XIcon className="mr-2 h-4 w-4" />
-                Batal
+                {t('common.cancel')}
               </Button>
               <Button size="sm" onClick={saveEditing}>
                 <CheckIcon className="mr-2 h-4 w-4" />
-                Simpan
+                {t('common.save')}
               </Button>
             </>
           ) : (
             <>
               <Button variant="outline" size="sm" onClick={startEditing}>
                 <PencilIcon className="mr-2 h-4 w-4" />
-                Ubah
+                {t('common.edit')}
               </Button>
               <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
                 <Trash2Icon className="mr-2 h-4 w-4" />
-                Hapus
+                {t('common.delete')}
               </Button>
             </>
           )}
@@ -367,12 +369,12 @@ export function ServiceOrderDetailPage() {
           {/* Detail Pekerjaan */}
           <div>
             <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-              Detail Pekerjaan
+              {t('service_orders.job_detail')}
             </h3>
             <div className="rounded-2xl border p-5 shadow-sm bg-card space-y-4">
               <div className="grid grid-cols-2 gap-4 border-b pb-4">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Pelanggan</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t('common.customer')}</p>
                   {editing ? (
                     <Input value={editCustomer} onChange={e => setEditCustomer(e.target.value)} className="h-8 text-sm" />
                   ) : (
@@ -380,18 +382,18 @@ export function ServiceOrderDetailPage() {
                   )}
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Tanggal</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t('common.date')}</p>
                   <p className="font-medium text-base">{order.date}</p>
                 </div>
                 {order.estimatedCompletion && (
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1">Estimasi Selesai</p>
+                    <p className="text-xs text-muted-foreground mb-1">{t('service_orders.estimated_completion')}</p>
                     <p className="font-medium text-base">{new Date(order.estimatedCompletion).toLocaleDateString('id-ID', { dateStyle: 'long' })}</p>
                   </div>
                 )}
               </div>
               <div>
-                <p className="text-xs text-muted-foreground mb-1">Kerusakan / Pekerjaan</p>
+                <p className="text-xs text-muted-foreground mb-1">{t('service_orders.issue_or_job')}</p>
                 {editing ? (
                   <textarea
                     value={editDesc}
@@ -404,7 +406,7 @@ export function ServiceOrderDetailPage() {
               </div>
               {order.notes && (
                 <div className="pt-2">
-                  <p className="text-xs text-muted-foreground mb-1">Catatan Tambahan</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t('service_orders.additional_notes')}</p>
                   <p className="text-sm text-muted-foreground">{order.notes}</p>
                 </div>
               )}
@@ -413,7 +415,7 @@ export function ServiceOrderDetailPage() {
 
           {/* Daftar Produk / Item Biaya */}
           <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Item Produk / Jasa yang Dipakai</h3>
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">{t('service_orders.items_used')}</h3>
             <div className="rounded-2xl border p-5 shadow-sm bg-card">
               {editing ? (
                 <div className="flex flex-col gap-3">
@@ -421,10 +423,10 @@ export function ServiceOrderDetailPage() {
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-muted/40">
-                          <TableHead>Nama</TableHead>
-                          <TableHead className="text-right w-20">Qty</TableHead>
-                          <TableHead className="text-right w-28">Harga</TableHead>
-                          <TableHead className="text-right w-28">Subtotal</TableHead>
+                          <TableHead>{t('common.name')}</TableHead>
+                          <TableHead className="text-right w-20">{t('common.qty')}</TableHead>
+                          <TableHead className="text-right w-28">{t('common.price')}</TableHead>
+                          <TableHead className="text-right w-28">{t('common.subtotal')}</TableHead>
                           <TableHead className="w-10"></TableHead>
                         </TableRow>
                       </TableHeader>
@@ -432,7 +434,7 @@ export function ServiceOrderDetailPage() {
                         {editItems.map((item, idx) => (
                           <TableRow key={item.id}>
                             <TableCell className="py-1.5 px-2">
-                              <Input value={item.name} onChange={e => { const newItems = [...editItems]; newItems[idx].name = e.target.value; setEditItems(newItems) }} placeholder="Nama produk" className="h-8 text-sm" />
+                              <Input value={item.name} onChange={e => { const newItems = [...editItems]; newItems[idx].name = e.target.value; setEditItems(newItems) }} placeholder={t('service_orders.item_name_placeholder')} className="h-8 text-sm" />
                             </TableCell>
                             <TableCell className="py-1.5 px-2">
                               <Input value={item.qty} onChange={e => { const newItems = [...editItems]; newItems[idx].qty = e.target.value; setEditItems(newItems) }} inputMode="numeric" className="h-8 text-sm text-right" />
@@ -462,19 +464,19 @@ export function ServiceOrderDetailPage() {
                               <Trash2Icon className="h-3.5 w-3.5 text-destructive" />
                             </Button>
                           </div>
-                          <Input value={item.name} onChange={e => { const newItems = [...editItems]; newItems[idx].name = e.target.value; setEditItems(newItems) }} placeholder="Nama produk" className="h-8 text-sm" />
+                          <Input value={item.name} onChange={e => { const newItems = [...editItems]; newItems[idx].name = e.target.value; setEditItems(newItems) }} placeholder={t('service_orders.item_name_placeholder')} className="h-8 text-sm" />
                           <div className="grid grid-cols-2 gap-2">
                             <div className="flex flex-col gap-1">
-                              <span className="text-xs text-muted-foreground">Qty</span>
+                              <span className="text-xs text-muted-foreground">{t('common.qty')}</span>
                               <Input value={item.qty} onChange={e => { const newItems = [...editItems]; newItems[idx].qty = e.target.value; setEditItems(newItems) }} inputMode="numeric" className="h-8 text-sm" />
                             </div>
                             <div className="flex flex-col gap-1">
-                              <span className="text-xs text-muted-foreground">Harga</span>
+                              <span className="text-xs text-muted-foreground">{t('common.price')}</span>
                               <Input value={item.unitPrice} onChange={e => { const newItems = [...editItems]; newItems[idx].unitPrice = e.target.value; setEditItems(newItems) }} inputMode="numeric" className="h-8 text-sm" />
                             </div>
                           </div>
                           <div className="flex justify-between items-center pt-1">
-                            <span className="text-xs text-muted-foreground">Subtotal</span>
+                            <span className="text-xs text-muted-foreground">{t('common.subtotal')}</span>
                             <span className="text-sm font-medium">{itemSubtotal > 0 ? formatCurrency(itemSubtotal) : '-'}</span>
                           </div>
                         </div>
@@ -484,17 +486,17 @@ export function ServiceOrderDetailPage() {
                   <Dialog open={isProductModalOpen} onOpenChange={setIsProductModalOpen}>
                     <DialogTrigger asChild>
                       <Button type="button" variant="ghost" size="sm" className="self-start">
-                        <PlusIcon className="mr-1 h-3.5 w-3.5" />Tambah Produk / Jasa
+                        <PlusIcon className="mr-1 h-3.5 w-3.5" />{t('service_orders.add_product_service')}
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col">
                       <DialogHeader>
-                        <DialogTitle>Pilih Produk / Jasa</DialogTitle>
+                        <DialogTitle>{t('service_orders.select_product_service')}</DialogTitle>
                       </DialogHeader>
                       <div className="relative mt-2">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
-                          placeholder="Cari produk / jasa..."
+                          placeholder={t('service_orders.search_product_service')}
                           className="pl-8"
                           value={productSearch}
                           onChange={(e) => setProductSearch(e.target.value)}
@@ -512,16 +514,16 @@ export function ServiceOrderDetailPage() {
                               variant="outline"
                               onClick={() => {
                                 setEditItems(prev => [...prev, { id: crypto.randomUUID(), name: p.name, qty: '1', unitPrice: String(p.price) }])
-                                toast.success(`${p.name} ditambahkan`)
+                                toast.success(t('service_orders.item_added', { name: p.name }))
                                 setIsProductModalOpen(false)
                               }}
                             >
-                              Tambah
+                              {t('common.add')}
                             </Button>
                           </div>
                         ))}
                         {filteredProducts.length === 0 && (
-                          <p className="text-center text-sm text-muted-foreground py-8">Tidak ada item ditemukan</p>
+                          <p className="text-center text-sm text-muted-foreground py-8">{t('service_orders.no_items_found')}</p>
                         )}
                       </div>
                       <DialogFooter>
@@ -529,7 +531,7 @@ export function ServiceOrderDetailPage() {
                           setEditItems(prev => [...prev, { id: crypto.randomUUID(), name: '', qty: '1', unitPrice: '' }])
                           setIsProductModalOpen(false)
                         }}>
-                          + Tambah Item Manual
+                          {t('service_orders.add_manual_item')}
                         </Button>
                       </DialogFooter>
                     </DialogContent>
@@ -537,7 +539,7 @@ export function ServiceOrderDetailPage() {
                 </div>
               ) : (
                 (!order.items || order.items.length === 0) ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">Tidak ada rincian item (Hanya biaya total)</p>
+                  <p className="text-sm text-muted-foreground text-center py-4">{t('service_orders.no_item_details')}</p>
                 ) : (
                   <div className="space-y-3">
                     {order.items.map(item => (
@@ -557,10 +559,10 @@ export function ServiceOrderDetailPage() {
 
           {/* Timeline Status */}
           <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Riwayat Status</h3>
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">{t('service_orders.status_history')}</h3>
             <div className="rounded-2xl border p-5 shadow-sm bg-card">
               {(!order.timeline || order.timeline.length === 0) ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Belum ada riwayat timeline</p>
+                <p className="text-sm text-muted-foreground text-center py-4">{t('service_orders.no_timeline_history')}</p>
               ) : (
                 <div className="space-y-4 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border before:to-transparent">
                   {order.timeline.map((item: { id: string; status: string; date: string; note: string; type?: string }) => (
@@ -570,7 +572,7 @@ export function ServiceOrderDetailPage() {
                       </div>
                       <div className={`w-[calc(100%-2.5rem)] md:w-[calc(50%-1.25rem)] border bg-background p-3 rounded-xl shadow-sm ${item.type === 'warranty' ? 'border-amber-200' : ''}`}>
                         <div className="flex items-center justify-between space-x-2 mb-1">
-                          <StatusBadge label={item.type === 'warranty' ? 'Garansi' : item.status} tone={item.type === 'warranty' ? 'warning' : tone(item.status)} />
+                          <StatusBadge label={item.type === 'warranty' ? t('service_orders.warranty') : item.status} tone={item.type === 'warranty' ? 'warning' : tone(item.status)} />
                           <time className="text-xs text-muted-foreground">{new Date(item.date).toLocaleDateString('id-ID')}</time>
                         </div>
                         <p className="text-sm mt-2 text-muted-foreground">{item.note}</p>
@@ -586,13 +588,13 @@ export function ServiceOrderDetailPage() {
         {/* Kolom Kanan: Status & Pembayaran */}
         <div className="space-y-4">
           <div className="rounded-2xl border p-5 shadow-sm bg-card space-y-4">
-            <h3 className="font-semibold border-b pb-2">Status & Biaya</h3>
+            <h3 className="font-semibold border-b pb-2">{t('service_orders.status_and_cost')}</h3>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Status Pengerjaan</span>
+              <span className="text-sm text-muted-foreground">{t('service_orders.job_status')}</span>
               {editing ? (
                 <Select value={editStatus} onValueChange={setEditStatus}>
                   <SelectTrigger className="h-8 w-44">
-                    <SelectValue placeholder="Pilih..." />
+                    <SelectValue placeholder={t('common.select_placeholder')} />
                   </SelectTrigger>
                   <SelectContent>
                     {serviceOrderStatusOptions.map(opt => (
@@ -606,7 +608,7 @@ export function ServiceOrderDetailPage() {
             </div>
             
             <div className="flex justify-between items-center pt-2">
-              <span className="text-sm text-muted-foreground">Biaya Service</span>
+              <span className="text-sm text-muted-foreground">{t('service_orders.service_cost')}</span>
               <span className="font-bold">
                 {formatCurrency(
                   editing 
@@ -617,19 +619,19 @@ export function ServiceOrderDetailPage() {
             </div>
 
             <div className="flex justify-between items-center text-primary pt-2 border-t border-dashed">
-              <span className="font-medium">Sudah Dibayar</span>
+              <span className="font-medium">{t('service_orders.paid_amount')}</span>
               <span className="font-bold">{formatCurrency(totalPaid)}</span>
             </div>
             
             {remaining > 0 ? (
               <div className="flex justify-between items-center text-destructive pt-2">
-                <span className="font-medium">Kekurangan (Sisa)</span>
+                <span className="font-medium">{t('service_orders.remaining_balance')}</span>
                 <span className="font-bold text-lg">{formatCurrency(remaining)}</span>
               </div>
             ) : (
               <div className="flex justify-between items-center text-success pt-2">
-                <span className="font-medium">Status Bayar</span>
-                <span className="font-bold text-lg">LUNAS</span>
+                <span className="font-medium">{t('service_orders.payment_status')}</span>
+                <span className="font-bold text-lg">{t('common.paid')}</span>
               </div>
             )}
             
@@ -639,14 +641,14 @@ export function ServiceOrderDetailPage() {
                 setPaymentOpen(true)
               }}>
                 <CreditCard className="mr-2 h-4 w-4" />
-                Terima Pembayaran
+                {t('service_orders.accept_payment')}
               </Button>
             )}
 
             {/* Garansi */}
             <div className="border-t border-dashed pt-3 mt-3 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Garansi Service</span>
+                <span className="text-sm text-muted-foreground">{t('service_orders.service_warranty')}</span>
                 {editing ? (
                   <div className="flex items-center gap-1.5">
                     <input
@@ -667,12 +669,12 @@ export function ServiceOrderDetailPage() {
                         />
                         <Select value={editWarrantyUnit} onValueChange={(v) => setEditWarrantyUnit(v as 'hari' | 'bulan' | 'tahun')}>
                           <SelectTrigger className="h-7 w-20 text-xs">
-                            <SelectValue placeholder="Pilih..." />
+                            <SelectValue placeholder={t('common.select_placeholder')} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="hari">Hari</SelectItem>
-                            <SelectItem value="bulan">Bln</SelectItem>
-                            <SelectItem value="tahun">Thn</SelectItem>
+                            <SelectItem value="hari">{t('common.days')}</SelectItem>
+                            <SelectItem value="bulan">{t('common.months')}</SelectItem>
+                            <SelectItem value="tahun">{t('common.years')}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -683,7 +685,7 @@ export function ServiceOrderDetailPage() {
                     {order.warrantyEndDate && isWarrantyExpired(order.warrantyEndDate) ? (
                       <>
                         <ShieldX className="h-4 w-4 text-destructive" />
-                        <span className="text-xs text-destructive font-medium">Kadaluarsa</span>
+                        <span className="text-xs text-destructive font-medium">{t('service_orders.warranty_expired')}</span>
                       </>
                     ) : (
                       <>
@@ -695,12 +697,12 @@ export function ServiceOrderDetailPage() {
                     )}
                   </div>
                 ) : (
-                  <span className="text-xs text-muted-foreground">Tidak ada</span>
+                  <span className="text-xs text-muted-foreground">{t('common.none')}</span>
                 )}
               </div>
               {order.hasWarranty && order.warrantyEndDate && !editing && (
                 <div className="text-xs text-muted-foreground">
-                  Berlaku sampai {new Date(order.warrantyEndDate).toLocaleDateString('id-ID', { dateStyle: 'long' })}
+                  {t('service_orders.valid_until', { date: new Date(order.warrantyEndDate).toLocaleDateString('id-ID', { dateStyle: 'long' }) })}
                 </div>
               )}
             </div>
@@ -709,7 +711,7 @@ export function ServiceOrderDetailPage() {
           {/* Riwayat Pembayaran */}
           {payments && payments.length > 0 && (
             <div className="rounded-2xl border p-5 shadow-sm bg-card space-y-3">
-              <h3 className="font-semibold border-b pb-2">Riwayat Pembayaran</h3>
+              <h3 className="font-semibold border-b pb-2">{t('service_orders.payment_history')}</h3>
               {payments.map(p => (
                 <div key={p.id} className="flex justify-between text-sm py-2 border-b last:border-0 last:pb-0">
                   <div>
@@ -727,12 +729,12 @@ export function ServiceOrderDetailPage() {
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Hapus service order</DialogTitle>
-            <DialogDescription>Service order {order.code} akan dihapus secara permanen dari sistem.</DialogDescription>
+            <DialogTitle>{t('service_orders.delete_title')}</DialogTitle>
+            <DialogDescription>{t('service_orders.delete_description', { code: order.code })}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Batal</Button>
-            <Button variant="destructive" onClick={handleDelete}>Hapus</Button>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>{t('common.cancel')}</Button>
+            <Button variant="destructive" onClick={handleDelete}>{t('common.delete')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -740,16 +742,16 @@ export function ServiceOrderDetailPage() {
       <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Terima Pembayaran</DialogTitle>
-            <DialogDescription>Masukkan nominal yang dibayar oleh pelanggan.</DialogDescription>
+            <DialogTitle>{t('service_orders.accept_payment')}</DialogTitle>
+            <DialogDescription>{t('service_orders.payment_dialog_description')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="flex justify-between text-sm">
-              <span>Sisa Tagihan</span>
+              <span>{t('service_orders.remaining_bill')}</span>
               <span className="font-bold text-destructive">{formatCurrency(remaining)}</span>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Metode</label>
+              <label className="text-sm font-medium">{t('common.method')}</label>
               <div className="grid grid-cols-3 gap-2">
                 {activeMethods.map((method) => (
                   <Button
@@ -764,7 +766,7 @@ export function ServiceOrderDetailPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Nominal Dibayar</label>
+              <label className="text-sm font-medium">{t('common.amount')}</label>
               <Input 
                 type="number"
                 value={payAmount || ''}
@@ -774,8 +776,8 @@ export function ServiceOrderDetailPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPaymentOpen(false)}>Batal</Button>
-            <Button onClick={handleAddPayment} disabled={payAmount <= 0}>Simpan Pembayaran</Button>
+            <Button variant="outline" onClick={() => setPaymentOpen(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleAddPayment} disabled={payAmount <= 0}>{t('service_orders.save_payment')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

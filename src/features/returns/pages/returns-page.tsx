@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { formatCurrency } from '@/lib/format-currency'
 import { ReturnCrudActions } from '@/features/returns/components/return-crud-actions'
 import { useReturns } from '@/features/returns/hooks/use-returns'
@@ -14,29 +15,30 @@ function tone(status: string) {
 }
 
 export function ReturnsPage() {
+  const { t } = useTranslation()
   const returnRows = useReturns()
 
   return (
-    <PageShell title="Retur" description="Retur penjualan dan pembelian beserta dampak refund dan stok." actions={<ReturnCrudActions />}>
-      <ContentCard title="Daftar Retur" description="Retur tersimpan lokal dulu, lalu masuk antrean sinkron.">
+    <PageShell title={t('returns.title') || 'Retur'} description={t('returns.page_description')} actions={<ReturnCrudActions />}>
+      <ContentCard title={t('returns.list_title')} description={t('returns.list_description')}>
         <DataTable
           data={returnRows}
-          emptyTitle="Belum ada retur"
+          emptyTitle={t('returns.empty')}
           columns={[
-            { key: 'code', header: 'No Retur' },
-            { key: 'type', header: 'Tipe' },
-            { key: 'referenceCode', header: 'Referensi' },
-            { key: 'date', header: 'Tanggal' },
-            { key: 'total', header: 'Total', render: (row) => formatCurrency(row.total) },
-            { key: 'status', header: 'Status', render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
-            { key: 'actions', header: 'Aksi', render: (row) => <ReturnCrudActions ret={row} /> },
+            { key: 'code', header: t('returns.code_header') },
+            { key: 'type', header: t('common.type') },
+            { key: 'referenceCode', header: t('returns.reference_header') },
+            { key: 'date', header: t('common.date') },
+            { key: 'total', header: t('common.total'), render: (row) => formatCurrency(row.total) },
+            { key: 'status', header: t('common.status'), render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
+            { key: 'actions', header: t('common.actions'), render: (row) => <ReturnCrudActions ret={row} /> },
           ]}
           mobileRender={(row) => (
             <div className="flex flex-col gap-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-medium">{row.code}</p>
-                  <p className="text-sm text-muted-foreground">{row.type} · Ref: {row.referenceCode}</p>
+                  <p className="text-sm text-muted-foreground">{row.type} · {t('returns.reference_header')}: {row.referenceCode}</p>
                 </div>
                 <StatusBadge label={row.status} tone={tone(row.status)} />
               </div>

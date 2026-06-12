@@ -1,5 +1,6 @@
 import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,7 @@ import { salesOrderRepository } from '@/services/local-db/repository'
 import type { LocalSalesOrder } from '@/services/local-db/schema'
 
 export function SalesOrderCrudActions({ order }: { order?: LocalSalesOrder }) {
+  const { t } = useTranslation()
   const [formOpen, setFormOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const isEdit = Boolean(order)
@@ -33,10 +35,10 @@ export function SalesOrderCrudActions({ order }: { order?: LocalSalesOrder }) {
       await salesOrderRepository.upsert(nextOrder)
       await syncCustomerSalesMetrics(order?.customerId)
       await syncCustomerSalesMetrics(nextOrder.customerId)
-      toast.success(isEdit ? 'Invoice diperbarui' : 'Invoice dibuat')
+      toast.success(t(isEdit ? 'sales_orders.updated' : 'sales_orders.created'))
       setFormOpen(false)
     } catch (error) {
-      toast.error(`Gagal menyimpan: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.save_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -44,10 +46,10 @@ export function SalesOrderCrudActions({ order }: { order?: LocalSalesOrder }) {
     if (!order) return
     try {
       await deleteSalesOrder(order.id)
-      toast.success('Invoice dihapus')
+      toast.success(t('sales_orders.deleted'))
       setDeleteOpen(false)
     } catch (error) {
-      toast.error(`Gagal menghapus: ${error instanceof Error ? error.message : 'Terjadi kesalahan'}`)
+      toast.error(t('common.delete_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
   }
 
@@ -56,17 +58,17 @@ export function SalesOrderCrudActions({ order }: { order?: LocalSalesOrder }) {
       <Sheet open={formOpen} onOpenChange={setFormOpen}>
         <SheetTrigger asChild>
           {order
-            ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />Ubah</Button>
-            : <Button><PlusIcon data-icon="inline-start" />Buat Invoice</Button>}
+            ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />{t('common.edit')}</Button>
+            : <Button><PlusIcon data-icon="inline-start" />{t('sales_orders.create')}</Button>}
         </SheetTrigger>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
           <SheetHeader>
-            <SheetTitle>{isEdit ? 'Ubah invoice' : 'Buat invoice baru'}</SheetTitle>
-            <SheetDescription>Invoice tersimpan lokal dulu, lalu masuk antrean sinkron.</SheetDescription>
+            <SheetTitle>{t(isEdit ? 'sales_orders.edit_title' : 'sales_orders.create_title')}</SheetTitle>
+            <SheetDescription>{t('sales_orders.form_sheet_description')}</SheetDescription>
           </SheetHeader>
           <SalesOrderForm
             defaultValues={order ? mapSalesOrderRecordToFormValues(order) : undefined}
-            submitLabel={isEdit ? 'Simpan perubahan' : 'Buat invoice'}
+            submitLabel={t(isEdit ? 'common.save_changes' : 'sales_orders.create')}
             onCancel={() => setFormOpen(false)}
             onSubmit={handleSubmit}
           />
@@ -74,16 +76,16 @@ export function SalesOrderCrudActions({ order }: { order?: LocalSalesOrder }) {
       </Sheet>
       {order ? (
         <>
-          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />Hapus</Button>
+          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />{t('common.delete')}</Button>
           <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Hapus invoice</DialogTitle>
-                <DialogDescription>Invoice {order.code} akan dihapus dari data lokal dan masuk antrean sinkron.</DialogDescription>
+                <DialogTitle>{t('sales_orders.delete_title')}</DialogTitle>
+                <DialogDescription>{t('sales_orders.delete_description', { code: order.code })}</DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setDeleteOpen(false)}>Batal</Button>
-                <Button variant="destructive" onClick={handleDelete}>Hapus invoice</Button>
+                <Button variant="outline" onClick={() => setDeleteOpen(false)}>{t('common.cancel')}</Button>
+                <Button variant="destructive" onClick={handleDelete}>{t('sales_orders.delete_confirm')}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

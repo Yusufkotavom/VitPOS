@@ -22,7 +22,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { shiftRepository } from '@/services/local-db/repository'
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { useQueryClient } from '@tanstack/react-query'
 import { useMediaQuery } from '@/hooks/use-media-query'

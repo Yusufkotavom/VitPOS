@@ -1414,6 +1414,18 @@ var uuidPattern2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-
 function isValidUuid(value) {
   return uuidPattern2.test(value);
 }
+var LEGACY_COMPANY_SETTING_KEYS = {
+  "Ikon Usaha": "company-icon",
+  "Logo Perusahaan": "company-logo",
+  "Nama Usaha": "company-name",
+  "Nomor Telepon": "company-phone",
+  "Alamat Usaha": "company-address",
+  "NPWP / NIB": "company-tax-number"
+};
+function normalizeSettingKey(key, area) {
+  if (area === "Profil Usaha") return LEGACY_COMPANY_SETTING_KEYS[key] ?? key;
+  return key;
+}
 function toNumeric(value) {
   if (value === void 0 || value === null) return "0";
   if (typeof value === "number") return String(value);
@@ -1815,8 +1827,9 @@ async function applySetting(db2, ctx, entityId, mutationType, payload) {
     return;
   }
   const now = /* @__PURE__ */ new Date();
-  const settingKey = payload.key ?? payload.id ?? payload.setting ?? entityId;
+  const rawKey = payload.key ?? payload.id ?? payload.setting ?? entityId;
   const area = payload.area ?? "general";
+  const settingKey = normalizeSettingKey(rawKey, area);
   const existing = await db2.query.settings.findFirst({
     where: and3(eq3(settings.tenantId, ctx.tenantId), eq3(settings.key, settingKey))
   });
@@ -2235,7 +2248,7 @@ async function applyMutation(db2, ctx, entityType, entityId, mutationType, paylo
 }
 
 // src/features/sync/routes.ts
-var LEGACY_COMPANY_SETTING_KEYS = {
+var LEGACY_COMPANY_SETTING_KEYS2 = {
   "Ikon Usaha": "company-icon",
   "Logo Perusahaan": "company-logo",
   "Nama Usaha": "company-name",
@@ -2243,8 +2256,8 @@ var LEGACY_COMPANY_SETTING_KEYS = {
   "Alamat Usaha": "company-address",
   "NPWP / NIB": "company-tax-number"
 };
-function normalizeSettingKey(key, area) {
-  if (area === "Profil Usaha") return LEGACY_COMPANY_SETTING_KEYS[key] ?? key;
+function normalizeSettingKey2(key, area) {
+  if (area === "Profil Usaha") return LEGACY_COMPANY_SETTING_KEYS2[key] ?? key;
   return key;
 }
 var syncRoutes = new Hono4();
@@ -2553,8 +2566,8 @@ syncRoutes.get("/pull", async (c) => {
       entityType: "setting",
       mutationType: "update",
       payload: {
-        id: normalizeSettingKey(row.key, row.area),
-        key: normalizeSettingKey(row.key, row.area),
+        id: normalizeSettingKey2(row.key, row.area),
+        key: normalizeSettingKey2(row.key, row.area),
         setting: row.key,
         area: row.area,
         value: row.value,
