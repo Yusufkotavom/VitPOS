@@ -1,4 +1,14 @@
+import {
+  BUSINESS_PLAYBOOKS,
+  DEFAULT_BUSINESS_MODE,
+  DEFAULT_VERTICAL,
+  type BusinessModeId,
+  type BusinessVerticalId,
+} from '@/features/auth/data/business-playbooks'
+
 export type TemplatePreset = {
+  businessVertical?: BusinessVerticalId
+  businessMode?: BusinessModeId
   categories: { name: string; description?: string }[]
   products: { name: string; category: string; price: number; type: 'Produk Fisik' | 'Jasa' }[]
   paymentMethods: { name: string; provider: string; type: string }[]
@@ -7,7 +17,24 @@ export type TemplatePreset = {
   supplier: { name: string; phone: string; city: string }
 }
 
+const combo = BUSINESS_PLAYBOOKS[DEFAULT_VERTICAL].modes.find((mode) => mode.id === DEFAULT_BUSINESS_MODE)!
+
 export const TEMPLATE_PRESETS: Record<string, TemplatePreset> = {
+  atk_printing: {
+    businessVertical: DEFAULT_VERTICAL,
+    businessMode: DEFAULT_BUSINESS_MODE,
+    categories: combo.categories.map((name) => ({ name })),
+    products: combo.products.map((item) => ({
+      name: item.name,
+      category: item.category,
+      price: item.price,
+      type: item.type,
+    })),
+    paymentMethods: [...combo.paymentMethods],
+    cashCategories: [...combo.cashCategories],
+    customer: { name: 'Pelanggan Umum', phone: '081234567890', city: 'Surabaya' },
+    supplier: { name: 'Supplier ATK Utama', phone: '081234567891', city: 'Surabaya' },
+  },
   retail: {
     categories: [
       { name: 'Makanan & Minuman', description: 'Produk makanan dan minuman' },
@@ -161,6 +188,7 @@ export const TEMPLATE_PRESETS: Record<string, TemplatePreset> = {
 }
 
 export const TEMPLATE_LABELS: Record<string, string> = {
+  atk_printing: 'ATK & Printing',
   retail: 'Toko Retail',
   fnb: 'F&B / Makanan Minuman',
   jasa: 'Jasa',
@@ -170,6 +198,7 @@ export const TEMPLATE_LABELS: Record<string, string> = {
 }
 
 export const TEMPLATE_ICONS: Record<string, string> = {
+  atk_printing: 'Package',
   retail: 'ShoppingCart',
   fnb: 'Coffee',
   jasa: 'Monitor',

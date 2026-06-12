@@ -31,7 +31,7 @@ vi.mock('@/services/api/client', () => ({
 import { OnboardingPage } from '@/features/auth/pages/onboarding-page'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { localDb } from '@/services/local-db/client'
-import { TEMPLATE_PRESETS } from '@/features/auth/data/template-data'
+import { buildAtkPrintingSeed } from '@/services/local-db/seed-playbooks'
 
 describe('onboarding page data logic', () => {
   it('creates tenant + seeded entities from template on finish', async () => {
@@ -50,63 +50,71 @@ describe('onboarding page data logic', () => {
       createElement(MemoryRouter, { initialEntries: ['/onboarding'] },
         createElement(Routes, null,
           createElement(Route, { path: '/onboarding', element: createElement(OnboardingPage) }),
-          createElement(Route, { path: '/billing', element: createElement('div', null, 'Billing Route') }),
+          createElement(Route, { path: '/dashboard', element: createElement('div', null, 'Dashboard Route') }),
         ),
       ),
     )
 
-    // Step 1: Info
-    expect(screen.getAllByText(/Informasi Perusahaan/)[1]).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText(/Nama Bisnis/), { target: { value: 'Toko Baru' } })
+    // Step 1: pilih vertikal usaha
+    expect(screen.getAllByText('Pilih jenis usaha')[0]).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Lanjut' }))
 
-    // Step 2: Template - default is retail
-    expect(screen.getAllByText(/Pilih Template Bisnis/)[1]).toBeInTheDocument()
-    expect(screen.getByText('Toko Retail')).toBeInTheDocument()
+    // Step 2: pilih model usaha ATK & printing
+    expect(screen.getAllByText('Pilih model usaha')[0]).toBeInTheDocument()
+    expect(screen.getByText('Gabungan ATK + Printing')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Gabungan ATK \+ Printing/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Lanjut' }))
 
-    // Step 3: Customize data - shows CRUD template data
-    expect(screen.getAllByText(/Sesuaikan Data Template/)[1]).toBeInTheDocument()
-    const preset = TEMPLATE_PRESETS.retail
-    expect(screen.getByText(preset.customer.name)).toBeInTheDocument()
-    expect(screen.getByText(preset.supplier.name)).toBeInTheDocument()
+    // Step 3: data inti usaha
+    expect(screen.getAllByText('Data inti usaha')[0]).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/Nama usaha/), { target: { value: 'Toko Baru' } })
+    fireEvent.change(screen.getByLabelText(/WhatsApp usaha/), { target: { value: '081234567890' } })
+    const seed = buildAtkPrintingSeed({
+      tenantId: 'tenant-preview',
+      businessMode: 'atk_printing_combo',
+      tenantName: 'Preview',
+      ownerName: 'Preview Owner',
+      city: 'Surabaya',
+      initialCash: 500000,
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Lanjut' }))
 
-    // Step 4: Payment methods - pre-selected from template
-    expect(screen.getAllByText(/Metode Pembayaran/)[1]).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /Lanjut ke Tagihan/ }))
+    // Step 4-5: review and finish
+    fireEvent.click(screen.getByRole('button', { name: 'Lanjut' }))
+    expect(screen.getAllByText('Review setup')[0]).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Masuk dan mulai transaksi/i }))
 
-    expect(await screen.findByText('Billing Route')).toBeInTheDocument()
+    expect(await screen.findByText('Dashboard Route')).toBeInTheDocument()
     expect(apiPostMock).toHaveBeenCalledWith('/auth/register', expect.objectContaining({ tenantName: 'Toko Baru' }))
 
     const state = useAuthStore.getState()
     expect(state.activeTenant?.name).toBe('Toko Baru')
-    expect(state.activeTenant?.type).toBe('retail')
+    expect(state.activeTenant?.type).toBe('atk_printing_combo')
 
     // Verify seeded entities
     expect(await localDb.tenants.count()).toBe(1)
     expect(await localDb.tenantMembers.count()).toBe(1)
 
     const categories = await localDb.productCategories.toArray()
-    expect(categories.length).toBe(preset.categories.length)
+    expect(categories.length).toBe(seed.categories.length)
     expect(categories[0].tenantId).toBe(state.activeTenant?.id)
 
     const products = await localDb.products.toArray()
-    expect(products.length).toBe(preset.products.length)
+    expect(products.length).toBe(seed.products.length)
     expect(products[0].tenantId).toBe(state.activeTenant?.id)
 
     const paymentMethods = await localDb.paymentMethods.toArray()
-    expect(paymentMethods.length).toBe(preset.paymentMethods.length)
+    expect(paymentMethods.length).toBe(seed.paymentMethods.length)
 
     const cashCategories = await localDb.cashCategories.toArray()
-    expect(cashCategories.length).toBe(preset.cashCategories.length)
+    expect(cashCategories.length).toBe(seed.cashCategories.length)
 
     const customers = await localDb.customers.toArray()
     expect(customers.length).toBe(1)
-    expect(customers[0].name).toBe(preset.customer.name)
+    expect(customers[0].name).toBe(seed.customers[0].name)
 
     const suppliers = await localDb.suppliers.toArray()
     expect(suppliers.length).toBe(1)
-    expect(suppliers[0].name).toBe(preset.supplier.name)
+    expect(suppliers[0].name).toBe(seed.suppliers[0].name)
   })
 })

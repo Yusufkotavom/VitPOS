@@ -1,103 +1,71 @@
-import { useState } from 'react'
-import { CheckCircle2, ChevronRight, Store, Building2, Package, CreditCard, ShoppingCart, Coffee, Monitor, Stethoscope, Users, Truck, Banknote, Edit, Trash2, Loader2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { CheckCircle2, ChevronRight, Loader2 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { CurrencyInput } from '@/shared/components/forms/currency-input'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { BusinessIdentityForm, type BusinessIdentityFormValue } from '@/features/auth/components/onboarding/business-identity-form'
+import { BusinessModeSelector } from '@/features/auth/components/onboarding/business-mode-selector'
+import { PostSetupChecklist } from '@/features/auth/components/onboarding/post-setup-checklist'
+import { SetupReviewPanel } from '@/features/auth/components/onboarding/setup-review-panel'
+import { TemplatePreviewCard } from '@/features/auth/components/onboarding/template-preview-card'
+import { VerticalSelector } from '@/features/auth/components/onboarding/vertical-selector'
+import { BUSINESS_PLAYBOOKS, DEFAULT_BUSINESS_MODE, DEFAULT_VERTICAL, type BusinessModeId, type BusinessVerticalId } from '@/features/auth/data/business-playbooks'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { apiPost } from '@/services/api/client'
 import { localDb } from '@/services/local-db/client'
 import { settingRepository } from '@/services/local-db/repository'
+import { buildAtkPrintingSeed } from '@/services/local-db/seed-playbooks'
 import { enqueueOutboxItem } from '@/services/sync/outbox-service'
-import { TEMPLATE_PRESETS, type TemplatePreset } from '@/features/auth/data/template-data'
+
+type Uuid = ReturnType<typeof crypto.randomUUID>
 
 type RegisterResponse = {
   ok: boolean
-  defaultBranchId?: string
-  defaultWarehouseId?: string
-  user: {
-    id: string
-    email: string
-    name: string
-    role?: 'user' | 'platform_admin'
-  }
-  memberships: Array<{
-    tenantId: string
-    role: string
-    tenantName: string
-    tenantPlan: string
-  }>
+  defaultBranchId?: Uuid
+  defaultWarehouseId?: Uuid
+  user: { id: string; email: string; name: string; role?: 'user' | 'platform_admin' }
+  memberships: Array<{ tenantId: Uuid; role: string; tenantName: string; tenantPlan: string }>
 }
+
 const steps = [
-  { id: 1, title: 'Informasi Perusahaan', icon: Store },
-  { id: 2, title: 'Pilih Template Bisnis', icon: Building2 },
-  { id: 3, title: 'Sesuaikan Data Template', icon: Package },
-  { id: 4, title: 'Metode Pembayaran', icon: CreditCard },
+  { id: 1, title: 'Pilih jenis usaha' },
+  { id: 2, title: 'Pilih model usaha' },
+  { id: 3, title: 'Data inti usaha' },
+  { id: 4, title: 'Preview template' },
+  { id: 5, title: 'Review setup' },
 ]
 
-const ICONS = [
-  { id: 'Store', component: Store },
-  { id: 'ShoppingCart', component: ShoppingCart },
-  { id: 'Coffee', component: Coffee },
-  { id: 'Monitor', component: Monitor },
-]
-
-const TEMPLATE_META: Record<string, { icon: typeof Store; label: string; desc: string }> = {
-  retail: { icon: ShoppingCart, label: 'Toko Retail', desc: 'Sembako, elektronik, kebutuhan sehari-hari' },
-  fnb: { icon: Coffee, label: 'F&B / Makanan Minuman', desc: 'Restoran, kafe, kedai makanan' },
-  jasa: { icon: Monitor, label: 'Jasa', desc: 'Servis, konsultasi, bengkel' },
-  grosir: { icon: Package, label: 'Grosir', desc: 'Distributor, supplier, kulakan' },
-  klinik: { icon: Stethoscope, label: 'Klinik', desc: 'Praktek dokter, klinik kesehatan' },
-  lainnya: { icon: Building2, label: 'Lainnya', desc: 'Bisnis umum / custom' },
+const initialIdentity: BusinessIdentityFormValue = {
+  tenantName: '',
+  ownerName: '',
+  ownerEmail: '',
+  ownerPassword: '',
+  whatsapp: '',
+  city: 'Surabaya',
+  address: '',
+  openHours: '08.00 - 20.00',
+  initialCash: '500000',
 }
 
-type EditableProduct = { id: string; name: string; category: string; price: number; type: 'Produk Fisik' | 'Jasa' }
-type EditableCategory = { id: string; name: string }
-type EditablePaymentMethod = { id: string; name: string; provider: string; type: string }
-type EditableCashCategory = { id: string; name: string; type: 'Pemasukan' | 'Pengeluaran' }
-type EditableCustomer = { name: string; phone: string; city: string }
-type EditableSupplier = { name: string; phone: string; city: string }
+function clonePreset(modeId: BusinessModeId) {
+  const seed = buildAtkPrintingSeed({
+    tenantId: crypto.randomUUID(),
+    businessMode: modeId,
+    tenantName: 'Preview Template',
+    ownerName: 'Preview Owner',
+    city: 'Surabaya',
+    initialCash: 500000,
+    seedIdPrefix: 'preview',
+  })
 
-function Rupiah({ amount }: { amount: number }) {
-  return <>{'Rp ' + amount.toLocaleString('id-ID')}</>
-}
-
-function fromPreset(preset: TemplatePreset) {
   return {
-    products: preset.products.map((p) => ({ ...p, id: crypto.randomUUID() })),
-    categories: preset.categories.map((c) => ({ id: crypto.randomUUID(), name: c.name })),
-    paymentMethods: preset.paymentMethods.map((pm) => ({ ...pm, id: crypto.randomUUID() })),
-    cashCategories: preset.cashCategories.map((cc) => ({ ...cc, id: crypto.randomUUID() })),
-    customer: { ...preset.customer },
-    supplier: { ...preset.supplier },
+    categories: seed.categories.map(({ id, name }) => ({ id, name })),
+    products: seed.products.map(({ id, name, category, type, price, costPrice, stock }) => ({ id, name, category, type, price, cost: costPrice, stock })),
+    paymentMethods: seed.paymentMethods.map(({ id, name, provider, type }) => ({ id, name, provider, type })),
+    cashCategories: seed.cashCategories.map(({ id, name, type }) => ({ id, name, type })),
+    customer: { ...seed.customers[0] },
+    supplier: { ...seed.suppliers[0] },
   }
 }
 
@@ -105,164 +73,92 @@ export function OnboardingPage() {
   const navigate = useNavigate()
   const { currentUser, setAuth, setActiveTenant } = useAuthStore()
   const [error, setError] = useState<string | null>(null)
-
   const [step, setStep] = useState(1)
-
-  const [ownerData, setOwnerData] = useState({ name: '', email: '', password: '' })
-  const [tenantName, setTenantName] = useState('')
-  const [tenantIcon, setTenantIcon] = useState('Store')
-  const [template, setTemplate] = useState('retail')
-
-  // Editable template data
-  const [editableProducts, setEditableProducts] = useState<EditableProduct[]>(() => fromPreset(TEMPLATE_PRESETS.retail).products)
-  const [editableCategories, setEditableCategories] = useState<EditableCategory[]>(() => fromPreset(TEMPLATE_PRESETS.retail).categories)
-  const [editablePaymentMethods, setEditablePaymentMethods] = useState<EditablePaymentMethod[]>(() => fromPreset(TEMPLATE_PRESETS.retail).paymentMethods)
-  const [editableCashCategories, setEditableCashCategories] = useState<EditableCashCategory[]>(() => fromPreset(TEMPLATE_PRESETS.retail).cashCategories)
-  const [editableCustomer, setEditableCustomer] = useState<EditableCustomer>(() => ({ ...TEMPLATE_PRESETS.retail.customer }))
-  const [editableSupplier, setEditableSupplier] = useState<EditableSupplier>(() => ({ ...TEMPLATE_PRESETS.retail.supplier }))
-
-  const [selectedPayments, setSelectedPayments] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(TEMPLATE_PRESETS.retail.paymentMethods.map((pm) => [pm.name, true]))
-  )
-
-  // Product dialog state
-  const [productDialogOpen, setProductDialogOpen] = useState(false)
-  const [editingProductId, setEditingProductId] = useState<string | null>(null)
-  const [productForm, setProductForm] = useState({ name: '', category: '', price: '', type: 'Produk Fisik' as EditableProduct['type'] })
-
-  // Payment method dialog state
-  const [pmDialogOpen, setPmDialogOpen] = useState(false)
-  const [editingPmId, setEditingPmId] = useState<string | null>(null)
-  const [pmForm, setPmForm] = useState({ name: '', provider: '', type: '' })
-
-  // Customer/Supplier edit dialog
-  const [editPersonOpen, setEditPersonOpen] = useState<'customer' | 'supplier' | null>(null)
-  const [personForm, setPersonForm] = useState({ name: '', phone: '', city: '' })
-
-  function handleTemplateChange(t: string) {
-    setTemplate(t)
-    const p = fromPreset(TEMPLATE_PRESETS[t])
-    setEditableProducts(p.products)
-    setEditableCategories(p.categories)
-    setEditablePaymentMethods(p.paymentMethods)
-    setEditableCashCategories(p.cashCategories)
-    setEditableCustomer(p.customer)
-    setEditableSupplier(p.supplier)
-    setSelectedPayments(Object.fromEntries(p.paymentMethods.map((pm) => [pm.name, true])))
-  }
-
+  const [businessVertical, setBusinessVertical] = useState<BusinessVerticalId>(DEFAULT_VERTICAL)
+  const [businessMode, setBusinessMode] = useState<BusinessModeId>(DEFAULT_BUSINESS_MODE)
+  const [identityForm, setIdentityForm] = useState<BusinessIdentityFormValue>(initialIdentity)
   const [loading, setLoading] = useState(false)
+  const [selectedPayments, setSelectedPayments] = useState<Record<string, boolean>>({})
+  const [editable, setEditable] = useState(() => clonePreset(DEFAULT_BUSINESS_MODE))
 
-  const canGoNextStep1 = currentUser
-    ? tenantName.trim() !== ''
-    : ownerData.name && ownerData.email && ownerData.password && tenantName.trim() !== ''
+  const activeVertical = BUSINESS_PLAYBOOKS[businessVertical]
+  const activeMode = activeVertical.modes.find((mode) => mode.id === businessMode) ?? activeVertical.modes[0]
+  const canGoNextStep3 = identityForm.tenantName.trim() !== '' && identityForm.whatsapp.trim() !== '' && (currentUser || (identityForm.ownerName && identityForm.ownerEmail && identityForm.ownerPassword))
+  const canProceed = step === 3 ? Boolean(canGoNextStep3) : true
+
+  const previewItems = useMemo(() => [
+    { label: 'Kategori', value: String(editable.categories.length) },
+    { label: 'Produk / jasa', value: String(editable.products.length) },
+    { label: 'Pembayaran', value: String(editable.paymentMethods.length) },
+    { label: 'Kas awal', value: `Rp ${Number(identityForm.initialCash || 0).toLocaleString('id-ID')}` },
+  ], [editable, identityForm.initialCash])
+
+  function handleModeChange(value: BusinessModeId) {
+    const next = clonePreset(value)
+    setBusinessMode(value)
+    setEditable(next)
+    setSelectedPayments(Object.fromEntries(next.paymentMethods.map((item) => [item.name, true])))
+  }
 
   async function handleFinish() {
     if (loading) return
-    setError(null)
+
     setLoading(true)
+    setError(null)
     const now = new Date().toISOString()
-    let userId = currentUser?.id
-    let tenantRole = 'owner'
-    let defaultBranchId: string | undefined
-    let defaultWarehouseId: string | undefined
 
     try {
-      const normalizedName = (currentUser?.name ?? ownerData.name).trim()
-      const normalizedEmail = (currentUser?.email ?? ownerData.email).trim().toLowerCase()
-      const normalizedPassword = currentUser?.passwordHash ?? ownerData.password
+      const normalizedName = (currentUser?.name ?? identityForm.ownerName).trim()
+      const normalizedEmail = (currentUser?.email ?? identityForm.ownerEmail).trim().toLowerCase()
+      const normalizedPassword = currentUser?.passwordHash ?? identityForm.ownerPassword
 
       if (!currentUser) {
         const existingUser = await localDb.users.where('email').equals(normalizedEmail).first()
-        if (existingUser) {
-          setError('Email sudah terdaftar. Silakan login dulu.')
-          setStep(1)
-          return
-        }
+        if (existingUser) throw new Error('Email sudah terdaftar. Silakan login dulu.')
       }
 
-      const membershipCount = currentUser
-        ? await localDb.tenantMembers.where('userId').equals(currentUser.id).count()
-        : 0
-
+      const membershipCount = currentUser ? await localDb.tenantMembers.where('userId').equals(currentUser.id).count() : 0
       const shouldProvisionCloudTenant = membershipCount === 0
-
       let tenantId = crypto.randomUUID()
       let cloudUser: RegisterResponse['user'] | undefined
-      if (shouldProvisionCloudTenant) {
-        type RegisterLikeResponse = RegisterResponse
-        let registerResponse: RegisterLikeResponse | null = null
-        let registerError: unknown = null
+      let defaultBranchId: string | undefined
+      let defaultWarehouseId: string | undefined
+      let tenantRole = 'owner'
 
+      if (shouldProvisionCloudTenant) {
+        let registerResponse: RegisterResponse | null = null
         try {
-          registerResponse = await apiPost<RegisterLikeResponse>('/auth/register', {
+          registerResponse = await apiPost<RegisterResponse>('/auth/register', {
             name: normalizedName,
             email: normalizedEmail,
             password: normalizedPassword,
-            tenantName: tenantName.trim(),
+            tenantName: identityForm.tenantName.trim(),
           })
         } catch (err) {
-          registerError = err
           const message = err instanceof Error ? err.message : ''
-          const isAlreadyRegistered =
-            /409/.test(message) || /already registered/i.test(message) || /email sudah terdaftar/i.test(message)
-
-          if (isAlreadyRegistered) {
-            try {
-              registerResponse = await apiPost<RegisterLikeResponse>('/auth/login', {
-                email: normalizedEmail,
-                password: normalizedPassword,
-              })
-            } catch (loginErr) {
-              const loginMessage = loginErr instanceof Error ? loginErr.message : 'Login gagal'
-              setError(`Email sudah terdaftar, namun gagal login: ${loginMessage}`)
-              setStep(1)
-              return
-            }
-          }
+          if (!/409|already registered|email sudah terdaftar/i.test(message)) throw err
+          registerResponse = await apiPost<RegisterResponse>('/auth/login', { email: normalizedEmail, password: normalizedPassword })
         }
 
-        if (!registerResponse) {
-          throw registerError instanceof Error
-            ? registerError
-            : new Error('Registrasi cloud gagal dan tidak dapat dipulihkan')
-        }
-
-        const primaryMembership = registerResponse.memberships[0]
-        if (!primaryMembership) {
-          throw new Error('Membership cloud tidak ditemukan setelah registrasi')
-        }
-
+        if (!registerResponse?.memberships?.[0]) throw new Error('Membership cloud tidak ditemukan setelah registrasi')
         cloudUser = registerResponse.user
-        userId = registerResponse.user.id
-        tenantId = primaryMembership.tenantId as `${string}-${string}-${string}-${string}-${string}`
-        tenantRole = primaryMembership.role
+        tenantId = registerResponse.memberships[0].tenantId
+        tenantRole = registerResponse.memberships[0].role
         defaultBranchId = registerResponse.defaultBranchId
         defaultWarehouseId = registerResponse.defaultWarehouseId
       } else {
-        if (!userId) {
-          userId = crypto.randomUUID()
-        }
-        const res = await apiPost<{
-          ok: boolean
-          tenantId: string
-          defaultBranchId: string
-          defaultWarehouseId: string
-        }>('/tenants', {
+        const res = await apiPost<{ ok: boolean; tenantId: Uuid; defaultBranchId: Uuid; defaultWarehouseId: Uuid }>('/tenants', {
           id: tenantId,
-          name: tenantName.trim(),
+          name: identityForm.tenantName.trim(),
         })
-        if (res && res.ok) {
-          tenantId = res.tenantId as `${string}-${string}-${string}-${string}-${string}`
-          defaultBranchId = res.defaultBranchId
-          defaultWarehouseId = res.defaultWarehouseId
-        } else {
-          throw new Error('Gagal mendaftarkan unit usaha baru di server cloud.')
-        }
+        if (!res?.ok) throw new Error('Gagal mendaftarkan unit usaha baru di server cloud.')
+        tenantId = res.tenantId
+        defaultBranchId = res.defaultBranchId
+        defaultWarehouseId = res.defaultWarehouseId
       }
 
       const nextUser = {
-        id: userId,
+        id: cloudUser?.id ?? currentUser?.id ?? crypto.randomUUID(),
         name: normalizedName,
         email: normalizedEmail,
         passwordHash: normalizedPassword,
@@ -270,683 +166,130 @@ export function OnboardingPage() {
         createdAt: currentUser?.createdAt ?? now,
         updatedAt: now,
       }
-
       await localDb.users.put(nextUser)
-      if (currentUser && currentUser.id !== userId) {
-        await localDb.users.delete(currentUser.id)
-      }
+      if (currentUser && currentUser.id !== nextUser.id) await localDb.users.delete(currentUser.id)
       setAuth(nextUser)
 
-      const newTenant = {
+      const tenant = {
         id: tenantId,
-        name: tenantName,
-        type: template,
-        phone: '',
+        name: identityForm.tenantName.trim(),
+        type: businessMode,
+        phone: identityForm.whatsapp,
         planCode: 'trial',
         isActive: true,
         createdAt: now,
         updatedAt: now,
       }
+      await localDb.tenants.put(tenant)
+      await localDb.tenantMembers.put({ id: crypto.randomUUID(), tenantId, userId: nextUser.id, role: 'owner', isActive: true, createdAt: now, updatedAt: now })
+      setActiveTenant(tenant, tenantRole)
 
-      const newMember = {
-        id: crypto.randomUUID(),
-        tenantId,
-        userId: userId!,
-        role: 'owner',
-        isActive: true,
-        createdAt: now,
-        updatedAt: now,
+      for (const category of editable.categories) {
+        const id = crypto.randomUUID()
+        await localDb.productCategories.put({ id, tenantId, name: category.name, description: '', status: 'Aktif', syncStatus: 'pending', version: 1, updatedAt: now })
+        await enqueueOutboxItem({ entityType: 'product_category', entityId: id, mutationType: 'create', payload: { name: category.name } })
+      }
+      for (const product of editable.products) {
+        const id = crypto.randomUUID()
+        await localDb.products.put({ id, tenantId, name: product.name, category: product.category, type: product.type, price: product.price, costPrice: product.cost, stock: product.stock, manageStock: product.type === 'Produk Fisik', status: 'Aktif', syncStatus: 'pending', version: 1, updatedAt: now })
+        await enqueueOutboxItem({ entityType: 'product', entityId: id, mutationType: 'create', payload: { name: product.name, category: product.category, type: product.type, price: product.price } })
+      }
+      for (const paymentMethod of editable.paymentMethods) {
+        if (selectedPayments[paymentMethod.name] === false) continue
+        const id = crypto.randomUUID()
+        await localDb.paymentMethods.put({ id, tenantId, name: paymentMethod.name, provider: paymentMethod.provider, type: paymentMethod.type, status: 'Aktif', updatedAt: now })
+        await enqueueOutboxItem({ entityType: 'setting', entityId: id, mutationType: 'create', payload: { key: `payment_method_${paymentMethod.name}`, value: paymentMethod.name, area: 'payment' } })
+      }
+      for (const cashCategory of editable.cashCategories) {
+        const id = crypto.randomUUID()
+        await localDb.cashCategories.put({ id, tenantId, name: cashCategory.name, type: cashCategory.type, status: 'Aktif', syncStatus: 'pending', version: 1, updatedAt: now })
+        await enqueueOutboxItem({ entityType: 'cash_category', entityId: id, mutationType: 'create', payload: { name: cashCategory.name, type: cashCategory.type } })
       }
 
-      await localDb.tenants.put(newTenant)
-      await localDb.tenantMembers.put(newMember)
+      await localDb.customers.put({ id: crypto.randomUUID(), tenantId, name: 'Pelanggan Umum', phone: identityForm.whatsapp, city: identityForm.city, receivable: 0, orders: 0, status: 'Aktif', syncStatus: 'pending', version: 1, updatedAt: now })
+      await localDb.suppliers.put({ id: crypto.randomUUID(), tenantId, name: 'Supplier ATK Utama', phone: '', city: identityForm.city, payable: 0, orders: 0, status: 'Aktif', syncStatus: 'pending', version: 1, updatedAt: now })
 
-      setActiveTenant(newTenant, tenantRole)
-
-      for (const cat of editableCategories) {
-        const catId = crypto.randomUUID()
-        await localDb.productCategories.put({
-          id: catId,
-          tenantId,
-          name: cat.name,
-          description: '',
-          status: 'Aktif',
-          syncStatus: 'pending',
-          version: 1,
-          updatedAt: now,
-        })
-        await enqueueOutboxItem({ entityType: 'product_category', entityId: catId, mutationType: 'create', payload: { name: cat.name } })
-      }
-
-      for (const prod of editableProducts) {
-        const prodId = crypto.randomUUID()
-        await localDb.products.put({
-          id: prodId,
-          tenantId,
-          name: prod.name,
-          category: prod.category,
-          type: prod.type,
-          price: prod.price,
-          stock: 0,
-          status: 'Aktif',
-          syncStatus: 'pending',
-          version: 1,
-          updatedAt: now,
-        })
-        await enqueueOutboxItem({ entityType: 'product', entityId: prodId, mutationType: 'create', payload: { name: prod.name, category: prod.category, type: prod.type, price: prod.price } })
-      }
-
-      for (const pm of editablePaymentMethods) {
-        if (selectedPayments[pm.name]) {
-          const pmId = crypto.randomUUID()
-          await localDb.paymentMethods.put({
-            id: pmId,
-            tenantId,
-            name: pm.name,
-            provider: pm.provider,
-            type: pm.type,
-            status: 'Aktif',
-            updatedAt: now,
-          })
-          await enqueueOutboxItem({ entityType: 'setting', entityId: pmId, mutationType: 'create', payload: { key: `payment_method_${pm.name}`, value: pm.name, area: 'payment' } })
-        }
-      }
-
-      for (const cc of editableCashCategories) {
-        const ccId = crypto.randomUUID()
-        await localDb.cashCategories.put({
-          id: ccId,
-          tenantId,
-          name: cc.name,
-          type: cc.type,
-          status: 'Aktif',
-          syncStatus: 'pending',
-          version: 1,
-          updatedAt: now,
-        })
-        await enqueueOutboxItem({ entityType: 'cash_category', entityId: ccId, mutationType: 'create', payload: { name: cc.name, type: cc.type } })
-      }
-
-      const customerId = crypto.randomUUID()
-      await localDb.customers.put({
-        id: customerId,
-        tenantId,
-        name: editableCustomer.name,
-        phone: editableCustomer.phone,
-        city: editableCustomer.city,
-        receivable: 0,
-        orders: 0,
-        status: 'Aktif',
-        syncStatus: 'pending',
-        version: 1,
-        updatedAt: now,
-      })
-      await enqueueOutboxItem({ entityType: 'customer', entityId: customerId, mutationType: 'create', payload: { name: editableCustomer.name, phone: editableCustomer.phone, city: editableCustomer.city } })
-
-      const supplierId = crypto.randomUUID()
-      await localDb.suppliers.put({
-        id: supplierId,
-        tenantId,
-        name: editableSupplier.name,
-        phone: editableSupplier.phone,
-        city: editableSupplier.city,
-        payable: 0,
-        orders: 0,
-        status: 'Aktif',
-        syncStatus: 'pending',
-        version: 1,
-        updatedAt: now,
-      })
-      await enqueueOutboxItem({ entityType: 'supplier', entityId: supplierId, mutationType: 'create', payload: { name: editableSupplier.name, phone: editableSupplier.phone, city: editableSupplier.city } })
-
-      const printSettings = [
-        { id: 'company-name', area: 'Profil Usaha', setting: 'Nama Usaha', value: tenantName },
-        { id: 'company-phone', area: 'Profil Usaha', setting: 'Nomor Telepon', value: '' },
-        { id: 'company-address', area: 'Profil Usaha', setting: 'Alamat Usaha', value: '' },
+      for (const setting of [
+        { id: 'company-name', area: 'Profil Usaha', setting: 'Nama Usaha', value: identityForm.tenantName.trim() },
+        { id: 'company-phone', area: 'Profil Usaha', setting: 'Nomor Telepon', value: identityForm.whatsapp },
+        { id: 'company-address', area: 'Profil Usaha', setting: 'Alamat Usaha', value: identityForm.address },
         { id: 'company-tax-number', area: 'Profil Usaha', setting: 'NPWP / NIB', value: '' },
-        { id: 'company-icon', area: 'Profil Usaha', setting: 'Ikon Usaha', value: tenantIcon },
+        { id: 'company-icon', area: 'Profil Usaha', setting: 'Ikon Usaha', value: 'Store' },
+        { id: 'business-vertical', area: 'System', setting: 'business_vertical', value: businessVertical },
+        { id: 'business-mode', area: 'System', setting: 'business_mode', value: businessMode },
+        { id: 'initial-cash', area: 'Kas', setting: 'kas_awal', value: identityForm.initialCash || '0' },
         { id: 'receipt-header', area: 'Struk', setting: 'Header Struk (POS)', value: '' },
         { id: 'receipt-footer', area: 'Struk', setting: 'Footer Struk (POS)', value: 'Terima kasih atas kunjungan Anda.' },
         { id: 'invoice-term', area: 'Invoice', setting: 'Catatan / Term Invoice', value: 'Syarat & Ketentuan berlaku.' },
-      ]
-
-      if (defaultBranchId) {
-        printSettings.push({ id: `${tenantId}:default-branch-id`, area: 'System', setting: 'default_branch_id', value: defaultBranchId })
-      }
-      if (defaultWarehouseId) {
-        printSettings.push({ id: `${tenantId}:default-warehouse-id`, area: 'System', setting: 'default_warehouse_id', value: defaultWarehouseId })
+      ]) {
+        await settingRepository.upsert({ ...setting, status: 'Lengkap', updatedAt: now, tenantId })
       }
 
-      for (const s of printSettings) {
-        await settingRepository.upsert({ ...s, status: 'Lengkap', updatedAt: now, tenantId })
-      }
-
-      navigate('/billing')
+      if (defaultBranchId) await settingRepository.upsert({ id: `${tenantId}:default-branch-id`, area: 'System', setting: 'default_branch_id', value: defaultBranchId, status: 'Lengkap', updatedAt: now, tenantId })
+      if (defaultWarehouseId) await settingRepository.upsert({ id: `${tenantId}:default-warehouse-id`, area: 'System', setting: 'default_warehouse_id', value: defaultWarehouseId, status: 'Lengkap', updatedAt: now, tenantId })
+      navigate('/dashboard')
     } catch (err) {
-      console.error(err)
-      const detail = err instanceof Error ? err.message : String(err)
-      setError(`Terjadi kesalahan saat menyimpan data: ${detail}`)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      setError(`Terjadi kesalahan saat menyimpan data: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setLoading(false)
     }
   }
 
-  function openAddProduct() {
-    setEditingProductId(null)
-    setProductForm({ name: '', category: editableCategories[0]?.name ?? '', price: '', type: 'Produk Fisik' })
-    setProductDialogOpen(true)
-  }
-
-  function openEditProduct(p: EditableProduct) {
-    setEditingProductId(p.id)
-    setProductForm({ name: p.name, category: p.category, price: String(p.price), type: p.type })
-    setProductDialogOpen(true)
-  }
-
-  function saveProduct() {
-    if (!productForm.name || !productForm.price) return
-    if (editingProductId) {
-      setEditableProducts((prev) =>
-        prev.map((p) => (p.id === editingProductId ? { ...p, name: productForm.name, category: productForm.category, price: Number(productForm.price), type: productForm.type } : p))
-      )
-    } else {
-      setEditableProducts((prev) => [...prev, { id: crypto.randomUUID(), name: productForm.name, category: productForm.category, price: Number(productForm.price), type: productForm.type }])
-    }
-    setProductDialogOpen(false)
-  }
-
-  function deleteProduct(id: string) {
-    setEditableProducts((prev) => prev.filter((p) => p.id !== id))
-  }
-
-  function addCategory() {
-    const name = prompt('Nama kategori baru:')
-    if (name?.trim()) {
-      setEditableCategories((prev) => [...prev, { id: crypto.randomUUID(), name: name.trim() }])
-    }
-  }
-
-  function removeCategory(id: string) {
-    const cat = editableCategories.find((c) => c.id === id)
-    if (cat && editableProducts.some((p) => p.category === cat.name)) {
-      if (!confirm(`Hapus kategori "${cat.name}"? Produk dengan kategori ini tidak akan terhapus.`)) return
-    }
-    setEditableCategories((prev) => prev.filter((c) => c.id !== id))
-  }
-
-  function openAddPm() {
-    setEditingPmId(null)
-    setPmForm({ name: '', provider: '', type: 'tunai' })
-    setPmDialogOpen(true)
-  }
-
-  function openEditPm(pm: EditablePaymentMethod) {
-    setEditingPmId(pm.id)
-    setPmForm({ name: pm.name, provider: pm.provider, type: pm.type })
-    setPmDialogOpen(true)
-  }
-
-  function savePm() {
-    if (!pmForm.name || !pmForm.provider) return
-    if (editingPmId) {
-      setEditablePaymentMethods((prev) =>
-        prev.map((pm) => (pm.id === editingPmId ? { ...pm, name: pmForm.name, provider: pmForm.provider, type: pmForm.type } : pm))
-      )
-    } else {
-      setEditablePaymentMethods((prev) => [...prev, { id: crypto.randomUUID(), name: pmForm.name, provider: pmForm.provider, type: pmForm.type }])
-    }
-    setPmDialogOpen(false)
-  }
-
-  function deletePm(id: string) {
-    setEditablePaymentMethods((prev) => prev.filter((pm) => pm.id !== id))
-  }
-
-  function addCashCategory() {
-    const name = prompt('Nama kategori kas:')
-    if (!name?.trim()) return
-    const type = confirm('Jenis Pemasukan? (Cancel = Pengeluaran)') ? 'Pemasukan' as const : 'Pengeluaran' as const
-    setEditableCashCategories((prev) => [...prev, { id: crypto.randomUUID(), name: name.trim(), type }])
-  }
-
-  function removeCashCategory(id: string) {
-    setEditableCashCategories((prev) => prev.filter((cc) => cc.id !== id))
-  }
-
-  function openEditPerson(type: 'customer' | 'supplier') {
-    const data = type === 'customer' ? editableCustomer : editableSupplier
-    setEditPersonOpen(type)
-    setPersonForm({ ...data })
-  }
-
-  function savePerson() {
-    if (!personForm.name || !personForm.phone) return
-    if (editPersonOpen === 'customer') {
-      setEditableCustomer({ name: personForm.name, phone: personForm.phone, city: personForm.city })
-    } else {
-      setEditableSupplier({ name: personForm.name, phone: personForm.phone, city: personForm.city })
-    }
-    setEditPersonOpen(null)
-  }
-
   return (
     <main className="min-h-screen bg-muted/30 px-4 py-8 flex items-center justify-center">
-      <div className="mx-auto grid w-full max-w-4xl gap-6 lg:grid-cols-[280px_1fr]">
-
+      <div className="mx-auto grid w-full max-w-5xl gap-6 lg:grid-cols-[280px_1fr]">
         <Card className="h-fit">
           <CardHeader>
             <CardTitle>Progress Setup</CardTitle>
             <CardDescription>Langkah {step} dari {steps.length}</CardDescription>
             <div className="mt-2 h-2 w-full rounded-full bg-secondary">
-              <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${(step / steps.length) * 100}%` }} />
+              <div className="h-full rounded-full bg-primary" style={{ width: `${(step / steps.length) * 100}%` }} />
             </div>
           </CardHeader>
           <CardContent>
             <ol className="flex flex-col gap-3">
-              {steps.map((s) => {
-                const isActive = step === s.id
-                const isPast = step > s.id
-                return (
-                  <li key={s.id} className={`flex items-center gap-3 rounded-xl border px-3 py-2 transition-colors ${isActive ? 'bg-primary/5 border-primary/20' : ''} ${isPast ? 'opacity-70' : ''}`}>
-                    <div className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${isActive ? 'bg-primary text-primary-foreground' : isPast ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                      {isPast ? <CheckCircle2 className="size-4" /> : s.id}
-                    </div>
-                    <span className={`font-medium text-sm ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>{s.title}</span>
-                  </li>
-                )
-              })}
+              {steps.map((item) => (
+                <li key={item.id} className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${step === item.id ? 'bg-primary/5 border-primary/20' : ''}`}>
+                  <div className={`flex size-8 items-center justify-center rounded-full text-sm font-semibold ${step === item.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                    {step > item.id ? <CheckCircle2 className="size-4" /> : item.id}
+                  </div>
+                  <span className="text-sm font-medium">{item.title}</span>
+                </li>
+              ))}
             </ol>
           </CardContent>
         </Card>
 
-        <div className="flex flex-col gap-6">
-          <Card className="min-h-[400px] flex flex-col">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                  {step === 1 && <Store />}
-                  {step === 2 && <Building2 />}
-                  {step === 3 && <Package />}
-                  {step === 4 && <CreditCard />}
-                </div>
-                <div>
-                  <CardTitle>{steps[step - 1]?.title}</CardTitle>
-                  <CardDescription>
-                    {step === 1 && 'Data dasar untuk dashboard, struk, dan cabang pertama.'}
-                    {step === 2 && 'Pilih template yang paling sesuai dengan jenis usaha Anda.'}
-                    {step === 3 && 'Sesuaikan produk, kategori, dan data lainnya sebelum simpan.'}
-                    {step === 4 && 'Centang metode pembayaran yang aktif digunakan.'}
-                  </CardDescription>
-                </div>
+        <Card className="min-h-[460px] flex flex-col">
+          <CardHeader>
+            <CardTitle>{steps[step - 1].title}</CardTitle>
+            <CardDescription>
+              {step === 1 ? 'Pilih vertikal usaha yang paling sesuai.' : step === 2 ? 'Pilih mode usaha ATK & printing yang paling dekat dengan kebutuhan toko.' : step === 3 ? 'Lengkapi data inti usaha agar setup siap dipakai.' : step === 4 ? 'Cek ringkasan template sebelum masuk review.' : 'Pastikan semua data sudah siap disimpan.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1 space-y-6">
+            {error ? <div className="rounded bg-destructive/10 p-3 text-sm font-medium text-destructive">{error}</div> : null}
+            {step === 1 ? <VerticalSelector verticals={Object.values(BUSINESS_PLAYBOOKS)} selectedVertical={businessVertical} onSelect={setBusinessVertical} /> : null}
+            {step === 2 ? <BusinessModeSelector modes={activeVertical.modes} selectedMode={businessMode} onSelect={handleModeChange} /> : null}
+            {step === 3 ? <BusinessIdentityForm value={identityForm} showOwnerFields={!currentUser} onChange={setIdentityForm} /> : null}
+            {step === 4 ? <TemplatePreviewCard title={activeMode.label} description={activeMode.description} items={previewItems} /> : null}
+            {step === 5 ? (
+              <div className="space-y-4">
+                <SetupReviewPanel title="Data usaha" items={[{ label: 'Nama usaha', value: identityForm.tenantName || '-' }, { label: 'WhatsApp', value: identityForm.whatsapp || '-' }, { label: 'Kota', value: identityForm.city || '-' }, { label: 'Kas awal', value: `Rp ${Number(identityForm.initialCash || 0).toLocaleString('id-ID')}` }]} onEdit={() => setStep(3)} />
+                <SetupReviewPanel title="Template aktif" items={[{ label: 'Vertikal', value: activeVertical.label }, { label: 'Mode', value: activeMode.label }, { label: 'Produk / jasa', value: String(editable.products.length) }, { label: 'Pembayaran aktif', value: String(Object.values(selectedPayments).filter(Boolean).length || editable.paymentMethods.length) }]} onEdit={() => setStep(4)} />
+                <PostSetupChecklist />
               </div>
-            </CardHeader>
-            <CardContent className="flex-1">
-              {error && <div className="mb-4 p-3 rounded bg-destructive/10 text-destructive text-sm font-medium">{error}</div>}
-
-              {/* Step 1 */}
-              {step === 1 && (
-                <div className="grid gap-4 md:grid-cols-2">
-                  {!currentUser ? (
-                    <>
-                      <div className="flex flex-col gap-2 md:col-span-2">
-                        <Label htmlFor="owner-name">Nama owner</Label>
-                        <Input id="owner-name" value={ownerData.name} onChange={e => setOwnerData({...ownerData, name: e.target.value})} placeholder="Nama lengkap" />
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <Label htmlFor="owner-email">Email owner</Label>
-                        <Input id="owner-email" type="email" value={ownerData.email} onChange={e => setOwnerData({...ownerData, email: e.target.value})} placeholder="owner@usaha.co.id" />
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <Label htmlFor="owner-password">Kata sandi owner</Label>
-                        <Input id="owner-password" type="password" value={ownerData.password} onChange={e => setOwnerData({...ownerData, password: e.target.value})} placeholder="Minimal 8 karakter" />
-                      </div>
-                    </>
-                  ) : null}
-
-                  <div className="flex flex-col gap-2 md:col-span-2 mt-2 pt-4 border-t">
-                    <Label htmlFor="business-name">Nama Bisnis</Label>
-                    <Input id="business-name" value={tenantName} onChange={e => setTenantName(e.target.value)} placeholder="Contoh: Toko Sumber Rejeki" />
-                  </div>
-
-                  <div className="flex flex-col gap-3 md:col-span-2 mt-2">
-                    <Label>Pilih Ikon Bisnis</Label>
-                    <div className="flex flex-wrap gap-3">
-                      {ICONS.map(({ id, component: IconComponent }) => (
-                        <div
-                          key={id}
-                          onClick={() => setTenantIcon(id)}
-                          className={`cursor-pointer rounded-xl border p-3 flex items-center justify-center transition-all ${tenantIcon === id ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'hover:border-primary/50'}`}
-                        >
-                          <IconComponent className="size-6" />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2: Pick template */}
-              {step === 2 && (
-                <div className="grid gap-4 md:grid-cols-2">
-                  {Object.entries(TEMPLATE_META).map(([key, meta]) => {
-                    const Icon = meta.icon
-                    return (
-                      <div
-                        key={key}
-                        className={`border rounded-xl p-4 cursor-pointer transition-all hover:border-primary/50 ${template === key ? 'border-primary bg-primary/5 ring-1 ring-primary' : ''}`}
-                        onClick={() => handleTemplateChange(key)}
-                      >
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                            <Icon className="size-5" />
-                          </div>
-                          <div>
-                            <div className="font-semibold">{meta.label}</div>
-                            <div className="text-xs text-muted-foreground">{meta.desc}</div>
-                          </div>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {TEMPLATE_PRESETS[key].products.length} produk &middot; {TEMPLATE_PRESETS[key].categories.length} kategori &middot; {TEMPLATE_PRESETS[key].paymentMethods.length} pembayaran
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
-              {/* Step 3: CRUD review */}
-              {step === 3 && (
-                <div className="space-y-5">
-
-                  {/* Products */}
-                  <section>
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium flex items-center gap-1.5"><Package className="size-4" /> Produk ({editableProducts.length})</h4>
-                      <Button variant="outline" size="sm" onClick={openAddProduct}>+ Produk</Button>
-                    </div>
-                    {editableProducts.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Belum ada produk.</p>
-                    ) : (
-                      <div className="border rounded-xl overflow-x-auto text-sm">
-                        <Table>
-                          <TableHeader className="bg-muted">
-                            <TableRow>
-                              <TableHead className="p-2 font-medium">Nama</TableHead>
-                              <TableHead className="p-2 font-medium">Kategori</TableHead>
-                              <TableHead className="p-2 font-medium text-right">Harga</TableHead>
-                              <TableHead className="w-20 p-2 font-medium text-center">Aksi</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {editableProducts.map((p) => (
-                              <TableRow key={p.id}>
-                                <TableCell className="p-2">{p.name}</TableCell>
-                                <TableCell className="p-2"><Badge variant="outline" className="capitalize">{p.category}</Badge></TableCell>
-                                <TableCell className="p-2 text-right"><Rupiah amount={p.price} /></TableCell>
-                                <TableCell className="p-2 text-center">
-                                  <div className="flex items-center justify-center gap-1">
-                                    <Button type="button" onClick={() => openEditProduct(p)} variant="ghost" size="icon" className="h-7 w-7 text-primary"><Edit className="size-3.5" /></Button>
-                                    <Button type="button" onClick={() => deleteProduct(p.id)} variant="ghost" size="icon" className="h-7 w-7 text-destructive"><Trash2 className="size-3.5" /></Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </section>
-
-                  {/* Categories */}
-                  <section>
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium flex items-center gap-1.5"><Building2 className="size-4" /> Kategori Produk ({editableCategories.length})</h4>
-                      <Button variant="outline" size="sm" onClick={addCategory}>+ Kategori</Button>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {editableCategories.map((c) => (
-                        <Badge key={c.id} variant="secondary" className="text-xs gap-1 pr-1">
-                          {c.name}
-                          <Button type="button" onClick={() => removeCategory(c.id)} variant="ghost" size="icon" className="h-4 w-4 text-muted-foreground hover:text-destructive ml-0.5">&times;</Button>
-                        </Badge>
-                      ))}
-                    </div>
-                  </section>
-
-                  {/* Payment Methods */}
-                  <section>
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium flex items-center gap-1.5"><CreditCard className="size-4" /> Metode Pembayaran ({editablePaymentMethods.length})</h4>
-                      <Button variant="outline" size="sm" onClick={openAddPm}>+ Pembayaran</Button>
-                    </div>
-                    {editablePaymentMethods.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Belum ada metode pembayaran.</p>
-                    ) : (
-                      <div className="border rounded-xl overflow-x-auto text-sm">
-                        <Table>
-                          <TableHeader className="bg-muted">
-                            <TableRow>
-                              <TableHead className="p-2 font-medium">Nama</TableHead>
-                              <TableHead className="p-2 font-medium">Provider</TableHead>
-                              <TableHead className="p-2 font-medium">Tipe</TableHead>
-                              <TableHead className="w-20 p-2 font-medium text-center">Aksi</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {editablePaymentMethods.map((pm) => (
-                              <TableRow key={pm.id}>
-                                <TableCell className="p-2 whitespace-nowrap">{pm.name}</TableCell>
-                                <TableCell className="p-2 text-muted-foreground whitespace-nowrap">{pm.provider}</TableCell>
-                                <TableCell className="p-2"><Badge variant="outline" className="capitalize whitespace-nowrap">{pm.type}</Badge></TableCell>
-                                <TableCell className="p-2 text-center">
-                                  <div className="flex items-center justify-center gap-1">
-                                    <Button type="button" onClick={() => openEditPm(pm)} variant="ghost" size="icon" className="h-7 w-7 text-primary"><Edit className="size-3.5" /></Button>
-                                    <Button type="button" onClick={() => deletePm(pm.id)} variant="ghost" size="icon" className="h-7 w-7 text-destructive"><Trash2 className="size-3.5" /></Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </section>
-
-                  {/* Cash Categories */}
-                  <section>
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium flex items-center gap-1.5"><Banknote className="size-4" /> Kategori Kas ({editableCashCategories.length})</h4>
-                      <Button variant="outline" size="sm" onClick={addCashCategory}>+ Kategori</Button>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {editableCashCategories.map((cc) => (
-                        <Badge key={cc.id} variant="secondary" className={`text-xs gap-1 pr-1 ${cc.type === 'Pemasukan' ? 'border-green-300' : 'border-red-300'}`}>
-                          {cc.name}
-                          <span className={cc.type === 'Pemasukan' ? 'text-green-600' : 'text-red-500'}>({cc.type})</span>
-                          <Button type="button" onClick={() => removeCashCategory(cc.id)} variant="ghost" size="icon" className="h-4 w-4 text-muted-foreground hover:text-destructive ml-0.5">&times;</Button>
-                        </Badge>
-                      ))}
-                    </div>
-                  </section>
-
-                  {/* Customer & Supplier */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <section>
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium flex items-center gap-1.5"><Users className="size-4" /> Pelanggan</h4>
-                        <Button variant="outline" size="sm" onClick={() => openEditPerson('customer')}>Ubah</Button>
-                      </div>
-                      <div className="text-sm text-muted-foreground border rounded-xl p-3 overflow-hidden">
-                        <div className="font-medium text-foreground truncate">{editableCustomer.name}</div>
-                        <div className="truncate">{editableCustomer.phone}</div>
-                        <div className="truncate">{editableCustomer.city}</div>
-                      </div>
-                    </section>
-                    <section>
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium flex items-center gap-1.5"><Truck className="size-4" /> Supplier</h4>
-                        <Button variant="outline" size="sm" onClick={() => openEditPerson('supplier')}>Ubah</Button>
-                      </div>
-                      <div className="text-sm text-muted-foreground border rounded-xl p-3 overflow-hidden">
-                        <div className="font-medium text-foreground truncate">{editableSupplier.name}</div>
-                        <div className="truncate">{editableSupplier.phone}</div>
-                        <div className="truncate">{editableSupplier.city}</div>
-                      </div>
-                    </section>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 4: Payment method checkboxes */}
-              {step === 4 && (
-                <div className="space-y-4 max-w-sm">
-                  {editablePaymentMethods.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Belum ada metode pembayaran. Tambah di langkah sebelumnya.</p>
-                  ) : (
-                    editablePaymentMethods.map((pm) => (
-                      <div key={pm.id} className="flex items-center space-x-2 border rounded-lg p-4 cursor-pointer hover:bg-muted/50" onClick={() => setSelectedPayments({...selectedPayments, [pm.name]: !selectedPayments[pm.name]})}>
-                        <input id={`pay-${pm.id}`} type="checkbox" checked={selectedPayments[pm.name] ?? true} onChange={(e) => setSelectedPayments({...selectedPayments, [pm.name]: e.target.checked})} className="size-4" />
-                        <Label htmlFor={`pay-${pm.id}`} className="flex-1 cursor-pointer">{pm.name} <span className="text-xs text-muted-foreground">({pm.provider})</span></Label>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-
-            </CardContent>
-
-            {/* Product Dialog */}
-            <Dialog open={productDialogOpen} onOpenChange={setProductDialogOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{editingProductId ? 'Edit Produk' : 'Tambah Produk'}</DialogTitle>
-                  <DialogDescription>Sesuaikan produk untuk template ini.</DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Nama Produk</Label>
-                    <Input value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} placeholder="Nama produk" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Kategori</Label>
-                    <Select value={productForm.category} onValueChange={(v) => setProductForm({...productForm, category: v})}>
-                      <SelectTrigger><SelectValue placeholder="Pilih kategori" /></SelectTrigger>
-                      <SelectContent>
-                        {editableCategories.map((c) => (
-                          <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Tipe</Label>
-                    <Select value={productForm.type} onValueChange={(v) => setProductForm({...productForm, type: v as EditableProduct['type'] })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Produk Fisik">Produk Fisik</SelectItem>
-                        <SelectItem value="Jasa">Jasa</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Harga</Label>
-                    <CurrencyInput prefix="Rp" value={productForm.price} onValueChange={(val) => setProductForm({...productForm, price: String(val)})} placeholder="10000" />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setProductDialogOpen(false)}>Batal</Button>
-                  <Button onClick={saveProduct} disabled={!productForm.name || !productForm.price}>Simpan</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-
-            {/* Payment Method Dialog */}
-            <Dialog open={pmDialogOpen} onOpenChange={setPmDialogOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{editingPmId ? 'Edit Pembayaran' : 'Tambah Pembayaran'}</DialogTitle>
-                  <DialogDescription>Sesuaikan metode pembayaran untuk template ini.</DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Nama</Label>
-                    <Input value={pmForm.name} onChange={e => setPmForm({...pmForm, name: e.target.value})} placeholder="QRIS" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Provider</Label>
-                    <Input value={pmForm.provider} onChange={e => setPmForm({...pmForm, provider: e.target.value})} placeholder="GoPay / Bank / Tunai" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Tipe</Label>
-                    <Select value={pmForm.type} onValueChange={(v) => setPmForm({...pmForm, type: v})}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="tunai">Tunai</SelectItem>
-                        <SelectItem value="qris">QRIS</SelectItem>
-                        <SelectItem value="kartu">Kartu</SelectItem>
-                        <SelectItem value="transfer">Transfer</SelectItem>
-                        <SelectItem value="ewallet">E-Wallet</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setPmDialogOpen(false)}>Batal</Button>
-                  <Button onClick={savePm} disabled={!pmForm.name || !pmForm.provider}>Simpan</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-
-            {/* Person Edit Dialog */}
-            <Dialog open={editPersonOpen !== null} onOpenChange={(open) => { if (!open) setEditPersonOpen(null) }}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Ubah {editPersonOpen === 'customer' ? 'Pelanggan' : 'Supplier'}</DialogTitle>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Nama</Label>
-                    <Input value={personForm.name} onChange={e => setPersonForm({...personForm, name: e.target.value})} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Telepon</Label>
-                    <Input value={personForm.phone} onChange={e => setPersonForm({...personForm, phone: e.target.value})} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Kota</Label>
-                    <Input value={personForm.city} onChange={e => setPersonForm({...personForm, city: e.target.value})} />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setEditPersonOpen(null)}>Batal</Button>
-                  <Button onClick={savePerson} disabled={!personForm.name || !personForm.phone}>Simpan</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-
-            <CardFooter className="flex items-center justify-between border-t bg-muted/20 p-6">
-              {step > 1 ? (
-                <Button variant="outline" onClick={() => setStep(step - 1)}>Kembali</Button>
-              ) : (
-                <Button variant="outline" asChild>
-                  <Link to="/login">Ke Login</Link>
-                </Button>
-              )}
-
-              {step < steps.length ? (
-                <Button onClick={() => setStep(step + 1)} disabled={step === 1 && !canGoNextStep1}>
-                  Lanjut <ChevronRight className="ml-2 size-4" />
-                </Button>
-              ) : (
-                <Button onClick={handleFinish} disabled={loading}>
-                  {loading && <Loader2 className="mr-2 size-4 animate-spin" />}
-                  Lanjut ke Tagihan <ChevronRight className="ml-2 size-4" />
-                </Button>
-              )}
-            </CardFooter>
-          </Card>
-        </div>
+            ) : null}
+          </CardContent>
+          <CardFooter className="flex items-center justify-between border-t bg-muted/20 p-6">
+            {step > 1 ? <Button variant="outline" onClick={() => setStep(step - 1)}>Kembali</Button> : <Button variant="outline" asChild><Link to="/login">Ke Login</Link></Button>}
+            {step < steps.length ? (
+              <Button onClick={() => setStep(step + 1)} disabled={!canProceed}>Lanjut <ChevronRight className="ml-2 size-4" /></Button>
+            ) : (
+              <Button onClick={handleFinish} disabled={loading}>{loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}Masuk dan mulai transaksi <ChevronRight className="ml-2 size-4" /></Button>
+            )}
+          </CardFooter>
+        </Card>
       </div>
     </main>
   )

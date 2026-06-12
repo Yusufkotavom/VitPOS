@@ -7,8 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { LoginPage } from '@/features/auth/pages/login-page'
 import { OnboardingPage } from '@/features/auth/pages/onboarding-page'
+import { PostSetupChecklist } from '@/features/auth/components/onboarding/post-setup-checklist'
 import { TenantSelectorPage } from '@/features/auth/pages/tenant-selector-page'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { DashboardPage } from '@/features/dashboard/pages/dashboard-page'
 import { localDb } from '@/services/local-db/client'
 
 const { apiPostMock } = vi.hoisted(() => ({
@@ -79,8 +81,22 @@ describe('auth polish behavior', () => {
     render(createElement(MemoryRouter, null, createElement(OnboardingPage)))
 
     expect(screen.getByText('Progress Setup')).toBeInTheDocument()
-    expect(screen.getByLabelText('Nama Bisnis')).toBeInTheDocument()
+    expect(screen.getByText('Pilih vertikal usaha yang paling sesuai.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Lanjut/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Ke Login/i })).toBeInTheDocument()
+  })
+
+  it('shows polished post-setup checklist copy', () => {
+    render(createElement(PostSetupChecklist))
+
+    expect(screen.getByText('Checklist setelah setup')).toBeInTheDocument()
+    expect(screen.getByText('Tambah 5 produk atau jasa terlaris')).toBeInTheDocument()
+    expect(screen.getByText('Atur harga jual dan modal')).toBeInTheDocument()
+  })
+
+  it('dashboard adds a clear owner-facing intro label', () => {
+    render(createElement(MemoryRouter, null, createElement(DashboardPage)))
+
+    expect(screen.getByText('Dashboard usaha')).toBeInTheDocument()
   })
 })

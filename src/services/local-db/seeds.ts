@@ -1,5 +1,6 @@
 import { baimRuntime } from '@/lib/baim-runtime'
 import { localDb } from '@/services/local-db/client'
+import { createPlaybookSeedBundle } from '@/services/local-db/seed-playbooks'
 import type {
   LocalCash,
   LocalCustomer,
@@ -197,6 +198,10 @@ export const demoConflicts: SyncConflict[] = [
     createdAt: now(),
   },
 ]
+
+export function createDemoPlaybookSeedBundle(tenantId: string = DEMO_TENANT_ID) {
+  return createPlaybookSeedBundle(tenantId)
+}
 
 export async function clearLocalDemoData() {
   await Promise.all([
