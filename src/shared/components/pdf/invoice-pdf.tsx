@@ -1,51 +1,51 @@
-import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
+import { Document, Page, StyleSheet, Text, View, Image } from '@react-pdf/renderer'
 import { formatCurrency } from '@/lib/format-currency'
 import type { PdfInvoiceData, PdfCompanySettings } from './types'
+import type { InvoiceThemeTokens } from './invoice-themes'
+import { invoiceThemes } from './invoice-themes'
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   page: { padding: 40, fontSize: 9, fontFamily: 'Helvetica', color: '#374151', lineHeight: 1.5 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#e5e7eb', paddingBottom: 15, marginBottom: 20 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, paddingBottom: 15, marginBottom: 20 },
   companyInfo: { flexDirection: 'column', maxWidth: '60%' },
-  companyName: { fontSize: 16, fontWeight: 'bold', color: '#111827', marginBottom: 4 },
-  companySub: { color: '#4b5563', fontSize: 8, marginBottom: 2 },
+  companyName: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
+  companySub: { fontSize: 8, marginBottom: 2 },
   invoiceMeta: { alignItems: 'flex-end' },
-  invoiceTitle: { fontSize: 20, fontWeight: 'bold', color: '#1e3a8a', marginBottom: 5 },
-  metaText: { fontSize: 8, color: '#4b5563', marginBottom: 2 },
+  invoiceTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 5 },
+  metaText: { fontSize: 8, marginBottom: 2 },
   detailsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 25 },
   billTo: { width: '48%' },
-  sectionTitle: { fontSize: 9, fontWeight: 'bold', color: '#374151', borderBottomWidth: 1, borderBottomColor: '#e5e7eb', paddingBottom: 3, marginBottom: 6, textTransform: 'uppercase' },
-  detailText: { fontSize: 8, color: '#4b5563', marginBottom: 2 },
+  sectionTitle: { fontSize: 9, fontWeight: 'bold', borderBottomWidth: 1, paddingBottom: 3, marginBottom: 6, textTransform: 'uppercase' },
+  detailText: { fontSize: 8, marginBottom: 2 },
   table: { marginTop: 10, marginBottom: 20 },
-  tableHeader: { flexDirection: 'row', backgroundColor: '#f3f4f6', borderBottomWidth: 1, borderBottomColor: '#d1d5db', paddingVertical: 6, paddingHorizontal: 8, fontWeight: 'bold' },
-  tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#e5e7eb', paddingVertical: 6, paddingHorizontal: 8 },
+  tableHeader: { flexDirection: 'row', borderBottomWidth: 1, paddingVertical: 6, paddingHorizontal: 8, fontWeight: 'bold' },
+  tableRow: { flexDirection: 'row', borderBottomWidth: 1, paddingVertical: 6, paddingHorizontal: 8 },
   colItem: { width: '45%' },
   colQty: { width: '15%', textAlign: 'center' },
   colPrice: { width: '20%', textAlign: 'right' },
   colTotal: { width: '20%', textAlign: 'right' },
-  headerText: { fontWeight: 'bold', color: '#374151' },
   totalsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
   stampContainer: { width: '50%' },
   badge: { borderWidth: 2, paddingVertical: 6, paddingHorizontal: 12, fontSize: 14, fontWeight: 'bold', textTransform: 'uppercase', alignSelf: 'flex-start', marginTop: 10, borderRadius: 4 },
-  badgePaid: { borderColor: '#16a34a', color: '#16a34a' },
-  badgeUnpaid: { borderColor: '#dc2626', color: '#dc2626' },
-  badgePartial: { borderColor: '#ca8a04', color: '#ca8a04' },
   totalsTable: { width: '40%' },
   totalsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  totalsRowBold: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderTopColor: '#d1d5db', fontWeight: 'bold', fontSize: 10, color: '#111827' },
-  footer: { position: 'absolute', bottom: 30, left: 40, right: 40, borderTopWidth: 1, borderTopColor: '#e5e7eb', paddingTop: 10, textAlign: 'center', color: '#9ca3af', fontSize: 8 },
-  termsContainer: { marginTop: 30, borderTopWidth: 1, borderTopColor: '#e5e7eb', paddingTop: 10 },
-  termsTitle: { fontSize: 8, fontWeight: 'bold', color: '#4b5563', textTransform: 'uppercase', marginBottom: 4 },
-  termsText: { fontSize: 7, color: '#6b7280' },
+  totalsRowBold: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, fontWeight: 'bold', fontSize: 10, color: '#111827' },
+  footer: { position: 'absolute', bottom: 30, left: 40, right: 40, borderTopWidth: 1, paddingTop: 10, textAlign: 'center', fontSize: 8 },
+  termsContainer: { marginTop: 30, borderTopWidth: 1, paddingTop: 10 },
+  termsTitle: { fontSize: 8, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 4 },
+  termsText: { fontSize: 7 },
+  paymentRow: { flexDirection: 'row', borderBottomWidth: 1, paddingVertical: 5, paddingHorizontal: 8 },
+  logo: { width: 120, height: 'auto', marginBottom: 4 },
+  logoPlaceholder: { width: 120, height: 40, backgroundColor: '#f3f4f6', borderRadius: 4, marginBottom: 4, justifyContent: 'center', alignItems: 'center' },
 })
 
 function fmt(n: number) {
   return formatCurrency(n)
 }
 
-function badgeStyle(status: string) {
-  if (status === 'Lunas') return { ...styles.badge, ...styles.badgePaid }
-  if (status === 'Belum Bayar') return { ...styles.badge, ...styles.badgeUnpaid }
-  return { ...styles.badge, ...styles.badgePartial }
+function badgeStyle(theme: InvoiceThemeTokens, status: string) {
+  const borderColor = status === 'Lunas' ? theme.badgePaid : status === 'Belum Bayar' ? theme.badgeUnpaid : theme.badgePartial
+  return { ...baseStyles.badge, borderColor, color: borderColor }
 }
 
 function badgeLabel(status: string) {
@@ -55,81 +55,88 @@ function badgeLabel(status: string) {
 }
 
 export function InvoicePDF({ data, settings }: { data: PdfInvoiceData; settings: PdfCompanySettings }) {
+  const theme = invoiceThemes[settings.invoiceTheme] ?? invoiceThemes.klasik
   const remaining = Math.max(0, data.summary.grandTotal - data.summary.paidTotal)
 
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <View style={styles.companyInfo}>
-            <Text style={styles.companyName}>{settings.companyName}</Text>
-            {settings.companyAddress && <Text style={styles.companySub}>{settings.companyAddress}</Text>}
-            {settings.companyPhone && <Text style={styles.companySub}>Telp: {settings.companyPhone}</Text>}
-            {settings.companyTax && <Text style={styles.companySub}>NPWP/NIB: {settings.companyTax}</Text>}
+      <Page size="A4" style={baseStyles.page}>
+        <View style={[baseStyles.header, { borderBottomColor: theme.headerAccent }]}>
+          <View style={baseStyles.companyInfo}>
+            {settings.invoiceLogo ? (
+              <Image src={settings.invoiceLogo} style={baseStyles.logo} />
+            ) : (
+              <Text style={[baseStyles.companyName, { color: theme.headerTextColor }]}>{settings.companyName}</Text>
+            )}
+            <View style={{ flexDirection: 'column', gap: 2 }}>
+              {settings.companyAddress && <Text style={[baseStyles.companySub, { color: theme.headerTextColor === '#ffffff' || theme.headerTextColor === '#f8fafc' || theme.headerTextColor === '#fef2f2' ? '#cbd5e1' : '#4b5563' }]}>{settings.companyAddress}</Text>}
+              {settings.companyPhone && <Text style={[baseStyles.companySub, { color: theme.headerTextColor === '#ffffff' || theme.headerTextColor === '#f8fafc' || theme.headerTextColor === '#fef2f2' ? '#cbd5e1' : '#4b5563' }]}>Telp: {settings.companyPhone}</Text>}
+              {settings.companyTax && <Text style={[baseStyles.companySub, { color: theme.headerTextColor === '#ffffff' || theme.headerTextColor === '#f8fafc' || theme.headerTextColor === '#fef2f2' ? '#cbd5e1' : '#4b5563' }]}>NPWP/NIB: {settings.companyTax}</Text>}
+            </View>
           </View>
-          <View style={styles.invoiceMeta}>
-            <Text style={styles.invoiceTitle}>INVOICE</Text>
-            <Text style={styles.metaText}>{data.code}</Text>
-            <Text style={styles.metaText}>{data.date}</Text>
-          </View>
-        </View>
-
-        <View style={styles.detailsContainer}>
-          <View style={styles.billTo}>
-            <Text style={styles.sectionTitle}>Tujuan Tagihan</Text>
-            <Text style={[styles.detailText, { fontWeight: 'bold' }]}>{data.customer.name}</Text>
-            {data.customer.phone && <Text style={styles.detailText}>{data.customer.phone}</Text>}
+          <View style={baseStyles.invoiceMeta}>
+            <Text style={[baseStyles.invoiceTitle, { color: theme.titleColor }]}>INVOICE</Text>
+            <Text style={[baseStyles.metaText, { color: theme.headerTextColor === '#ffffff' || theme.headerTextColor === '#f8fafc' || theme.headerTextColor === '#fef2f2' ? '#cbd5e1' : '#4b5563' }]}>{data.code}</Text>
+            <Text style={[baseStyles.metaText, { color: theme.headerTextColor === '#ffffff' || theme.headerTextColor === '#f8fafc' || theme.headerTextColor === '#fef2f2' ? '#cbd5e1' : '#4b5563' }]}>{data.date}</Text>
           </View>
         </View>
 
-        <View style={styles.table}>
-          <View style={styles.tableHeader}>
-            <View style={styles.colItem}><Text style={styles.headerText}>Item</Text></View>
-            <View style={styles.colQty}><Text style={styles.headerText}>Qty</Text></View>
-            <View style={styles.colPrice}><Text style={styles.headerText}>Harga</Text></View>
-            <View style={styles.colTotal}><Text style={styles.headerText}>Total</Text></View>
+        <View style={baseStyles.detailsContainer}>
+          <View style={baseStyles.billTo}>
+            <Text style={[baseStyles.sectionTitle, { color: theme.accentColor, borderBottomColor: theme.tableBorderColor }]}>Tujuan Tagihan</Text>
+            <Text style={[baseStyles.detailText, { fontWeight: 'bold', color: '#111827' }]}>{data.customer.name}</Text>
+            {data.customer.phone && <Text style={[baseStyles.detailText, { color: '#4b5563' }]}>{data.customer.phone}</Text>}
+          </View>
+        </View>
+
+        <View style={baseStyles.table}>
+          <View style={[baseStyles.tableHeader, { backgroundColor: theme.tableHeaderBg, borderBottomColor: theme.tableBorderColor }]}>
+            <View style={baseStyles.colItem}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>Item</Text></View>
+            <View style={baseStyles.colQty}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>Qty</Text></View>
+            <View style={baseStyles.colPrice}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>Harga</Text></View>
+            <View style={baseStyles.colTotal}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>Total</Text></View>
           </View>
           {data.items.map((item, i) => (
-            <View key={i} style={styles.tableRow}>
-              <View style={styles.colItem}><Text>{item.name}</Text></View>
-              <View style={styles.colQty}><Text>{item.qty}</Text></View>
-              <View style={styles.colPrice}><Text>{fmt(item.price)}</Text></View>
-              <View style={styles.colTotal}><Text>{fmt(item.subtotal)}</Text></View>
+            <View key={i} style={[baseStyles.tableRow, { borderBottomColor: theme.tableBorderColor }]}>
+              <View style={baseStyles.colItem}><Text>{item.name}</Text></View>
+              <View style={baseStyles.colQty}><Text>{item.qty}</Text></View>
+              <View style={baseStyles.colPrice}><Text>{fmt(item.price)}</Text></View>
+              <View style={baseStyles.colTotal}><Text>{fmt(item.subtotal)}</Text></View>
             </View>
           ))}
         </View>
 
-        <View style={styles.totalsContainer}>
-          <View style={styles.stampContainer}>
-            <Text style={badgeStyle(data.summary.status)}>{badgeLabel(data.summary.status)}</Text>
+        <View style={baseStyles.totalsContainer}>
+          <View style={baseStyles.stampContainer}>
+            <Text style={badgeStyle(theme, data.summary.status)}>{badgeLabel(data.summary.status)}</Text>
           </View>
-          <View style={styles.totalsTable}>
-            <View style={styles.totalsRow}>
+          <View style={baseStyles.totalsTable}>
+            <View style={baseStyles.totalsRow}>
               <Text>Subtotal</Text>
               <Text style={{ fontWeight: 'bold' }}>{fmt(data.summary.subtotal)}</Text>
             </View>
             {data.summary.discount > 0 && (
-              <View style={styles.totalsRow}>
+              <View style={baseStyles.totalsRow}>
                 <Text>Diskon</Text>
                 <Text>-{fmt(data.summary.discount)}</Text>
               </View>
             )}
-            <View style={styles.totalsRow}>
+            <View style={baseStyles.totalsRow}>
               <Text>Total</Text>
               <Text style={{ fontWeight: 'bold' }}>{fmt(data.summary.grandTotal)}</Text>
             </View>
-            <View style={styles.totalsRow}>
+            <View style={baseStyles.totalsRow}>
               <Text>Dibayar</Text>
               <Text>{fmt(data.summary.paidTotal)}</Text>
             </View>
             {remaining > 0 && (
-              <View style={styles.totalsRowBold}>
+              <View style={[baseStyles.totalsRowBold, { borderTopColor: theme.tableBorderColor }]}>
                 <Text>Sisa Tagihan</Text>
                 <Text>{fmt(remaining)}</Text>
               </View>
             )}
             {data.summary.change && data.summary.change > 0 && (
-              <View style={styles.totalsRow}>
+              <View style={baseStyles.totalsRow}>
                 <Text>Kembali</Text>
                 <Text>{fmt(data.summary.change)}</Text>
               </View>
@@ -139,14 +146,14 @@ export function InvoicePDF({ data, settings }: { data: PdfInvoiceData; settings:
 
         {data.payments && data.payments.length > 0 && (
           <View style={{ marginTop: 20 }}>
-            <Text style={styles.termsTitle}>Riwayat Pembayaran</Text>
-            <View style={[styles.tableHeader, { marginTop: 5 }]}>
-              <View style={{ width: '40%' }}><Text style={styles.headerText}>Tanggal</Text></View>
-              <View style={{ width: '30%' }}><Text style={styles.headerText}>Metode</Text></View>
-              <View style={{ width: '30%', textAlign: 'right' }}><Text style={styles.headerText}>Nominal</Text></View>
+            <Text style={[baseStyles.termsTitle, { color: theme.accentColor }]}>Riwayat Pembayaran</Text>
+            <View style={[baseStyles.tableHeader, { backgroundColor: theme.tableHeaderBg, borderBottomColor: theme.tableBorderColor, marginTop: 5 }]}>
+              <View style={{ width: '40%' }}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>Tanggal</Text></View>
+              <View style={{ width: '30%' }}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>Metode</Text></View>
+              <View style={{ width: '30%', textAlign: 'right' }}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>Nominal</Text></View>
             </View>
             {data.payments.map((p, i) => (
-              <View key={i} style={styles.tableRow}>
+              <View key={i} style={[baseStyles.paymentRow, { borderBottomColor: theme.tableBorderColor }]}>
                 <View style={{ width: '40%' }}><Text>{p.date}</Text></View>
                 <View style={{ width: '30%' }}><Text style={{ textTransform: 'capitalize' }}>{p.method}</Text></View>
                 <View style={{ width: '30%', textAlign: 'right' }}><Text>{fmt(p.amount)}</Text></View>
@@ -156,14 +163,14 @@ export function InvoicePDF({ data, settings }: { data: PdfInvoiceData; settings:
         )}
 
         {(data.notes || settings.invoiceTerm) && (
-          <View style={styles.termsContainer}>
-            <Text style={styles.termsTitle}>Catatan</Text>
-            <Text style={styles.termsText}>{data.notes || settings.invoiceTerm}</Text>
+          <View style={[baseStyles.termsContainer, { borderTopColor: theme.tableBorderColor }]}>
+            <Text style={[baseStyles.termsTitle, { color: theme.accentColor }]}>Catatan</Text>
+            <Text style={[baseStyles.termsText, { color: '#6b7280' }]}>{data.notes || settings.invoiceTerm}</Text>
           </View>
         )}
 
-        <View style={styles.footer}>
-          <Text>{settings.receiptFooter || 'Terima kasih atas kepercayaan Anda.'}</Text>
+        <View style={[baseStyles.footer, { borderTopColor: theme.footerBorder }]}>
+          <Text style={{ color: '#9ca3af' }}>{settings.receiptFooter || 'Terima kasih atas kepercayaan Anda.'}</Text>
         </View>
       </Page>
     </Document>

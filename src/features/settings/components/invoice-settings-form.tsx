@@ -4,9 +4,12 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { useSettings } from '@/features/settings/hooks/use-settings'
 import { settingRepository } from '@/services/local-db/repository'
+import { invoiceThemeOptions, type InvoiceThemeName } from '@/shared/components/pdf/types'
+import { invoiceThemes } from '@/shared/components/pdf/invoice-themes'
 
 const fields = [
   { id: 'invoice-prefix', label: 'Prefix Invoice', placeholder: 'INV', type: 'input' as const },
@@ -29,6 +32,10 @@ export function InvoiceSettingsForm() {
   const [saving, setSaving] = useState(false)
   const hydrated = useRef(false)
 
+  const [theme, setTheme] = useState<InvoiceThemeName>('klasik')
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
+  const logoInputRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
     if (hydrated.current || settings.length === 0) return
     const vals = emptyValues()
@@ -36,11 +43,38 @@ export function InvoiceSettingsForm() {
       vals[field.id] = settings.find((s) => s.id === field.id)?.value ?? ''
     }
     setValues(vals)
+
+    const themeRaw = settings.find((s) => s.id === 'invoice-theme')?.value
+    if (themeRaw && ['klasik', 'korporat', 'modern', 'eksekutif'].includes(themeRaw)) {
+      setTheme(themeRaw as InvoiceThemeName)
+    }
+    const savedLogo = settings.find((s) => s.id === 'invoice-logo')?.value
+    if (savedLogo) setLogoPreview(savedLogo)
+
     hydrated.current = true
   }, [settings])
 
   function setField(field: FieldId, value: string) {
     setValues((current) => ({ ...current, [field]: value }))
+  }
+
+  function handleLogoChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Ukuran logo maksimal 2MB')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      setLogoPreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  function handleRemoveLogo() {
+    setLogoPreview(null)
+    if (logoInputRef.current) logoInputRef.current.value = ''
   }
 
   async function handleSave() {
@@ -58,6 +92,31 @@ export function InvoiceSettingsForm() {
           updatedAt: now,
         })
       }
+
+      await settingRepository.upsert({
+        id: 'invoice-theme',
+        tenantId: resolveTenantId(settings.find((s) => s.id === 'invoice-theme')?.tenantId),
+        area: 'Invoice & Struk',
+        setting: 'Tema Invoice',
+        value: theme,
+        status: 'Lengkap',
+        updatedAt: now,
+      })
+
+      if (logoPreview !== null) {
+        await settingRepository.upsert({
+          id: 'invoice-logo',
+          tenantId: resolveTenantId(settings.find((s) => s.id === 'invoice-logo')?.tenantId),
+          area: 'Invoice & Struk',
+          setting: 'Logo Invoice',
+          value: logoPreview,
+          status: logoPreview ? 'Lengkap' : 'Belum Lengkap',
+          updatedAt: now,
+        })
+      } else if (settings.find((s) => s.id === 'invoice-logo')?.value) {
+        await settingRepository.remove('invoice-logo')
+      }
+
       toast.success('Pengaturan invoice & struk disimpan')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Gagal menyimpan pengaturan invoice & struk')
@@ -66,15 +125,79 @@ export function InvoiceSettingsForm() {
     }
   }
 
+
+
   return (
     <div className="rounded-2xl border bg-background p-5 shadow-sm">
       <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold">Invoice & Struk</h2>
-          <p className="text-sm text-muted-foreground">Atur prefix invoice, term, serta header/footer struk POS.</p>
+          <p className="text-sm text-muted-foreground">Atur prefix invoice, term, tema, logo, serta header/footer struk POS.</p>
         </div>
         <Button onClick={handleSave} disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan'}</Button>
       </div>
+
+      <div className="mb-6 space-y-4 rounded-xl border p-4">
+        <div>
+          <Label className="text-sm font-medium">Tema Invoice</Label>
+          <p className="text-xs text-muted-foreground mb-3">Pilih tampilan premium untuk PDF invoice.</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {invoiceThemeOptions.map((opt) => {
+              const t = invoiceThemes[opt.value]
+              const isActive = theme === opt.value
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setTheme(opt.value)}
+                  className={`relative flex flex-col items-center gap-2 rounded-xl border-2 p-3 text-center transition-all hover:shadow-md ${
+                    isActive ? 'border-primary ring-2 ring-primary/20' : 'border-transparent bg-muted/30'
+                  }`}
+                >
+                  <div className="flex h-10 w-full items-center justify-center rounded-lg px-2 text-[10px] font-bold" style={{ backgroundColor: t.headerBg, color: t.headerTextColor === '#ffffff' || t.headerTextColor === '#f8fafc' || t.headerTextColor === '#fef2f2' ? '#fff' : '#111' }}>
+                    {opt.label}
+                  </div>
+                  <span className="text-xs font-medium">{opt.label}</span>
+                  <span className="text-[10px] text-muted-foreground leading-tight">{opt.description}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-6 space-y-3 rounded-xl border p-4">
+        <Label className="text-sm font-medium">Logo Perusahaan</Label>
+        <p className="text-xs text-muted-foreground mb-1">Upload logo untuk ditampilkan di invoice A4. Maks 2MB, format JPG/PNG.</p>
+        <div className="flex items-center gap-4">
+          <div className="flex h-16 w-40 items-center justify-center rounded-lg border bg-muted/20 overflow-hidden">
+            {logoPreview ? (
+              <img src={logoPreview} alt="Logo preview" className="max-h-full max-w-full object-contain p-1" />
+            ) : (
+              <span className="text-[10px] text-muted-foreground">Belum ada logo</span>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleLogoChange}
+              className="hidden"
+              id="logo-upload"
+            />
+            <Button variant="outline" size="sm" type="button" onClick={() => logoInputRef.current?.click()}>
+              {logoPreview ? 'Ganti Logo' : 'Pilih Logo'}
+            </Button>
+            {logoPreview && (
+              <Button variant="ghost" size="sm" type="button" onClick={handleRemoveLogo} className="text-destructive">
+                Hapus Logo
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2">
         {fields.map((field) => (
           <label key={field.id} className={field.type === 'textarea' ? 'flex flex-col gap-1.5 text-sm font-medium md:col-span-2' : 'flex flex-col gap-1.5 text-sm font-medium'}>

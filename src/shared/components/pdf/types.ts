@@ -1,5 +1,14 @@
 export type PdfDocumentType = 'invoice' | 'service' | 'receipt' | 'payment'
 
+export type InvoiceThemeName = 'klasik' | 'korporat' | 'modern' | 'eksekutif'
+
+export const invoiceThemeOptions: { value: InvoiceThemeName; label: string; description: string }[] = [
+  { value: 'klasik', label: 'Klasik', description: 'Biru profesional, bersih, dan rapi' },
+  { value: 'korporat', label: 'Korporat', description: 'Navyl gelap dengan aksen emas elegan' },
+  { value: 'modern', label: 'Modern', description: 'Minimalis dengan aksen teal' },
+  { value: 'eksekutif', label: 'Eksekutif', description: 'Burgundy mewah dengan nuansa hangat' },
+]
+
 export type PdfCompanySettings = {
   companyName: string
   companyPhone: string
@@ -8,6 +17,8 @@ export type PdfCompanySettings = {
   receiptHeader: string
   receiptFooter: string
   invoiceTerm: string
+  invoiceTheme: InvoiceThemeName
+  invoiceLogo?: string
 }
 
 export type PdfLineItem = {
