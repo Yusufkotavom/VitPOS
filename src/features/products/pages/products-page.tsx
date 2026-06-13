@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { LayoutGrid, List, Filter, Image as ImageIcon, Package, Coffee, Shirt, MonitorSmartphone, Download, Upload } from 'lucide-react'
 import { toast } from 'sonner'
@@ -75,14 +74,6 @@ export function ProductsPage() {
 
   return (
     <PageShell title={t('products.title')} description={t('products.description')} actions={<ProductCrudActions />}>
-      <div className="mb-4 flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/products/categories">Kategori Produk</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/products/recipes">Resep / BOM</Link>
-        </Button>
-      </div>
       <ContentCard>
         <div className="mb-4 flex flex-col gap-2 border-b pb-4 sm:flex-row sm:items-center">
           <Input placeholder={t('common.search')} value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-64" />

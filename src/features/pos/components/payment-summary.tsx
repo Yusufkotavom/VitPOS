@@ -51,7 +51,7 @@ export function PaymentSummary({ onComplete, shiftId }: { onComplete?: () => voi
 
     setProcessing(true)
     try {
-      const result = await posTransactionService.checkout(store.cartItems, totals, store.paymentMethod, store.paidAmount, store.discount, store.customerName, store.customerId, shiftId)
+      const result = await posTransactionService.checkout(store.cartItems, totals, store.paymentMethod, store.paidAmount, store.discount, store.customerName, store.customerId, shiftId, store.orderNote)
       if (!result) {
         throw new Error('Transaksi tidak menghasilkan data order')
       }
@@ -101,7 +101,7 @@ export function PaymentSummary({ onComplete, shiftId }: { onComplete?: () => voi
         change: successOrder.change,
         status: successOrder.amountPaid >= successOrder.total ? 'Lunas' : 'Sebagian',
       },
-      notes: '',
+      notes: store.orderNote.trim(),
     }
     printPdf(invoiceData)
   }

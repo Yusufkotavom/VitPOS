@@ -187,6 +187,7 @@ const id = {
     open_shift_now: 'Buka Shift Sekarang',
     item_count: '{{count}} item',
     submit_payment: 'Bayar',
+    checkout: 'Checkout',
     saving: 'Menyimpan...',
     paid_amount_label: 'Uang Diterima / Dibayar',
     order_id: 'ID Pesanan',

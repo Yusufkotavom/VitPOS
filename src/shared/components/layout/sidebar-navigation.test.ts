@@ -100,8 +100,10 @@ describe('sidebar navigation coverage', () => {
       '/pos',
       '/shift',
       '/sales-orders',
+      '/service-orders',
       '/products',
       '/inventory',
+      '/purchases',
       '/customers',
       '/cash',
       '/reports',
@@ -109,8 +111,6 @@ describe('sidebar navigation coverage', () => {
     ]))
     expect(routes).not.toEqual(expect.arrayContaining([
       '/products/categories',
-      '/service-orders',
-      '/purchases',
       '/suppliers',
       '/returns',
       '/sync',
@@ -133,6 +133,8 @@ describe('sidebar navigation coverage', () => {
     )
 
     expect(screen.getByText('Operasional')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Service Order/i })).toHaveAttribute('href', '/service-orders')
+    expect(screen.getByRole('link', { name: /Pembelian/i })).toHaveAttribute('href', '/purchases')
     expect(screen.getByRole('link', { name: /Produk/i })).toHaveAttribute('href', '/products')
     expect(screen.queryByRole('link', { name: /Kategori Produk/i })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Shift Kasir/i })).toHaveAttribute('href', '/shift')

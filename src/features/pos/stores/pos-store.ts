@@ -13,6 +13,7 @@ type PosStore = {
   customerId: string | null
   customerName: string | null
   viewMode: 'grid' | 'list'
+  orderNote: string
   setSearchQuery: (value: string) => void
   setSelectedCategory: (value: string) => void
   addItem: (product: PosProduct) => void
@@ -24,6 +25,7 @@ type PosStore = {
   setPaymentMethod: (value: PosPaymentMethod) => void
   setPaidAmount: (value: number) => void
   setDiscount: (value: number) => void
+  setOrderNote: (value: string) => void
   setCustomer: (id: string | null, name: string | null) => void
   setCart: (items: PosCartItem[]) => void
   setViewMode: (value: 'grid' | 'list') => void
@@ -39,6 +41,7 @@ export const usePosStore = create<PosStore>((set) => ({
   customerId: null,
   customerName: null,
   viewMode: 'grid',
+  orderNote: '',
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setSelectedCategory: (selectedCategory) => set({ selectedCategory }),
   addItem: (product) =>
@@ -102,10 +105,11 @@ export const usePosStore = create<PosStore>((set) => ({
         .filter((item) => item.qty > 0),
     })),
   removeItem: (productId) => set((state) => ({ cartItems: state.cartItems.filter((item) => item.productId !== productId) })),
-  clearCart: () => set({ cartItems: [], discount: 0, paidAmount: 0, paymentMethod: 'tunai', customerId: null, customerName: null }),
+  clearCart: () => set({ cartItems: [], discount: 0, paidAmount: 0, paymentMethod: 'tunai', customerId: null, customerName: null, orderNote: '' }),
   setPaymentMethod: (paymentMethod) => set({ paymentMethod }),
   setPaidAmount: (paidAmount) => set({ paidAmount }),
   setDiscount: (discount) => set({ discount }),
+  setOrderNote: (orderNote) => set({ orderNote }),
   setCustomer: (id, name) => set({ customerId: id, customerName: name }),
   setCart: (items) => set({ cartItems: items }),
   setViewMode: (viewMode) => set({ viewMode }),

@@ -13,11 +13,9 @@ import { cn } from '@/lib/utils'
 import { AppErrorDialog } from '@/shared/components/feedback/app-error-dialog'
 import { PullToRefresh } from '@/shared/components/feedback/pull-to-refresh'
 import { AppSidebar } from '@/shared/components/layout/app-sidebar'
-import { LanguageSwitcher } from '@/shared/components/nav/language-switcher'
 import { OfflineBanner } from '@/shared/components/sync/offline-banner'
 import { InitialSyncScreen } from '@/shared/components/sync/initial-sync-screen'
 import { SyncIndicator } from '@/shared/components/sync/sync-indicator'
-import { ThemeToggle } from '@/shared/components/nav/theme-toggle'
 import { UserMenu } from '@/shared/components/nav/user-menu'
 import { useRefresh } from '@/shared/providers/refresh-provider'
 
@@ -78,8 +76,6 @@ export function AppLayout() {
             </div>
             <div className="ml-auto flex items-center gap-2">
               <SyncIndicator summary={syncSummary} />
-              <LanguageSwitcher />
-              <ThemeToggle />
               <UserMenu />
             </div>
           </header>

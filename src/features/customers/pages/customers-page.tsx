@@ -36,7 +36,18 @@ export function CustomersPage() {
   const paginated = filtered.slice(0, parseInt(pageSize))
 
   return (
-    <PageShell title={t('customers.title')} description={t('customers.description')} actions={<CustomerCrudActions />}>
+    <PageShell
+      title={t('customers.title')}
+      description={t('customers.description')}
+      actions={
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/suppliers">Supplier</Link>
+          </Button>
+          <CustomerCrudActions />
+        </div>
+      }
+    >
       <ContentCard>
         <div className="mb-4 flex flex-row items-center gap-2 border-b pb-4">
           <Input placeholder={t('customers.search_placeholder')} value={search} onChange={e => setSearch(e.target.value)} className="w-full sm:w-64" />

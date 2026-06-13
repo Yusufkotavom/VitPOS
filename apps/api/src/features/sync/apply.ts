@@ -79,6 +79,7 @@ type SalesOrderPayload = {
   taxTotal?: number | string
   grandTotal?: number | string
   paidTotal?: number | string
+  notes?: string
   status?: string
   items?: Array<{
     id?: string
@@ -252,7 +253,7 @@ async function applySale(db: AppDb, ctx: ApplyContext, entityId: string, mutatio
       taxTotal: toNumeric(payload.taxTotal),
       grandTotal: toNumeric(payload.grandTotal),
       paidTotal: toNumeric(payload.paidTotal),
-      notes: null,
+      notes: typeof payload.notes === 'string' ? payload.notes : null,
       syncStatus: 'synced',
       version: 1,
       createdAt: now,
@@ -267,6 +268,7 @@ async function applySale(db: AppDb, ctx: ApplyContext, entityId: string, mutatio
         taxTotal: toNumeric(payload.taxTotal),
         grandTotal: toNumeric(payload.grandTotal),
         paidTotal: toNumeric(payload.paidTotal),
+        notes: typeof payload.notes === 'string' ? payload.notes : null,
         syncStatus: 'synced',
         updatedAt: now,
       },

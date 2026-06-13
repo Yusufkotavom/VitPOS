@@ -25,7 +25,6 @@ import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { StatusBadge } from '@/shared/components/display/status-badge'
-import { DataTable } from '@/shared/components/data-table/data-table'
 import { ReceiptPrintLayout } from '@/features/pos/components/receipt-print-layout'
 import type { PosOrderSummary } from '@/features/pos/types/pos-order.types'
 import { printPage } from '@/lib/print'
@@ -244,8 +243,6 @@ export function SalesOrderDetailPage() {
 
   const shortage = Math.max(0, order.grandTotal - order.paidTotal)
   const isPaid = shortage === 0
-  type PaymentRow = { date: string; method: string; amount: number; status: string }
-
   const editSubtotal = editItems.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.unitPrice) || 0), 0)
 
   const receiptOrder: PosOrderSummary | null = order ? {
@@ -332,8 +329,8 @@ export function SalesOrderDetailPage() {
       description={`${order.customerName} · ${formatDate(order.date)}`}
       actions={actionButtons}
     >
-      <div className="grid gap-6 md:grid-cols-3">
-        <div className="space-y-6 md:col-span-2">
+      <div className="min-w-0 grid gap-6 md:grid-cols-3">
+        <div className="min-w-0 space-y-6 md:col-span-2">
           <div>
             <h3 className="text-sm font-medium text-muted-foreground mb-3">Item Pesanan</h3>
             {editing ? (
@@ -461,11 +458,11 @@ export function SalesOrderDetailPage() {
                 </Dialog>
               </div>
             ) : (
-              <div className="rounded-lg border bg-background">
+              <div className="min-w-0 rounded-lg border bg-background">
                 <div className="border-b px-3 py-2 text-xs text-muted-foreground sm:hidden">
                   Geser ke kanan untuk lihat semua kolom
                 </div>
-                <div className="overflow-x-auto">
+                <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
                   <Table className="min-w-[640px]">
                     <TableHeader>
                       <TableRow className="bg-muted/40">
@@ -500,16 +497,40 @@ export function SalesOrderDetailPage() {
           </div>
 
           <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">Pembayaran</h3>
-            <DataTable
-              data={order.payments?.map((p: PaymentRow, idx: number) => ({ ...p, id: String(idx) })) || []}
-              emptyTitle="Belum ada pembayaran"
-              columns={[
-                { key: 'date', header: 'Tanggal', render: (row: PaymentRow) => formatDate(row.date) },
-                { key: 'method', header: 'Metode', render: (row: PaymentRow) => <span className="capitalize">{row.method}</span> },
-                { key: 'amount', header: 'Nominal', render: (row: PaymentRow) => formatCurrency(row.amount) },
-              ]}
-            />
+            <h3 className="mb-3 text-sm font-medium text-muted-foreground">Pembayaran</h3>
+            <div className="min-w-0 rounded-lg border bg-background">
+              <div className="border-b px-3 py-2 text-xs text-muted-foreground sm:hidden">
+                Geser ke kanan untuk lihat semua kolom
+              </div>
+              <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
+                <Table className="min-w-[520px]">
+                  <TableHeader>
+                    <TableRow className="bg-muted/40">
+                      <TableHead>Tanggal</TableHead>
+                      <TableHead>Metode</TableHead>
+                      <TableHead className="w-32 text-right">Nominal</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(order.payments || []).length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={3} className="py-6 text-center text-muted-foreground">
+                          Belum ada pembayaran
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      (order.payments || []).map((payment, idx) => (
+                        <TableRow key={`${payment.date}-${payment.method}-${idx}`}>
+                          <TableCell>{formatDate(payment.date)}</TableCell>
+                          <TableCell className="capitalize">{payment.method}</TableCell>
+                          <TableCell className="text-right font-medium">{formatCurrency(payment.amount)}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
           </div>
         </div>
 

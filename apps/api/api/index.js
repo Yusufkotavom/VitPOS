@@ -1625,7 +1625,7 @@ async function applySale(db2, ctx, entityId, mutationType, payload) {
     taxTotal: toNumeric(payload.taxTotal),
     grandTotal: toNumeric(payload.grandTotal),
     paidTotal: toNumeric(payload.paidTotal),
-    notes: null,
+    notes: typeof payload.notes === "string" ? payload.notes : null,
     syncStatus: "synced",
     version: 1,
     createdAt: now,
@@ -1639,6 +1639,7 @@ async function applySale(db2, ctx, entityId, mutationType, payload) {
       taxTotal: toNumeric(payload.taxTotal),
       grandTotal: toNumeric(payload.grandTotal),
       paidTotal: toNumeric(payload.paidTotal),
+      notes: typeof payload.notes === "string" ? payload.notes : null,
       syncStatus: "synced",
       updatedAt: now
     }

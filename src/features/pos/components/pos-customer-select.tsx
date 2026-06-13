@@ -27,7 +27,7 @@ export function PosCustomerSelect() {
   const localCustomers = useCustomers()
   const [isAddOpen, setIsAddOpen] = useState(false)
 
-  const activeCustomers = localCustomers.filter(c => c.status === t('common.active'))
+  const activeCustomers = localCustomers.filter(c => c.status === 'Aktif')
 
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerFormSchema),

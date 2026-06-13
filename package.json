@@ -31,6 +31,7 @@
     "db:push": "drizzle-kit push",
     "db:seed:baim": "node scripts/seed-baim.mjs",
     "db:seed:admin": "node scripts/seed-platform-admin.mjs",
+    "db:seed:grocery": "node scripts/seed-grocery-enterprise.mjs",
     "db:studio": "drizzle-kit studio",
     "preview": "vite preview"
   },

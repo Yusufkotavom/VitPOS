@@ -8,6 +8,7 @@ import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { localDb } from '@/services/local-db/client'
 import { DEMO_TENANT_ID, seedLocalDemoData, demoOutboxItems } from '@/services/local-db/seeds'
 import { applyPullItems, runSync } from '@/services/sync/sync-engine'
+import type { OutboxItem } from '@/services/local-db/schema'
 
 config({ path: '.env.local' })
 config()
@@ -106,6 +107,49 @@ describe('runSync integration', () => {
     const payments = await localDb.payments.where('[tenantId+salesOrderId]').equals([DEMO_TENANT_ID, order!.id]).toArray()
     expect(payments.length).toBeGreaterThan(0)
     expect(payments[0]?.date).toBeTruthy()
+  }, 15000)
+
+  it('preserves sales order notes through push and pull', async () => {
+    const salesOrderId = crypto.randomUUID()
+    const outboxItem: OutboxItem & { tenantId: string } = {
+      id: crypto.randomUUID(),
+      tenantId: DEMO_TENANT_ID,
+      entityType: 'sale',
+      entityId: salesOrderId,
+      mutationType: 'create',
+      payload: {
+        id: salesOrderId,
+        code: 'INV-NOTE-001',
+        orderNumber: 'INV-NOTE-001',
+        customerName: 'Umum',
+        subtotal: 120000,
+        discountTotal: 0,
+        taxTotal: 0,
+        grandTotal: 120000,
+        paidTotal: 120000,
+        notes: 'Catatan tes sinkron POS',
+        status: 'Lunas',
+        items: [],
+      },
+      status: 'queued',
+      attempts: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    await localDb.outbox.clear()
+    await localDb.outbox.put(outboxItem)
+
+    const pushResult = await runSync()
+    expect(pushResult.failed).toBe(0)
+
+    await localDb.salesOrders.delete(salesOrderId)
+
+    const pullResult = await runSync()
+    const order = await localDb.salesOrders.get(salesOrderId)
+
+    expect(pullResult.failed).toBe(0)
+    expect(order?.notes).toBe('Catatan tes sinkron POS')
   }, 15000)
 
   it('maps legacy company setting labels to machine keys during pull', async () => {

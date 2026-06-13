@@ -7,8 +7,10 @@ import {
   ReceiptText,
   Settings,
   ShoppingCart,
+  Truck,
   Users,
   Wallet,
+  Wrench,
   type LucideIcon,
 } from 'lucide-react'
 import type { TFunction } from 'i18next'
@@ -45,8 +47,10 @@ export function sidebarNavigation(t: TFunction): SidebarNavigationGroup[] {
       group: 'Operasional',
       items: [
         { to: '/sales-orders', label: t('nav.sales_orders'), icon: ClipboardList },
+        { to: '/service-orders', label: t('nav.service_order'), icon: Wrench },
         { to: '/products', label: t('nav.products'), icon: Package },
         { to: '/inventory', label: t('nav.inventory'), icon: Boxes },
+        { to: '/purchases', label: t('nav.pembelian'), icon: Truck },
         { to: '/customers', label: t('nav.customers'), icon: Users },
         { to: '/cash', label: t('nav.cash_bank'), icon: Wallet },
         { to: '/reports', label: t('nav.reports'), icon: BarChart3 },

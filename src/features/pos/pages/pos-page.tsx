@@ -17,10 +17,11 @@ import { toast } from 'sonner'
 import { posTransactionService } from '@/features/pos/services/pos-transaction.service'
 import { useActiveShift } from '@/features/shift/hooks/use-active-shift'
 import { useNavigate, Link } from 'react-router-dom'
-import { LockIcon, Clock, FileText, Wrench, PlusCircle, ArrowLeft } from 'lucide-react'
+import { LockIcon, Clock, FileText, Wrench, PlusCircle, ArrowLeft, ShoppingCart } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { shiftRepository } from '@/services/local-db/repository'
 import { localDb } from '@/services/local-db/client'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
@@ -93,7 +94,7 @@ export function PosPage() {
     if (!hasItems || isDraftingRef.current) return
     setDrafting(true)
     try {
-      await posTransactionService.saveDraft(store.cartItems, totals, store.discount, store.customerName, store.customerId, activeShift?.id)
+      await posTransactionService.saveDraft(store.cartItems, totals, store.discount, store.customerName, store.customerId, activeShift?.id, store.orderNote)
       toast.success(t('pos.draft_saved'))
       store.clearCart()
     } catch (error) {
@@ -175,7 +176,7 @@ export function PosPage() {
       <HeldSaleBanner visible={hasItems && syncSummary.pendingCount > 0} />
 
       <main className="flex flex-1 overflow-hidden">
-        <div className="flex flex-1 flex-col overflow-y-auto">
+        <div className="flex flex-1 flex-col overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom))] xl:pb-0">
           <div className="sticky top-0 z-10 border-b bg-background/95 p-4 backdrop-blur">
             <CategoryTabs />
           </div>
@@ -213,17 +214,25 @@ export function PosPage() {
       </main>
 
       {/* Footer Bawah: Keranjang (Mobile) */}
-      <div className="border-t bg-background p-3 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] xl:hidden z-20 sticky bottom-0">
-        <div className="mx-auto flex items-center gap-3">
-          <div className="flex-1 cursor-pointer" onClick={() => setIsMobileCartOpen(true)}>
-            <p className="text-xs text-muted-foreground">{t('pos.item_count', { count: totals.itemCount })} <span className="underline ml-1">{t('pos.see_detail')}</span></p>
-            <p className="text-lg font-bold">{formatCurrency(totals.total)}</p>
-          </div>
-          <Button variant="outline" size="sm" disabled={!hasItems || isDrafting} onClick={handleDraft}>
-            {isDrafting ? '...' : t('pos.draft_short')}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-4px_10px_rgba(0,0,0,0.05)] xl:hidden">
+        <div className="mx-auto flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-11 w-11 shrink-0"
+            onClick={() => setIsMobileCartOpen(true)}
+            aria-label={t('pos.open_detail')}
+          >
+            <ShoppingCart className="h-4 w-4" />
           </Button>
-          <Button size="lg" className="min-w-32" disabled={!hasItems} onClick={() => setIsPaymentOpen(true)}>
-            {t('pos.submit_payment')}
+
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-muted-foreground">{t('pos.item_count', { count: totals.itemCount })}</p>
+            <p className="truncate text-lg font-bold">{formatCurrency(totals.total)}</p>
+          </div>
+
+          <Button size="lg" className="min-w-32" disabled={!hasItems} onClick={() => setIsMobileCartOpen(true)}>
+            {t('pos.checkout')}
           </Button>
         </div>
       </div>
@@ -321,7 +330,17 @@ export function PosPage() {
           <div className="flex-1 overflow-y-auto p-4">
             <CartPanel />
           </div>
-          <div className="border-t p-4 space-y-3 bg-background">
+          <div className="border-t bg-background p-4 space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="pos-mobile-order-note">{t('pos.note_optional')}</Label>
+              <Textarea
+                id="pos-mobile-order-note"
+                value={store.orderNote}
+                onChange={(event) => store.setOrderNote(event.target.value)}
+                placeholder={t('pos.note_optional')}
+                className="min-h-20 resize-none"
+              />
+            </div>
             <div className="flex justify-between font-medium">
               <span className="text-muted-foreground">{t('common.total')}</span>
               <span className="text-xl font-bold">{formatCurrency(totals.total)}</span>

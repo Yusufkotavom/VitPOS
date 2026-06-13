@@ -47,6 +47,7 @@ export function PosDraftDialog({ open, onOpenChange }: PosDraftDialogProps) {
       store.clearCart()
       store.setCart(cartItems)
       store.setDiscount(draft.discountTotal || 0)
+      store.setOrderNote(draft.notes ?? '')
       if (draft.customerId) {
         store.setCustomer(draft.customerId, draft.customerName)
       } else if (draft.customerName) {

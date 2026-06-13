@@ -39,7 +39,7 @@ function isPaidStatus(total: number, paid: number): LocalSalesOrder['status'] {
 }
 
 export const posTransactionService = {
-  async saveDraft(cartItems: CartItem[], totals: PosTotals, discountTotal: number = 0, customerName?: string | null, customerId?: string | null, shiftId?: string | null) {
+  async saveDraft(cartItems: CartItem[], totals: PosTotals, discountTotal: number = 0, customerName?: string | null, customerId?: string | null, shiftId?: string | null, notes?: string) {
     if (cartItems.length === 0) return
 
     const tenantId = requireActiveTenantId()
@@ -70,6 +70,7 @@ export const posTransactionService = {
       taxTotal: 0,
       grandTotal: totals.total,
       paidTotal: 0,
+      notes: notes?.trim() || undefined,
       status: 'Draft',
       items: draftItems,
       syncStatus: 'pending',
@@ -97,7 +98,7 @@ export const posTransactionService = {
     })
   },
 
-  async checkout(cartItems: CartItem[], totals: PosTotals, paymentMethod: PosPaymentMethod, paidAmount: number, discountTotal: number = 0, customerName?: string | null, customerId?: string | null, shiftId?: string | null) {
+  async checkout(cartItems: CartItem[], totals: PosTotals, paymentMethod: PosPaymentMethod, paidAmount: number, discountTotal: number = 0, customerName?: string | null, customerId?: string | null, shiftId?: string | null, notes?: string) {
     if (cartItems.length === 0) return
 
     const tenantId = requireActiveTenantId()
@@ -132,6 +133,7 @@ export const posTransactionService = {
       taxTotal: 0,
       grandTotal: totals.total,
       paidTotal: retainedAmount,
+      notes: notes?.trim() || undefined,
       status: isPaidStatus(totals.total, retainedAmount),
       items,
       syncStatus: 'pending',
