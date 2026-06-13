@@ -92,21 +92,29 @@ describe('sidebar navigation coverage', () => {
     const routes = allItems.map((item) => item.to)
 
     expect(routes).toEqual(expect.arrayContaining([
+      '/',
+      '/pos',
+      '/shift',
+      '/sales-orders',
+      '/products',
+      '/inventory',
+      '/customers',
+      '/cash',
+      '/reports',
+      '/settings',
+    ]))
+    expect(routes).not.toEqual(expect.arrayContaining([
       '/products/categories',
       '/service-orders',
       '/purchases',
       '/suppliers',
       '/returns',
       '/sync',
-      '/shift',
       '/platform-admin',
     ]))
     expect(nav.map((group) => group.group)).toEqual(expect.arrayContaining([
       'Utama',
-      'Penjualan',
-      'Katalog & Stok',
-      'Relasi Bisnis',
-      'Keuangan & Laporan',
+      'Operasional',
       'Sistem',
     ]))
   })
@@ -120,9 +128,9 @@ describe('sidebar navigation coverage', () => {
       ),
     )
 
-    expect(screen.getByText('Katalog & Stok')).toBeInTheDocument()
-    expect(screen.getByText('Produk')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Kategori Produk/i })).toHaveAttribute('href', '/products/categories')
+    expect(screen.getByText('Operasional')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Produk/i })).toHaveAttribute('href', '/products')
+    expect(screen.queryByRole('link', { name: /Kategori Produk/i })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Shift Kasir/i })).toHaveAttribute('href', '/shift')
   })
 })

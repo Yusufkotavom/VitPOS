@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { LayoutGrid, List, Filter } from 'lucide-react'
 
@@ -60,6 +61,14 @@ export function CashPage() {
           <p className="mt-2 text-2xl font-semibold">{formatCurrency(balance)}</p>
         </article>
       </section>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/cash/categories">Kategori Kas</Link>
+        </Button>
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/cash/payment-methods">Metode Pembayaran</Link>
+        </Button>
+      </div>
       <ContentCard title={t('cash.transactions')} description={t('cash.description')}>
         <div className="mb-4 flex flex-row items-center gap-2 border-b pb-4">
           <input

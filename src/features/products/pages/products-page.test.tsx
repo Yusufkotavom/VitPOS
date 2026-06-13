@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ProductsPage } from '@/features/products/pages/products-page'
@@ -108,7 +109,11 @@ describe('ProductsPage', () => {
   it('keeps list and card toggle available on mobile', () => {
     isDesktop = false
 
-    render(<ProductsPage />)
+    render(
+      <MemoryRouter>
+        <ProductsPage />
+      </MemoryRouter>,
+    )
 
     expect(screen.getByRole('button', { name: 'List View' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Card View' })).toBeInTheDocument()

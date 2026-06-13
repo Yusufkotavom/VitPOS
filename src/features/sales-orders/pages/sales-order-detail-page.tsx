@@ -244,7 +244,6 @@ export function SalesOrderDetailPage() {
 
   const shortage = Math.max(0, order.grandTotal - order.paidTotal)
   const isPaid = shortage === 0
-  type OrderItem = { name: string; unitPrice: number; qty: number; subtotal: number }
   type PaymentRow = { date: string; method: string; amount: number; status: string }
 
   const editSubtotal = editItems.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.unitPrice) || 0), 0)
@@ -462,16 +461,41 @@ export function SalesOrderDetailPage() {
                 </Dialog>
               </div>
             ) : (
-              <DataTable
-                data={order.items?.map((i: OrderItem, idx: number) => ({ ...i, id: String(idx) })) || []}
-                columns={[
-                  { key: 'name', header: 'Item' },
-                  { key: 'unitPrice', header: 'Harga', render: (row: OrderItem) => formatCurrency(row.unitPrice) },
-                  { key: 'qty', header: 'Qty' },
-                  { key: 'subtotal', header: 'Subtotal', render: (row: OrderItem) => formatCurrency(row.subtotal) },
-                ]}
-                emptyTitle="Belum ada item"
-              />
+              <div className="rounded-lg border bg-background">
+                <div className="border-b px-3 py-2 text-xs text-muted-foreground sm:hidden">
+                  Geser ke kanan untuk lihat semua kolom
+                </div>
+                <div className="overflow-x-auto">
+                  <Table className="min-w-[640px]">
+                    <TableHeader>
+                      <TableRow className="bg-muted/40">
+                        <TableHead>Item</TableHead>
+                        <TableHead className="w-28 text-right">Harga</TableHead>
+                        <TableHead className="w-20 text-right">Qty</TableHead>
+                        <TableHead className="w-32 text-right">Subtotal</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(order.items || []).length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="py-6 text-center text-muted-foreground">
+                            Belum ada item
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        (order.items || []).map((item, idx) => (
+                          <TableRow key={item.id ?? idx}>
+                            <TableCell className="font-medium whitespace-normal">{item.name}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
+                            <TableCell className="text-right">{item.qty}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(item.subtotal)}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
             )}
           </div>
 
