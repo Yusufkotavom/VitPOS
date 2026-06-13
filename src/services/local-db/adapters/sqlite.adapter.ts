@@ -215,27 +215,24 @@ class SqliteAdapterTable<T extends { id: string }> implements AdapterTable<T> {
       .map(k => `${k} = EXCLUDED.${k}`)
       .join(', ');
 
-    let statement = `INSERT INTO ${this.tableName} (${columns}) VALUES (${keys.map(() => '?').join(', ')})`;
-    if (updateAssignments.length > 0) {
-      statement += ` ON CONFLICT(id) DO UPDATE SET ${updateAssignments}`;
-    } else {
-      statement += ` ON CONFLICT(id) DO NOTHING`;
-    }
+    const statement = `INSERT INTO ${this.tableName} (${columns}) VALUES (${keys.map(() => '?').join(', ')})`;
+    const onConflict = updateAssignments.length > 0
+      ? ` ON CONFLICT(id) DO UPDATE SET ${updateAssignments}`
+      : ` ON CONFLICT(id) DO NOTHING`;
+    const fullStatement = statement + onConflict;
 
-    const valuesArray = rows.map(row => {
-      return keys.map(k => {
+    // Use individual run() calls instead of executeSet for compatibility
+    // with manual BEGIN/COMMIT transactions in runInTransaction.
+    // executeSet manages its own internal transaction, which conflicts
+    // with explicit transaction wrapping.
+    for (const row of rows) {
+      const values = keys.map(k => {
         const val = row[k as keyof T];
         if (typeof val === 'boolean') return val ? 1 : 0;
         return typeof val === 'object' && val !== null ? JSON.stringify(val) : val;
       });
-    });
-
-    await conn.executeSet([
-      {
-        statement,
-        values: valuesArray,
-      },
-    ]);
+      await conn.run(fullStatement, values);
+    }
 
     return rows.map(r => r.id);
   }
