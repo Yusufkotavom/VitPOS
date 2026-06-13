@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/sidebar'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { useSyncStore } from '@/features/sync/stores/sync-store'
+import { TenantSwitcher } from '@/features/auth/components/tenant-switcher'
 import { useSettings } from '@/features/settings/hooks/use-settings'
 import { SyncStatusBadge } from '@/shared/components/sync/sync-status-badge'
 
@@ -46,20 +47,24 @@ export function AppSidebar() {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg">
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground overflow-hidden">
-                {companyLogo ? (
-                  <img src={companyLogo} alt={companyName} className="size-full object-cover" />
-                ) : (
-                  <CompanyIcon aria-hidden="true" className="size-5" />
-                )}
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">{companyName}</span>
-                <span className="truncate text-xs text-muted-foreground">{t('shared.sidebar_business_suite')}</span>
-              </div>
-              <ChevronsUpDown aria-hidden="true" className="ml-auto" />
-            </SidebarMenuButton>
+            <TenantSwitcher
+              trigger={
+                <SidebarMenuButton size="lg" tooltip="Pilih usaha">
+                  <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary text-primary-foreground">
+                    {companyLogo ? (
+                      <img src={companyLogo} alt={companyName} className="size-full object-cover" />
+                    ) : (
+                      <CompanyIcon aria-hidden="true" className="size-5" />
+                    )}
+                  </div>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-semibold">{companyName}</span>
+                    <span className="truncate text-xs text-muted-foreground">Klik untuk pindah tenant</span>
+                  </div>
+                  <ChevronsUpDown aria-hidden="true" className="ml-auto" />
+                </SidebarMenuButton>
+              }
+            />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>

@@ -1,4 +1,4 @@
-import { createElement } from 'react'
+import { createElement, type ReactNode } from 'react'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -67,6 +67,10 @@ function mockT(key: string): string {
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: mockT }),
+}))
+
+vi.mock('@/features/auth/components/tenant-switcher', () => ({
+  TenantSwitcher: ({ trigger }: { trigger: ReactNode }) => createElement('div', null, trigger),
 }))
 
 describe('sidebar navigation coverage', () => {

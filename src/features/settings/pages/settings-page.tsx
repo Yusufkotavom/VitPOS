@@ -1,6 +1,8 @@
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { Link } from 'react-router-dom'
 import { Building2, FileText, MessageSquare, User, ChevronRight, CreditCard, RefreshCw, Shield } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { TenantSwitcher } from '@/features/auth/components/tenant-switcher'
 
 const settingsItems = [
   { to: '/settings/company', label: 'Profil Usaha', description: 'Ikon, logo, nama, alamat, dan legalitas usaha', icon: Building2 },
@@ -16,6 +18,22 @@ const settingsItems = [
 export function SettingsPage() {
   return (
     <PageShell title="Pengaturan" description="Kelola preferensi sistem dan profil usaha Anda.">
+      <div className="mb-4 rounded-xl border bg-card p-4 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-medium">Pindah Tenant</p>
+            <p className="text-xs text-muted-foreground">Pilih usaha aktif tanpa keluar dari aplikasi.</p>
+          </div>
+          <TenantSwitcher
+            trigger={
+              <Button variant="outline" className="justify-between sm:min-w-56">
+                Pilih / pindah tenant
+                <ChevronRight className="size-4" />
+              </Button>
+            }
+          />
+        </div>
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {settingsItems.map(item => (
           <Link
