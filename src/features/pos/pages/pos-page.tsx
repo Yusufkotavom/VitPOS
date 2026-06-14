@@ -48,6 +48,23 @@ export function PosPage() {
   const [isDraftsOpen, setIsDraftsOpen] = useState(false)
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
 
+  function handlePayClick() {
+    if (!store.customerName || store.customerName.trim() === '') {
+      toast.error(t('pos.customer_required', 'Silakan pilih pelanggan terlebih dahulu'))
+      setIsMobileCartOpen(false)
+      setTimeout(() => {
+        const customerInput = document.getElementById('pos-customer-select')
+        if (customerInput) {
+          customerInput.focus()
+          customerInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }, 300) // wait for drawer to close on mobile
+      return
+    }
+    setIsMobileCartOpen(false)
+    setIsPaymentOpen(true)
+  }
+
   async function handleOpenShift() {
     if (!startCash) return toast.error(t('pos.start_cash_required'))
     try {
@@ -205,7 +222,7 @@ export function PosPage() {
               <Button variant="outline" disabled={!hasItems || isDrafting} onClick={handleDraft}>
                 {isDrafting ? t('pos.saving') : t('pos.save_draft')}
               </Button>
-              <Button disabled={!hasItems} onClick={() => setIsPaymentOpen(true)}>
+              <Button disabled={!hasItems} onClick={handlePayClick}>
                 {t('pos.submit_payment')}
               </Button>
             </div>
@@ -349,7 +366,7 @@ export function PosPage() {
               <Button variant="outline" disabled={!hasItems || isDrafting} onClick={() => { setIsMobileCartOpen(false); handleDraft(); }}>
                 {isDrafting ? t('pos.saving') : t('pos.save_draft')}
               </Button>
-              <Button disabled={!hasItems} onClick={() => { setIsMobileCartOpen(false); setIsPaymentOpen(true); }}>
+              <Button disabled={!hasItems} onClick={handlePayClick}>
                 {t('pos.submit_payment')}
               </Button>
             </div>

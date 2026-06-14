@@ -44,6 +44,7 @@ export function SalesOrderDetailPage() {
   const { data: order, isLoading, refetch } = useSalesOrder(id)
   const [editing, setEditing] = useState(false)
   const [editItems, setEditItems] = useState<EditableItem[]>([])
+  const [editPaidTotal, setEditPaidTotal] = useState('')
   
   // Product dialog states
   const [isProductModalOpen, setIsProductModalOpen] = useState(false)
@@ -108,6 +109,7 @@ export function SalesOrderDetailPage() {
   function startEditing() {
     if (!order) return
     setEditItems(order.items.map(i => ({ id: i.id, name: i.name, qty: String(i.qty), unitPrice: String(i.unitPrice) })))
+    setEditPaidTotal(String(order.paidTotal))
     setEditing(true)
   }
 
@@ -125,6 +127,14 @@ export function SalesOrderDetailPage() {
       })
       const subtotal = items.reduce((s, i) => s + i.subtotal, 0)
       const grandTotal = subtotal - order.discountTotal + order.taxTotal
+      const paidTotal = Number(editPaidTotal) || 0
+
+      let newStatus = order.status
+      if (newStatus !== 'Batal' && newStatus !== 'Draft') {
+        if (paidTotal >= grandTotal && grandTotal > 0) newStatus = 'Lunas'
+        else if (paidTotal > 0) newStatus = 'Sebagian'
+        else newStatus = 'Belum Bayar'
+      }
 
       await salesOrderRepository.upsert({
         ...order,
@@ -140,6 +150,8 @@ export function SalesOrderDetailPage() {
         })),
         subtotal,
         grandTotal,
+        paidTotal,
+        status: newStatus,
         version: order.version + 1,
         updatedAt: new Date().toISOString(),
       })
@@ -241,9 +253,11 @@ export function SalesOrderDetailPage() {
     )
   }
 
-  const shortage = Math.max(0, order.grandTotal - order.paidTotal)
-  const isPaid = shortage === 0
   const editSubtotal = editItems.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.unitPrice) || 0), 0)
+  const editGrandTotal = editing ? editSubtotal - order.discountTotal + order.taxTotal : order.grandTotal
+  const editPaid = editing ? (Number(editPaidTotal) || 0) : order.paidTotal
+  const shortage = Math.max(0, editGrandTotal - editPaid)
+  const isPaid = shortage === 0
 
   const receiptOrder: PosOrderSummary | null = order ? {
     id: order.id,
@@ -538,7 +552,11 @@ export function SalesOrderDetailPage() {
           <div className="rounded-lg border p-4 space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Status</span>
-              <StatusBadge label={order.status} tone={tone(order.status)} />
+              {editing ? (
+                <StatusBadge label={isPaid ? 'Lunas' : editPaid > 0 ? 'Sebagian' : 'Belum Bayar'} tone={isPaid ? 'success' : editPaid > 0 ? 'warning' : 'danger'} />
+              ) : (
+                <StatusBadge label={order.status} tone={tone(order.status)} />
+              )}
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Subtotal</span>
@@ -562,7 +580,16 @@ export function SalesOrderDetailPage() {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Dibayar</span>
-              <span className="font-semibold text-green-600">{formatCurrency(order.paidTotal)}</span>
+              {editing ? (
+                <Input
+                  inputMode="numeric"
+                  value={editPaidTotal}
+                  onChange={e => setEditPaidTotal(e.target.value)}
+                  className="h-8 w-32 text-right font-semibold"
+                />
+              ) : (
+                <span className="font-semibold text-green-600">{formatCurrency(order.paidTotal)}</span>
+              )}
             </div>
             <div className="flex justify-between items-center pt-2 border-t">
               <span className="font-medium">{isPaid ? 'Status' : 'Sisa Tagihan'}</span>
@@ -573,7 +600,7 @@ export function SalesOrderDetailPage() {
               )}
             </div>
 
-            {shortage > 0 && (
+            {shortage > 0 && !editing && (
               <Button className="w-full" onClick={() => setPayOpen(true)}>
                 <CreditCard className="mr-2 h-4 w-4" />
                 Terima Pembayaran

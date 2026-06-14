@@ -46,9 +46,22 @@ export function PaymentSummary({ onComplete, shiftId }: { onComplete?: () => voi
     setPaidAmount(totals.total)
   }, [setPaidAmount, totals.total])
 
+  const [hasAttemptedCheckout, setHasAttemptedCheckout] = useState(false)
+
   async function handleCheckout() {
     if (store.cartItems.length === 0 || isProcessingRef.current) return
 
+    if (!store.paymentMethod) {
+      setHasAttemptedCheckout(true)
+      toast.error(t('pos.payment_method_required', 'Silakan pilih metode pembayaran terlebih dahulu.'))
+      const paymentSection = document.getElementById('pos-payment-methods')
+      if (paymentSection) {
+        paymentSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+      return
+    }
+
+    setHasAttemptedCheckout(false)
     setProcessing(true)
     try {
       const result = await posTransactionService.checkout(store.cartItems, totals, store.paymentMethod, store.paidAmount, store.discount, store.customerName, store.customerId, shiftId, store.orderNote)
@@ -206,8 +219,8 @@ export function PaymentSummary({ onComplete, shiftId }: { onComplete?: () => voi
         </div>
       </div>
 
-      <div className="space-y-3 pt-2">
-        <label className="text-sm font-medium">{t('pos.payment_method_select')}</label>
+      <div id="pos-payment-methods" className={`space-y-3 pt-2 p-2 rounded-xl transition-colors ${hasAttemptedCheckout && !store.paymentMethod ? 'bg-destructive/10 border border-destructive/50' : ''}`}>
+        <label className={`text-sm font-medium ${hasAttemptedCheckout && !store.paymentMethod ? 'text-destructive' : ''}`}>{t('pos.payment_method_select')}</label>
         <div className="grid grid-cols-3 gap-2">
           {activeMethods.map((method: { id: string; name: string }) => (
             <Button

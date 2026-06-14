@@ -70,7 +70,9 @@ export function mapSalesOrderFormToRecord(values: SalesOrderFormValues, id: stri
     tenantId,
     code: values.code.trim(),
     customerName: values.customerName.trim(),
-    date: values.date,
+    date: values.date.length === 10
+      ? new Date(values.date + 'T' + new Date().toLocaleTimeString('en-GB')).toISOString()
+      : values.date,
     subtotal,
     discountTotal,
     taxTotal,

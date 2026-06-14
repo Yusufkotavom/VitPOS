@@ -2,7 +2,6 @@ import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { localDb } from '@/services/local-db/client'
 import { customerRepository } from '@/services/local-db/repository'
 import { enqueueOutboxItem } from '@/services/sync/outbox-service'
-import { todayISO } from '@/lib/date'
 import type { LocalPayment, LocalSalesOrder, OutboxItem, PosPaymentMethodCode } from '@/services/local-db/schema'
 
 function createId(prefix: string) {
@@ -87,7 +86,7 @@ export async function recordSalesOrderPayment(
     source,
     method,
     amount: paidAmount,
-    date: todayISO(),
+    date: nowIso,
     status: 'Berhasil',
     syncStatus: 'pending',
     version: 1,

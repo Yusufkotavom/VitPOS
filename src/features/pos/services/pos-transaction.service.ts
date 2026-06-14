@@ -2,7 +2,6 @@ import { localDb } from '@/services/local-db/client'
 import { productRepository } from '@/services/local-db/repository'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { syncCustomerSalesMetrics } from '@/features/sales-orders/services/sales-order-finance.service'
-import { todayISO } from '@/lib/date'
 import type { LocalPayment, LocalProduct, LocalSalesOrder, LocalSalesOrderItem, LocalStockMovement, OutboxItem, PosPaymentMethodCode, LocalInventory } from '@/services/local-db/schema'
 import type { PosPaymentMethod } from '@/features/pos/types/pos.types'
 
@@ -64,7 +63,7 @@ export const posTransactionService = {
       customerId: customerId ?? undefined,
       customerName: customerName || 'Umum',
       shiftId: shiftId ?? undefined,
-      date: todayISO(),
+      date: nowIso,
       subtotal: totals.subtotal,
       discountTotal: discountTotal,
       taxTotal: 0,
@@ -127,7 +126,7 @@ export const posTransactionService = {
       customerId: customerId ?? undefined,
       customerName: customerName || 'Umum',
       shiftId: shiftId ?? undefined,
-      date: todayISO(),
+      date: nowIso,
       subtotal: totals.subtotal,
       discountTotal: discountTotal,
       taxTotal: 0,
@@ -150,7 +149,7 @@ export const posTransactionService = {
       shiftId: shiftId ?? undefined,
       method: paymentMethod as PosPaymentMethodCode,
       amount: retainedAmount,
-      date: todayISO(),
+      date: nowIso,
       status: paymentMethod === 'piutang' ? 'Pending' : 'Berhasil',
       syncStatus: 'pending',
       version: 1,

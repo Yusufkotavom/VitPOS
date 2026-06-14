@@ -27,12 +27,10 @@ export function formatDateTime(value: string) {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
-    timeZone: 'UTC',
   }).format(d)
   const timePart = new Intl.DateTimeFormat('id-ID', {
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: 'UTC',
   }).format(d).replace(/\./g, ':')
   return `${datePart}, ${timePart}`
 }

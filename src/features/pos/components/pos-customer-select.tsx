@@ -64,7 +64,7 @@ export function PosCustomerSelect() {
     <div className="flex items-center gap-2 w-full">
       <div className="flex-1">
         <Combobox items={activeCustomers} value={customerName || ''} onValueChange={handleInputChange}>
-          <ComboboxInput placeholder="Cari / Pilih Pelanggan (Umum)" />
+          <ComboboxInput id="pos-customer-select" placeholder="Cari / Pilih Pelanggan" />
           <ComboboxContent>
             {activeCustomers.length === 0 ? (
               <ComboboxEmpty>{t('customers.none')}</ComboboxEmpty>

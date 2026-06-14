@@ -73,7 +73,6 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
         {
           description: store.description,
           notes: store.notes,
-          status: store.status,
           estimatedCompletion: store.estimatedCompletion,
           hasWarranty: store.hasWarranty,
           warrantyValue: store.warrantyValue ? Number(store.warrantyValue) : undefined,
@@ -141,7 +140,7 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
       customer_name: successOrder.customerName ?? 'Umum',
       device: store.description.split('\n')[0] || store.description,
       problem: store.description,
-      status: store.status,
+      status: 'Diterima',
       cost: formatCurrency(successOrder.total),
       estimated_completion: store.estimatedCompletion ? new Date(store.estimatedCompletion).toLocaleDateString('id-ID', { dateStyle: 'long' }) : '-',
       items,

@@ -25,7 +25,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { localDb } from '@/services/local-db/client'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { useServiceOrderCreateStore } from '@/features/service-orders/stores/service-order-create-store'
-import { serviceOrderStatusOptions } from '@/features/service-orders/schemas/service-order-form-schema'
 import { SocPaymentSummary } from '@/features/service-orders/components/soc-payment-summary'
 import { customerFormSchema, customerInitialValues, customerStatusOptions, type CustomerFormValues, mapCustomerFormToRecord } from '@/features/customers/schemas/customer-form-schema'
 import { createCustomerId } from '@/features/catalog/lib/entity-id'
@@ -132,22 +131,6 @@ export function ServiceOrderCreatePage() {
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">{t('common.status')}</Label>
-              <Select value={store.status} onValueChange={store.setStatus}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {serviceOrderStatusOptions.map(opt => (
-                      <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">{t('service_orders.estimated_completion')}</Label>
               <Popover>
                 <PopoverTrigger asChild>
@@ -221,14 +204,6 @@ export function ServiceOrderCreatePage() {
             placeholder={t('service_orders.job_description_placeholder')}
             value={store.description}
             onChange={e => store.setDescription(e.target.value)}
-          />
-
-          <Label htmlFor="soc-notes">{t('common.notes')}</Label>
-          <Input
-            id="soc-notes"
-            placeholder={t('service_orders.internal_notes')}
-            value={store.notes}
-            onChange={e => store.setNotes(e.target.value)}
           />
         </div>
 

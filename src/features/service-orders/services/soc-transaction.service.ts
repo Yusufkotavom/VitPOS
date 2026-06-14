@@ -12,7 +12,6 @@ import type {
   LocalInventory, 
   OutboxItem,
   PosPaymentMethodCode,
-  ServiceOrderStatus,
   WarrantyUnit,
 } from '@/services/local-db/schema'
 
@@ -45,7 +44,7 @@ export const socTransactionService = {
     paidAmount: number, 
     customerName: string, 
     customerId: string | null,
-    serviceData: { description: string; notes: string; status: string; estimatedCompletion?: string; hasWarranty?: boolean; warrantyValue?: number; warrantyUnit?: WarrantyUnit }
+    serviceData: { description: string; notes: string; estimatedCompletion?: string; hasWarranty?: boolean; warrantyValue?: number; warrantyUnit?: WarrantyUnit }
   ) {
     if (!serviceData.description.trim()) throw new Error('Deskripsi pekerjaan wajib diisi')
 
@@ -65,7 +64,7 @@ export const socTransactionService = {
 
     const timelineEvents: LocalServiceOrder['timeline'] = [{
       id: crypto.randomUUID(),
-      status: serviceData.status,
+      status: 'Diterima',
       date: nowIso,
       note: 'Service order dibuat',
     }]
@@ -73,7 +72,7 @@ export const socTransactionService = {
     if (serviceData.hasWarranty && serviceData.warrantyValue && serviceData.warrantyUnit) {
       timelineEvents.push({
         id: crypto.randomUUID(),
-        status: serviceData.status,
+        status: 'Diterima',
         date: nowIso,
         note: buildWarrantyTimelineNote({ value: serviceData.warrantyValue, unit: serviceData.warrantyUnit, mode: 'created', endDate: warrantyEndDate }),
         type: 'warranty',
@@ -91,7 +90,7 @@ export const socTransactionService = {
       estimatedCompletion: serviceData.estimatedCompletion,
       cost: totals.total,
       paidTotal: retainedAmount,
-      status: serviceData.status as ServiceOrderStatus,
+      status: 'Diterima',
       items: items.map(c => ({ ...c })),
       notes: serviceData.notes,
       hasWarranty: serviceData.hasWarranty,
