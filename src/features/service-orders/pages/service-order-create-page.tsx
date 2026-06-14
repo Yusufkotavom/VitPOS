@@ -89,6 +89,17 @@ export function ServiceOrderCreatePage() {
       toast.error(t('service_orders.description_required'))
       return
     }
+    if (!store.customerName || store.customerName.trim() === '') {
+      toast.error('Silakan pilih pelanggan terlebih dahulu')
+      setTimeout(() => {
+        const input = document.getElementById('soc-customer-select')
+        if (input) {
+          input.focus()
+          input.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }, 100)
+      return
+    }
     setIsPaymentOpen(true)
   }
 
@@ -104,7 +115,7 @@ export function ServiceOrderCreatePage() {
               <div className="flex items-center gap-2">
                 <div className="flex-1">
                   <Combobox items={activeCustomers} value={store.customerName || ''} onValueChange={handleCustomerInputChange}>
-                    <ComboboxInput placeholder={t('service_orders.search_select')} />
+                    <ComboboxInput id="soc-customer-select" placeholder={t('service_orders.search_select')} />
                     <ComboboxContent>
                       {activeCustomers.length === 0 ? (
                         <ComboboxEmpty>{t('customers.none')}</ComboboxEmpty>

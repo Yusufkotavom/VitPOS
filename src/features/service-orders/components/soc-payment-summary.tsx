@@ -56,11 +56,23 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
   } : null
 
   const [paidAmount, setPaidAmount] = useState(totals.total)
-  const [paymentMethod, setPaymentMethod] = useState('tunai')
+  const [paymentMethod, setPaymentMethod] = useState('')
+  const [hasAttemptedCheckout, setHasAttemptedCheckout] = useState(false)
 
   async function handleCheckout() {
     if (isProcessingRef.current) return
 
+    if (!paymentMethod) {
+      setHasAttemptedCheckout(true)
+      toast.error('Silakan pilih metode pembayaran terlebih dahulu.')
+      const methodsSection = document.getElementById('soc-payment-methods')
+      if (methodsSection) {
+        methodsSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+      return
+    }
+
+    setHasAttemptedCheckout(false)
     setProcessing(true)
     try {
       const result = await socTransactionService.checkout(
@@ -210,8 +222,8 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
         </div>
       </div>
 
-      <div className="space-y-3 pt-2">
-        <label className="text-sm font-medium">Metode Pembayaran</label>
+      <div id="soc-payment-methods" className={`space-y-3 pt-2 p-2 rounded-xl transition-colors ${hasAttemptedCheckout && !paymentMethod ? 'bg-destructive/10 border border-destructive/50' : ''}`}>
+        <label className={`text-sm font-medium ${hasAttemptedCheckout && !paymentMethod ? 'text-destructive' : ''}`}>Metode Pembayaran</label>
         <div className="grid grid-cols-3 gap-2">
           {activeMethods.map((method: { id: string; name: string }) => (
             <Button
