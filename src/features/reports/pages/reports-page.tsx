@@ -1,5 +1,6 @@
 import { BadgeDollarSign, Boxes, ClipboardList, ReceiptText, Scale, TrendingUp, Wallet } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 import { ReportsSummaryCards } from '@/features/reports/components/reports-summary-cards'
 import { getReportPreset } from '@/features/reports/config/report-presets'
@@ -17,13 +18,14 @@ const REPORT_CARD_ICONS = {
 } as const
 
 export function ReportsPage() {
+  const { t } = useTranslation()
   const { data: reportRows = [] } = useReportRows()
   const reportPreset = getReportPreset('atk_printing_combo')
 
   return (
     <PageShell
-      title="Laporan"
-      description="Ringkasan owner, penjualan, stok, kas, dan piutang untuk usaha harian."
+      title={t('reports.report')}
+      description={t('reports.report_description')}
     >
       <ReportsSummaryCards reports={reportRows} />
 

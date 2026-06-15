@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -22,6 +23,7 @@ const MOVEMENT_LABELS: Record<string, string> = {
 }
 
 export function InventoryReportPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const params = useReportDateParams()
   const { data, isLoading } = useInventoryReport(params)
@@ -36,16 +38,16 @@ export function InventoryReportPage() {
       hpp: v.unitCost,
       nilai: v.value,
       stokMinimum: v.minimumStock,
-      status: v.isLow ? 'Stok Rendah' : 'Aman',
+      status: v.isLow ? t('reports.low_stock_count') : t('products.stock_status_safe'),
     }))
-    exportToCsv(`laporan-stok-${params.from ?? 'awal'}-${params.to ?? 'akhir'}.csv`, [
-      { key: 'produk', header: 'Produk' },
+    exportToCsv(`${t('reports.inventory_title')}-${params.from ?? 'awal'}-${params.to ?? 'akhir'}.csv`, [
+      { key: 'produk', header: t('common.name') },
       { key: 'sku', header: 'SKU' },
-      { key: 'stok', header: 'Stok' },
+      { key: 'stok', header: t('products.available_stock') },
       { key: 'hpp', header: 'HPP' },
       { key: 'nilai', header: 'Nilai' },
       { key: 'stokMinimum', header: 'Stok Min' },
-      { key: 'status', header: 'Status' },
+      { key: 'status', header: t('common.status') },
     ], rows)
   }
 
@@ -56,34 +58,34 @@ export function InventoryReportPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-xl font-semibold">Laporan Stok</h1>
-          <p className="text-sm text-muted-foreground">Valuasi inventory, pergerakan stok, dan peringatan stok rendah</p>
+          <h1 className="text-xl font-semibold">{t('reports.inventory_title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('reports.inventory_description')}</p>
         </div>
         <div className="ml-auto">
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={!data}>Export CSV</Button>
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={!data}>{t('common.export')} CSV</Button>
         </div>
       </div>
 
       <ReportDateFilter />
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">Memuat data...</p>
+        <p className="text-sm text-muted-foreground py-8 text-center">{t('common.loading')}</p>
       ) : data ? (
         <>
           <div className="grid gap-3 md:grid-cols-3">
-            <ReportMetricCard label="Total SKU" value={String(data.summary.totalSkus)} />
-            <ReportMetricCard label="Nilai Inventory" value={formatCurrency(data.summary.totalValue)} />
-            <ReportMetricCard label="Stok Rendah" value={String(data.summary.lowStockCount)} tone={data.summary.lowStockCount > 0 ? 'negative' : 'neutral'} />
+            <ReportMetricCard label={t('reports.total_sku')} value={String(data.summary.totalSkus)} />
+            <ReportMetricCard label={t('reports.inventory_value')} value={formatCurrency(data.summary.totalValue)} />
+            <ReportMetricCard label={t('reports.low_stock_count')} value={String(data.summary.lowStockCount)} tone={data.summary.lowStockCount > 0 ? 'negative' : 'neutral'} />
           </div>
 
-          <ReportSection title="Pergerakan Stok">
+          <ReportSection title={t('reports.stock_movements')}>
             <div className="overflow-x-auto">
               <Table className="w-full text-sm">
                 <TableHeader>
                   <TableRow className="border-b text-left text-muted-foreground">
-                    <TableHead className="pb-2 font-medium">Tipe</TableHead>
-                    <TableHead className="pb-2 font-medium text-right">Total Qty</TableHead>
-                    <TableHead className="pb-2 font-medium text-right">Jumlah</TableHead>
+                    <TableHead className="pb-2 font-medium">{t('reports.movement_type')}</TableHead>
+                    <TableHead className="pb-2 font-medium text-right">{t('reports.movement_total_qty')}</TableHead>
+                    <TableHead className="pb-2 font-medium text-right">{t('reports.movement_count')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -101,17 +103,17 @@ export function InventoryReportPage() {
             </div>
           </ReportSection>
 
-          <ReportSection title="Valuasi Inventory">
+          <ReportSection title={t('reports.inventory_valuation')}>
             <div className="overflow-x-auto">
               <Table className="w-full text-sm">
                 <TableHeader>
                   <TableRow className="border-b text-left text-muted-foreground">
-                    <TableHead className="pb-2 font-medium">Produk</TableHead>
+                    <TableHead className="pb-2 font-medium">{t('common.name')}</TableHead>
                     <TableHead className="pb-2 font-medium">SKU</TableHead>
-                    <TableHead className="pb-2 font-medium text-right">Stok</TableHead>
+                    <TableHead className="pb-2 font-medium text-right">{t('products.available_stock')}</TableHead>
                     <TableHead className="pb-2 font-medium text-right">HPP</TableHead>
-                    <TableHead className="pb-2 font-medium text-right">Nilai</TableHead>
-                    <TableHead className="pb-2 font-medium text-center">Status</TableHead>
+                    <TableHead className="pb-2 font-medium text-right">{t('reports.value')}</TableHead>
+                    <TableHead className="pb-2 font-medium text-center">{t('common.status')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -124,9 +126,9 @@ export function InventoryReportPage() {
                       <TableCell className="py-2 text-right font-semibold">{formatCurrency(v.value)}</TableCell>
                       <TableCell className="py-2 text-center">
                         {v.isLow ? (
-                          <span className="inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Rendah</span>
+                          <span className="inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">{t('reports.low_stock_count')}</span>
                         ) : (
-                          <span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Aman</span>
+                          <span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">{t('products.stock_status_safe')}</span>
                         )}
                       </TableCell>
                     </TableRow>
@@ -137,16 +139,16 @@ export function InventoryReportPage() {
           </ReportSection>
 
           {data.movementDetail.length > 0 && (
-            <ReportSection title="Log Pergerakan (200 terakhir)">
+            <ReportSection title={t('reports.movement_log')}>
               <div className="overflow-x-auto">
                 <Table className="w-full text-sm">
                   <TableHeader>
                     <TableRow className="border-b text-left text-muted-foreground">
-                      <TableHead className="pb-2 font-medium">Tanggal</TableHead>
-                      <TableHead className="pb-2 font-medium">Produk</TableHead>
-                      <TableHead className="pb-2 font-medium">Tipe</TableHead>
-                      <TableHead className="pb-2 font-medium text-right">Qty</TableHead>
-                      <TableHead className="pb-2 font-medium">Keterangan</TableHead>
+                      <TableHead className="pb-2 font-medium">{t('common.date')}</TableHead>
+                      <TableHead className="pb-2 font-medium">{t('common.name')}</TableHead>
+                      <TableHead className="pb-2 font-medium">{t('reports.movement_type')}</TableHead>
+                      <TableHead className="pb-2 font-medium text-right">{t('reports.movement_qty')}</TableHead>
+                      <TableHead className="pb-2 font-medium">{t('reports.movement_notes')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

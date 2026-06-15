@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -13,6 +14,7 @@ import { useState } from 'react'
 
 export function GeneralLedgerPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const params = useReportDateParams()
   const [accountCode, setAccountCode] = useState<string>('')
   const { accounts, accountsLoading, data, isLoading } = useGeneralLedger(accountCode || undefined, params)
@@ -28,13 +30,13 @@ export function GeneralLedgerPage() {
       kredit: r.credit,
       saldo: r.balance,
     }))
-    exportToCsv(`buku-besar-${data.account.code}-${params.from ?? 'awal'}-${params.to ?? 'akhir'}.csv`, [
-      { key: 'tanggal', header: 'Tanggal' },
+    exportToCsv(`general-ledger-${data.account.code}-${params.from ?? 'awal'}-${params.to ?? 'akhir'}.csv`, [
+      { key: 'tanggal', header: t('common.date') },
       { key: 'kodeJurnal', header: 'Kode Jurnal' },
-      { key: 'deskripsi', header: 'Deskripsi' },
-      { key: 'debit', header: 'Debit' },
-      { key: 'kredit', header: 'Kredit' },
-      { key: 'saldo', header: 'Saldo' },
+      { key: 'deskripsi', header: t('common.description') },
+      { key: 'debit', header: t('reports.debit') },
+      { key: 'kredit', header: t('reports.credit') },
+      { key: 'saldo', header: t('reports.balance') },
     ], rows)
   }
 
@@ -45,20 +47,20 @@ export function GeneralLedgerPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-xl font-semibold">Buku Besar</h1>
-          <p className="text-sm text-muted-foreground">Riwayat transaksi per akun — berdasarkan jurnal akuntansi</p>
+          <h1 className="text-xl font-semibold">{t('reports.general_ledger')}</h1>
+          <p className="text-sm text-muted-foreground">{t('reports.general_ledger_description')}</p>
         </div>
         <div className="ml-auto">
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={!data}>Export CSV</Button>
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={!data}>{t('common.export')} CSV</Button>
         </div>
       </div>
 
       <div className="rounded-xl border bg-card p-4">
         <label className="space-y-1.5 text-sm font-medium">
-          Pilih Akun
+          {t('reports.select_account')}
           <Select value={accountCode} onValueChange={setAccountCode} disabled={accountsLoading}>
             <SelectTrigger className="w-full md:w-80">
-              <SelectValue placeholder="Pilih akun..." />
+              <SelectValue placeholder={t('reports.select_account_placeholder')} />
             </SelectTrigger>
             <SelectContent>
               {accounts.map((a) => (
@@ -72,9 +74,9 @@ export function GeneralLedgerPage() {
       <ReportDateFilter />
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">Memuat data...</p>
+        <p className="text-sm text-muted-foreground py-8 text-center">{t('common.loading')}</p>
       ) : !accountCode ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">Pilih akun untuk melihat buku besar</p>
+        <p className="text-sm text-muted-foreground py-8 text-center">{t('reports.no_account_selected')}</p>
       ) : data ? (
         <>
           <Card>
@@ -82,19 +84,19 @@ export function GeneralLedgerPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    <TableHead className="py-2">Tanggal</TableHead>
-                    <TableHead className="py-2">Kode Jurnal</TableHead>
-                    <TableHead className="py-2">Deskripsi</TableHead>
-                    <TableHead className="py-2 text-right">Debit</TableHead>
-                    <TableHead className="py-2 text-right">Kredit</TableHead>
-                    <TableHead className="py-2 text-right">Saldo</TableHead>
+                    <TableHead className="py-2">{t('common.date')}</TableHead>
+                    <TableHead className="py-2">{t('reports.journal_code')}</TableHead>
+                    <TableHead className="py-2">{t('common.description')}</TableHead>
+                    <TableHead className="py-2 text-right">{t('reports.debit')}</TableHead>
+                    <TableHead className="py-2 text-right">{t('reports.credit')}</TableHead>
+                    <TableHead className="py-2 text-right">{t('reports.balance')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data.rows.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                        Belum ada transaksi untuk akun ini
+                        {t('reports.no_transactions_for_account')}
                       </TableCell>
                     </TableRow>
                   )}
@@ -114,7 +116,7 @@ export function GeneralLedgerPage() {
           </Card>
 
           <div className="rounded-xl border bg-card p-4 text-right">
-            <span className="text-sm text-muted-foreground mr-3">Saldo Akhir:</span>
+            <span className="text-sm text-muted-foreground mr-3">{t('reports.ending_balance')}</span>
             <span className="text-lg font-bold">{formatCurrency(data.endingBalance)}</span>
           </div>
         </>

@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -30,6 +31,7 @@ const METHOD_LABELS: Record<string, string> = {
 }
 
 export function PaymentReportPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const params = useReportDateParams()
   const { data, isLoading } = usePaymentReport(params)
@@ -57,10 +59,10 @@ export function PaymentReportPage() {
       total: m.total,
       jumlah: m.count,
     }))
-    exportToCsv(`laporan-pembayaran-${params.from ?? 'awal'}-${params.to ?? 'akhir'}.csv`, [
-      { key: 'metode', header: 'Metode' },
-      { key: 'total', header: 'Total' },
-      { key: 'jumlah', header: 'Jumlah Transaksi' },
+    exportToCsv(`${t('reports.payment_title')}-${params.from ?? 'awal'}-${params.to ?? 'akhir'}.csv`, [
+      { key: 'metode', header: t('common.method') },
+      { key: 'total', header: t('common.total') },
+      { key: 'jumlah', header: t('reports.transaction_count') },
     ], rows)
   }
 
@@ -71,29 +73,29 @@ export function PaymentReportPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-xl font-semibold">Laporan Pembayaran</h1>
-          <p className="text-sm text-muted-foreground">Breakdown metode bayar, cash flow, dan piutang</p>
+          <h1 className="text-xl font-semibold">{t('reports.payment_title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('reports.payment_description')}</p>
         </div>
         <div className="ml-auto">
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={!data}>Export CSV</Button>
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={!data}>{t('common.export')} CSV</Button>
         </div>
       </div>
 
       <ReportDateFilter />
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">Memuat data...</p>
+        <p className="text-sm text-muted-foreground py-8 text-center">{t('common.loading')}</p>
       ) : data ? (
         <>
           <div className="grid gap-3 md:grid-cols-3">
-            <ReportMetricCard label="Total Diterima" value={formatCurrency(data.summary.totalCollected)} tone="positive" />
-            <ReportMetricCard label="Piutang Outstanding" value={formatCurrency(data.summary.totalReceivable)} tone="negative" />
-            <ReportMetricCard label="Jumlah Transaksi" value={String(data.summary.transactionCount)} />
+            <ReportMetricCard label={t('reports.total_received')} value={formatCurrency(data.summary.totalCollected)} tone="positive" />
+            <ReportMetricCard label={t('reports.receivable_outstanding')} value={formatCurrency(data.summary.totalReceivable)} tone="negative" />
+            <ReportMetricCard label={t('reports.transaction_count')} value={String(data.summary.transactionCount)} />
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             {pieData.length > 0 && (
-              <ReportSection title="Metode Pembayaran">
+              <ReportSection title={t('reports.payment_method')}>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -111,7 +113,7 @@ export function PaymentReportPage() {
             )}
 
             {barData.length > 0 && (
-              <ReportSection title="Cash Flow Harian">
+              <ReportSection title={t('reports.daily_cash_flow')}>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={barData}>
@@ -129,14 +131,14 @@ export function PaymentReportPage() {
             )}
           </div>
 
-          <ReportSection title="Breakdown Metode">
+          <ReportSection title={t('reports.method_breakdown')}>
             <div className="overflow-x-auto">
               <Table className="w-full text-sm">
                 <TableHeader>
                   <TableRow className="border-b text-left text-muted-foreground">
-                    <TableHead className="pb-2 font-medium">Metode</TableHead>
-                    <TableHead className="pb-2 font-medium text-right">Total</TableHead>
-                    <TableHead className="pb-2 font-medium text-right">Transaksi</TableHead>
+                    <TableHead className="pb-2 font-medium">{t('reports.method')}</TableHead>
+                    <TableHead className="pb-2 font-medium text-right">{t('common.total')}</TableHead>
+                    <TableHead className="pb-2 font-medium text-right">{t('reports.payment_transactions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -155,22 +157,22 @@ export function PaymentReportPage() {
           </ReportSection>
 
           {data.receivables.length > 0 && (
-            <ReportSection title="Piutang Outstanding">
+            <ReportSection title={t('reports.receivable_section')}>
               <div className="grid gap-3 mb-3 md:grid-cols-4">
-                <ReportMetricCard label="0-7 hari" value={formatCurrency(data.aging.current)} />
-                <ReportMetricCard label="8-30 hari" value={formatCurrency(data.aging.days7)} />
-                <ReportMetricCard label="31-60 hari" value={formatCurrency(data.aging.days30)} />
-                <ReportMetricCard label="> 60 hari" value={formatCurrency(data.aging.over60)} tone="negative" />
+                <ReportMetricCard label={t('reports.aging_days_0_7')} value={formatCurrency(data.aging.current)} />
+                <ReportMetricCard label={t('reports.aging_days_8_30')} value={formatCurrency(data.aging.days7)} />
+                <ReportMetricCard label={t('reports.aging_days_31_60')} value={formatCurrency(data.aging.days30)} />
+                <ReportMetricCard label={t('reports.aging_over_60')} value={formatCurrency(data.aging.over60)} tone="negative" />
               </div>
               <div className="overflow-x-auto">
                 <Table className="w-full text-sm">
                   <TableHeader>
                     <TableRow className="border-b text-left text-muted-foreground">
-                      <TableHead className="pb-2 font-medium">No. Order</TableHead>
-                      <TableHead className="pb-2 font-medium text-right">Total</TableHead>
-                      <TableHead className="pb-2 font-medium text-right">Dibayar</TableHead>
-                      <TableHead className="pb-2 font-medium text-right">Sisa</TableHead>
-                      <TableHead className="pb-2 font-medium text-right">Tanggal</TableHead>
+                      <TableHead className="pb-2 font-medium">{t('reports.order_number')}</TableHead>
+                      <TableHead className="pb-2 font-medium text-right">{t('common.total')}</TableHead>
+                      <TableHead className="pb-2 font-medium text-right">{t('reports.receivable_paid')}</TableHead>
+                      <TableHead className="pb-2 font-medium text-right">{t('reports.receivable_remaining')}</TableHead>
+                      <TableHead className="pb-2 font-medium text-right">{t('common.date')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

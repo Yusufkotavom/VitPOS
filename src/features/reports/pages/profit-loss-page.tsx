@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeft } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -11,6 +12,7 @@ import { formatCurrency } from '@/lib/format-currency'
 import { exportToCsv } from '@/shared/utils/export-csv'
 
 export function ProfitLossPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const params = useReportDateParams()
   const { data, isLoading } = useProfitLoss(params)
@@ -19,17 +21,17 @@ export function ProfitLossPage() {
     if (!data) return
     const rows = [
       ...data.revenues.map((r, i) => ({ id: `rev${i}`, akun: r.accountName, nilai: r.amount })),
-      { id: 'tr', akun: 'Total Pendapatan', nilai: data.totalRevenue },
+      { id: 'tr', akun: t('reports.total_revenue'), nilai: data.totalRevenue },
       ...data.cogs.map((c, i) => ({ id: `cogs${i}`, akun: c.accountName, nilai: -c.amount })),
-      { id: 'tc', akun: 'Total HPP', nilai: -data.totalCogs },
-      { id: 'gp', akun: 'Laba Kotor', nilai: data.grossProfit },
+      { id: 'tc', akun: t('reports.total_cogs'), nilai: -data.totalCogs },
+      { id: 'gp', akun: t('reports.gross_profit'), nilai: data.grossProfit },
       ...data.expenses.map((e, i) => ({ id: `exp${i}`, akun: e.accountName, nilai: -e.amount })),
-      { id: 'te', akun: 'Total Beban', nilai: -data.totalExpense },
-      { id: 'np', akun: 'Laba Bersih', nilai: data.netProfit },
+      { id: 'te', akun: t('reports.total_expense'), nilai: -data.totalExpense },
+      { id: 'np', akun: t('reports.net_profit'), nilai: data.netProfit },
     ]
-    exportToCsv(`laba-rugi-${params.from ?? 'awal'}-${params.to ?? 'akhir'}.csv`, [
-      { key: 'akun', header: 'Akun' },
-      { key: 'nilai', header: 'Nilai' },
+    exportToCsv(`profit-loss-${params.from ?? 'awal'}-${params.to ?? 'akhir'}.csv`, [
+      { key: 'akun', header: t('reports.account') },
+      { key: 'nilai', header: t('reports.value') },
     ], rows)
   }
 
@@ -40,26 +42,26 @@ export function ProfitLossPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-xl font-semibold">Laporan Laba Rugi</h1>
-          <p className="text-sm text-muted-foreground">Pendapatan, HPP, beban, dan laba bersih — berdasarkan jurnal akuntansi</p>
+          <h1 className="text-xl font-semibold">{t('reports.profit_loss_title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('reports.profit_loss_description')}</p>
         </div>
         <div className="ml-auto">
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={!data}>Export CSV</Button>
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={!data}>{t('common.export')} CSV</Button>
         </div>
       </div>
 
       <ReportDateFilter />
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">Memuat data...</p>
+        <p className="text-sm text-muted-foreground py-8 text-center">{t('common.loading')}</p>
       ) : data ? (
         <>
           <div className="grid gap-3 md:grid-cols-5">
-            <ReportMetricCard label="Total Pendapatan" value={formatCurrency(data.totalRevenue)} tone="positive" />
-            <ReportMetricCard label="HPP" value={formatCurrency(data.totalCogs)} />
-            <ReportMetricCard label="Laba Kotor" value={formatCurrency(data.grossProfit)} tone={data.grossProfit >= 0 ? 'positive' : 'negative'} />
-            <ReportMetricCard label="Total Beban" value={formatCurrency(data.totalExpense)} tone="negative" />
-            <ReportMetricCard label="Laba Bersih" value={formatCurrency(data.netProfit)} tone={data.netProfit >= 0 ? 'positive' : 'negative'} />
+            <ReportMetricCard label={t('reports.total_revenue')} value={formatCurrency(data.totalRevenue)} tone="positive" />
+            <ReportMetricCard label={t('reports.cogs_label')} value={formatCurrency(data.totalCogs)} />
+            <ReportMetricCard label={t('reports.gross_profit')} value={formatCurrency(data.grossProfit)} tone={data.grossProfit >= 0 ? 'positive' : 'negative'} />
+            <ReportMetricCard label={t('reports.total_expense')} value={formatCurrency(data.totalExpense)} tone="negative" />
+            <ReportMetricCard label={t('reports.net_profit')} value={formatCurrency(data.netProfit)} tone={data.netProfit >= 0 ? 'positive' : 'negative'} />
           </div>
 
           <Card>
@@ -67,11 +69,11 @@ export function ProfitLossPage() {
               <Table>
                 <TableBody>
                   <TableRow className="border-b bg-muted/50">
-                    <TableCell colSpan={2} className="py-2 font-semibold">PENDAPATAN (4xxx)</TableCell>
+                    <TableCell colSpan={2} className="py-2 font-semibold">{t('reports.revenue_section')}</TableCell>
                   </TableRow>
                   {data.revenues.length === 0 && (
                     <TableRow className="border-b">
-                      <TableCell className="py-2 text-muted-foreground" colSpan={2}>Belum ada data pendapatan</TableCell>
+                      <TableCell className="py-2 text-muted-foreground" colSpan={2}>{t('reports.no_revenue_data')}</TableCell>
                     </TableRow>
                   )}
                   {data.revenues.map((r) => (
@@ -81,7 +83,7 @@ export function ProfitLossPage() {
                     </TableRow>
                   ))}
                   <TableRow className="font-bold">
-                    <TableCell className="py-2">Total Pendapatan</TableCell>
+                    <TableCell className="py-2">{t('reports.total_revenue')}</TableCell>
                     <TableCell className="py-2 text-right text-green-600">{formatCurrency(data.totalRevenue)}</TableCell>
                   </TableRow>
                 </TableBody>
@@ -94,11 +96,11 @@ export function ProfitLossPage() {
               <Table>
                 <TableBody>
                   <TableRow className="border-b bg-muted/50">
-                    <TableCell colSpan={2} className="py-2 font-semibold">HARGA POKOK PENJUALAN (5xxx)</TableCell>
+                    <TableCell colSpan={2} className="py-2 font-semibold">{t('reports.cogs_section')}</TableCell>
                   </TableRow>
                   {data.cogs.length === 0 && (
                     <TableRow className="border-b">
-                      <TableCell className="py-2 text-muted-foreground" colSpan={2}>Belum ada data HPP</TableCell>
+                      <TableCell className="py-2 text-muted-foreground" colSpan={2}>{t('reports.no_cogs_data')}</TableCell>
                     </TableRow>
                   )}
                   {data.cogs.map((c) => (
@@ -108,11 +110,11 @@ export function ProfitLossPage() {
                     </TableRow>
                   ))}
                   <TableRow className="font-bold">
-                    <TableCell className="py-2">Total HPP</TableCell>
+                    <TableCell className="py-2">{t('reports.total_cogs')}</TableCell>
                     <TableCell className="py-2 text-right text-red-600">-{formatCurrency(data.totalCogs)}</TableCell>
                   </TableRow>
                   <TableRow className="font-bold">
-                    <TableCell className="py-2">Laba Kotor</TableCell>
+                    <TableCell className="py-2">{t('reports.gross_profit')}</TableCell>
                     <TableCell className={`py-2 text-right ${data.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {formatCurrency(data.grossProfit)}
                     </TableCell>
@@ -127,11 +129,11 @@ export function ProfitLossPage() {
               <Table>
                 <TableBody>
                   <TableRow className="border-b bg-muted/50">
-                    <TableCell colSpan={2} className="py-2 font-semibold">BEBAN OPERASIONAL (6xxx)</TableCell>
+                    <TableCell colSpan={2} className="py-2 font-semibold">{t('reports.expense_section')}</TableCell>
                   </TableRow>
                   {data.expenses.length === 0 && (
                     <TableRow className="border-b">
-                      <TableCell className="py-2 text-muted-foreground" colSpan={2}>Belum ada data beban</TableCell>
+                      <TableCell className="py-2 text-muted-foreground" colSpan={2}>{t('reports.no_expense_data')}</TableCell>
                     </TableRow>
                   )}
                   {data.expenses.map((e) => (
@@ -141,7 +143,7 @@ export function ProfitLossPage() {
                     </TableRow>
                   ))}
                   <TableRow className="font-bold">
-                    <TableCell className="py-2">Total Beban</TableCell>
+                    <TableCell className="py-2">{t('reports.total_expense')}</TableCell>
                     <TableCell className="py-2 text-right text-red-600">-{formatCurrency(data.totalExpense)}</TableCell>
                   </TableRow>
                 </TableBody>
@@ -154,10 +156,10 @@ export function ProfitLossPage() {
               <Table>
                 <TableBody>
                   <TableRow className="border-b bg-muted/50">
-                    <TableCell colSpan={2} className="py-2 font-semibold">LABA BERSIH</TableCell>
+                    <TableCell colSpan={2} className="py-2 font-semibold">{t('reports.net_profit_section')}</TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell className="py-2 text-lg font-bold">Net Profit</TableCell>
+                    <TableCell className="py-2 text-lg font-bold">{t('reports.net_profit')}</TableCell>
                     <TableCell className={`py-2 text-right text-lg font-bold ${data.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {formatCurrency(data.netProfit)}
                     </TableCell>

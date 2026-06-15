@@ -9,10 +9,10 @@ function createMockDb() {
       where: vi.fn((key: string) => ({
         equals: vi.fn((value: string) => ({
           toArray: vi.fn(async () =>
-            Array.from(accounts.values()).filter((a) => (a as Record<string, string>)[key] === value),
+            Array.from(accounts.values()).filter((a) => (a as unknown as Record<string, string>)[key] === value),
           ),
           first: vi.fn(async () =>
-            Array.from(accounts.values()).find((a) => (a as Record<string, string>)[key] === value),
+            Array.from(accounts.values()).find((a) => (a as unknown as Record<string, string>)[key] === value),
           ),
           filter: vi.fn((fn: (a: LocalAccount) => boolean) => ({
             first: vi.fn(async () => Array.from(accounts.values()).find(fn)),

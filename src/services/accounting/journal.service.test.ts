@@ -47,10 +47,10 @@ const mockDb = {
       return {
         equals: vi.fn((value: string) => ({
           toArray: vi.fn(async () =>
-            Array.from(accounts.values()).filter((a) => (a as Record<string, string>)[key] === value),
+            Array.from(accounts.values()).filter((a) => (a as unknown as Record<string, string>)[key] === value),
           ),
           first: vi.fn(async () =>
-            Array.from(accounts.values()).find((a) => (a as Record<string, string>)[key] === value) ?? null,
+            Array.from(accounts.values()).find((a) => (a as unknown as Record<string, string>)[key] === value) ?? null,
           ),
         })),
       }
@@ -61,7 +61,7 @@ const mockDb = {
     where: vi.fn((key: string) => ({
       equals: vi.fn((value: string) => ({
         toArray: vi.fn(async () =>
-          Array.from(journalEntries.values()).filter((e) => (e as Record<string, string>)[key] === value),
+          Array.from(journalEntries.values()).filter((e) => (e as unknown as Record<string, string>)[key] === value),
         ),
       })),
       between: vi.fn(() => ({

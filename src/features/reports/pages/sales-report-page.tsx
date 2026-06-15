@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -12,6 +13,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 export function SalesReportPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const params = useReportDateParams()
   const { data, isLoading } = useSalesReport(params)
 
@@ -40,11 +42,11 @@ export function SalesReportPage() {
       service: d.service,
       total: d.total,
     }))
-    exportToCsv(`laporan-penjualan-${params.from ?? 'awal'}-${params.to ?? 'akhir'}.csv`, [
-      { key: 'tanggal', header: 'Tanggal' },
-      { key: 'penjualan', header: 'Penjualan' },
+    exportToCsv(`sales-report-${params.from ?? 'awal'}-${params.to ?? 'akhir'}.csv`, [
+      { key: 'tanggal', header: t('common.date') },
+      { key: 'penjualan', header: t('reports.sales') },
       { key: 'service', header: 'Service' },
-      { key: 'total', header: 'Total' },
+      { key: 'total', header: t('common.total') },
     ], rows)
   }
 
@@ -55,29 +57,29 @@ export function SalesReportPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-xl font-semibold">Laporan Penjualan</h1>
-          <p className="text-sm text-muted-foreground">Omzet harian, top produk, tren penjualan & service</p>
+          <h1 className="text-xl font-semibold">{t('reports.sales_title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('reports.sales_description')}</p>
         </div>
         <div className="ml-auto">
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={!data}>Export CSV</Button>
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={!data}>{t('common.export')} CSV</Button>
         </div>
       </div>
 
       <ReportDateFilter />
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">Memuat data...</p>
+        <p className="text-sm text-muted-foreground py-8 text-center">{t('common.loading')}</p>
       ) : data ? (
         <>
           <div className="grid gap-3 md:grid-cols-4">
-            <ReportMetricCard label="Total Omzet" value={formatCurrency(data.summary.totalRevenue)} tone="positive" />
-            <ReportMetricCard label="Total Order" value={String(data.summary.totalOrders)} />
-            <ReportMetricCard label="Rata-rata Order" value={formatCurrency(data.summary.avgOrderValue)} />
-            <ReportMetricCard label="Total Dibayar" value={formatCurrency(data.summary.totalPaid)} />
+            <ReportMetricCard label={t('reports.total_omzet')} value={formatCurrency(data.summary.totalRevenue)} tone="positive" />
+            <ReportMetricCard label={t('reports.total_orders')} value={String(data.summary.totalOrders)} />
+            <ReportMetricCard label={t('reports.avg_order_value')} value={formatCurrency(data.summary.avgOrderValue)} />
+            <ReportMetricCard label={t('reports.total_paid')} value={formatCurrency(data.summary.totalPaid)} />
           </div>
 
           {allTrend.length > 0 && (
-            <ReportSection title="Tren Pendapatan">
+            <ReportSection title={t('reports.revenue_trend')}>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={allTrend}>
@@ -85,7 +87,7 @@ export function SalesReportPage() {
                     <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                     <Tooltip formatter={(v) => formatCurrency(Number(v))} />
-                    <Area type="monotone" dataKey="penjualan" stackId="1" stroke="#2563eb" fill="#2563eb" fillOpacity={0.3} name="Penjualan" />
+                    <Area type="monotone" dataKey="penjualan" stackId="1" stroke="#2563eb" fill="#2563eb" fillOpacity={0.3} name={t('reports.sales')} />
                     <Area type="monotone" dataKey="service" stackId="1" stroke="#7c3aed" fill="#7c3aed" fillOpacity={0.3} name="Service" />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -94,15 +96,15 @@ export function SalesReportPage() {
           )}
 
           {data.topProducts.length > 0 && (
-            <ReportSection title="Top 20 Produk">
+            <ReportSection title={t('reports.top_products')}>
               <div className="overflow-x-auto">
                 <Table className="w-full text-sm">
                   <TableHeader>
                     <TableRow className="border-b text-left text-muted-foreground">
-                      <TableHead className="pb-2 font-medium">#</TableHead>
-                      <TableHead className="pb-2 font-medium">Produk</TableHead>
-                      <TableHead className="pb-2 font-medium text-right">Qty</TableHead>
-                      <TableHead className="pb-2 font-medium text-right">Pendapatan</TableHead>
+                      <TableHead className="pb-2 font-medium">{t('reports.top_products_rank')}</TableHead>
+                      <TableHead className="pb-2 font-medium">{t('reports.top_products_product')}</TableHead>
+                      <TableHead className="pb-2 font-medium text-right">{t('reports.top_products_qty')}</TableHead>
+                      <TableHead className="pb-2 font-medium text-right">{t('reports.top_products_revenue')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
