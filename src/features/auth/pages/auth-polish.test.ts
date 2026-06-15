@@ -81,7 +81,7 @@ describe('auth polish behavior', () => {
     render(createElement(MemoryRouter, null, createElement(OnboardingPage)))
 
     expect(screen.getByText('Progress Setup')).toBeInTheDocument()
-    expect(screen.getByText('Pilih vertikal usaha yang paling sesuai.')).toBeInTheDocument()
+    expect(screen.getByText('Pilih vertikal usaha yang paling sesuai, atau lewati untuk mengatur nanti.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Lanjut/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Ke Login/i })).toBeInTheDocument()
   })

@@ -41,8 +41,12 @@ export function CashPage() {
 
   const paginated = filtered.slice(0, parseInt(pageSize))
 
-  const totalIncome = cash.reduce((sum, row) => sum + row.income, 0)
-  const totalExpense = cash.reduce((sum, row) => sum + row.expense, 0)
+  let totalIncome = 0
+  let totalExpense = 0
+  for (const row of cash) {
+    totalIncome += row.income
+    totalExpense += row.expense
+  }
   const balance = totalIncome - totalExpense
 
   return (
@@ -89,7 +93,7 @@ export function CashPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t('cash.all_accounts')}</SelectItem>
-                  {Array.from(new Set(cash.map(c => c.account))).map(acc => (
+                  {Array.from(new Set(cash.map(c => c.account))).filter(acc => acc !== "").map(acc => (
                     <SelectItem key={acc} value={acc}>{acc}</SelectItem>
                   ))}
                 </SelectContent>
@@ -100,7 +104,7 @@ export function CashPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t('cash.all_categories')}</SelectItem>
-                  {Array.from(new Set(cash.map(c => c.category))).filter(Boolean).map(cat => (
+                  {Array.from(new Set(cash.map(c => c.category))).filter(Boolean).filter(cat => cat !== "").map(cat => (
                     <SelectItem key={cat} value={cat}>{getCategoryName(cat)}</SelectItem>
                   ))}
                 </SelectContent>

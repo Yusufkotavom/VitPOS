@@ -42,10 +42,7 @@ const initialIdentity: BusinessIdentityFormValue = {
   ownerEmail: '',
   ownerPassword: '',
   whatsapp: '',
-  city: 'Surabaya',
   address: '',
-  openHours: '08.00 - 20.00',
-  initialCash: '500000',
 }
 
 function clonePreset(modeId: BusinessModeId) {
@@ -90,8 +87,8 @@ export function OnboardingPage() {
     { label: 'Kategori', value: String(editable.categories.length) },
     { label: 'Produk / jasa', value: String(editable.products.length) },
     { label: 'Pembayaran', value: String(editable.paymentMethods.length) },
-    { label: 'Kas awal', value: `Rp ${Number(identityForm.initialCash || 0).toLocaleString('id-ID')}` },
-  ], [editable, identityForm.initialCash])
+    { label: 'Kas awal', value: 'Rp 500.000' },
+  ], [editable])
 
   function handleModeChange(value: BusinessModeId) {
     const next = clonePreset(value)
@@ -206,8 +203,8 @@ export function OnboardingPage() {
         await enqueueOutboxItem({ entityType: 'cash_category', entityId: id, mutationType: 'create', payload: { name: cashCategory.name, type: cashCategory.type } })
       }
 
-      await localDb.customers.put({ id: crypto.randomUUID(), tenantId, name: 'Pelanggan Umum', phone: identityForm.whatsapp, city: identityForm.city, receivable: 0, orders: 0, status: 'Aktif', syncStatus: 'pending', version: 1, updatedAt: now })
-      await localDb.suppliers.put({ id: crypto.randomUUID(), tenantId, name: 'Supplier ATK Utama', phone: '', city: identityForm.city, payable: 0, orders: 0, status: 'Aktif', syncStatus: 'pending', version: 1, updatedAt: now })
+      await localDb.customers.put({ id: crypto.randomUUID(), tenantId, name: 'Pelanggan Umum', phone: identityForm.whatsapp, city: 'Surabaya', receivable: 0, orders: 0, status: 'Aktif', syncStatus: 'pending', version: 1, updatedAt: now })
+      await localDb.suppliers.put({ id: crypto.randomUUID(), tenantId, name: 'Supplier ATK Utama', phone: '', city: 'Surabaya', payable: 0, orders: 0, status: 'Aktif', syncStatus: 'pending', version: 1, updatedAt: now })
 
       for (const setting of [
         { id: 'company-name', area: 'Profil Usaha', setting: 'Nama Usaha', value: identityForm.tenantName.trim() },
@@ -217,7 +214,7 @@ export function OnboardingPage() {
         { id: 'company-icon', area: 'Profil Usaha', setting: 'Ikon Usaha', value: 'Store' },
         { id: 'business-vertical', area: 'System', setting: 'business_vertical', value: businessVertical },
         { id: 'business-mode', area: 'System', setting: 'business_mode', value: businessMode },
-        { id: 'initial-cash', area: 'Kas', setting: 'kas_awal', value: identityForm.initialCash || '0' },
+        { id: 'initial-cash', area: 'Kas', setting: 'kas_awal', value: '500000' },
         { id: 'receipt-header', area: 'Struk', setting: 'Header Struk (POS)', value: '' },
         { id: 'receipt-footer', area: 'Struk', setting: 'Footer Struk (POS)', value: 'Terima kasih atas kunjungan Anda.' },
         { id: 'invoice-term', area: 'Invoice', setting: 'Catatan / Term Invoice', value: 'Syarat & Ketentuan berlaku.' },
@@ -264,18 +261,18 @@ export function OnboardingPage() {
           <CardHeader>
             <CardTitle>{steps[step - 1].title}</CardTitle>
             <CardDescription>
-              {step === 1 ? 'Pilih vertikal usaha yang paling sesuai.' : step === 2 ? 'Pilih mode usaha ATK & printing yang paling dekat dengan kebutuhan toko.' : step === 3 ? 'Lengkapi data inti usaha agar setup siap dipakai.' : step === 4 ? 'Cek ringkasan template sebelum masuk review.' : 'Pastikan semua data sudah siap disimpan.'}
+              {step === 1 ? 'Pilih vertikal usaha yang paling sesuai, atau lewati untuk mengatur nanti.' : step === 2 ? 'Pilih mode usaha ATK & printing yang paling dekat dengan kebutuhan toko.' : step === 3 ? 'Lengkapi nama, nomor, dan alamat usaha.' : step === 4 ? 'Cek ringkasan template sebelum masuk review.' : 'Pastikan semua data sudah siap disimpan.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 space-y-6">
             {error ? <div className="rounded bg-destructive/10 p-3 text-sm font-medium text-destructive">{error}</div> : null}
-            {step === 1 ? <VerticalSelector verticals={Object.values(BUSINESS_PLAYBOOKS)} selectedVertical={businessVertical} onSelect={setBusinessVertical} /> : null}
+            {step === 1 ? <VerticalSelector verticals={Object.values(BUSINESS_PLAYBOOKS)} selectedVertical={businessVertical} onSelect={setBusinessVertical} onSkip={() => setStep(3)} /> : null}
             {step === 2 ? <BusinessModeSelector modes={activeVertical.modes} selectedMode={businessMode} onSelect={handleModeChange} /> : null}
             {step === 3 ? <BusinessIdentityForm value={identityForm} showOwnerFields={!currentUser} onChange={setIdentityForm} /> : null}
             {step === 4 ? <TemplatePreviewCard title={activeMode.label} description={activeMode.description} items={previewItems} /> : null}
             {step === 5 ? (
               <div className="space-y-4">
-                <SetupReviewPanel title="Data usaha" items={[{ label: 'Nama usaha', value: identityForm.tenantName || '-' }, { label: 'WhatsApp', value: identityForm.whatsapp || '-' }, { label: 'Kota', value: identityForm.city || '-' }, { label: 'Kas awal', value: `Rp ${Number(identityForm.initialCash || 0).toLocaleString('id-ID')}` }]} onEdit={() => setStep(3)} />
+                <SetupReviewPanel title="Data usaha" items={[{ label: 'Nama usaha', value: identityForm.tenantName || '-' }, { label: 'WhatsApp', value: identityForm.whatsapp || '-' }, { label: 'Alamat', value: identityForm.address || '-' }]} onEdit={() => setStep(3)} />
                 <SetupReviewPanel title="Template aktif" items={[{ label: 'Vertikal', value: activeVertical.label }, { label: 'Mode', value: activeMode.label }, { label: 'Produk / jasa', value: String(editable.products.length) }, { label: 'Pembayaran aktif', value: String(Object.values(selectedPayments).filter(Boolean).length || editable.paymentMethods.length) }]} onEdit={() => setStep(4)} />
                 <PostSetupChecklist />
               </div>

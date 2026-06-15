@@ -68,7 +68,7 @@ describe('onboarding page data logic', () => {
     // Step 3: data inti usaha
     expect(screen.getAllByText('Data inti usaha')[0]).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText(/Nama usaha/), { target: { value: 'Toko Baru' } })
-    fireEvent.change(screen.getByLabelText(/WhatsApp usaha/), { target: { value: '081234567890' } })
+    fireEvent.change(screen.getByLabelText(/Nomor WhatsApp/), { target: { value: '081234567890' } })
     const seed = buildAtkPrintingSeed({
       tenantId: 'tenant-preview',
       businessMode: 'atk_printing_combo',

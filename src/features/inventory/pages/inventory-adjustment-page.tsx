@@ -165,7 +165,7 @@ export function InventoryAdjustmentPage() {
                   <SelectValue placeholder="-- Cari atau pilih produk --" />
                 </SelectTrigger>
                 <SelectContent>
-                  {products.map(p => (
+                  {products.filter(p => p.id !== "").map(p => (
                     <SelectItem key={p.id} value={p.id}>{p.name} (Sisa: {p.stock})</SelectItem>
                   ))}
                 </SelectContent>

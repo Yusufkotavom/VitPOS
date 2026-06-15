@@ -7,7 +7,6 @@ import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from '@/components/ui/combobox'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Field, FieldGroup } from '@/components/ui/field'
@@ -107,8 +106,7 @@ export function ServiceOrderCreatePage() {
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-muted/20 relative pb-20">
-      <div className="px-4 pt-4">
-        <Card className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-3xl w-full px-4 pt-4">
           <div className="flex flex-wrap items-end gap-4 px-4 py-3">
             <div className="flex-1 min-w-[200px] space-y-1">
               <Label className="text-xs text-muted-foreground">{t('common.customer')}</Label>
@@ -202,9 +200,8 @@ export function ServiceOrderCreatePage() {
                 </div>
               )}
             </div>
+            </div>
           </div>
-        </Card>
-      </div>
 
       <main className="flex-1 mx-auto max-w-3xl w-full p-4 space-y-4">
         <div className="space-y-3">

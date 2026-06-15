@@ -22,7 +22,7 @@ export function ServiceOrderForm({ defaultValues, submitLabel, onCancel, onSubmi
 
   return (
     <form className="flex flex-col gap-4 p-4" onSubmit={form.handleSubmit(onSubmit)}>
-      <FormSection title="Info service" description="Nomor service, pelanggan, dan status.">
+      <div className="grid gap-4 md:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm font-medium">
           Nomor service
           <Input aria-invalid={Boolean(errors.code)} {...form.register('code')} placeholder="SVC-20260608-001" />
@@ -42,7 +42,7 @@ export function ServiceOrderForm({ defaultValues, submitLabel, onCancel, onSubmi
           Status
           <FormSelect control={form.control} name="status" options={serviceOrderStatusOptions.map(o => ({ label: o, value: o }))} />
         </label>
-      </FormSection>
+      </div>
       <FormSection title="Pekerjaan & biaya" description="Deskripsi pekerjaan dan estimasi biaya.">
         <label className="flex flex-col gap-1 text-sm font-medium">
           Deskripsi pekerjaan

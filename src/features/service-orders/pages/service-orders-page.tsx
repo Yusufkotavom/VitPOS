@@ -184,7 +184,7 @@ export function ServiceOrdersPage() {
                       <SelectTrigger><SelectValue placeholder={t('common.customer')} /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Semua Pelanggan</SelectItem>
-                        {customers.map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}
+                        {customers.filter(name => name !== "").map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     <Select value={sortBy} onValueChange={setSortBy}>

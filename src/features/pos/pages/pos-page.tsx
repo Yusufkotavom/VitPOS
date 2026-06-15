@@ -80,51 +80,45 @@ export function PosPage() {
         <span className="font-semibold text-sm">{t('common.back')}</span>
       </div>
       <header className="px-4 py-2 md:py-4">
-        <div className="mx-auto grid max-w-screen-2xl gap-3 md:grid-cols-2">
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs font-medium text-muted-foreground">{t('pos.customer')}</p>
-              <div className="flex items-center gap-1 text-muted-foreground">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsDraftsOpen(true)}>
-                        <FileText className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{t('pos.draft_list')}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate('/service-orders')}>
-                        <Wrench className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{t('pos.service_list')}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate('/service-orders/new')}>
-                        <PlusCircle className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{t('pos.new_service')}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
+        <div className="mx-auto max-w-screen-2xl">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-medium text-muted-foreground">{t('pos.customer')}</p>
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsDraftsOpen(true)}>
+                      <FileText className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{t('pos.draft_list')}</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate('/service-orders')}>
+                      <Wrench className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{t('pos.service_list')}</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate('/service-orders/new')}>
+                      <PlusCircle className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{t('pos.new_service')}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
-            <PosCustomerSelect />
           </div>
-          <div>
-            <p className="mb-2 text-xs font-medium text-muted-foreground">{t('nav.products')}</p>
-            <ProductSearch />
-          </div>
+          <PosCustomerSelect />
         </div>
       </header>
 
@@ -134,6 +128,9 @@ export function PosPage() {
         <div className="flex flex-1 flex-col overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom))] xl:pb-0">
           <div className="sticky top-0 z-10 border-b bg-background/95 p-4 backdrop-blur">
             <CategoryTabs />
+          </div>
+          <div className="border-b px-4 py-3 md:py-3">
+            <ProductSearch />
           </div>
           <div className="p-4">
             <ProductGrid />
