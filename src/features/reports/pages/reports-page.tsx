@@ -1,4 +1,4 @@
-import { BadgeDollarSign, Boxes, ClipboardList, ReceiptText, Scale, TrendingUp, Wallet } from 'lucide-react'
+import { BadgeDollarSign, BookText, Boxes, ClipboardList, ReceiptText, Scale, TrendingUp, Wallet } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
@@ -12,6 +12,7 @@ const REPORT_CARD_ICONS = {
   Penjualan: ReceiptText,
   'Laba Rugi': TrendingUp,
   Neraca: Scale,
+  'Buku Besar': BookText,
   Stok: Boxes,
   Kas: Wallet,
   Piutang: BadgeDollarSign,
