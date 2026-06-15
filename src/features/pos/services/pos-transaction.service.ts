@@ -38,14 +38,14 @@ function isPaidStatus(total: number, paid: number): LocalSalesOrder['status'] {
 }
 
 export const posTransactionService = {
-  async saveDraft(cartItems: CartItem[], totals: PosTotals, discountTotal: number = 0, customerName?: string | null, customerId?: string | null, shiftId?: string | null, notes?: string) {
+  async saveDraft(cartItems: CartItem[], totals: PosTotals, discountTotal: number = 0, customerName?: string | null, customerId?: string | null, notes?: string) {
     if (cartItems.length === 0) return
 
     const tenantId = requireActiveTenantId()
     const draftId = crypto.randomUUID()
     const nowIso = new Date().toISOString()
 
-      const draftItems: LocalSalesOrderItem[] = cartItems.map((cartItem) => ({
+    const draftItems: LocalSalesOrderItem[] = cartItems.map((cartItem) => ({
       id: crypto.randomUUID(),
       tenantId,
       salesOrderId: draftId,
@@ -62,7 +62,6 @@ export const posTransactionService = {
       code: `DRF-${Date.now()}`,
       customerId: customerId ?? undefined,
       customerName: customerName || 'Umum',
-      shiftId: shiftId ?? undefined,
       date: nowIso,
       subtotal: totals.subtotal,
       discountTotal: discountTotal,
@@ -97,7 +96,7 @@ export const posTransactionService = {
     })
   },
 
-  async checkout(cartItems: CartItem[], totals: PosTotals, paymentMethod: PosPaymentMethod, paidAmount: number, discountTotal: number = 0, customerName?: string | null, customerId?: string | null, shiftId?: string | null, notes?: string) {
+  async checkout(cartItems: CartItem[], totals: PosTotals, paymentMethod: PosPaymentMethod, paidAmount: number, discountTotal: number = 0, customerName?: string | null, customerId?: string | null, notes?: string) {
     if (cartItems.length === 0) return
 
     const tenantId = requireActiveTenantId()
@@ -125,7 +124,6 @@ export const posTransactionService = {
       code: await orderCode(),
       customerId: customerId ?? undefined,
       customerName: customerName || 'Umum',
-      shiftId: shiftId ?? undefined,
       date: nowIso,
       subtotal: totals.subtotal,
       discountTotal: discountTotal,
@@ -146,7 +144,6 @@ export const posTransactionService = {
       ref: `PAY-${Date.now().toString().slice(-6)}`,
       salesOrderId,
       source: 'POS',
-      shiftId: shiftId ?? undefined,
       method: paymentMethod as PosPaymentMethodCode,
       amount: retainedAmount,
       date: nowIso,

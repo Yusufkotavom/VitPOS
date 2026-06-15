@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { HeldSaleBanner } from '@/features/pos/components/held-sale-banner'
 import { useSyncStore } from '@/features/sync/stores/sync-store'
 import { CartPanel } from '@/features/pos/components/cart-panel'
@@ -15,18 +15,12 @@ import { selectPosTotals, usePosStore } from '@/features/pos/stores/pos-store'
 import { formatCurrency } from '@/lib/format-currency'
 import { toast } from 'sonner'
 import { posTransactionService } from '@/features/pos/services/pos-transaction.service'
-import { useActiveShift } from '@/features/shift/hooks/use-active-shift'
 import { useNavigate, Link } from 'react-router-dom'
-import { LockIcon, Clock, FileText, Wrench, PlusCircle, ArrowLeft, ShoppingCart } from 'lucide-react'
+import { FileText, Wrench, PlusCircle, ArrowLeft, ShoppingCart } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { shiftRepository } from '@/services/local-db/repository'
-import { localDb } from '@/services/local-db/client'
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
-import { resolveTenantId } from '@/features/auth/stores/auth-store'
-import { useQueryClient } from '@tanstack/react-query'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
 import { useMediaQuery } from '@/hooks/use-media-query'
 
 export function PosPage() {
@@ -36,15 +30,11 @@ export function PosPage() {
   const totals = selectPosTotals(store)
   const hasItems = totals.itemCount > 0
   const isDesktop = useMediaQuery('(min-width: 768px)')
-  const activeShift = useActiveShift()
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
   const [isDrafting, setIsDraftingState] = useState(false)
   const isDraftingRef = useRef(false)
   const setDrafting = (v: boolean) => { isDraftingRef.current = v; setIsDraftingState(v) }
-
-  const [startCash, setStartCash] = useState('')
   const [isDraftsOpen, setIsDraftsOpen] = useState(false)
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
 
@@ -58,60 +48,18 @@ export function PosPage() {
           customerInput.focus()
           customerInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
         }
-      }, 300) // wait for drawer to close on mobile
+      }, 300)
       return
     }
     setIsMobileCartOpen(false)
     setIsPaymentOpen(true)
   }
 
-  async function handleOpenShift() {
-    if (!startCash) return toast.error(t('pos.start_cash_required'))
-    try {
-      const tenantId = resolveTenantId()
-      const shiftId = crypto.randomUUID()
-      const startCashAmount = parseFloat(startCash)
-      const nowIso = new Date().toISOString()
-
-      await shiftRepository.upsert({
-        id: shiftId,
-        tenantId,
-        cashierName: t('shift.active_cashier'),
-        startTime: nowIso,
-        startCash: startCashAmount,
-        status: 'open',
-      })
-
-      await localDb.cash.put({
-        id: crypto.randomUUID(),
-        tenantId,
-        ref: `KAS-${shiftId.slice(0, 6)}`,
-        date: nowIso,
-        account: 'Kas Toko',
-        category: 'Modal Awal',
-        income: startCashAmount,
-        expense: 0,
-        status: 'Tercatat',
-        shiftId,
-      })
-
-      toast.success(t('shift.opened'))
-      setStartCash('')
-      await queryClient.invalidateQueries({ queryKey: ['active-shift'] })
-    } catch (error) {
-      toast.error(`${t('pos.shift_open_failed')}${error instanceof Error ? error.message : t('common.error_generic')}`)
-    }
-  }
-
-  if (activeShift === undefined) {
-    return <div className="flex h-[100dvh] items-center justify-center text-muted-foreground">{t('pos.checking_session')}</div>
-  }
-
   async function handleDraft() {
     if (!hasItems || isDraftingRef.current) return
     setDrafting(true)
     try {
-      await posTransactionService.saveDraft(store.cartItems, totals, store.discount, store.customerName, store.customerId, activeShift?.id, store.orderNote)
+      await posTransactionService.saveDraft(store.cartItems, totals, store.discount, store.customerName, store.customerId, store.orderNote)
       toast.success(t('pos.draft_saved'))
       store.clearCart()
     } catch (error) {
@@ -138,16 +86,6 @@ export function PosPage() {
               <p className="text-xs font-medium text-muted-foreground">{t('pos.customer')}</p>
               <div className="flex items-center gap-1 text-muted-foreground">
                 <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate('/shift')}>
-                        <Clock className={`h-4 w-4 ${activeShift ? 'text-emerald-500' : 'text-orange-500'}`} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{t('pos.check_shift')}</p>
-                    </TooltipContent>
-                  </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsDraftsOpen(true)}>
@@ -261,7 +199,7 @@ export function PosPage() {
               <DialogTitle>{t('pos.payment')}</DialogTitle>
             </DialogHeader>
             <div className="py-2">
-              <PaymentSummary onComplete={() => setIsPaymentOpen(false)} shiftId={activeShift?.id} />
+              <PaymentSummary onComplete={() => setIsPaymentOpen(false)} />
             </div>
           </DialogContent>
         </Dialog>
@@ -272,67 +210,7 @@ export function PosPage() {
               <DrawerTitle>{t('pos.payment')}</DrawerTitle>
             </DrawerHeader>
             <div className="flex-1 overflow-y-auto p-4">
-              <PaymentSummary onComplete={() => setIsPaymentOpen(false)} shiftId={activeShift?.id} />
-            </div>
-          </DrawerContent>
-        </Drawer>
-      )}
-
-      {isDesktop ? (
-        <Dialog open={activeShift === null} onOpenChange={() => {}}>
-          <DialogContent className="sm:max-w-md pointer-events-auto" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
-            <DialogHeader>
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-orange-100">
-                <LockIcon className="h-8 w-8 text-orange-600" />
-              </div>
-              <DialogTitle className="text-center text-xl">{t('pos.cashier_session_closed')}</DialogTitle>
-              <DialogDescription className="text-center">
-                {t('pos.enter_start_cash')}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label>{t('pos.start_cash_label')}</Label>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  value={startCash}
-                  onChange={(e) => setStartCash(e.target.value)}
-                  placeholder={t('pos.example_cash')}
-                  autoFocus
-                />
-              </div>
-            </div>
-            <DialogFooter className="sm:justify-center">
-              <Button size="lg" className="w-full sm:w-auto" onClick={handleOpenShift}>{t('pos.open_shift_now')}</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      ) : (
-        <Drawer open={activeShift === null} onOpenChange={() => {}} dismissible={false}>
-          <DrawerContent>
-            <DrawerHeader>
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-orange-100">
-                <LockIcon className="h-8 w-8 text-orange-600" />
-              </div>
-              <DrawerTitle className="text-center text-xl">{t('pos.cashier_session_closed')}</DrawerTitle>
-              <DrawerDescription className="text-center">
-                {t('pos.enter_start_cash')}
-              </DrawerDescription>
-            </DrawerHeader>
-            <div className="p-4 space-y-4">
-              <div className="space-y-2">
-                <Label>{t('pos.start_cash_label')}</Label>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  value={startCash}
-                  onChange={(e) => setStartCash(e.target.value)}
-                  placeholder={t('pos.example_cash')}
-                  autoFocus
-                />
-              </div>
-              <Button size="lg" className="w-full" onClick={handleOpenShift}>{t('pos.open_shift_now')}</Button>
+              <PaymentSummary onComplete={() => setIsPaymentOpen(false)} />
             </div>
           </DrawerContent>
         </Drawer>

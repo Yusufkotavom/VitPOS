@@ -27,7 +27,7 @@ export function SalesOrderForm({ defaultValues, submitLabel, onCancel, onSubmit 
 
   return (
     <form className="flex flex-col gap-4 p-4" onSubmit={form.handleSubmit(onSubmit)}>
-      <FormSection title={t('sales_orders.form_info_title')} description={t('sales_orders.form_info_description')}>
+      <div className="grid gap-4 md:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm font-medium">
           {t('sales_orders.invoice_number_label')}
           <Input aria-invalid={Boolean(errors.code)} {...form.register('code')} placeholder={t('sales_orders.invoice_number_placeholder')} />
@@ -47,7 +47,7 @@ export function SalesOrderForm({ defaultValues, submitLabel, onCancel, onSubmit 
           {t('common.status')}
           <FormSelect control={form.control} name="status" options={salesOrderStatusOptions.map(o => ({ label: o, value: o }))} />
         </label>
-      </FormSection>
+      </div>
 
       <FormSection title={t('sales_orders.order_items')} description={t('sales_orders.order_items_description')}>
         <div className="flex flex-col gap-3">

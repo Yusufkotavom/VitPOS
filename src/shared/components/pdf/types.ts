@@ -1,4 +1,4 @@
-export type PdfDocumentType = 'invoice' | 'service' | 'receipt' | 'payment'
+export type PdfDocumentType = 'invoice' | 'service' | 'receipt' | 'payment' | 'sales-order'
 
 export type InvoiceThemeName = 'klasik' | 'korporat' | 'modern' | 'eksekutif'
 
@@ -103,13 +103,28 @@ export type PdfPaymentData = {
   status: string
 }
 
-export type PdfData = PdfInvoiceData | PdfServiceData | PdfReceiptData | PdfPaymentData
+export type PdfSalesOrderData = {
+  type: 'sales-order'
+  code: string
+  date: string
+  customer: PdfCustomer
+  items: PdfLineItem[]
+  summary: {
+    subtotal: number
+    discount: number
+    grandTotal: number
+  }
+  notes: string
+}
+
+export type PdfData = PdfInvoiceData | PdfServiceData | PdfReceiptData | PdfPaymentData | PdfSalesOrderData
 
 export const labels = {
   invoice: 'INVOICE',
   service: 'SERVICE ORDER',
   receipt: 'STRUK',
   payment: 'BUKTI PEMBAYARAN',
+  'sales-order': 'SURAT PESANAN',
   date: 'Tanggal',
   status: 'Status',
   customer: 'Pelanggan',

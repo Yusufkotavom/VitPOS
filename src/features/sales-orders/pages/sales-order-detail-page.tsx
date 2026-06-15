@@ -94,6 +94,20 @@ export function SalesOrderDetailPage() {
     payments: order.payments?.map(p => ({ method: p.method, amount: p.amount, date: formatDateTime(p.date) })),
   } : null
 
+  const salesOrderData: PdfData | null = order ? {
+    type: 'sales-order',
+    code: order.code,
+    date: formatDateTime(order.date),
+    customer: { name: order.customerName, phone: invoiceCustomer?.phone },
+    items: order.items?.map(i => ({ name: i.name, qty: i.qty, price: i.unitPrice, subtotal: i.subtotal })) || [],
+    summary: {
+      subtotal: order.subtotal,
+      discount: order.discountTotal,
+      grandTotal: order.grandTotal,
+    },
+    notes: order.notes || '',
+  } : null
+
   if (isLoading) {
     return (
       <PageShell title="Loading..." description="">
@@ -297,7 +311,7 @@ export function SalesOrderDetailPage() {
             <Printer className="mr-2 h-4 w-4" />
             Struk (Thermal)
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => invoiceData && printPdf(invoiceData)}>
+          <DropdownMenuItem onClick={() => salesOrderData && printPdf(salesOrderData)}>
             <FileText className="mr-2 h-4 w-4" />
             Sales Order (A4)
           </DropdownMenuItem>
