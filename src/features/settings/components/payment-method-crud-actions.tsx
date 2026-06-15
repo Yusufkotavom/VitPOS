@@ -1,20 +1,38 @@
 import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { createEntityId } from '@/features/catalog/lib/entity-id'
+import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { PaymentMethodForm } from '@/features/settings/components/payment-method-form'
 import { mapPaymentMethodFormToRecord, mapPaymentMethodRecordToFormValues, type PaymentMethodFormValues } from '@/features/settings/schemas/payment-method-schema'
 import { paymentMethodRepository } from '@/services/local-db/repository'
+import { canDeletePaymentMethod } from '@/shared/lib/delete-guard'
 import type { LocalPaymentMethod } from '@/services/local-db/schema'
 
 export function PaymentMethodCrudActions({ paymentMethod }: { paymentMethod?: LocalPaymentMethod }) {
   const [formOpen, setFormOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [hasReferences, setHasReferences] = useState(false)
+  const [referenceReason, setReferenceReason] = useState<string>()
   const isEdit = Boolean(paymentMethod)
+
+  useEffect(() => {
+    if (!paymentMethod) {
+      setHasReferences(false)
+      setReferenceReason(undefined)
+      return
+    }
+    const tenantId = resolveTenantId(paymentMethod.tenantId)
+    canDeletePaymentMethod(paymentMethod.name, tenantId).then((result) => {
+      setHasReferences(!result.allowed)
+      setReferenceReason(result.reason)
+    })
+  }, [paymentMethod])
 
   async function handleSubmit(values: PaymentMethodFormValues) {
     try {
@@ -29,6 +47,14 @@ export function PaymentMethodCrudActions({ paymentMethod }: { paymentMethod?: Lo
 
   async function handleDelete() {
     if (!paymentMethod) return
+    // Safety net: cek sekali lagi sebelum hapus
+    const tenantId = resolveTenantId(paymentMethod.tenantId)
+    const guard = await canDeletePaymentMethod(paymentMethod.name, tenantId)
+    if (!guard.allowed) {
+      toast.error(guard.reason)
+      setDeleteOpen(false)
+      return
+    }
     try {
       await paymentMethodRepository.remove(paymentMethod.id)
       toast.success('Metode pembayaran dihapus')
@@ -49,12 +75,21 @@ export function PaymentMethodCrudActions({ paymentMethod }: { paymentMethod?: Lo
             <SheetTitle>{isEdit ? 'Ubah Metode Pembayaran' : 'Tambah Metode Pembayaran'}</SheetTitle>
             <SheetDescription>Konfigurasi channel pembayaran untuk transaksi.</SheetDescription>
           </SheetHeader>
-          <PaymentMethodForm defaultValues={paymentMethod ? mapPaymentMethodRecordToFormValues(paymentMethod) : undefined} submitLabel={isEdit ? 'Simpan perubahan' : 'Simpan metode pembayaran'} onCancel={() => setFormOpen(false)} onSubmit={handleSubmit} />
+          <PaymentMethodForm isEdit={isEdit} defaultValues={paymentMethod ? mapPaymentMethodRecordToFormValues(paymentMethod) : undefined} submitLabel={isEdit ? 'Simpan perubahan' : 'Simpan metode pembayaran'} onCancel={() => setFormOpen(false)} onSubmit={handleSubmit} />
         </SheetContent>
       </Sheet>
       {paymentMethod ? (
         <>
-          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />Hapus</Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span tabIndex={0}>
+                <Button variant="destructive" size="sm" disabled={hasReferences} onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />Hapus</Button>
+              </span>
+            </TooltipTrigger>
+            {hasReferences && referenceReason ? (
+              <TooltipContent side="bottom" className="text-xs max-w-48">{referenceReason}</TooltipContent>
+            ) : null}
+          </Tooltip>
           <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
             <DialogContent>
               <DialogHeader>

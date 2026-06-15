@@ -4,6 +4,7 @@ import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { todayISO } from '@/lib/date'
 import { addWarrantyDuration, buildWarrantyTimelineNote } from '@/features/service-orders/lib/warranty'
 import { syncCustomerSalesMetrics } from '@/features/sales-orders/services/sales-order-finance.service'
+import { recordServiceOrderJournal } from '@/services/accounting/accounting-integration'
 import type { 
   LocalServiceOrder, 
   LocalPayment, 
@@ -235,6 +236,19 @@ export const socTransactionService = {
       } catch (err) {
         console.error('[SOC] syncCustomerSalesMetrics failed (non-critical):', err)
       }
+    }
+
+    // Accounting journal entry (non-blocking)
+    try {
+      await recordServiceOrderJournal(
+        tenantId,
+        serviceOrderId,
+        totals.total,
+        paymentMethod,
+        todayISO(),
+      )
+    } catch (err) {
+      console.warn('[SOC] recordServiceOrderJournal failed (non-critical):', err)
     }
 
     return { serviceOrderId, paymentId, code: serviceOrder.code, serviceOrder, payment }

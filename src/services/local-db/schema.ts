@@ -418,4 +418,44 @@ export type SyncRun = {
   pullSummary?: string
 }
 
+export type AccountType = 'asset' | 'liability' | 'equity' | 'revenue' | 'cogs' | 'expense'
+
+export type LocalAccount = {
+  id: string
+  tenantId: string
+  code: string
+  name: string
+  type: AccountType
+  isSystem: boolean
+  isActive: boolean
+  syncStatus: SyncStatus
+  version: number
+  updatedAt: string
+}
+
+export type LocalJournalEntry = {
+  id: string
+  tenantId: string
+  code: string
+  description: string
+  referenceType: string
+  referenceId: string
+  date: string
+  syncStatus: SyncStatus
+  version: number
+  updatedAt: string
+}
+
+export type LocalJournalLine = {
+  id: string
+  tenantId: string
+  journalEntryId: string
+  accountId: string
+  accountCode: string
+  debit: number
+  credit: number
+  syncStatus: SyncStatus
+  updatedAt: string
+}
+
 export type { ConflictResolution, ConflictStatus, OutboxItem, OutboxStatus, SyncEntityType, SyncMutationType }

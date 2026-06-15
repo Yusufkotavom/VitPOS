@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ReturnForm } from '@/features/returns/components/return-form'
 import { mapReturnFormToRecord, mapReturnRecordToFormValues, type ReturnFormValues } from '@/features/returns/schemas/return-form-schema'
 import { returnRepository } from '@/services/local-db/repository'
+import { recordReturnJournal } from '@/services/accounting/accounting-integration'
 import type { LocalReturn } from '@/services/local-db/schema'
 
 export function ReturnCrudActions({ ret }: { ret?: LocalReturn }) {
@@ -32,7 +33,29 @@ export function ReturnCrudActions({ ret }: { ret?: LocalReturn }) {
       }
 
       const finalValues = { ...values, code: finalCode }
-      await returnRepository.upsert(mapReturnFormToRecord(finalValues, id, ret))
+      const returnRecord = mapReturnFormToRecord(finalValues, id, ret)
+      await returnRepository.upsert(returnRecord)
+
+      // Accounting journal entry (non-blocking)
+      if (returnRecord.type === 'Penjualan') {
+        try {
+          const totalCost = returnRecord.items.reduce(
+            (sum, item) => sum + (item.unitPrice * item.qty),
+            0,
+          )
+          await recordReturnJournal(
+            returnRecord.tenantId,
+            returnRecord.id,
+            returnRecord.total,
+            totalCost,
+            'tunai', // default payment method for returns
+            returnRecord.date,
+          )
+        } catch (err) {
+          console.warn('[Returns] recordReturnJournal failed (non-critical):', err)
+        }
+      }
+
       toast.success(isEdit ? t('returns.updated') : t('returns.created'))
       setFormOpen(false)
     } catch (error) {

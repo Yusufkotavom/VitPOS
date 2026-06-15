@@ -11,6 +11,7 @@ describe('report presets', () => {
       'Penjualan',
       'Laba Rugi',
       'Neraca',
+      'Buku Besar',
       'Stok',
       'Kas',
       'Piutang',

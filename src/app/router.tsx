@@ -24,6 +24,7 @@ const CashCategoriesPage = lazy(() => import('@/features/cash/pages/cash-categor
 const ReportsPage = lazy(() => import('@/features/reports/pages/reports-page').then(pick('ReportsPage')))
 const ProfitLossPage = lazy(() => import('@/features/reports/pages/profit-loss-page').then(pick('ProfitLossPage')))
 const BalanceSheetPage = lazy(() => import('@/features/reports/pages/balance-sheet-page').then(pick('BalanceSheetPage')))
+const GeneralLedgerPage = lazy(() => import('@/features/reports/pages/general-ledger-page').then(pick('GeneralLedgerPage')))
 const SalesReportPage = lazy(() => import('@/features/reports/pages/sales-report-page').then(pick('SalesReportPage')))
 const PaymentReportPage = lazy(() => import('@/features/reports/pages/payment-report-page').then(pick('PaymentReportPage')))
 const InventoryReportPage = lazy(() => import('@/features/reports/pages/inventory-report-page').then(pick('InventoryReportPage')))
@@ -94,6 +95,7 @@ export const router = createBrowserRouter([
       { path: 'reports', element: routeElement(ReportsPage) },
       { path: 'reports/profit-loss', element: routeElement(ProfitLossPage) },
       { path: 'reports/balance-sheet', element: routeElement(BalanceSheetPage) },
+      { path: 'reports/general-ledger', element: routeElement(GeneralLedgerPage) },
       { path: 'reports/sales', element: routeElement(SalesReportPage) },
       { path: 'reports/payments', element: routeElement(PaymentReportPage) },
       { path: 'reports/inventory', element: routeElement(InventoryReportPage) },

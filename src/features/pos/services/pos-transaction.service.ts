@@ -2,6 +2,7 @@ import { localDb } from '@/services/local-db/client'
 import { productRepository } from '@/services/local-db/repository'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { syncCustomerSalesMetrics } from '@/features/sales-orders/services/sales-order-finance.service'
+import { recordPosSaleJournal } from '@/services/accounting/accounting-integration'
 import type { LocalPayment, LocalProduct, LocalSalesOrder, LocalSalesOrderItem, LocalStockMovement, OutboxItem, PosPaymentMethodCode, LocalInventory } from '@/services/local-db/schema'
 import type { PosPaymentMethod } from '@/features/pos/types/pos.types'
 
@@ -312,6 +313,24 @@ export const posTransactionService = {
       await syncCustomerSalesMetrics(customerId ?? undefined, tenantId)
     } catch (err) {
       console.error('[POS] syncCustomerSalesMetrics failed (non-critical):', err)
+    }
+
+    // Accounting journal entry (non-blocking)
+    try {
+      const totalHpp = cartItems.reduce((sum, item) => {
+        const product = cartProductMap.get(item.productId)
+        return sum + (product?.costPrice ?? 0) * item.qty
+      }, 0)
+      await recordPosSaleJournal(
+        tenantId,
+        salesOrderId,
+        totals.total,
+        totalHpp,
+        paymentMethod,
+        nowIso,
+      )
+    } catch (err) {
+      console.warn('[POS] recordPosSaleJournal failed (non-critical):', err)
     }
 
     return { salesOrderId, paymentId, code: salesOrder.code }

@@ -1,6 +1,7 @@
 import { requireActiveTenantId, resolveTenantId } from '@/features/auth/stores/auth-store'
 import { localDb } from '@/services/local-db/client'
 import { productRepository, stockMovementRepository, purchaseRepository, supplierRepository } from '@/services/local-db/repository'
+import { recordPurchaseJournal } from '@/services/accounting/accounting-integration'
 import type { LocalInventory, LocalProduct, LocalPurchase } from '@/services/local-db/schema'
 
 function createId(prefix: string) {
@@ -116,6 +117,18 @@ export async function receivePurchaseOrder(purchase: LocalPurchase, warehouseNam
   })
 
   await syncSupplierPurchaseMetrics(purchase.supplierId, tenantId)
+
+  // Accounting journal entry (non-blocking)
+  try {
+    await recordPurchaseJournal(
+      tenantId,
+      purchase.id,
+      purchase.grandTotal,
+      now,
+    )
+  } catch (err) {
+    console.warn('[Purchasing] recordPurchaseJournal failed (non-critical):', err)
+  }
 
   return {
     ...purchase,

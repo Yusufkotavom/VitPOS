@@ -16,6 +16,8 @@ export const returnTypeEnum = pgEnum('return_type', ['sale', 'purchase'])
 export const returnStatusEnum = pgEnum('return_status', ['draft', 'processing', 'completed', 'cancelled'])
 export const serviceOrderStatusEnum = pgEnum('service_order_status', ['received', 'in_progress', 'completed', 'picked_up', 'cancelled'])
 export const recipeStatusEnum = pgEnum('recipe_status', ['draft', 'active'])
+export const accountTypeEnum = pgEnum('account_type', ['asset', 'liability', 'equity', 'revenue', 'cogs', 'expense'])
+export const journalEntryStatusEnum = pgEnum('journal_entry_status', ['draft', 'posted'])
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -479,6 +481,44 @@ export const productionBatches = pgTable('production_batches', {
   ...timestamps,
 }, (table) => [index('production_batches_tenant_id_idx').on(table.tenantId), index('production_batches_branch_id_idx').on(table.branchId), index('production_batches_recipe_id_idx').on(table.recipeId), index('production_batches_product_id_idx').on(table.productId)])
 
+export const accounts = pgTable('accounts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  code: varchar('code', { length: 20 }).notNull(),
+  name: varchar('name', { length: 180 }).notNull(),
+  type: accountTypeEnum('type').notNull(),
+  isSystem: boolean('is_system').default(false).notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  syncStatus: syncStatusEnum('sync_status').default('synced').notNull(),
+  version: integer('version').default(1).notNull(),
+  ...timestamps,
+}, (table) => [index('accounts_tenant_id_idx').on(table.tenantId)])
+
+export const journalEntries = pgTable('journal_entries', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  code: varchar('code', { length: 80 }).notNull(),
+  description: text('description'),
+  referenceType: varchar('reference_type', { length: 80 }),
+  referenceId: uuid('reference_id'),
+  date: timestamp('date', { withTimezone: true }).defaultNow().notNull(),
+  syncStatus: syncStatusEnum('sync_status').default('synced').notNull(),
+  version: integer('version').default(1).notNull(),
+  ...timestamps,
+}, (table) => [index('journal_entries_tenant_id_idx').on(table.tenantId), index('journal_entries_reference_idx').on(table.referenceType, table.referenceId)])
+
+export const journalLines = pgTable('journal_lines', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id),
+  journalEntryId: uuid('journal_entry_id').notNull().references(() => journalEntries.id),
+  accountId: uuid('account_id').notNull().references(() => accounts.id),
+  accountCode: varchar('account_code', { length: 20 }).notNull(),
+  debit: numeric('debit', { precision: 14, scale: 2 }).default('0').notNull(),
+  credit: numeric('credit', { precision: 14, scale: 2 }).default('0').notNull(),
+  syncStatus: syncStatusEnum('sync_status').default('synced').notNull(),
+  ...timestamps,
+}, (table) => [index('journal_lines_tenant_id_idx').on(table.tenantId), index('journal_lines_entry_id_idx').on(table.journalEntryId), index('journal_lines_account_id_idx').on(table.accountId)])
+
 export const outboxLogs = pgTable('outbox_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
   tenantId: uuid('tenant_id').notNull(),
@@ -563,4 +603,19 @@ export const purchaseItemsRelations = relations(purchaseItems, ({ one }) => ({
 
 export const returnItemsRelations = relations(returnItems, ({ one }) => ({
   returnOrder: one(returns, { fields: [returnItems.returnId], references: [returns.id] }),
+}))
+
+export const accountsRelations = relations(accounts, ({ one }) => ({
+  tenant: one(tenants, { fields: [accounts.tenantId], references: [tenants.id] }),
+}))
+
+export const journalEntriesRelations = relations(journalEntries, ({ one, many }) => ({
+  tenant: one(tenants, { fields: [journalEntries.tenantId], references: [tenants.id] }),
+  lines: many(journalLines),
+}))
+
+export const journalLinesRelations = relations(journalLines, ({ one }) => ({
+  tenant: one(tenants, { fields: [journalLines.tenantId], references: [tenants.id] }),
+  journalEntry: one(journalEntries, { fields: [journalLines.journalEntryId], references: [journalEntries.id] }),
+  account: one(accounts, { fields: [journalLines.accountId], references: [accounts.id] }),
 }))

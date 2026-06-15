@@ -32,6 +32,11 @@ const SHARED_OWNER_CARDS: ReportCardPreset[] = [
     description: 'Aset, kewajiban, dan ekuitas perusahaan',
   },
   {
+    to: '/reports/general-ledger',
+    title: 'Buku Besar',
+    description: 'Riwayat transaksi per akun',
+  },
+  {
     to: '/reports/inventory',
     title: 'Stok',
     description: 'Barang hampir habis, mutasi, restok',

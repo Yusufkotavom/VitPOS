@@ -1,5 +1,6 @@
 import { localDb } from '@/services/local-db/client'
 import { productRepository, stockMovementRepository } from '@/services/local-db/repository'
+import { recordStockAdjustmentJournal } from '@/services/accounting/accounting-integration'
 import type { LocalProduct, LocalStockMovement, LocalInventory } from '@/services/local-db/schema'
 
 export const inventoryAdjustmentService = {
@@ -52,6 +53,19 @@ export const inventoryAdjustmentService = {
       })
       await stockMovementRepository.upsert(movement)
     })
+
+    // Accounting journal entry (non-blocking)
+    try {
+      await recordStockAdjustmentJournal(
+        product.tenantId,
+        product,
+        qty,
+        movementId,
+        nowIso,
+      )
+    } catch (err) {
+      console.warn('[Inventory] recordStockAdjustmentJournal failed (non-critical):', err)
+    }
     
     return nextStock
   }

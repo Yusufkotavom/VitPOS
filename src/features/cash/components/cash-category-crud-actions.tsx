@@ -10,17 +10,34 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { Field, FieldGroup } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Label } from '@/components/ui/label'
 import { cashCategoryFormSchema, cashCategoryInitialValues, cashCategoryTypeOptions, type CashCategoryFormValues } from '@/features/cash/schemas/cash-category-schema'
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { cashCategoryRepository } from '@/services/local-db/repository'
+import { canDeleteCashCategory } from '@/shared/lib/delete-guard'
 import type { LocalCashCategory } from '@/services/local-db/schema'
 
 export function CashCategoryCrudActions({ category }: { category?: LocalCashCategory }) {
   const { t } = useTranslation()
   const [formOpen, setFormOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [hasReferences, setHasReferences] = useState(false)
+  const [referenceReason, setReferenceReason] = useState<string>()
   const isEdit = Boolean(category)
+
+  useEffect(() => {
+    if (!category) {
+      setHasReferences(false)
+      setReferenceReason(undefined)
+      return
+    }
+    const tenantId = resolveTenantId(category.tenantId)
+    canDeleteCashCategory(category.name, tenantId).then((result) => {
+      setHasReferences(!result.allowed)
+      setReferenceReason(result.reason)
+    })
+  }, [category])
 
   const form = useForm<CashCategoryFormValues>({
     resolver: zodResolver(cashCategoryFormSchema),
@@ -58,6 +75,14 @@ export function CashCategoryCrudActions({ category }: { category?: LocalCashCate
 
   async function handleDelete() {
     if (!category) return
+    // Safety net: cek sekali lagi sebelum hapus
+    const tenantId = resolveTenantId(category.tenantId)
+    const guard = await canDeleteCashCategory(category.name, tenantId)
+    if (!guard.allowed) {
+      toast.error(guard.reason)
+      setDeleteOpen(false)
+      return
+    }
     try {
       await cashCategoryRepository.remove(category.id)
       toast.success(t('cash.category_deleted'))
@@ -94,7 +119,7 @@ export function CashCategoryCrudActions({ category }: { category?: LocalCashCate
                   name="type"
                   control={form.control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isEdit}>
                       <SelectTrigger id="type">
                         <SelectValue placeholder={t('common.select_placeholder')} />
                       </SelectTrigger>
@@ -115,7 +140,7 @@ export function CashCategoryCrudActions({ category }: { category?: LocalCashCate
                   name="status"
                   control={form.control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isEdit}>
                       <SelectTrigger id="category-status">
                         <SelectValue placeholder={t('common.select_status')} />
                       </SelectTrigger>
@@ -143,7 +168,16 @@ export function CashCategoryCrudActions({ category }: { category?: LocalCashCate
       </Dialog>
       {category ? (
         <>
-          <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />{t('common.delete')}</Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span tabIndex={0}>
+                <Button variant="destructive" size="sm" disabled={hasReferences} onClick={() => setDeleteOpen(true)}><Trash2Icon data-icon="inline-start" />{t('common.delete')}</Button>
+              </span>
+            </TooltipTrigger>
+            {hasReferences && referenceReason ? (
+              <TooltipContent side="bottom" className="text-xs max-w-48">{referenceReason}</TooltipContent>
+            ) : null}
+          </Tooltip>
           <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
             <DialogContent>
               <DialogHeader>

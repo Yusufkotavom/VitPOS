@@ -17,6 +17,7 @@ import { mapCashFormToRecord, mapCashRecordToFormValues } from '@/features/cash/
 import { useCashCategories } from '@/features/cash/hooks/use-cash-categories'
 import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
 import { cashRepository } from '@/services/local-db/repository'
+import { recordCashJournal } from '@/services/accounting/accounting-integration'
 import type { LocalCash } from '@/services/local-db/schema'
 
 export function CashCrudActions({ cash }: { cash?: LocalCash }) {
@@ -57,7 +58,23 @@ export function CashCrudActions({ cash }: { cash?: LocalCash }) {
       }
 
       const finalValues = { ...values, ref: finalRef }
-      await cashRepository.upsert(mapCashFormToRecord(finalValues, id))
+      const cashRecord = mapCashFormToRecord(finalValues, id)
+      await cashRepository.upsert(cashRecord)
+
+      // Accounting journal entry (non-blocking)
+      try {
+        await recordCashJournal(
+          cashRecord.tenantId,
+          id,
+          Math.max(cashRecord.income, cashRecord.expense),
+          values.category,
+          values.type as 'Pemasukan' | 'Pengeluaran',
+          values.date,
+        )
+      } catch (err) {
+        console.warn('[Cash] recordCashJournal failed (non-critical):', err)
+      }
+
       toast.success(isEdit ? t('cash.transaction_updated') : t('cash.transaction_added'))
       setFormOpen(false)
     } catch (error) {

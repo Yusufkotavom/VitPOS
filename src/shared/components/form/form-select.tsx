@@ -15,6 +15,7 @@ interface FormSelectProps<TFieldValues extends FieldValues> {
   label?: string
   options: { label: string; value: string }[]
   placeholder?: string
+  disabled?: boolean
 }
 
 export function FormSelect<TFieldValues extends FieldValues>({
@@ -23,6 +24,7 @@ export function FormSelect<TFieldValues extends FieldValues>({
   label,
   options,
   placeholder = 'Pilih...',
+  disabled,
 }: FormSelectProps<TFieldValues>) {
   return (
     <Controller
@@ -31,7 +33,7 @@ export function FormSelect<TFieldValues extends FieldValues>({
       render={({ field, fieldState }) => (
         <Field className="flex flex-col gap-1 space-y-0">
           {label && <FieldLabel>{label}</FieldLabel>}
-          <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+          <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value} disabled={disabled}>
             <SelectTrigger aria-invalid={Boolean(fieldState.error)}>
               <SelectValue placeholder={placeholder} />
             </SelectTrigger>

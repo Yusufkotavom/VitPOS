@@ -1,10 +1,13 @@
 import { localDb } from '@/services/local-db/client'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import type {
+  LocalAccount,
   LocalCash,
   LocalCashCategory,
   LocalCustomer,
   LocalInventory,
+  LocalJournalEntry,
+  LocalJournalLine,
   LocalPayment,
   LocalProduct,
   LocalProductCategory,
@@ -159,3 +162,6 @@ export const serviceOrderRepository = createRepository<LocalServiceOrder>({ tabl
 export const paymentMethodRepository = createRepository<LocalPaymentMethod>({ table: localDb.paymentMethods, outboxTable: localDb.outbox, entityType: 'payment_method' })
 export const recipeRepository = createRepository<LocalRecipe>({ table: localDb.recipes, outboxTable: localDb.outbox, entityType: 'recipe' })
 export const productionBatchRepository = createRepository<LocalProductionBatch>({ table: localDb.productionBatches, outboxTable: localDb.outbox, entityType: 'production_batch' })
+export const accountRepository = createRepository<LocalAccount>({ table: localDb.accounts, outboxTable: localDb.outbox, entityType: 'account' })
+export const journalEntryRepository = createRepository<LocalJournalEntry>({ table: localDb.journalEntries, outboxTable: localDb.outbox, entityType: 'journal_entry' })
+export const journalLineRepository = createRepository<LocalJournalLine>({ table: localDb.journalLines, outboxTable: localDb.outbox, entityType: 'journal_line' })

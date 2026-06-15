@@ -19,23 +19,18 @@ export function BalanceSheetPage() {
     if (!data) return
     const rows = [
       { id: '1', akun: 'ASET', nilai: '' },
-      { id: '2', akun: '  Kas', nilai: String(data.assets.cashOnHand) },
-      { id: '2a', akun: '  Rekening Bank', nilai: String(data.assets.bankAccounts) },
-      { id: '2b', akun: '  E-Wallet & QRIS', nilai: String(data.assets.ewallets) },
-      ...data.assets.otherAssets.map((asset, i) => ({ id: `2c${i}`, akun: `  Aset Lain (${asset.method})`, nilai: String(asset.total) })),
-      { id: '3', akun: '  Piutang Usaha', nilai: String(data.assets.accountsReceivable) },
-      { id: '4', akun: '  Persediaan', nilai: String(data.assets.inventoryValue) },
-      { id: '5', akun: 'Total Aset', nilai: String(data.assets.totalAssets) },
-      { id: '6', akun: '', nilai: '' },
-      { id: '7', akun: 'LIABILITAS', nilai: '' },
-      { id: '8', akun: '  Hutang Usaha', nilai: String(data.liabilities.accountsPayable) },
-      { id: '9', akun: 'Total Liabilitas', nilai: String(data.liabilities.totalLiabilities) },
-      { id: '10', akun: '', nilai: '' },
-      { id: '11', akun: 'EKUITAS', nilai: '' },
-      { id: '12', akun: '  Laba Ditahan', nilai: String(data.equity.retainedEarnings) },
-      { id: '13', akun: 'Total Ekuitas', nilai: String(data.equity.totalEquity) },
-      { id: '14', akun: '', nilai: '' },
-      { id: '15', akun: 'Total Liabilitas + Ekuitas', nilai: String(data.totalLiabilitiesAndEquity) },
+      ...data.assets.map((a, i) => ({ id: `a${i}`, akun: `  ${a.accountName}`, nilai: String(a.balance) })),
+      { id: 'ta', akun: 'Total Aset', nilai: String(data.totalAssets) },
+      { id: '', akun: '', nilai: '' },
+      { id: '2', akun: 'LIABILITAS', nilai: '' },
+      ...data.liabilities.map((l, i) => ({ id: `l${i}`, akun: `  ${l.accountName}`, nilai: String(l.balance) })),
+      { id: 'tl', akun: 'Total Liabilitas', nilai: String(data.totalLiabilities) },
+      { id: '', akun: '', nilai: '' },
+      { id: '3', akun: 'EKUITAS', nilai: '' },
+      ...data.equities.map((e, i) => ({ id: `e${i}`, akun: `  ${e.accountName}`, nilai: String(e.balance) })),
+      { id: 'te', akun: 'Total Ekuitas', nilai: String(data.totalEquity) },
+      { id: '', akun: '', nilai: '' },
+      { id: '4', akun: 'Total Liabilitas + Ekuitas', nilai: String(data.totalLiabilitiesEquity) },
     ]
     exportToCsv(`neraca-${params.to ?? 'current'}.csv`, [
       { key: 'akun', header: 'Akun' },
@@ -51,7 +46,7 @@ export function BalanceSheetPage() {
         </Button>
         <div>
           <h1 className="text-xl font-semibold">Neraca (Balance Sheet)</h1>
-          <p className="text-sm text-muted-foreground">Posisi keuangan: aset, liabilitas, dan ekuitas</p>
+          <p className="text-sm text-muted-foreground">Posisi keuangan: aset, liabilitas, dan ekuitas — berdasarkan jurnal akuntansi</p>
         </div>
         <div className="ml-auto">
           <Button variant="outline" size="sm" onClick={handleExport} disabled={!data}>Export CSV</Button>
@@ -65,9 +60,9 @@ export function BalanceSheetPage() {
       ) : data ? (
         <>
           <div className="grid gap-3 md:grid-cols-3">
-            <ReportMetricCard label="Total Aset" value={formatCurrency(data.assets.totalAssets)} tone="positive" />
-            <ReportMetricCard label="Total Liabilitas" value={formatCurrency(data.liabilities.totalLiabilities)} tone="negative" />
-            <ReportMetricCard label="Total Ekuitas" value={formatCurrency(data.equity.totalEquity)} />
+            <ReportMetricCard label="Total Aset" value={formatCurrency(data.totalAssets)} tone="positive" />
+            <ReportMetricCard label="Total Liabilitas" value={formatCurrency(data.totalLiabilities)} tone="negative" />
+            <ReportMetricCard label="Total Ekuitas" value={formatCurrency(data.totalEquity)} />
           </div>
 
           <Card>
@@ -75,66 +70,65 @@ export function BalanceSheetPage() {
               <Table>
                 <TableBody>
                   <TableRow className="border-b bg-muted/50">
-                    <TableCell colSpan={2} className="py-2 font-semibold">ASET</TableCell>
+                    <TableCell colSpan={2} className="py-2 font-semibold">ASET (1xxx)</TableCell>
                   </TableRow>
-                  <TableRow className="border-b">
-                    <TableCell className="py-2">Kas</TableCell>
-                    <TableCell className="py-2 text-right font-semibold">{formatCurrency(data.assets.cashOnHand)}</TableCell>
-                  </TableRow>
-                  <TableRow className="border-b">
-                    <TableCell className="py-2">Rekening Bank</TableCell>
-                    <TableCell className="py-2 text-right font-semibold">{formatCurrency(data.assets.bankAccounts)}</TableCell>
-                  </TableRow>
-                  <TableRow className="border-b">
-                    <TableCell className="py-2">E-Wallet & QRIS</TableCell>
-                    <TableCell className="py-2 text-right font-semibold">{formatCurrency(data.assets.ewallets)}</TableCell>
-                  </TableRow>
-                  {data.assets.otherAssets.map((asset, i) => (
-                    <TableRow key={i} className="border-b">
-                      <TableCell className="py-2 capitalize">Aset Lain ({asset.method})</TableCell>
-                      <TableCell className="py-2 text-right font-semibold">{formatCurrency(asset.total)}</TableCell>
+                  {data.assets.length === 0 && (
+                    <TableRow className="border-b">
+                      <TableCell className="py-2 text-muted-foreground" colSpan={2}>Belum ada data aset</TableCell>
+                    </TableRow>
+                  )}
+                  {data.assets.map((a) => (
+                    <TableRow key={a.accountCode} className="border-b">
+                      <TableCell className="py-2">{a.accountName}</TableCell>
+                      <TableCell className="py-2 text-right font-semibold">{formatCurrency(a.balance)}</TableCell>
                     </TableRow>
                   ))}
-                  <TableRow className="border-b">
-                    <TableCell className="py-2">Piutang Usaha</TableCell>
-                    <TableCell className="py-2 text-right font-semibold">{formatCurrency(data.assets.accountsReceivable)}</TableCell>
-                  </TableRow>
-                  <TableRow className="border-b">
-                    <TableCell className="py-2">Persediaan</TableCell>
-                    <TableCell className="py-2 text-right font-semibold">{formatCurrency(data.assets.inventoryValue)}</TableCell>
-                  </TableRow>
                   <TableRow className="font-bold border-t">
                     <TableCell className="py-2">Total Aset</TableCell>
-                    <TableCell className="py-2 text-right text-green-600">{formatCurrency(data.assets.totalAssets)}</TableCell>
+                    <TableCell className="py-2 text-right text-green-600">{formatCurrency(data.totalAssets)}</TableCell>
                   </TableRow>
 
                   <TableRow className="border-b bg-muted/50">
-                    <TableCell colSpan={2} className="py-2 font-semibold">LIABILITAS</TableCell>
+                    <TableCell colSpan={2} className="py-2 font-semibold">LIABILITAS (2xxx)</TableCell>
                   </TableRow>
-                  <TableRow className="border-b">
-                    <TableCell className="py-2">Hutang Usaha</TableCell>
-                    <TableCell className="py-2 text-right font-semibold text-red-600">{formatCurrency(data.liabilities.accountsPayable)}</TableCell>
-                  </TableRow>
+                  {data.liabilities.length === 0 && (
+                    <TableRow className="border-b">
+                      <TableCell className="py-2 text-muted-foreground" colSpan={2}>Belum ada data liabilitas</TableCell>
+                    </TableRow>
+                  )}
+                  {data.liabilities.map((l) => (
+                    <TableRow key={l.accountCode} className="border-b">
+                      <TableCell className="py-2">{l.accountName}</TableCell>
+                      <TableCell className="py-2 text-right font-semibold text-red-600">{formatCurrency(l.balance)}</TableCell>
+                    </TableRow>
+                  ))}
                   <TableRow className="font-bold border-t">
                     <TableCell className="py-2">Total Liabilitas</TableCell>
-                    <TableCell className="py-2 text-right text-red-600">{formatCurrency(data.liabilities.totalLiabilities)}</TableCell>
+                    <TableCell className="py-2 text-right text-red-600">{formatCurrency(data.totalLiabilities)}</TableCell>
                   </TableRow>
 
                   <TableRow className="border-b bg-muted/50">
-                    <TableCell colSpan={2} className="py-2 font-semibold">EKUITAS</TableCell>
+                    <TableCell colSpan={2} className="py-2 font-semibold">EKUITAS (3xxx)</TableCell>
                   </TableRow>
-                  <TableRow className="border-b">
-                    <TableCell className="py-2">Laba Ditahan</TableCell>
-                    <TableCell className="py-2 text-right font-semibold">{formatCurrency(data.equity.retainedEarnings)}</TableCell>
-                  </TableRow>
+                  {data.equities.length === 0 && (
+                    <TableRow className="border-b">
+                      <TableCell className="py-2 text-muted-foreground" colSpan={2}>Belum ada data ekuitas</TableCell>
+                    </TableRow>
+                  )}
+                  {data.equities.map((e) => (
+                    <TableRow key={e.accountCode} className="border-b">
+                      <TableCell className="py-2">{e.accountName}</TableCell>
+                      <TableCell className="py-2 text-right font-semibold">{formatCurrency(e.balance)}</TableCell>
+                    </TableRow>
+                  ))}
                   <TableRow className="font-bold border-t">
                     <TableCell className="py-2">Total Ekuitas</TableCell>
-                    <TableCell className="py-2 text-right">{formatCurrency(data.equity.totalEquity)}</TableCell>
+                    <TableCell className="py-2 text-right">{formatCurrency(data.totalEquity)}</TableCell>
                   </TableRow>
 
                   <TableRow className="font-bold border-t-2">
                     <TableCell className="py-2">Liabilitas + Ekuitas</TableCell>
-                    <TableCell className="py-2 text-right">{formatCurrency(data.totalLiabilitiesAndEquity)}</TableCell>
+                    <TableCell className="py-2 text-right">{formatCurrency(data.totalLiabilitiesEquity)}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>

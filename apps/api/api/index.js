@@ -19,6 +19,9 @@ import postgres from "postgres";
 // ../../src/db/schema/index.ts
 var schema_exports = {};
 __export(schema_exports, {
+  accountTypeEnum: () => accountTypeEnum,
+  accounts: () => accounts,
+  accountsRelations: () => accountsRelations,
   billingPeriodEnum: () => billingPeriodEnum,
   branches: () => branches,
   branchesRelations: () => branchesRelations,
@@ -27,6 +30,11 @@ __export(schema_exports, {
   cashCategoryTypeEnum: () => cashCategoryTypeEnum,
   cashRelations: () => cashRelations,
   customers: () => customers,
+  journalEntries: () => journalEntries,
+  journalEntriesRelations: () => journalEntriesRelations,
+  journalEntryStatusEnum: () => journalEntryStatusEnum,
+  journalLines: () => journalLines,
+  journalLinesRelations: () => journalLinesRelations,
   memberRoleEnum: () => memberRoleEnum,
   orderStatusEnum: () => orderStatusEnum,
   outboxLogs: () => outboxLogs,
@@ -108,6 +116,8 @@ var returnTypeEnum = pgEnum("return_type", ["sale", "purchase"]);
 var returnStatusEnum = pgEnum("return_status", ["draft", "processing", "completed", "cancelled"]);
 var serviceOrderStatusEnum = pgEnum("service_order_status", ["received", "in_progress", "completed", "picked_up", "cancelled"]);
 var recipeStatusEnum = pgEnum("recipe_status", ["draft", "active"]);
+var accountTypeEnum = pgEnum("account_type", ["asset", "liability", "equity", "revenue", "cogs", "expense"]);
+var journalEntryStatusEnum = pgEnum("journal_entry_status", ["draft", "posted"]);
 var timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -536,6 +546,41 @@ var productionBatches = pgTable("production_batches", {
   version: integer("version").default(1).notNull(),
   ...timestamps
 }, (table) => [index("production_batches_tenant_id_idx").on(table.tenantId), index("production_batches_branch_id_idx").on(table.branchId), index("production_batches_recipe_id_idx").on(table.recipeId), index("production_batches_product_id_idx").on(table.productId)]);
+var accounts = pgTable("accounts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  code: varchar("code", { length: 20 }).notNull(),
+  name: varchar("name", { length: 180 }).notNull(),
+  type: accountTypeEnum("type").notNull(),
+  isSystem: boolean("is_system").default(false).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  syncStatus: syncStatusEnum("sync_status").default("synced").notNull(),
+  version: integer("version").default(1).notNull(),
+  ...timestamps
+}, (table) => [index("accounts_tenant_id_idx").on(table.tenantId)]);
+var journalEntries = pgTable("journal_entries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  code: varchar("code", { length: 80 }).notNull(),
+  description: text("description"),
+  referenceType: varchar("reference_type", { length: 80 }),
+  referenceId: uuid("reference_id"),
+  date: timestamp("date", { withTimezone: true }).defaultNow().notNull(),
+  syncStatus: syncStatusEnum("sync_status").default("synced").notNull(),
+  version: integer("version").default(1).notNull(),
+  ...timestamps
+}, (table) => [index("journal_entries_tenant_id_idx").on(table.tenantId), index("journal_entries_reference_idx").on(table.referenceType, table.referenceId)]);
+var journalLines = pgTable("journal_lines", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  journalEntryId: uuid("journal_entry_id").notNull().references(() => journalEntries.id),
+  accountId: uuid("account_id").notNull().references(() => accounts.id),
+  accountCode: varchar("account_code", { length: 20 }).notNull(),
+  debit: numeric("debit", { precision: 14, scale: 2 }).default("0").notNull(),
+  credit: numeric("credit", { precision: 14, scale: 2 }).default("0").notNull(),
+  syncStatus: syncStatusEnum("sync_status").default("synced").notNull(),
+  ...timestamps
+}, (table) => [index("journal_lines_tenant_id_idx").on(table.tenantId), index("journal_lines_entry_id_idx").on(table.journalEntryId), index("journal_lines_account_id_idx").on(table.accountId)]);
 var outboxLogs = pgTable("outbox_logs", {
   id: uuid("id").primaryKey().defaultRandom(),
   tenantId: uuid("tenant_id").notNull(),
@@ -607,6 +652,18 @@ var purchaseItemsRelations = relations(purchaseItems, ({ one }) => ({
 }));
 var returnItemsRelations = relations(returnItems, ({ one }) => ({
   returnOrder: one(returns, { fields: [returnItems.returnId], references: [returns.id] })
+}));
+var accountsRelations = relations(accounts, ({ one }) => ({
+  tenant: one(tenants, { fields: [accounts.tenantId], references: [tenants.id] })
+}));
+var journalEntriesRelations = relations(journalEntries, ({ one, many }) => ({
+  tenant: one(tenants, { fields: [journalEntries.tenantId], references: [tenants.id] }),
+  lines: many(journalLines)
+}));
+var journalLinesRelations = relations(journalLines, ({ one }) => ({
+  tenant: one(tenants, { fields: [journalLines.tenantId], references: [tenants.id] }),
+  journalEntry: one(journalEntries, { fields: [journalLines.journalEntryId], references: [journalEntries.id] }),
+  account: one(accounts, { fields: [journalLines.accountId], references: [accounts.id] })
 }));
 
 // src/lib/env.ts

@@ -20,6 +20,7 @@ import { usePurchases } from '@/features/purchases/hooks/use-purchases'
 import { paymentFormSchema, paymentInitialValues, paymentMethodOptions, paymentStatusOptions, type PaymentFormValues } from '@/features/payments/schemas/payment-form-schema'
 import { mapPaymentFormToRecord, mapPaymentRecordToFormValues } from '@/features/payments/schemas/payment-form-schema'
 import { paymentRepository } from '@/services/local-db/repository'
+import { recordPaymentReceivableJournal } from '@/services/accounting/accounting-integration'
 import type { LocalPayment } from '@/services/local-db/schema'
 
 export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
@@ -66,6 +67,23 @@ export function PaymentCrudActions({ payment }: { payment?: LocalPayment }) {
       if (nextPayment.purchaseId) {
         await syncPurchasePaymentSummary(nextPayment.purchaseId)
       }
+
+      // Accounting journal entry (non-blocking)
+      // Only for receivable payments (linked to sales orders or standalone)
+      if (!nextPayment.purchaseId) {
+        try {
+          await recordPaymentReceivableJournal(
+            nextPayment.tenantId,
+            nextPayment.id,
+            nextPayment.amount,
+            nextPayment.method,
+            nextPayment.date,
+          )
+        } catch (err) {
+          console.warn('[Payments] recordPaymentReceivableJournal failed (non-critical):', err)
+        }
+      }
+
       toast.success(isEdit ? t('payments.updated') : t('payments.recorded'))
       setFormOpen(false)
     } catch (error) {

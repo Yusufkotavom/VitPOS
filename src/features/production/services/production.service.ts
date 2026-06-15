@@ -1,6 +1,7 @@
 import { localDb } from '@/services/local-db/client'
 import { productRepository } from '@/services/local-db/repository'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
+import { recordProductionJournal } from '@/services/accounting/accounting-integration'
 import type { LocalProduct, LocalProductionBatch, LocalStockMovement, OutboxItem } from '@/services/local-db/schema'
 
 function createId(prefix: string) {
@@ -133,6 +134,24 @@ export async function produceFromRecipe(
     }
     await localDb.outbox.bulkPut(outboxItems)
   })
+
+  // Accounting journal entry (non-blocking)
+  try {
+    const totalCost = recipe.items.reduce((sum, item) => {
+      const ingredient = productMap.get(item.productId)
+      const consumeQty = item.qty * batchQty
+      const unitCost = ingredient?.costPrice ?? ingredient?.price ?? 0
+      return sum + consumeQty * unitCost
+    }, 0)
+    await recordProductionJournal(
+      tenantId,
+      batchId,
+      totalCost,
+      new Date().toISOString(),
+    )
+  } catch (err) {
+    console.warn('[Production] recordProductionJournal failed (non-critical):', err)
+  }
 
   return { batch, stockMovements, productUpdates }
 }

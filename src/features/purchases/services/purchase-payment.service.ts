@@ -3,6 +3,7 @@ import { localDb } from '@/services/local-db/client'
 import { enqueueOutboxItem } from '@/services/sync/outbox-service'
 import { syncSupplierPurchaseMetrics } from '@/features/purchases/services/purchase-receiving.service'
 import { todayISO } from '@/lib/date'
+import { recordPurchasePaymentJournal } from '@/services/accounting/accounting-integration'
 import type { LocalPayment, LocalPurchase, OutboxItem } from '@/services/local-db/schema'
 
 function createId(prefix: string) {
@@ -85,6 +86,19 @@ export async function recordPurchasePayment(
   })
 
   await syncSupplierPurchaseMetrics(updatedPurchase.supplierId, tenantId)
+
+  // Accounting journal entry (non-blocking)
+  try {
+    await recordPurchasePaymentJournal(
+      tenantId,
+      payment.id,
+      paidAmount,
+      method,
+      todayISO(),
+    )
+  } catch (err) {
+    console.warn('[Purchasing] recordPurchasePaymentJournal failed (non-critical):', err)
+  }
 
   return { purchase: updatedPurchase, payment }
 }
