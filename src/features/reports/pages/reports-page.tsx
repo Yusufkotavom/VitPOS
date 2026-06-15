@@ -1,4 +1,4 @@
-import { BadgeDollarSign, BarChart3, Boxes, ClipboardList, ReceiptText, Scale, TrendingUp, Wallet } from 'lucide-react'
+import { BadgeDollarSign, Boxes, ClipboardList, ReceiptText, Scale, TrendingUp, Wallet } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { ReportsSummaryCards } from '@/features/reports/components/reports-summary-cards'

@@ -160,7 +160,7 @@ export function PosPage() {
               <Button variant="outline" disabled={!hasItems || isDrafting} onClick={handleDraft}>
                 {isDrafting ? t('pos.saving') : t('pos.save_draft')}
               </Button>
-              <Button disabled={!hasItems} onClick={handlePayClick}>
+              <Button disabled={!hasItems} onClick={() => setIsMobileCartOpen(true)}>
                 {t('pos.submit_payment')}
               </Button>
             </div>
