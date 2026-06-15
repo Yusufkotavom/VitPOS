@@ -9,6 +9,8 @@ describe('report presets', () => {
     expect(preset.cards.map((card) => card.title)).toEqual([
       'Ringkasan',
       'Penjualan',
+      'Laba Rugi',
+      'Neraca',
       'Stok',
       'Kas',
       'Piutang',

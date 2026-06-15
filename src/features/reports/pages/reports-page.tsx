@@ -1,4 +1,4 @@
-import { BadgeDollarSign, Boxes, ClipboardList, ReceiptText, Wallet } from 'lucide-react'
+import { BadgeDollarSign, BarChart3, Boxes, ClipboardList, ReceiptText, Scale, TrendingUp, Wallet } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { ReportsSummaryCards } from '@/features/reports/components/reports-summary-cards'
@@ -9,6 +9,8 @@ import { PageShell } from '@/shared/components/layout/page-shell'
 const REPORT_CARD_ICONS = {
   Ringkasan: ClipboardList,
   Penjualan: ReceiptText,
+  'Laba Rugi': TrendingUp,
+  Neraca: Scale,
   Stok: Boxes,
   Kas: Wallet,
   Piutang: BadgeDollarSign,

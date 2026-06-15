@@ -311,6 +311,10 @@ export function SalesOrderDetailPage() {
             <Printer className="mr-2 h-4 w-4" />
             Struk (Thermal)
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => invoiceData && printPdf(invoiceData)}>
+            <FileText className="mr-2 h-4 w-4" />
+            Invoice (A4)
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => salesOrderData && printPdf(salesOrderData)}>
             <FileText className="mr-2 h-4 w-4" />
             Sales Order (A4)

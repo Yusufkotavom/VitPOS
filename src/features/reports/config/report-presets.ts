@@ -22,6 +22,16 @@ const SHARED_OWNER_CARDS: ReportCardPreset[] = [
     description: 'Omzet, transaksi, produk dan jasa laris',
   },
   {
+    to: '/reports/profit-loss',
+    title: 'Laba Rugi',
+    description: 'Pendapatan, beban, dan laba bersih periode',
+  },
+  {
+    to: '/reports/balance-sheet',
+    title: 'Neraca',
+    description: 'Aset, kewajiban, dan ekuitas perusahaan',
+  },
+  {
     to: '/reports/inventory',
     title: 'Stok',
     description: 'Barang hampir habis, mutasi, restok',
