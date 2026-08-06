@@ -246,7 +246,7 @@ syncRoutes.get('/pull', async (c) => {
         taxTotal: Number(row.taxTotal),
         grandTotal: Number(row.grandTotal),
         paidTotal: Number(row.paidTotal),
-        date: row.createdAt.toISOString(),
+        date: row.date ?? row.createdAt.toISOString(),
         notes: row.notes,
         version: row.version,
         items: row.items.map((i) => ({
@@ -278,7 +278,8 @@ syncRoutes.get('/pull', async (c) => {
         source: row.source,
         method: row.method,
         amount: Number(row.amount),
-        date: row.createdAt.toISOString(),
+        date: row.date ?? row.createdAt.toISOString(),
+        notes: row.notes,
         status: row.status,
       },
       transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),

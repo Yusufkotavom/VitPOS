@@ -144,6 +144,7 @@ export type LocalPayment = {
   method: PosPaymentMethodCode
   amount: number
   date: string
+  notes?: string
   status: PaymentStatus
   syncStatus: SyncStatus
   version: number

@@ -14,12 +14,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/format-currency'
-import { formatDate, formatDateTime } from '@/lib/date'
+import { formatDate, formatDateTime, toWibDateInput, wibDateToIso } from '@/lib/date'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { useSalesOrder } from '@/features/sales-orders/hooks/use-sales-order'
-import { deleteSalesOrder, recordSalesOrderPayment } from '@/features/sales-orders/services/sales-order-finance.service'
+import { deleteSalesOrder, recordSalesOrderPayment, syncCustomerSalesMetrics } from '@/features/sales-orders/services/sales-order-finance.service'
 import { salesOrderRepository } from '@/services/local-db/repository'
 import { localDb } from '@/services/local-db/client'
+import { enqueueOutboxItem } from '@/services/sync/outbox-service'
 import { messageTemplateService } from '@/services/message-template.service'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
@@ -27,6 +28,7 @@ import { PageShell } from '@/shared/components/layout/page-shell'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { ReceiptPrintLayout } from '@/features/pos/components/receipt-print-layout'
 import type { PosOrderSummary } from '@/features/pos/types/pos-order.types'
+import type { LocalPayment, LocalSalesOrder, PosPaymentMethodCode } from '@/services/local-db/schema'
 import { printPage } from '@/lib/print'
 
 function tone(status: string) {
@@ -38,13 +40,18 @@ function tone(status: string) {
 
 type EditableItem = { id: string; name: string; qty: string; unitPrice: string }
 
+type EditablePayment = { id: string; date: string; amount: string; method: string; notes: string }
+
 export function SalesOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const tenantId = requireActiveTenantId()
   const { data: order, isLoading, refetch } = useSalesOrder(id)
   const [editing, setEditing] = useState(false)
   const [editItems, setEditItems] = useState<EditableItem[]>([])
-  const [editPaidTotal, setEditPaidTotal] = useState('')
+  const [editPayments, setEditPayments] = useState<EditablePayment[]>([])
+  const [editCode, setEditCode] = useState('')
+  const [editDate, setEditDate] = useState('')
+  const [editNotes, setEditNotes] = useState('')
   
   // Product dialog states
   const [isProductModalOpen, setIsProductModalOpen] = useState(false)
@@ -123,7 +130,10 @@ export function SalesOrderDetailPage() {
   function startEditing() {
     if (!order) return
     setEditItems(order.items.map(i => ({ id: i.id, name: i.name, qty: String(i.qty), unitPrice: String(i.unitPrice) })))
-    setEditPaidTotal(String(order.paidTotal))
+    setEditPayments((order.payments || []).map(p => ({ id: p.id, date: toWibDateInput(p.date), amount: String(p.amount), method: p.method, notes: p.notes ?? '' })))
+    setEditCode(order.code)
+    setEditDate(toWibDateInput(order.date))
+    setEditNotes(order.notes ?? '')
     setEditing(true)
   }
 
@@ -134,6 +144,12 @@ export function SalesOrderDetailPage() {
   async function saveEditing() {
     if (!order) return
     try {
+      const code = editCode.trim()
+      if (!code) {
+        toast.error('Nomor invoice wajib diisi')
+        return
+      }
+
       const items = editItems.map(i => {
         const qty = Number(i.qty) || 0
         const unitPrice = Number(i.unitPrice) || 0
@@ -141,7 +157,15 @@ export function SalesOrderDetailPage() {
       })
       const subtotal = items.reduce((s, i) => s + i.subtotal, 0)
       const grandTotal = subtotal - order.discountTotal + order.taxTotal
-      const paidTotal = Number(editPaidTotal) || 0
+
+      const payments = editPayments.map(p => ({
+        id: p.id,
+        date: wibDateToIso(p.date),
+        amount: Number(p.amount) || 0,
+        method: p.method || 'tunai',
+        notes: p.notes.trim(),
+      }))
+      const paidTotal = payments.reduce((s, p) => s + p.amount, 0)
 
       let newStatus = order.status
       if (newStatus !== 'Batal' && newStatus !== 'Draft') {
@@ -150,11 +174,15 @@ export function SalesOrderDetailPage() {
         else newStatus = 'Belum Bayar'
       }
 
-      await salesOrderRepository.upsert({
+      const tenantId = order.tenantId
+      const updatedOrder: LocalSalesOrder = {
         ...order,
+        code,
+        date: wibDateToIso(editDate) || order.date,
+        notes: editNotes.trim() || undefined,
         items: items.map(i => ({
           id: i.id,
-          tenantId: order.tenantId,
+          tenantId,
           salesOrderId: order.id,
           productId: order.items.find((item) => item.id === i.id)?.productId ?? '',
           name: i.name,
@@ -168,8 +196,43 @@ export function SalesOrderDetailPage() {
         status: newStatus,
         version: order.version + 1,
         updatedAt: new Date().toISOString(),
+      }
+
+      const existingPayments = await localDb.payments.where('tenantId').equals(tenantId).toArray()
+      const linkedPayments = existingPayments.filter(p => p.salesOrderId === order.id)
+      const keptIds = new Set(payments.map(p => p.id))
+      const nowIso = new Date().toISOString()
+
+      await localDb.transaction('rw', [localDb.salesOrders, localDb.payments, localDb.outbox], async () => {
+        for (const removed of linkedPayments.filter(p => !keptIds.has(p.id))) {
+          await enqueueOutboxItem({ entityType: 'payment', entityId: removed.id, mutationType: 'delete', payload: removed })
+          await localDb.payments.delete(removed.id)
+        }
+        for (const p of payments) {
+          const existing = linkedPayments.find(lp => lp.id === p.id)
+          const payment: LocalPayment = {
+            id: existing?.id ?? `pay-${crypto.randomUUID()}`,
+            tenantId,
+            ref: existing?.ref ?? `PAY-${Date.now().toString().slice(-6)}`,
+            salesOrderId: order.id,
+            source: existing?.source ?? 'Invoice',
+            method: p.method as PosPaymentMethodCode,
+            amount: p.amount,
+            date: p.date,
+            notes: p.notes || undefined,
+            status: existing?.status ?? 'Berhasil',
+            syncStatus: 'pending',
+            version: (existing?.version ?? 0) + 1,
+            updatedAt: nowIso,
+          }
+          await enqueueOutboxItem({ entityType: 'payment', entityId: payment.id, mutationType: existing ? 'update' : 'create', payload: payment })
+          await localDb.payments.put(payment)
+        }
+        await salesOrderRepository.upsert(updatedOrder)
       })
-      toast.success('Item diperbarui')
+
+      await syncCustomerSalesMetrics(updatedOrder.customerId, tenantId)
+      toast.success('Invoice diperbarui')
       setEditing(false)
       refetch()
     } catch (error) {
@@ -187,6 +250,18 @@ export function SalesOrderDetailPage() {
 
   function updateItem(idx: number, field: keyof EditableItem, value: string) {
     setEditItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
+  }
+
+  function addPaymentRow() {
+    setEditPayments(prev => [...prev, { id: crypto.randomUUID(), date: toWibDateInput(new Date().toISOString()), amount: '0', method: activeMethods[0]?.name.toLowerCase() || 'tunai', notes: '' }])
+  }
+
+  function removePaymentRow(idx: number) {
+    setEditPayments(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  function updatePayment(idx: number, field: keyof EditablePayment, value: string) {
+    setEditPayments(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
   }
 
   async function handleReceivePayment() {
@@ -269,7 +344,7 @@ export function SalesOrderDetailPage() {
 
   const editSubtotal = editItems.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.unitPrice) || 0), 0)
   const editGrandTotal = editing ? editSubtotal - order.discountTotal + order.taxTotal : order.grandTotal
-  const editPaid = editing ? (Number(editPaidTotal) || 0) : order.paidTotal
+  const editPaid = editing ? editPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0) : order.paidTotal
   const shortage = Math.max(0, editGrandTotal - editPaid)
   const isPaid = shortage === 0
 
@@ -363,6 +438,30 @@ export function SalesOrderDetailPage() {
     >
       <div className="min-w-0 grid gap-6 md:grid-cols-3">
         <div className="min-w-0 space-y-6 md:col-span-2">
+          {editing && (
+            <div className="rounded-lg border bg-background p-4">
+              <h3 className="text-sm font-medium text-muted-foreground mb-3">Info Invoice</h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-muted-foreground">Nomor Invoice</label>
+                  <Input value={editCode} onChange={e => setEditCode(e.target.value)} className="h-8 text-sm" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-muted-foreground">Tanggal Invoice</label>
+                  <Input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} className="h-8 text-sm" />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1 mt-3">
+                <label className="text-xs font-medium text-muted-foreground">Catatan</label>
+                <textarea
+                  value={editNotes}
+                  onChange={e => setEditNotes(e.target.value)}
+                  className="min-h-[3.5rem] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="Catatan yang tampil di invoice..."
+                />
+              </div>
+            </div>
+          )}
           <div>
             <h3 className="text-sm font-medium text-muted-foreground mb-3">Item Pesanan</h3>
             {editing ? (
@@ -530,39 +629,104 @@ export function SalesOrderDetailPage() {
 
           <div>
             <h3 className="mb-3 text-sm font-medium text-muted-foreground">Pembayaran</h3>
-            <div className="min-w-0 rounded-lg border bg-background">
-              <div className="border-b px-3 py-2 text-xs text-muted-foreground sm:hidden">
-                Geser ke kanan untuk lihat semua kolom
-              </div>
-              <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
-                <Table className="min-w-[520px]">
-                  <TableHeader>
-                    <TableRow className="bg-muted/40">
-                      <TableHead>Tanggal</TableHead>
-                      <TableHead>Metode</TableHead>
-                      <TableHead className="w-32 text-right">Nominal</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(order.payments || []).length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={3} className="py-6 text-center text-muted-foreground">
-                          Belum ada pembayaran
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      (order.payments || []).map((payment, idx) => (
-                        <TableRow key={`${payment.date}-${payment.method}-${idx}`}>
-                          <TableCell>{formatDate(payment.date)}</TableCell>
-                          <TableCell className="capitalize">{payment.method}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(payment.amount)}</TableCell>
+            {editing ? (
+              <div className="flex flex-col gap-3">
+                <div className="min-w-0 rounded-lg border bg-background">
+                  <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
+                    <Table className="min-w-[720px]">
+                      <TableHeader>
+                        <TableRow className="bg-muted/40">
+                          <TableHead className="w-36">Tanggal</TableHead>
+                          <TableHead className="w-32">Metode</TableHead>
+                          <TableHead className="w-36 text-right">Nominal</TableHead>
+                          <TableHead>Catatan</TableHead>
+                          <TableHead className="w-10"></TableHead>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {editPayments.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="py-6 text-center text-muted-foreground">
+                              Belum ada pembayaran
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          editPayments.map((payment, idx) => (
+                            <TableRow key={payment.id}>
+                              <TableCell className="py-1.5 px-2">
+                                <Input type="date" value={payment.date} onChange={e => updatePayment(idx, 'date', e.target.value)} className="h-8 text-sm" />
+                              </TableCell>
+                              <TableCell className="py-1.5 px-2">
+                                <Select value={payment.method} onValueChange={value => updatePayment(idx, 'method', value)}>
+                                  <SelectTrigger className="h-8 text-sm">
+                                    <SelectValue placeholder="Metode" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {[...activeMethods, ...(activeMethods.some((m: { id: string; name: string }) => m.name.toLowerCase() === payment.method) ? [] : [{ id: payment.method, name: payment.method }])].map((m: { id: string; name: string }) => (
+                                      <SelectItem key={m.id} value={m.name.toLowerCase()}>{m.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell className="py-1.5 px-2">
+                                <Input value={payment.amount} onChange={e => updatePayment(idx, 'amount', e.target.value)} inputMode="numeric" className="h-8 text-sm text-right" />
+                              </TableCell>
+                              <TableCell className="py-1.5 px-2">
+                                <Input value={payment.notes} onChange={e => updatePayment(idx, 'notes', e.target.value)} placeholder="Catatan pembayaran" className="h-8 text-sm" />
+                              </TableCell>
+                              <TableCell className="py-1.5 px-2">
+                                {editPayments.length > 1 && (
+                                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => removePaymentRow(idx)}>
+                                    <Trash2Icon className="h-3.5 w-3.5 text-destructive" />
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+                <Button type="button" variant="ghost" size="sm" className="self-start" onClick={addPaymentRow}>
+                  <PlusIcon className="mr-1 h-3.5 w-3.5" />Tambah Pembayaran
+                </Button>
               </div>
-            </div>
+            ) : (
+              <div className="min-w-0 rounded-lg border bg-background">
+                <div className="border-b px-3 py-2 text-xs text-muted-foreground sm:hidden">
+                  Geser ke kanan untuk lihat semua kolom
+                </div>
+                <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
+                  <Table className="min-w-[520px]">
+                    <TableHeader>
+                      <TableRow className="bg-muted/40">
+                        <TableHead>Tanggal</TableHead>
+                        <TableHead>Metode</TableHead>
+                        <TableHead className="w-32 text-right">Nominal</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(order.payments || []).length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={3} className="py-6 text-center text-muted-foreground">
+                            Belum ada pembayaran
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        (order.payments || []).map((payment, idx) => (
+                          <TableRow key={`${payment.date}-${payment.method}-${idx}`}>
+                            <TableCell>{formatDate(payment.date)}</TableCell>
+                            <TableCell className="capitalize">{payment.method}</TableCell>
+                            <TableCell className="text-right font-medium">{formatCurrency(payment.amount)}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -598,16 +762,7 @@ export function SalesOrderDetailPage() {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Dibayar</span>
-              {editing ? (
-                <Input
-                  inputMode="numeric"
-                  value={editPaidTotal}
-                  onChange={e => setEditPaidTotal(e.target.value)}
-                  className="h-8 w-32 text-right font-semibold"
-                />
-              ) : (
-                <span className="font-semibold text-green-600">{formatCurrency(order.paidTotal)}</span>
-              )}
+              <span className="font-semibold text-green-600">{formatCurrency(editPaid)}</span>
             </div>
             <div className="flex justify-between items-center pt-2 border-t">
               <span className="font-medium">{isPaid ? 'Status' : 'Sisa Tagihan'}</span>

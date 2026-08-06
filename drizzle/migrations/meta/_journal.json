@@ -64,6 +64,13 @@
       "when": 1781191906914,
       "tag": "0008_warm_warbound",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786028878388,
+      "tag": "0009_invoice_edit_sync",
+      "breakpoints": true
     }
   ]
 }

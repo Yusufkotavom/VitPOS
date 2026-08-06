@@ -240,6 +240,7 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
       method: normalizePaymentMethod(payload.method),
       amount: Number(payload.amount ?? 0),
       date: typeof payload.date === 'string' ? toDateInput(payload.date) : existingPayment?.date ?? '',
+      notes: typeof payload.notes === 'string' ? payload.notes : existingPayment?.notes,
       status: SERVER_TO_LOCAL_PAYMENT_STATUS[rawStatus] ?? existingPayment?.status ?? 'Pending',
       syncStatus: 'synced',
       version: typeof payload.version === 'number' ? payload.version : 1,

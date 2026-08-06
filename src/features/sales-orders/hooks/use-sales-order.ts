@@ -22,6 +22,7 @@ export function useSalesOrder(id?: string) {
           amount: payment.amount,
           method: payment.method,
           status: payment.status,
+          notes: payment.notes,
         }))
 
       return {

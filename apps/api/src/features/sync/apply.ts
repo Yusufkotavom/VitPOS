@@ -101,6 +101,7 @@ type PaymentPayload = {
   method?: string
   amount?: number | string
   date?: string
+  notes?: string | null
   status?: string
 }
 
@@ -254,6 +255,7 @@ async function applySale(db: AppDb, ctx: ApplyContext, entityId: string, mutatio
       grandTotal: toNumeric(payload.grandTotal),
       paidTotal: toNumeric(payload.paidTotal),
       notes: typeof payload.notes === 'string' ? payload.notes : null,
+      date: payload.date ? new Date(payload.date).toISOString() : now.toISOString(),
       syncStatus: 'synced',
       version: 1,
       createdAt: now,
@@ -263,12 +265,14 @@ async function applySale(db: AppDb, ctx: ApplyContext, entityId: string, mutatio
       target: salesOrders.id,
       set: {
         status: mapClientSalesOrderStatus(payload.status),
+        orderNumber: payload.orderNumber ?? payload.code ?? undefined,
         subtotal: toNumeric(payload.subtotal),
         discountTotal: toNumeric(payload.discountTotal),
         taxTotal: toNumeric(payload.taxTotal),
         grandTotal: toNumeric(payload.grandTotal),
         paidTotal: toNumeric(payload.paidTotal),
         notes: typeof payload.notes === 'string' ? payload.notes : null,
+        date: payload.date ? new Date(payload.date).toISOString() : undefined,
         syncStatus: 'synced',
         updatedAt: now,
       },
@@ -322,6 +326,8 @@ async function applyPayment(db: AppDb, ctx: ApplyContext, entityId: string, muta
       method: mapClientPaymentMethod(payload.method),
       amount: toNumeric(payload.amount),
       referenceNumber: null,
+      date: payload.date ? new Date(payload.date).toISOString() : now.toISOString(),
+      notes: typeof payload.notes === 'string' ? payload.notes : null,
       status: mapClientPaymentStatus(payload.status),
       syncStatus: 'synced',
       createdAt: now,
@@ -333,6 +339,10 @@ async function applyPayment(db: AppDb, ctx: ApplyContext, entityId: string, muta
         status: mapClientPaymentStatus(payload.status),
         amount: toNumeric(payload.amount),
         source: payload.source ?? undefined,
+        method: payload.method ? mapClientPaymentMethod(payload.method) : undefined,
+        paymentNumber: payload.paymentNumber ?? payload.ref ?? undefined,
+        date: payload.date ? new Date(payload.date).toISOString() : undefined,
+        notes: typeof payload.notes === 'string' ? payload.notes : undefined,
         syncStatus: 'synced',
         updatedAt: now,
       },

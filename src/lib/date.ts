@@ -11,6 +11,22 @@ export function toDateInput(value: string | null | undefined): string {
 
 export const APP_TIME_ZONE = 'Asia/Jakarta'
 
+export function toWibDateInput(value: string | Date): string {
+  const d = value instanceof Date ? value : new Date(value)
+  if (isNaN(d.getTime())) return ''
+  return new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: APP_TIME_ZONE,
+  }).format(d)
+}
+
+export function wibDateToIso(date: string): string {
+  if (!date) return new Date().toISOString()
+  return `${date.slice(0, 10)}T05:00:00.000Z`
+}
+
 export function formatDate(value: string | Date) {
   const d = value instanceof Date ? value : new Date(value)
   if (isNaN(d.getTime())) return typeof value === 'string' ? value : ''

@@ -330,6 +330,7 @@ var salesOrders = pgTable("sales_orders", {
   taxTotal: numeric("tax_total", { precision: 14, scale: 2 }).default("0").notNull(),
   grandTotal: numeric("grand_total", { precision: 14, scale: 2 }).default("0").notNull(),
   paidTotal: numeric("paid_total", { precision: 14, scale: 2 }).default("0").notNull(),
+  date: timestamp("date", { mode: "string", withTimezone: true }),
   notes: text("notes"),
   syncStatus: syncStatusEnum("sync_status").default("pending").notNull(),
   version: integer("version").default(1).notNull(),
@@ -359,6 +360,8 @@ var payments = pgTable("payments", {
   method: paymentMethodEnum("method").notNull(),
   amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
   referenceNumber: varchar("reference_number", { length: 120 }),
+  date: timestamp("date", { mode: "string", withTimezone: true }),
+  notes: text("notes"),
   status: paymentStatusEnum("status").default("pending").notNull(),
   syncStatus: syncStatusEnum("sync_status").default("pending").notNull(),
   ...timestamps
@@ -1683,6 +1686,7 @@ async function applySale(db2, ctx, entityId, mutationType, payload) {
     grandTotal: toNumeric(payload.grandTotal),
     paidTotal: toNumeric(payload.paidTotal),
     notes: typeof payload.notes === "string" ? payload.notes : null,
+    date: payload.date ? new Date(payload.date).toISOString() : now.toISOString(),
     syncStatus: "synced",
     version: 1,
     createdAt: now,
@@ -1691,12 +1695,14 @@ async function applySale(db2, ctx, entityId, mutationType, payload) {
     target: salesOrders.id,
     set: {
       status: mapClientSalesOrderStatus(payload.status),
+      orderNumber: payload.orderNumber ?? payload.code ?? void 0,
       subtotal: toNumeric(payload.subtotal),
       discountTotal: toNumeric(payload.discountTotal),
       taxTotal: toNumeric(payload.taxTotal),
       grandTotal: toNumeric(payload.grandTotal),
       paidTotal: toNumeric(payload.paidTotal),
       notes: typeof payload.notes === "string" ? payload.notes : null,
+      date: payload.date ? new Date(payload.date).toISOString() : void 0,
       syncStatus: "synced",
       updatedAt: now
     }
@@ -1743,6 +1749,8 @@ async function applyPayment(db2, ctx, entityId, mutationType, payload) {
     method: mapClientPaymentMethod(payload.method),
     amount: toNumeric(payload.amount),
     referenceNumber: null,
+    date: payload.date ? new Date(payload.date).toISOString() : now.toISOString(),
+    notes: typeof payload.notes === "string" ? payload.notes : null,
     status: mapClientPaymentStatus(payload.status),
     syncStatus: "synced",
     createdAt: now,
@@ -1753,6 +1761,10 @@ async function applyPayment(db2, ctx, entityId, mutationType, payload) {
       status: mapClientPaymentStatus(payload.status),
       amount: toNumeric(payload.amount),
       source: payload.source ?? void 0,
+      method: payload.method ? mapClientPaymentMethod(payload.method) : void 0,
+      paymentNumber: payload.paymentNumber ?? payload.ref ?? void 0,
+      date: payload.date ? new Date(payload.date).toISOString() : void 0,
+      notes: typeof payload.notes === "string" ? payload.notes : void 0,
       syncStatus: "synced",
       updatedAt: now
     }
@@ -2572,7 +2584,7 @@ syncRoutes.get("/pull", async (c) => {
         taxTotal: Number(row.taxTotal),
         grandTotal: Number(row.grandTotal),
         paidTotal: Number(row.paidTotal),
-        date: row.createdAt.toISOString(),
+        date: row.date ?? row.createdAt.toISOString(),
         notes: row.notes,
         version: row.version,
         items: row.items.map((i) => ({
@@ -2604,7 +2616,8 @@ syncRoutes.get("/pull", async (c) => {
         source: row.source,
         method: row.method,
         amount: Number(row.amount),
-        date: row.createdAt.toISOString(),
+        date: row.date ?? row.createdAt.toISOString(),
+        notes: row.notes,
         status: row.status
       },
       transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
