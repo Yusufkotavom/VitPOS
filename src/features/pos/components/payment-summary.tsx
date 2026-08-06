@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { useTranslation } from 'react-i18next'
 import { formatCurrency } from '@/lib/format-currency'
+import { formatDateTime } from '@/lib/date'
 import { selectPosTotals, usePosStore } from '@/features/pos/stores/pos-store'
 import { posTransactionService } from '@/features/pos/services/pos-transaction.service'
 import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
@@ -100,11 +101,12 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
 
   async function handlePrintSalesOrder() {
     if (!successOrder) return
+    const customer = successOrder.customerId ? await localDb.customers.get(successOrder.customerId) : undefined
     const invoiceData: PdfData = {
       type: 'invoice',
       code: successOrder.code,
-      date: new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(successOrder.date),
-      customer: { name: successOrder.customerName ?? 'Umum' },
+      date: formatDateTime(successOrder.date),
+      customer: { name: successOrder.customerName ?? 'Umum', phone: customer?.phone, address: customer?.address },
       items: successOrder.items.map(i => ({ name: i.name, qty: i.qty, price: i.price, subtotal: i.subtotal })),
       summary: {
         subtotal: successOrder.subtotal,

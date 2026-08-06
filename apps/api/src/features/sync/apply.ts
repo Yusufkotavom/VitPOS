@@ -406,6 +406,7 @@ type CustomerPayload = {
   phone?: string
   email?: string
   city?: string | null
+  address?: string | null
   receivable?: number
   orders?: number
   status?: string
@@ -629,7 +630,7 @@ async function applyCustomer(db: AppDb, ctx: ApplyContext, entityId: string, mut
       name: payload.name ?? '',
       phone: payload.phone ?? null,
       email: payload.email ?? null,
-      address: payload.city ?? null,
+      address: payload.address ?? payload.city ?? null,
       notes: null,
       isActive: mapClientCustomerStatus(payload.status ?? payload.isActive),
       syncStatus: 'synced',
@@ -643,7 +644,7 @@ async function applyCustomer(db: AppDb, ctx: ApplyContext, entityId: string, mut
         name: payload.name ?? '',
         phone: payload.phone ?? null,
         email: payload.email ?? null,
-        address: payload.city ?? null,
+        address: payload.address ?? payload.city ?? null,
         isActive: mapClientCustomerStatus(payload.status ?? payload.isActive),
         syncStatus: 'synced',
         updatedAt: now,

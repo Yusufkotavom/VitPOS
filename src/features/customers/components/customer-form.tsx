@@ -42,6 +42,11 @@ export function CustomerForm({ defaultValues, submitLabel, onCancel, onSubmit }:
           {errors.city ? <span className="text-xs text-destructive">{errors.city.message}</span> : null}
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
+          {t('common.address')}
+          <textarea aria-invalid={Boolean(errors.address)} className="min-h-[3.5rem] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" {...form.register('address')} placeholder="Jl. Merdeka No. 123, Bandung" />
+          {errors.address ? <span className="text-xs text-destructive">{errors.address.message}</span> : null}
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-medium">
           {t('common.status')}
           <FormSelect control={form.control} name="status" options={customerStatusOptions.map(o => ({ label: o, value: o }))} />
         </label>

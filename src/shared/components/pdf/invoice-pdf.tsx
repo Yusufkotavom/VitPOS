@@ -53,6 +53,67 @@ const baseStyles = StyleSheet.create({
   footer: { position: 'absolute', bottom: 24, left: 30, right: 30, borderTopWidth: 1, paddingTop: 9, textAlign: 'center', fontSize: 8 },
 })
 
+type InvoiceLang = 'id' | 'en'
+
+const invoiceLabels: Record<InvoiceLang, Record<string, string>> = {
+  id: {
+    docLabel: 'Dokumen Penagihan',
+    billTo: 'Tujuan Tagihan',
+    quickSummary: 'Ringkasan Cepat',
+    statusLabel: 'Status',
+    totalLabel: 'Total',
+    remainingLabel: 'Sisa',
+    item: 'Item',
+    qty: 'Qty',
+    price: 'Harga',
+    total: 'Total',
+    notes: 'Catatan',
+    subtotal: 'Subtotal',
+    discount: 'Diskon',
+    paid: 'Dibayar',
+    change: 'Kembali',
+    remainingBalance: 'Sisa Tagihan',
+    paymentHistory: 'Riwayat Pembayaran',
+    date: 'Tanggal',
+    method: 'Metode',
+    amount: 'Nominal',
+    phone: 'Telp',
+    tax: 'NPWP/NIB',
+    paidStatus: 'Lunas',
+    unpaidStatus: 'Belum Bayar',
+    partialStatus: 'Dibayar Sebagian',
+    footerFallback: 'Terima kasih atas kepercayaan Anda.',
+  },
+  en: {
+    docLabel: 'Billing Document',
+    billTo: 'Bill To',
+    quickSummary: 'Quick Summary',
+    statusLabel: 'Status',
+    totalLabel: 'Total',
+    remainingLabel: 'Remaining',
+    item: 'Item',
+    qty: 'Qty',
+    price: 'Price',
+    total: 'Total',
+    notes: 'Notes',
+    subtotal: 'Subtotal',
+    discount: 'Discount',
+    paid: 'Paid',
+    change: 'Change',
+    remainingBalance: 'Outstanding Balance',
+    paymentHistory: 'Payment History',
+    date: 'Date',
+    method: 'Method',
+    amount: 'Amount',
+    phone: 'Phone',
+    tax: 'NPWP/NIB',
+    paidStatus: 'Paid',
+    unpaidStatus: 'Unpaid',
+    partialStatus: 'Partially Paid',
+    footerFallback: 'Thank you for your trust.',
+  },
+}
+
 function fmt(n: number) {
   return formatCurrency(n)
 }
@@ -63,123 +124,134 @@ function badgeColor(theme: InvoiceThemeTokens, status: string) {
   return theme.badgePartial
 }
 
-function badgeLabel(status: string) {
-  if (status === 'Lunas') return 'LUNAS'
-  if (status === 'Belum Bayar') return 'BELUM BAYAR'
-  return 'DIBAYAR SEBAGIAN'
+function badgeLabel(status: string, lang: InvoiceLang) {
+  const t = invoiceLabels[lang]
+  if (status === 'Lunas') return t.paidStatus.toUpperCase()
+  if (status === 'Belum Bayar') return t.unpaidStatus.toUpperCase()
+  return t.partialStatus.toUpperCase()
 }
 
 function contrastSoft(theme: InvoiceThemeTokens) {
   return { color: theme.headerMutedText }
 }
 
-export function InvoicePDF({ data, settings }: { data: PdfInvoiceData; settings: PdfCompanySettings }) {
-  const theme = invoiceThemes[settings.invoiceTheme] ?? invoiceThemes.klasik
+function InvoicePage({ data, settings, theme, lang }: { data: PdfInvoiceData; settings: PdfCompanySettings; theme: InvoiceThemeTokens; lang: InvoiceLang }) {
+  const t = invoiceLabels[lang]
   const remaining = Math.max(0, data.summary.grandTotal - data.summary.paidTotal)
   const statusColor = badgeColor(theme, data.summary.status)
 
   return (
-    <Document>
-      <Page size="A4" style={[baseStyles.page, { backgroundColor: theme.pageBg, color: theme.bodyText }]}> 
-        <View style={[baseStyles.hero, { backgroundColor: theme.headerBg }]}> 
-          <View style={[baseStyles.heroAccentBlock, { backgroundColor: theme.headerAccent }]} />
-          <View style={[baseStyles.heroAccentStripe, { backgroundColor: theme.headerAccent }]} />
-          <View style={baseStyles.heroTop}>
-            <View style={baseStyles.companyInfo}>
-              {settings.invoiceLogo ? (
-                <Image src={settings.invoiceLogo} style={baseStyles.logo} />
-              ) : (
-                <Text style={[baseStyles.companyName, { color: theme.headerTextColor }]}>{settings.companyName}</Text>
-              )}
-              {settings.invoiceLogo ? <Text style={[baseStyles.companyName, { color: theme.headerTextColor, fontSize: 13 }]}>{settings.companyName}</Text> : null}
-              {settings.companyAddress ? <Text style={[baseStyles.companySub, contrastSoft(theme)]}>{settings.companyAddress}</Text> : null}
-              {settings.companyPhone ? <Text style={[baseStyles.companySub, contrastSoft(theme)]}>Telp: {settings.companyPhone}</Text> : null}
-              {settings.companyTax ? <Text style={[baseStyles.companySub, contrastSoft(theme)]}>NPWP/NIB: {settings.companyTax}</Text> : null}
-            </View>
-            <View style={baseStyles.invoiceMeta}>
-              <Text style={[baseStyles.invoiceLabel, contrastSoft(theme)]}>Dokumen Penagihan</Text>
-              <Text style={[baseStyles.invoiceTitle, { color: theme.titleColor }]}>INVOICE</Text>
-              <Text style={[baseStyles.invoiceCodePill, { backgroundColor: theme.headerAccent, color: theme.headerTextColor }]}>{data.code}</Text>
-              <Text style={[baseStyles.metaText, contrastSoft(theme)]}>{formatDateTime(data.date)}</Text>
-            </View>
+    <Page size="A4" style={[baseStyles.page, { backgroundColor: theme.pageBg, color: theme.bodyText }]}>
+      <View style={[baseStyles.hero, { backgroundColor: theme.headerBg }]}>
+        <View style={[baseStyles.heroAccentBlock, { backgroundColor: theme.headerAccent }]} />
+        <View style={[baseStyles.heroAccentStripe, { backgroundColor: theme.headerAccent }]} />
+        <View style={baseStyles.heroTop}>
+          <View style={baseStyles.companyInfo}>
+            {settings.invoiceLogo ? (
+              <Image src={settings.invoiceLogo} style={baseStyles.logo} />
+            ) : (
+              <Text style={[baseStyles.companyName, { color: theme.headerTextColor }]}>{settings.companyName}</Text>
+            )}
+            {settings.invoiceLogo ? <Text style={[baseStyles.companyName, { color: theme.headerTextColor, fontSize: 13 }]}>{settings.companyName}</Text> : null}
+            {settings.companyAddress ? <Text style={[baseStyles.companySub, contrastSoft(theme)]}>{settings.companyAddress}</Text> : null}
+            {settings.companyPhone ? <Text style={[baseStyles.companySub, contrastSoft(theme)]}>{t.phone}: {settings.companyPhone}</Text> : null}
+            {settings.companyTax ? <Text style={[baseStyles.companySub, contrastSoft(theme)]}>{t.tax}: {settings.companyTax}</Text> : null}
+          </View>
+          <View style={baseStyles.invoiceMeta}>
+            <Text style={[baseStyles.invoiceLabel, contrastSoft(theme)]}>{t.docLabel}</Text>
+            <Text style={[baseStyles.invoiceTitle, { color: theme.titleColor }]}>INVOICE</Text>
+            <Text style={[baseStyles.invoiceCodePill, { backgroundColor: theme.headerAccent, color: theme.headerTextColor }]}>{data.code}</Text>
+            <Text style={[baseStyles.metaText, contrastSoft(theme)]}>{formatDateTime(data.date)}</Text>
           </View>
         </View>
+      </View>
 
-        <View style={baseStyles.infoGrid}>
-          <View style={[baseStyles.infoCard, { backgroundColor: theme.cardBg, borderColor: theme.sectionBorder }]}> 
-            <Text style={[baseStyles.sectionEyebrow, { color: theme.accentColor }]}>Tujuan Tagihan</Text>
-            <Text style={[baseStyles.detailTitle, { color: theme.bodyText }]}>{data.customer.name}</Text>
-            {data.customer.phone ? <Text style={[baseStyles.detailText, { color: theme.mutedText }]}>{data.customer.phone}</Text> : null}
+      <View style={baseStyles.infoGrid}>
+        <View style={[baseStyles.infoCard, { backgroundColor: theme.cardBg, borderColor: theme.sectionBorder }]}>
+          <Text style={[baseStyles.sectionEyebrow, { color: theme.accentColor }]}>{t.billTo}</Text>
+          <Text style={[baseStyles.detailTitle, { color: theme.bodyText }]}>{data.customer.name}</Text>
+          {data.customer.address ? <Text style={[baseStyles.detailText, { color: theme.mutedText, fontSize: 7, lineHeight: 1.5 }]}>{data.customer.address}</Text> : null}
+          {data.customer.phone ? <Text style={[baseStyles.detailText, { color: theme.mutedText }]}>{data.customer.phone}</Text> : null}
+        </View>
+        <View style={[baseStyles.infoCard, { backgroundColor: theme.cardSoftBg, borderColor: theme.sectionBorder }]}>
+          <Text style={[baseStyles.sectionEyebrow, { color: theme.accentColor }]}>{t.quickSummary}</Text>
+          <Text style={[baseStyles.detailText, { color: theme.mutedText }]}>{t.statusLabel}: {badgeLabel(data.summary.status, lang)}</Text>
+          <Text style={[baseStyles.detailText, { color: theme.mutedText }]}>{t.totalLabel}: {fmt(data.summary.grandTotal)}</Text>
+          <Text style={[baseStyles.detailText, { color: theme.mutedText }]}>{t.remainingLabel}: {fmt(remaining)}</Text>
+        </View>
+      </View>
+
+      <View style={[baseStyles.tableWrap, { backgroundColor: theme.cardBg, borderColor: theme.tableBorderColor }]}>
+        <View style={[baseStyles.tableHeader, { backgroundColor: theme.tableHeaderBg }]}>
+          <View style={baseStyles.colItem}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>{t.item}</Text></View>
+          <View style={baseStyles.colQty}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>{t.qty}</Text></View>
+          <View style={baseStyles.colPrice}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>{t.price}</Text></View>
+          <View style={baseStyles.colTotal}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>{t.total}</Text></View>
+        </View>
+        {data.items.map((item, i) => (
+          <View key={i} style={[baseStyles.tableRow, { borderTopColor: theme.tableBorderColor, backgroundColor: i % 2 === 0 ? theme.cardBg : theme.cardSoftBg }]}>
+            <View style={baseStyles.colItem}><Text>{item.name}</Text></View>
+            <View style={baseStyles.colQty}><Text>{item.qty}</Text></View>
+            <View style={baseStyles.colPrice}><Text>{fmt(item.price)}</Text></View>
+            <View style={baseStyles.colTotal}><Text style={{ fontWeight: 'bold' }}>{fmt(item.subtotal)}</Text></View>
           </View>
-          <View style={[baseStyles.infoCard, { backgroundColor: theme.cardSoftBg, borderColor: theme.sectionBorder }]}> 
-            <Text style={[baseStyles.sectionEyebrow, { color: theme.accentColor }]}>Ringkasan Cepat</Text>
-            <Text style={[baseStyles.detailText, { color: theme.mutedText }]}>Status: {badgeLabel(data.summary.status)}</Text>
-            <Text style={[baseStyles.detailText, { color: theme.mutedText }]}>Total: {fmt(data.summary.grandTotal)}</Text>
-            <Text style={[baseStyles.detailText, { color: theme.mutedText }]}>Sisa: {fmt(remaining)}</Text>
+        ))}
+      </View>
+
+      <View style={baseStyles.summaryArea}>
+        <View style={baseStyles.stampContainer}>
+          <Text style={[baseStyles.badge, { borderColor: statusColor, color: statusColor, backgroundColor: theme.cardBg }]}>{badgeLabel(data.summary.status, lang)}</Text>
+          {(data.notes || settings.invoiceTerm) ? (
+            <View style={[baseStyles.noteCard, { backgroundColor: theme.cardBg, borderColor: theme.sectionBorder }]}>
+              <Text style={[baseStyles.termsTitle, { color: theme.accentColor }]}>{t.notes}</Text>
+              <Text style={[baseStyles.termsText, { color: theme.mutedText }]}>{data.notes || settings.invoiceTerm}</Text>
+            </View>
+          ) : null}
+        </View>
+        <View style={[baseStyles.totalsPanel, { backgroundColor: theme.totalPanelBg, borderColor: theme.totalPanelBorder }]}>
+          <View style={baseStyles.totalsRow}><Text style={[baseStyles.totalsLabel, { color: theme.mutedText }]}>{t.subtotal}</Text><Text style={baseStyles.totalsValue}>{fmt(data.summary.subtotal)}</Text></View>
+          {data.summary.discount > 0 ? <View style={baseStyles.totalsRow}><Text style={[baseStyles.totalsLabel, { color: theme.mutedText }]}>{t.discount}</Text><Text style={baseStyles.totalsValue}>-{fmt(data.summary.discount)}</Text></View> : null}
+          <View style={baseStyles.totalsRow}><Text style={[baseStyles.totalsLabel, { color: theme.mutedText }]}>{t.paid}</Text><Text style={baseStyles.totalsValue}>{fmt(data.summary.paidTotal)}</Text></View>
+          {data.summary.change != null && data.summary.change > 0 ? <View style={baseStyles.totalsRow}><Text style={[baseStyles.totalsLabel, { color: theme.mutedText }]}>{t.change}</Text><Text style={baseStyles.totalsValue}>{fmt(data.summary.change)}</Text></View> : null}
+          <View style={[baseStyles.grandTotalRow, { borderTopColor: theme.totalPanelBorder }]}>
+            <Text style={[baseStyles.grandTotalLabel, { color: theme.bodyText }]}>{remaining > 0 ? t.remainingBalance : t.total}</Text>
+            <Text style={[baseStyles.grandTotalValue, { color: theme.accentColor }]}>{fmt(remaining > 0 ? remaining : data.summary.grandTotal)}</Text>
           </View>
         </View>
+      </View>
 
-        <View style={[baseStyles.tableWrap, { backgroundColor: theme.cardBg, borderColor: theme.tableBorderColor }]}> 
-          <View style={[baseStyles.tableHeader, { backgroundColor: theme.tableHeaderBg }]}> 
-            <View style={baseStyles.colItem}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>Item</Text></View>
-            <View style={baseStyles.colQty}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>Qty</Text></View>
-            <View style={baseStyles.colPrice}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>Harga</Text></View>
-            <View style={baseStyles.colTotal}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>Total</Text></View>
+      {data.payments && data.payments.length > 0 ? (
+        <View style={[baseStyles.paymentsSection, { backgroundColor: theme.cardBg, borderColor: theme.tableBorderColor }]}>
+          <Text style={[baseStyles.paymentTitle, { color: theme.accentColor, backgroundColor: theme.cardSoftBg }]}>{t.paymentHistory}</Text>
+          <View style={[baseStyles.tableHeader, { backgroundColor: theme.tableHeaderBg }]}>
+            <View style={{ width: '40%' }}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>{t.date}</Text></View>
+            <View style={{ width: '30%' }}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>{t.method}</Text></View>
+            <View style={{ width: '30%', textAlign: 'right' }}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>{t.amount}</Text></View>
           </View>
-          {data.items.map((item, i) => (
-            <View key={i} style={[baseStyles.tableRow, { borderTopColor: theme.tableBorderColor, backgroundColor: i % 2 === 0 ? theme.cardBg : theme.cardSoftBg }]}> 
-              <View style={baseStyles.colItem}><Text>{item.name}</Text></View>
-              <View style={baseStyles.colQty}><Text>{item.qty}</Text></View>
-              <View style={baseStyles.colPrice}><Text>{fmt(item.price)}</Text></View>
-              <View style={baseStyles.colTotal}><Text style={{ fontWeight: 'bold' }}>{fmt(item.subtotal)}</Text></View>
+          {data.payments.map((p, i) => (
+            <View key={i} style={[baseStyles.paymentRow, { borderTopColor: theme.tableBorderColor }]}>
+              <View style={{ width: '40%' }}><Text>{formatDateTime(p.date)}</Text></View>
+              <View style={{ width: '30%' }}><Text style={{ textTransform: 'capitalize' }}>{p.method}</Text></View>
+              <View style={{ width: '30%', textAlign: 'right' }}><Text>{fmt(p.amount)}</Text></View>
             </View>
           ))}
         </View>
+      ) : null}
 
-        <View style={baseStyles.summaryArea}>
-          <View style={baseStyles.stampContainer}>
-            <Text style={[baseStyles.badge, { borderColor: statusColor, color: statusColor, backgroundColor: theme.cardBg }]}>{badgeLabel(data.summary.status)}</Text>
-            {(data.notes || settings.invoiceTerm) ? (
-              <View style={[baseStyles.noteCard, { backgroundColor: theme.cardBg, borderColor: theme.sectionBorder }]}> 
-                <Text style={[baseStyles.termsTitle, { color: theme.accentColor }]}>Catatan</Text>
-                <Text style={[baseStyles.termsText, { color: theme.mutedText }]}>{data.notes || settings.invoiceTerm}</Text>
-              </View>
-            ) : null}
-          </View>
-          <View style={[baseStyles.totalsPanel, { backgroundColor: theme.totalPanelBg, borderColor: theme.totalPanelBorder }]}> 
-            <View style={baseStyles.totalsRow}><Text style={[baseStyles.totalsLabel, { color: theme.mutedText }]}>Subtotal</Text><Text style={baseStyles.totalsValue}>{fmt(data.summary.subtotal)}</Text></View>
-            {data.summary.discount > 0 ? <View style={baseStyles.totalsRow}><Text style={[baseStyles.totalsLabel, { color: theme.mutedText }]}>Diskon</Text><Text style={baseStyles.totalsValue}>-{fmt(data.summary.discount)}</Text></View> : null}
-            <View style={baseStyles.totalsRow}><Text style={[baseStyles.totalsLabel, { color: theme.mutedText }]}>Dibayar</Text><Text style={baseStyles.totalsValue}>{fmt(data.summary.paidTotal)}</Text></View>
-            {data.summary.change != null && data.summary.change > 0 ? <View style={baseStyles.totalsRow}><Text style={[baseStyles.totalsLabel, { color: theme.mutedText }]}>Kembali</Text><Text style={baseStyles.totalsValue}>{fmt(data.summary.change)}</Text></View> : null}
-            <View style={[baseStyles.grandTotalRow, { borderTopColor: theme.totalPanelBorder }]}> 
-              <Text style={[baseStyles.grandTotalLabel, { color: theme.bodyText }]}>{remaining > 0 ? 'Sisa Tagihan' : 'Total'}</Text>
-              <Text style={[baseStyles.grandTotalValue, { color: theme.accentColor }]}>{fmt(remaining > 0 ? remaining : data.summary.grandTotal)}</Text>
-            </View>
-          </View>
-        </View>
+      <View style={[baseStyles.footer, { borderTopColor: theme.footerBorder }]}>
+        <Text style={{ color: theme.mutedText }}>{settings.receiptFooter || t.footerFallback}</Text>
+      </View>
+    </Page>
+  )
+}
 
-        {data.payments && data.payments.length > 0 ? (
-          <View style={[baseStyles.paymentsSection, { backgroundColor: theme.cardBg, borderColor: theme.tableBorderColor }]}> 
-            <Text style={[baseStyles.paymentTitle, { color: theme.accentColor, backgroundColor: theme.cardSoftBg }]}>Riwayat Pembayaran</Text>
-            <View style={[baseStyles.tableHeader, { backgroundColor: theme.tableHeaderBg }]}> 
-              <View style={{ width: '40%' }}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>Tanggal</Text></View>
-              <View style={{ width: '30%' }}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>Metode</Text></View>
-              <View style={{ width: '30%', textAlign: 'right' }}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>Nominal</Text></View>
-            </View>
-            {data.payments.map((p, i) => (
-              <View key={i} style={[baseStyles.paymentRow, { borderTopColor: theme.tableBorderColor }]}> 
-                <View style={{ width: '40%' }}><Text>{formatDateTime(p.date)}</Text></View>
-                <View style={{ width: '30%' }}><Text style={{ textTransform: 'capitalize' }}>{p.method}</Text></View>
-                <View style={{ width: '30%', textAlign: 'right' }}><Text>{fmt(p.amount)}</Text></View>
-              </View>
-            ))}
-          </View>
-        ) : null}
+export function InvoicePDF({ data, settings }: { data: PdfInvoiceData; settings: PdfCompanySettings }) {
+  const theme = invoiceThemes[settings.invoiceTheme] ?? invoiceThemes.klasik
 
-        <View style={[baseStyles.footer, { borderTopColor: theme.footerBorder }]}> 
-          <Text style={{ color: theme.mutedText }}>{settings.receiptFooter || 'Terima kasih atas kepercayaan Anda.'}</Text>
-        </View>
-      </Page>
+  return (
+    <Document>
+      <InvoicePage data={data} settings={settings} theme={theme} lang="id" />
+      <InvoicePage data={data} settings={settings} theme={theme} lang="en" />
     </Document>
   )
 }

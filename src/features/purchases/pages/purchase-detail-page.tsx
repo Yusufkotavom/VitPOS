@@ -70,7 +70,7 @@ export function PurchaseDetailPage() {
     type: 'invoice',
     code: order.code,
     date: formatDateTime(order.date),
-    customer: { name: order.supplierName, phone: invoiceSupplier?.phone },
+    customer: { name: order.supplierName, phone: invoiceSupplier?.phone, address: invoiceSupplier?.city },
     items: order.items?.map(i => ({ name: i.name, qty: i.qty, price: i.unitPrice, subtotal: i.subtotal })) || [],
     summary: {
       subtotal: order.subtotal,

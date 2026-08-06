@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { formatCurrency } from '@/lib/format-currency'
+import { formatDateTime } from '@/lib/date'
 import { useServiceOrderCreateStore } from '@/features/service-orders/stores/service-order-create-store'
 import { socTransactionService } from '@/features/service-orders/services/soc-transaction.service'
 import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
@@ -41,7 +42,7 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
   const receiptData: PdfData | null = successOrder ? {
     type: 'receipt',
     code: successOrder.code,
-    date: new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(successOrder.date),
+    date: formatDateTime(successOrder.date),
     cashierName: successOrder.cashierName || 'Kasir',
     customer: { name: successOrder.customerName ?? 'Umum' },
     items: successOrder.items.map(i => ({ name: i.name, qty: i.qty, price: i.price, subtotal: i.subtotal })),

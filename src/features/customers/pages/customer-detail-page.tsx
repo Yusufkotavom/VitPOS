@@ -62,6 +62,7 @@ export function CustomerDetailPage() {
   const [editName, setEditName] = useState('')
   const [editPhone, setEditPhone] = useState('')
   const [editCity, setEditCity] = useState('')
+  const [editAddress, setEditAddress] = useState('')
   const [editStatus, setEditStatus] = useState('')
   const [editReceivable, setEditReceivable] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -134,6 +135,7 @@ export function CustomerDetailPage() {
     setEditName(customer.name)
     setEditPhone(customer.phone)
     setEditCity(customer.city)
+    setEditAddress(customer.address || '')
     setEditStatus(customer.status)
     setEditReceivable(String(customer.receivable))
     setEditing(true)
@@ -150,6 +152,7 @@ export function CustomerDetailPage() {
       updated.name = editName.trim()
       updated.phone = editPhone.trim()
       updated.city = editCity.trim()
+      updated.address = editAddress.trim()
       updated.status = editStatus
       updated.receivable = Number(editReceivable) || 0
       updated.version = customer.version + 1
@@ -236,9 +239,9 @@ export function CustomerDetailPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">{t('common.address')}</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t('common.city')}</p>
                   {editing ? (
-                    <Textarea value={editCity} onChange={e => setEditCity(e.target.value)} className="min-h-[3.5rem]" />
+                    <Input value={editCity} onChange={e => setEditCity(e.target.value)} className="h-8 text-sm" />
                   ) : (
                     <p className="font-medium">{customer.city}</p>
                   )}
@@ -259,9 +262,17 @@ export function CustomerDetailPage() {
                   ) : (
                     <StatusBadge label={customer.status} tone={customer.status === 'Aktif' ? 'success' : customer.status === 'Piutang' ? 'warning' : 'neutral'} />
                   )}
-                </div>
+              </div>
+              <div className="mt-4">
+                <p className="text-xs text-muted-foreground mb-1">{t('common.address')}</p>
+                {editing ? (
+                  <Textarea value={editAddress} onChange={e => setEditAddress(e.target.value)} className="min-h-[3.5rem]" />
+                ) : (
+                  <p className="font-medium">{customer.address || '—'}</p>
+                )}
               </div>
             </div>
+          </div>
           </div>
 
           <div>

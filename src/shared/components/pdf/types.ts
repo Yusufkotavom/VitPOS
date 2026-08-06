@@ -31,6 +31,7 @@ export type PdfLineItem = {
 export type PdfCustomer = {
   name: string
   phone?: string
+  address?: string
 }
 
 export type PdfSummary = {

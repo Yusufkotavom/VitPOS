@@ -80,7 +80,7 @@ export function SalesOrderDetailPage() {
     type: 'invoice',
     code: order.code,
     date: formatDateTime(order.date),
-    customer: { name: order.customerName, phone: invoiceCustomer?.phone },
+    customer: { name: order.customerName, phone: invoiceCustomer?.phone, address: invoiceCustomer?.address },
     items: order.items?.map(i => ({ name: i.name, qty: i.qty, price: i.unitPrice, subtotal: i.subtotal })) || [],
     summary: {
       subtotal: order.subtotal,
@@ -98,7 +98,7 @@ export function SalesOrderDetailPage() {
     type: 'sales-order',
     code: order.code,
     date: formatDateTime(order.date),
-    customer: { name: order.customerName, phone: invoiceCustomer?.phone },
+    customer: { name: order.customerName, phone: invoiceCustomer?.phone, address: invoiceCustomer?.address },
     items: order.items?.map(i => ({ name: i.name, qty: i.qty, price: i.unitPrice, subtotal: i.subtotal })) || [],
     summary: {
       subtotal: order.subtotal,

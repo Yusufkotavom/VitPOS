@@ -91,6 +91,7 @@ export type LocalCustomer = {
   name: string
   phone: string
   city: string
+  address?: string
   receivable: number
   orders: number
   status: string

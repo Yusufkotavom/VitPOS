@@ -315,6 +315,7 @@ syncRoutes.get('/pull', async (c) => {
         phone: row.phone,
         email: row.email,
         city: null,
+        address: row.address ?? '',
         receivable: 0,
         orders: 0,
         status: row.isActive ? 'Aktif' : 'Nonaktif',

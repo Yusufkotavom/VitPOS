@@ -284,6 +284,7 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
       name: typeof payload.name === 'string' ? payload.name : '',
       phone: typeof payload.phone === 'string' ? payload.phone : '',
       city: typeof payload.city === 'string' ? payload.city : '',
+      address: typeof payload.address === 'string' ? payload.address : '',
       receivable: Number(payload.receivable ?? 0),
       orders: Number(payload.orders ?? 0),
       status: typeof payload.status === 'string' ? payload.status : 'Aktif',

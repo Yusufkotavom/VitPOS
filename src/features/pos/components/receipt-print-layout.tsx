@@ -19,10 +19,11 @@ export function ReceiptPrintLayout({ order }: { order: PosOrderSummary | null })
   const receiptHeader = settings.find(s => s.id === 'receipt-header')?.value || ''
   const receiptFooter = settings.find(s => s.id === 'receipt-footer')?.value || 'Terima kasih atas kunjungan Anda'
 
-  // Format date natively for print layout
+  // Format date natively for print layout (WIB / Asia/Jakarta)
   const dateStr = new Intl.DateTimeFormat('id-ID', {
     dateStyle: 'medium',
     timeStyle: 'short',
+    timeZone: 'Asia/Jakarta',
   }).format(order.date)
 
   return (

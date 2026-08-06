@@ -9,28 +9,33 @@ export function toDateInput(value: string | null | undefined): string {
   return d.toISOString().slice(0, 10)
 }
 
-export function formatDate(value: string) {
-  const d = new Date(value)
-  if (isNaN(d.getTime())) return value
+export const APP_TIME_ZONE = 'Asia/Jakarta'
+
+export function formatDate(value: string | Date) {
+  const d = value instanceof Date ? value : new Date(value)
+  if (isNaN(d.getTime())) return typeof value === 'string' ? value : ''
   return new Intl.DateTimeFormat('id-ID', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
-    timeZone: 'UTC',
+    timeZone: APP_TIME_ZONE,
   }).format(d)
 }
 
-export function formatDateTime(value: string) {
-  const d = new Date(value)
-  if (isNaN(d.getTime())) return value
+export function formatDateTime(value: string | Date) {
+  const d = value instanceof Date ? value : new Date(value)
+  if (isNaN(d.getTime())) return typeof value === 'string' ? value : ''
   const datePart = new Intl.DateTimeFormat('id-ID', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
+    timeZone: APP_TIME_ZONE,
   }).format(d)
   const timePart = new Intl.DateTimeFormat('id-ID', {
     hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
+    timeZone: APP_TIME_ZONE,
   }).format(d).replace(/\./g, ':')
   return `${datePart}, ${timePart}`
 }

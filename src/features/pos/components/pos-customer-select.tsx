@@ -107,8 +107,12 @@ export function PosCustomerSelect() {
                 <Input id="phone" {...form.register('phone')} aria-invalid={!!errors.phone} />
               </Field>
               <Field data-invalid={!!errors.city}>
-                <Label htmlFor="city">{t('common.address')}</Label>
-                <Textarea id="city" {...form.register('city')} aria-invalid={!!errors.city} className="min-h-[3.5rem]" />
+                <Label htmlFor="city">{t('common.city')}</Label>
+                <Input id="city" {...form.register('city')} aria-invalid={!!errors.city} placeholder="Bandung" />
+              </Field>
+              <Field data-invalid={!!errors.address}>
+                <Label htmlFor="address">{t('common.address')}</Label>
+                <Textarea id="address" {...form.register('address')} aria-invalid={!!errors.address} className="min-h-[3.5rem]" />
               </Field>
               <Field>
                 <Label htmlFor="status">{t('common.status')}</Label>
