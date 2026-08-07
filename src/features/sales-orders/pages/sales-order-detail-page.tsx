@@ -203,7 +203,7 @@ export function SalesOrderDetailPage() {
       const keptIds = new Set(payments.map(p => p.id))
       const nowIso = new Date().toISOString()
 
-      await localDb.transaction('rw', [localDb.salesOrders, localDb.payments, localDb.outbox], async () => {
+      await localDb.transaction('rw', [localDb.salesOrders, localDb.salesOrderItems, localDb.payments, localDb.outbox], async () => {
         for (const removed of linkedPayments.filter(p => !keptIds.has(p.id))) {
           await enqueueOutboxItem({ entityType: 'payment', entityId: removed.id, mutationType: 'delete', payload: removed })
           await localDb.payments.delete(removed.id)
