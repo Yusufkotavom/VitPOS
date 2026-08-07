@@ -1669,6 +1669,7 @@ async function applySale(db2, ctx, entityId, mutationType, payload) {
   }
   const now = /* @__PURE__ */ new Date();
   if (mutationType === "delete") {
+    await db2.delete(payments).where(eq3(payments.salesOrderId, entityId));
     await db2.delete(salesOrderItems).where(eq3(salesOrderItems.salesOrderId, entityId));
     await db2.delete(salesOrders).where(eq3(salesOrders.id, entityId));
     return;
@@ -2075,6 +2076,7 @@ async function applySupplier(db2, ctx, entityId, mutationType, payload) {
 }
 async function applyPurchase(db2, ctx, entityId, mutationType, payload) {
   if (mutationType === "delete") {
+    await db2.delete(payments).where(eq3(payments.purchaseId, entityId));
     await db2.delete(purchaseItems).where(eq3(purchaseItems.purchaseId, entityId));
     await db2.delete(purchases).where(eq3(purchases.id, entityId));
     return;
@@ -2176,6 +2178,7 @@ async function applyReturn(db2, ctx, entityId, mutationType, payload) {
 }
 async function applyServiceOrder(db2, ctx, entityId, mutationType, payload) {
   if (mutationType === "delete") {
+    await db2.delete(payments).where(eq3(payments.serviceOrderId, entityId));
     await db2.delete(serviceOrders).where(eq3(serviceOrders.id, entityId));
     return;
   }

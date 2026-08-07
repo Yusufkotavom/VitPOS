@@ -235,6 +235,7 @@ async function applySale(db: AppDb, ctx: ApplyContext, entityId: string, mutatio
   const now = new Date()
 
   if (mutationType === 'delete') {
+    await db.delete(payments).where(eq(payments.salesOrderId, entityId))
     await db.delete(salesOrderItems).where(eq(salesOrderItems.salesOrderId, entityId))
     await db.delete(salesOrders).where(eq(salesOrders.id, entityId))
     return
@@ -880,6 +881,7 @@ async function applySupplier(db: AppDb, ctx: ApplyContext, entityId: string, mut
 
 async function applyPurchase(db: AppDb, ctx: ApplyContext, entityId: string, mutationType: string, payload: PurchasePayload) {
   if (mutationType === 'delete') {
+    await db.delete(payments).where(eq(payments.purchaseId, entityId))
     await db.delete(purchaseItems).where(eq(purchaseItems.purchaseId, entityId))
     await db.delete(purchases).where(eq(purchases.id, entityId))
     return
@@ -995,6 +997,7 @@ async function applyReturn(db: AppDb, ctx: ApplyContext, entityId: string, mutat
 
 async function applyServiceOrder(db: AppDb, ctx: ApplyContext, entityId: string, mutationType: string, payload: ServiceOrderPayload) {
   if (mutationType === 'delete') {
+    await db.delete(payments).where(eq(payments.serviceOrderId, entityId))
     await db.delete(serviceOrders).where(eq(serviceOrders.id, entityId))
     return
   }
