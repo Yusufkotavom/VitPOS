@@ -4,6 +4,7 @@ import { ServicePDF } from './service-pdf'
 import { ReceiptPDF } from './receipt-pdf'
 import { PaymentPDF } from './payment-pdf'
 import { SalesOrderPDF } from './sales-order-pdf'
+import { DeliveryNotePDF } from './delivery-note-pdf'
 
 export function PdfDocument({ data, settings }: { data: PdfData; settings: PdfCompanySettings }) {
   switch (data.type) {
@@ -17,5 +18,7 @@ export function PdfDocument({ data, settings }: { data: PdfData; settings: PdfCo
       return <PaymentPDF data={data} settings={settings} />
     case 'sales-order':
       return <SalesOrderPDF data={data} settings={settings} />
+    case 'delivery-note':
+      return <DeliveryNotePDF data={data} settings={settings} />
   }
 }

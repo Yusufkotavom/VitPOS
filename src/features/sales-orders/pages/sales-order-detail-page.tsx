@@ -115,6 +115,15 @@ export function SalesOrderDetailPage() {
     notes: order.notes || '',
   } : null
 
+  const deliveryNoteData: PdfData | null = order ? {
+    type: 'delivery-note',
+    code: `${order.code}-SJ`,
+    date: formatDateTime(order.date),
+    customer: { name: order.customerName, phone: invoiceCustomer?.phone, address: invoiceCustomer?.address },
+    items: order.items?.map(i => ({ name: i.name, qty: i.qty })) || [],
+    notes: order.notes || '',
+  } : null
+
   if (isLoading) {
     return (
       <PageShell title="Loading..." description="">
@@ -393,6 +402,10 @@ export function SalesOrderDetailPage() {
           <DropdownMenuItem onClick={() => salesOrderData && printPdf(salesOrderData)}>
             <FileText className="mr-2 h-4 w-4" />
             Sales Order (A4)
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => deliveryNoteData && printPdf(deliveryNoteData)}>
+            <FileText className="mr-2 h-4 w-4" />
+            Surat Jalan (A4)
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

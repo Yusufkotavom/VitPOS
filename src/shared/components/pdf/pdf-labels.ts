@@ -42,6 +42,11 @@ export const pdfLabels: Record<PdfLang, Record<string, string>> = {
     invoiceTotal: 'Total Invoice',
     status: 'Status',
     footerFallback: 'Terima kasih atas kepercayaan Anda.',
+    deliveryLabel: 'Dokumen Pengiriman',
+    deliveryTitle: 'SURAT JALAN',
+    shipTo: 'Dikirim Kepada',
+    sender: 'Pengirim',
+    noteLabel: 'Catatan',
   },
   en: {
     phone: 'Phone',
@@ -84,5 +89,10 @@ export const pdfLabels: Record<PdfLang, Record<string, string>> = {
     invoiceTotal: 'Invoice Total',
     status: 'Status',
     footerFallback: 'Thank you for your trust.',
+    deliveryLabel: 'Shipping Document',
+    deliveryTitle: 'DELIVERY NOTE',
+    shipTo: 'Ship To',
+    sender: 'Sender',
+    noteLabel: 'Notes',
   },
 }

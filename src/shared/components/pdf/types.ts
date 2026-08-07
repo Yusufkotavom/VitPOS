@@ -1,4 +1,4 @@
-export type PdfDocumentType = 'invoice' | 'service' | 'receipt' | 'payment' | 'sales-order'
+export type PdfDocumentType = 'invoice' | 'service' | 'receipt' | 'payment' | 'sales-order' | 'delivery-note'
 
 export type InvoiceThemeName = 'klasik' | 'korporat' | 'modern' | 'eksekutif'
 
@@ -118,7 +118,16 @@ export type PdfSalesOrderData = {
   notes: string
 }
 
-export type PdfData = PdfInvoiceData | PdfServiceData | PdfReceiptData | PdfPaymentData | PdfSalesOrderData
+export type PdfDeliveryNoteData = {
+  type: 'delivery-note'
+  code: string
+  date: string
+  customer: PdfCustomer
+  items: { name: string; qty: number }[]
+  notes: string
+}
+
+export type PdfData = PdfInvoiceData | PdfServiceData | PdfReceiptData | PdfPaymentData | PdfSalesOrderData | PdfDeliveryNoteData
 
 export const labels = {
   invoice: 'INVOICE',
