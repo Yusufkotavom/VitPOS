@@ -2,6 +2,7 @@ import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
 import { formatCurrency } from '@/lib/format-currency'
 import { formatDateTime } from '@/lib/date'
 import type { PdfPaymentData, PdfCompanySettings } from './types'
+import { pdfLabels, type PdfLang } from './pdf-labels'
 
 const styles = StyleSheet.create({
   page: { padding: 40, fontSize: 9, fontFamily: 'Helvetica', color: '#374151', lineHeight: 1.5 },
@@ -29,51 +30,60 @@ function fmt(n: number) {
   return formatCurrency(n)
 }
 
+function PaymentPage({ data, settings, lang }: { data: PdfPaymentData; settings: PdfCompanySettings; lang: PdfLang }) {
+  const t = pdfLabels[lang]
+
+  return (
+    <Page size="A4" style={styles.page}>
+      <View style={styles.header}>
+        <View style={styles.companyInfo}>
+          <Text style={styles.companyName}>{settings.companyName}</Text>
+          {settings.companyAddress && <Text style={styles.companySub}>{settings.companyAddress}</Text>}
+          {settings.companyPhone && <Text style={styles.companySub}>{t.phone}: {settings.companyPhone}</Text>}
+        </View>
+        <View style={styles.metaSection}>
+          <Text style={styles.title}>{t.paymentTitle}</Text>
+          <Text style={styles.metaText}>{data.ref}</Text>
+        </View>
+      </View>
+
+      <View style={styles.detailsContainer}>
+        <View style={styles.customerInfo}>
+          <Text style={styles.detailBold}>{data.customer.name}</Text>
+          <Text style={styles.detailText}>{t.invoiceNo}: {data.invoiceCode}</Text>
+        </View>
+        <View style={styles.paymentDetails}>
+          <Text style={styles.detailText}>{t.date}: {formatDateTime(data.date)}</Text>
+          <Text style={styles.detailText}>{t.method}: {data.method}</Text>
+          <Text style={styles.detailText}>{t.status}: {data.status}</Text>
+        </View>
+      </View>
+
+      <View style={styles.totalsSection}>
+        <View style={styles.totalsTable}>
+          <View style={styles.rowNormal}>
+            <Text>{t.invoiceTotal}</Text>
+            <Text style={{ fontWeight: 'bold' }}>{fmt(data.invoiceTotal)}</Text>
+          </View>
+          <View style={styles.rowBold}>
+            <Text>{t.paid}</Text>
+            <Text>{fmt(data.amount)}</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.footer}>
+        <Text>{t.footerFallback}</Text>
+      </View>
+    </Page>
+  )
+}
+
 export function PaymentPDF({ data, settings }: { data: PdfPaymentData; settings: PdfCompanySettings }) {
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <View style={styles.companyInfo}>
-            <Text style={styles.companyName}>{settings.companyName}</Text>
-            {settings.companyAddress && <Text style={styles.companySub}>{settings.companyAddress}</Text>}
-            {settings.companyPhone && <Text style={styles.companySub}>Telp: {settings.companyPhone}</Text>}
-          </View>
-          <View style={styles.metaSection}>
-            <Text style={styles.title}>BUKTI PEMBAYARAN</Text>
-            <Text style={styles.metaText}>{data.ref}</Text>
-          </View>
-        </View>
-
-        <View style={styles.detailsContainer}>
-          <View style={styles.customerInfo}>
-            <Text style={styles.detailBold}>{data.customer.name}</Text>
-            <Text style={styles.detailText}>No Invoice: {data.invoiceCode}</Text>
-          </View>
-          <View style={styles.paymentDetails}>
-            <Text style={styles.detailText}>Tanggal: {formatDateTime(data.date)}</Text>
-            <Text style={styles.detailText}>Metode: {data.method}</Text>
-            <Text style={styles.detailText}>Status: {data.status}</Text>
-          </View>
-        </View>
-
-        <View style={styles.totalsSection}>
-          <View style={styles.totalsTable}>
-            <View style={styles.rowNormal}>
-              <Text>Total Invoice</Text>
-              <Text style={{ fontWeight: 'bold' }}>{fmt(data.invoiceTotal)}</Text>
-            </View>
-            <View style={styles.rowBold}>
-              <Text>Dibayar</Text>
-              <Text>{fmt(data.amount)}</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.footer}>
-          <Text>Terima kasih atas kepercayaan Anda.</Text>
-        </View>
-      </Page>
+      <PaymentPage data={data} settings={settings} lang="id" />
+      <PaymentPage data={data} settings={settings} lang="en" />
     </Document>
   )
 }

@@ -3,7 +3,9 @@ import { Document, Image, Page, StyleSheet, Text, View } from '@react-pdf/render
 import { formatDateTime } from '@/lib/date'
 import { formatCurrency } from '@/lib/format-currency'
 import type { PdfCompanySettings, PdfSalesOrderData } from './types'
+import type { InvoiceThemeTokens } from './invoice-themes'
 import { invoiceThemes } from './invoice-themes'
+import { pdfLabels, type PdfLang } from './pdf-labels'
 
 const baseStyles = StyleSheet.create({
   page: { padding: 30, fontSize: 9, fontFamily: 'Helvetica', lineHeight: 1.45 },
@@ -49,8 +51,85 @@ function fmt(n: number) {
   return formatCurrency(n)
 }
 
-function contrastSoft(theme: typeof invoiceThemes.klasik) {
+function contrastSoft(theme: InvoiceThemeTokens) {
   return { color: theme.headerMutedText }
+}
+
+function SalesOrderPage({ data, settings, theme, lang }: { data: PdfSalesOrderData; settings: PdfCompanySettings; theme: InvoiceThemeTokens; lang: PdfLang }) {
+  const t = pdfLabels[lang]
+
+  return (
+    <Page size="A4" style={[baseStyles.page, { backgroundColor: theme.pageBg, color: theme.bodyText }]}>
+      <View style={[baseStyles.hero, { backgroundColor: theme.headerBg }]}>
+        <View style={[baseStyles.heroAccentBlock, { backgroundColor: theme.headerAccent }]} />
+        <View style={[baseStyles.heroAccentStripe, { backgroundColor: theme.headerAccent }]} />
+        <View style={baseStyles.heroTop}>
+          <View style={baseStyles.companyInfo}>
+            {settings.invoiceLogo ? (
+              <Image src={settings.invoiceLogo} style={baseStyles.logo} />
+            ) : (
+              <Text style={[baseStyles.companyName, { color: theme.headerTextColor }]}>{settings.companyName}</Text>
+            )}
+            {settings.invoiceLogo ? <Text style={[baseStyles.companyName, { color: theme.headerTextColor, fontSize: 13 }]}>{settings.companyName}</Text> : null}
+            {settings.companyAddress ? <Text style={[baseStyles.companySub, contrastSoft(theme)]}>{settings.companyAddress}</Text> : null}
+            {settings.companyPhone ? <Text style={[baseStyles.companySub, contrastSoft(theme)]}>{t.phone}: {settings.companyPhone}</Text> : null}
+            {settings.companyTax ? <Text style={[baseStyles.companySub, contrastSoft(theme)]}>{t.tax}: {settings.companyTax}</Text> : null}
+          </View>
+          <View style={baseStyles.invoiceMeta}>
+            <Text style={[baseStyles.invoiceLabel, contrastSoft(theme)]}>{t.orderLabel}</Text>
+            <Text style={[baseStyles.invoiceTitle, { color: theme.titleColor }]}>{t.orderTitle}</Text>
+            <Text style={[baseStyles.invoiceCodePill, { backgroundColor: theme.headerAccent, color: theme.headerTextColor }]}>{data.code}</Text>
+            <Text style={[baseStyles.metaText, contrastSoft(theme)]}>{formatDateTime(data.date)}</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={[baseStyles.infoCard, { backgroundColor: theme.cardBg, borderColor: theme.sectionBorder, marginBottom: 16 }]}>
+        <Text style={[baseStyles.sectionEyebrow, { color: theme.accentColor }]}>{t.billTo}</Text>
+        <Text style={[baseStyles.detailTitle, { color: theme.bodyText }]}>{data.customer.name}</Text>
+        {data.customer.phone ? <Text style={[baseStyles.detailText, { color: theme.mutedText }]}>{data.customer.phone}</Text> : null}
+      </View>
+
+      <View style={[baseStyles.tableWrap, { backgroundColor: theme.cardBg, borderColor: theme.tableBorderColor }]}>
+        <View style={[baseStyles.tableHeader, { backgroundColor: theme.tableHeaderBg }]}>
+          <View style={baseStyles.colItem}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>{t.item}</Text></View>
+          <View style={baseStyles.colQty}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>{t.qty}</Text></View>
+          <View style={baseStyles.colPrice}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>{t.price}</Text></View>
+          <View style={baseStyles.colTotal}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>{t.total}</Text></View>
+        </View>
+        {data.items.map((item, i) => (
+          <View key={i} style={[baseStyles.tableRow, { borderTopColor: theme.tableBorderColor, backgroundColor: i % 2 === 0 ? theme.cardBg : theme.cardSoftBg }]}>
+            <View style={baseStyles.colItem}><Text>{item.name}</Text></View>
+            <View style={baseStyles.colQty}><Text>{item.qty}</Text></View>
+            <View style={baseStyles.colPrice}><Text>{fmt(item.price)}</Text></View>
+            <View style={baseStyles.colTotal}><Text style={{ fontWeight: 'bold' }}>{fmt(item.subtotal)}</Text></View>
+          </View>
+        ))}
+      </View>
+
+      <View style={baseStyles.summaryArea}>
+        <View style={[baseStyles.totalsPanel, { backgroundColor: theme.totalPanelBg, borderColor: theme.totalPanelBorder }]}>
+          <View style={baseStyles.totalsRow}><Text style={[baseStyles.totalsLabel, { color: theme.mutedText }]}>{t.subtotal}</Text><Text style={baseStyles.totalsValue}>{fmt(data.summary.subtotal)}</Text></View>
+          {data.summary.discount > 0 ? <View style={baseStyles.totalsRow}><Text style={[baseStyles.totalsLabel, { color: theme.mutedText }]}>{t.discount}</Text><Text style={baseStyles.totalsValue}>-{fmt(data.summary.discount)}</Text></View> : null}
+          <View style={[baseStyles.grandTotalRow, { borderTopColor: theme.totalPanelBorder }]}>
+            <Text style={[baseStyles.grandTotalLabel, { color: theme.bodyText }]}>{t.total}</Text>
+            <Text style={[baseStyles.grandTotalValue, { color: theme.accentColor }]}>{fmt(data.summary.grandTotal)}</Text>
+          </View>
+        </View>
+      </View>
+
+      {data.notes ? (
+        <View style={[baseStyles.noteCard, { backgroundColor: theme.cardBg, borderColor: theme.sectionBorder }]}>
+          <Text style={[baseStyles.termsTitle, { color: theme.accentColor }]}>{t.notes}</Text>
+          <Text style={[baseStyles.termsText, { color: theme.mutedText }]}>{data.notes}</Text>
+        </View>
+      ) : null}
+
+      <View style={[baseStyles.footer, { borderTopColor: theme.footerBorder }]}>
+        <Text style={{ color: theme.mutedText }}>{settings.receiptFooter || t.footerFallback}</Text>
+      </View>
+    </Page>
+  )
 }
 
 export function SalesOrderPDF({ data, settings }: { data: PdfSalesOrderData; settings: PdfCompanySettings }) {
@@ -58,76 +137,8 @@ export function SalesOrderPDF({ data, settings }: { data: PdfSalesOrderData; set
 
   return (
     <Document>
-      <Page size="A4" style={[baseStyles.page, { backgroundColor: theme.pageBg, color: theme.bodyText }]}>
-        <View style={[baseStyles.hero, { backgroundColor: theme.headerBg }]}>
-          <View style={[baseStyles.heroAccentBlock, { backgroundColor: theme.headerAccent }]} />
-          <View style={[baseStyles.heroAccentStripe, { backgroundColor: theme.headerAccent }]} />
-          <View style={baseStyles.heroTop}>
-            <View style={baseStyles.companyInfo}>
-              {settings.invoiceLogo ? (
-                <Image src={settings.invoiceLogo} style={baseStyles.logo} />
-              ) : (
-                <Text style={[baseStyles.companyName, { color: theme.headerTextColor }]}>{settings.companyName}</Text>
-              )}
-              {settings.invoiceLogo ? <Text style={[baseStyles.companyName, { color: theme.headerTextColor, fontSize: 13 }]}>{settings.companyName}</Text> : null}
-              {settings.companyAddress ? <Text style={[baseStyles.companySub, contrastSoft(theme)]}>{settings.companyAddress}</Text> : null}
-              {settings.companyPhone ? <Text style={[baseStyles.companySub, contrastSoft(theme)]}>Telp: {settings.companyPhone}</Text> : null}
-              {settings.companyTax ? <Text style={[baseStyles.companySub, contrastSoft(theme)]}>NPWP/NIB: {settings.companyTax}</Text> : null}
-            </View>
-            <View style={baseStyles.invoiceMeta}>
-              <Text style={[baseStyles.invoiceLabel, contrastSoft(theme)]}>Dokumen Pesanan</Text>
-              <Text style={[baseStyles.invoiceTitle, { color: theme.titleColor }]}>SURAT PESANAN</Text>
-              <Text style={[baseStyles.invoiceCodePill, { backgroundColor: theme.headerAccent, color: theme.headerTextColor }]}>{data.code}</Text>
-              <Text style={[baseStyles.metaText, contrastSoft(theme)]}>{formatDateTime(data.date)}</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={[baseStyles.infoCard, { backgroundColor: theme.cardBg, borderColor: theme.sectionBorder, marginBottom: 16 }]}>
-          <Text style={[baseStyles.sectionEyebrow, { color: theme.accentColor }]}>Pelanggan</Text>
-          <Text style={[baseStyles.detailTitle, { color: theme.bodyText }]}>{data.customer.name}</Text>
-          {data.customer.phone ? <Text style={[baseStyles.detailText, { color: theme.mutedText }]}>{data.customer.phone}</Text> : null}
-        </View>
-
-        <View style={[baseStyles.tableWrap, { backgroundColor: theme.cardBg, borderColor: theme.tableBorderColor }]}>
-          <View style={[baseStyles.tableHeader, { backgroundColor: theme.tableHeaderBg }]}>
-            <View style={baseStyles.colItem}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>Item</Text></View>
-            <View style={baseStyles.colQty}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>Qty</Text></View>
-            <View style={baseStyles.colPrice}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>Harga</Text></View>
-            <View style={baseStyles.colTotal}><Text style={{ fontWeight: 'bold', color: theme.tableHeaderText }}>Total</Text></View>
-          </View>
-          {data.items.map((item, i) => (
-            <View key={i} style={[baseStyles.tableRow, { borderTopColor: theme.tableBorderColor, backgroundColor: i % 2 === 0 ? theme.cardBg : theme.cardSoftBg }]}>
-              <View style={baseStyles.colItem}><Text>{item.name}</Text></View>
-              <View style={baseStyles.colQty}><Text>{item.qty}</Text></View>
-              <View style={baseStyles.colPrice}><Text>{fmt(item.price)}</Text></View>
-              <View style={baseStyles.colTotal}><Text style={{ fontWeight: 'bold' }}>{fmt(item.subtotal)}</Text></View>
-            </View>
-          ))}
-        </View>
-
-        <View style={baseStyles.summaryArea}>
-          <View style={[baseStyles.totalsPanel, { backgroundColor: theme.totalPanelBg, borderColor: theme.totalPanelBorder }]}>
-            <View style={baseStyles.totalsRow}><Text style={[baseStyles.totalsLabel, { color: theme.mutedText }]}>Subtotal</Text><Text style={baseStyles.totalsValue}>{fmt(data.summary.subtotal)}</Text></View>
-            {data.summary.discount > 0 ? <View style={baseStyles.totalsRow}><Text style={[baseStyles.totalsLabel, { color: theme.mutedText }]}>Diskon</Text><Text style={baseStyles.totalsValue}>-{fmt(data.summary.discount)}</Text></View> : null}
-            <View style={[baseStyles.grandTotalRow, { borderTopColor: theme.totalPanelBorder }]}>
-              <Text style={[baseStyles.grandTotalLabel, { color: theme.bodyText }]}>Total</Text>
-              <Text style={[baseStyles.grandTotalValue, { color: theme.accentColor }]}>{fmt(data.summary.grandTotal)}</Text>
-            </View>
-          </View>
-        </View>
-
-        {data.notes ? (
-          <View style={[baseStyles.noteCard, { backgroundColor: theme.cardBg, borderColor: theme.sectionBorder }]}>
-            <Text style={[baseStyles.termsTitle, { color: theme.accentColor }]}>Catatan</Text>
-            <Text style={[baseStyles.termsText, { color: theme.mutedText }]}>{data.notes}</Text>
-          </View>
-        ) : null}
-
-        <View style={[baseStyles.footer, { borderTopColor: theme.footerBorder }]}>
-          <Text style={{ color: theme.mutedText }}>{settings.receiptFooter || 'Terima kasih atas kepercayaan Anda.'}</Text>
-        </View>
-      </Page>
+      <SalesOrderPage data={data} settings={settings} theme={theme} lang="id" />
+      <SalesOrderPage data={data} settings={settings} theme={theme} lang="en" />
     </Document>
   )
 }

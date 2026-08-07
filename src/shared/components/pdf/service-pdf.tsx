@@ -2,6 +2,7 @@ import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
 import { formatCurrency } from '@/lib/format-currency'
 import { formatDateTime } from '@/lib/date'
 import type { PdfServiceData, PdfCompanySettings } from './types'
+import { pdfLabels, type PdfLang } from './pdf-labels'
 
 const styles = StyleSheet.create({
   page: { padding: 40, fontSize: 9, fontFamily: 'Helvetica', color: '#374151', lineHeight: 1.5 },
@@ -43,131 +44,139 @@ function fmt(n: number) {
   return formatCurrency(n)
 }
 
-export function ServicePDF({ data, settings }: { data: PdfServiceData; settings: PdfCompanySettings }) {
+function ServicePage({ data, settings, lang }: { data: PdfServiceData; settings: PdfCompanySettings; lang: PdfLang }) {
+  const t = pdfLabels[lang]
   const itemsCost = data.items?.reduce((s, i) => s + i.subtotal, 0) ?? 0
   const remaining = Math.max(0, data.cost - data.summary.paidTotal)
   const showItemsTable = data.items && data.items.length > 0
 
   return (
-    <Document>
-      <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <View style={styles.companyInfo}>
-            <Text style={styles.companyName}>{settings.companyName}</Text>
-            {settings.companyAddress && <Text style={styles.companySub}>{settings.companyAddress}</Text>}
-            {settings.companyPhone && <Text style={styles.companySub}>Telp: {settings.companyPhone}</Text>}
-          </View>
-          <View style={styles.metaSection}>
-            <Text style={styles.title}>SERVICE ORDER</Text>
-            <Text style={styles.metaText}>{data.code}</Text>
-            <Text style={styles.metaText}>{formatDateTime(data.date)}</Text>
-            <Text style={styles.statusBadge}>Status: {data.summary.status}</Text>
+    <Page size="A4" style={styles.page}>
+      <View style={styles.header}>
+        <View style={styles.companyInfo}>
+          <Text style={styles.companyName}>{settings.companyName}</Text>
+          {settings.companyAddress && <Text style={styles.companySub}>{settings.companyAddress}</Text>}
+          {settings.companyPhone && <Text style={styles.companySub}>{t.phone}: {settings.companyPhone}</Text>}
+        </View>
+        <View style={styles.metaSection}>
+          <Text style={styles.title}>{t.serviceTitle}</Text>
+          <Text style={styles.metaText}>{data.code}</Text>
+          <Text style={styles.metaText}>{formatDateTime(data.date)}</Text>
+          <Text style={styles.statusBadge}>{t.status}: {data.summary.status}</Text>
+        </View>
+      </View>
+
+      <View style={styles.detailsContainer}>
+        <View style={styles.customerSection}>
+          <Text style={styles.sectionTitle}>{t.billTo}</Text>
+          <Text style={styles.detailBold}>{data.customer.name}</Text>
+          {data.customer.phone && <Text style={styles.detailText}>{data.customer.phone}</Text>}
+        </View>
+
+        <View style={{ marginBottom: 15 }}>
+          <Text style={styles.sectionTitle}>{t.serviceDetails}</Text>
+          <Text style={styles.detailBold}>{t.device}: {data.device}</Text>
+          <View style={styles.problemBox}>
+            <Text style={styles.problemText}>{data.problem}</Text>
           </View>
         </View>
 
-        <View style={styles.detailsContainer}>
-          <View style={styles.customerSection}>
-            <Text style={styles.sectionTitle}>Pelanggan</Text>
-            <Text style={styles.detailBold}>{data.customer.name}</Text>
-            {data.customer.phone && <Text style={styles.detailText}>{data.customer.phone}</Text>}
+        {data.warranty && (
+          <View style={[styles.warrantyBox, data.warranty.isExpired ? { backgroundColor: '#fef2f2', borderColor: '#fecaca' } : {}]}>
+            <Text style={data.warranty.isExpired ? styles.warrantyExpired : styles.warrantyActive}>
+              {data.warranty.isExpired ? t.warrantyExpired : t.warrantyActive} — {data.warranty.value} {data.warranty.unit}
+              {'\n'}{t.validUntil}: {new Date(data.warranty.endDate).toLocaleDateString('id-ID', { dateStyle: 'long' })}
+            </Text>
           </View>
+        )}
+      </View>
 
-          <View style={{ marginBottom: 15 }}>
-            <Text style={styles.sectionTitle}>Detail Servis</Text>
-            <Text style={styles.detailBold}>Perangkat: {data.device}</Text>
-            <View style={styles.problemBox}>
-              <Text style={styles.problemText}>{data.problem}</Text>
+      {showItemsTable ? (
+        <View style={{ marginBottom: 10 }}>
+          <Text style={styles.sectionTitle}>{t.itemsServices}</Text>
+          <View style={[styles.tableHeader, { marginTop: 5 }]}>
+            <View style={styles.colItem}><Text style={styles.headerText}>{t.item}</Text></View>
+            <View style={styles.colQty}><Text style={styles.headerText}>{t.qty}</Text></View>
+            <View style={styles.colPrice}><Text style={styles.headerText}>{t.price}</Text></View>
+            <View style={styles.colTotal}><Text style={styles.headerText}>Subtotal</Text></View>
+          </View>
+          {data.items?.map((item, i) => (
+            <View key={i} style={styles.tableRow}>
+              <View style={styles.colItem}><Text>{item.name}</Text></View>
+              <View style={styles.colQty}><Text>{item.qty}</Text></View>
+              <View style={styles.colPrice}><Text>{fmt(item.price)}</Text></View>
+              <View style={styles.colTotal}><Text>{fmt(item.subtotal)}</Text></View>
             </View>
+          ))}
+          <View style={[styles.tableRow, { backgroundColor: '#f9fafb' }]}>
+            <View style={styles.colItem}><Text style={{ fontWeight: 'bold' }}>{t.itemsTotal}</Text></View>
+            <View style={styles.colQty}></View>
+            <View style={styles.colPrice}></View>
+            <View style={styles.colTotal}><Text style={{ fontWeight: 'bold' }}>{fmt(itemsCost)}</Text></View>
           </View>
+        </View>
+      ) : (
+        <View style={{ marginBottom: 10 }}>
+          <View style={styles.tableHeader}>
+            <View style={styles.colDesc}><Text style={styles.headerText}>{t.description}</Text></View>
+            <View style={styles.colCost}><Text style={styles.headerText}>{t.cost}</Text></View>
+          </View>
+          <View style={styles.tableRow}>
+            <View style={styles.colDesc}><Text>{t.itemsServices} - {data.device}</Text></View>
+            <View style={styles.colCost}><Text>{fmt(data.cost)}</Text></View>
+          </View>
+        </View>
+      )}
 
-          {data.warranty && (
-            <View style={[styles.warrantyBox, data.warranty.isExpired ? { backgroundColor: '#fef2f2', borderColor: '#fecaca' } : {}]}>
-              <Text style={data.warranty.isExpired ? styles.warrantyExpired : styles.warrantyActive}>
-                {data.warranty.isExpired ? 'GARANSI KADALUARSA' : 'GARANSI AKTIF'} — {data.warranty.value} {data.warranty.unit}
-                {'\n'}Berlaku sampai: {new Date(data.warranty.endDate).toLocaleDateString('id-ID', { dateStyle: 'long' })}
-              </Text>
+      <View style={styles.totalsSection}>
+        <View style={styles.totalsTable}>
+          <View style={styles.totalsRowBold}>
+            <Text>{t.totalCost}</Text>
+            <Text>{fmt(data.cost)}</Text>
+          </View>
+          <View style={styles.totalsRow}>
+            <Text>{t.paid}</Text>
+            <Text>{fmt(data.summary.paidTotal)}</Text>
+          </View>
+          {remaining > 0 && (
+            <View style={styles.totalsRowBold}>
+              <Text>{t.remainingBalance}</Text>
+              <Text>{fmt(remaining)}</Text>
             </View>
           )}
         </View>
+      </View>
 
-        {showItemsTable ? (
-          <View style={{ marginBottom: 10 }}>
-            <Text style={styles.sectionTitle}>Item / Jasa</Text>
-            <View style={[styles.tableHeader, { marginTop: 5 }]}>
-              <View style={styles.colItem}><Text style={styles.headerText}>Item</Text></View>
-              <View style={styles.colQty}><Text style={styles.headerText}>Qty</Text></View>
-              <View style={styles.colPrice}><Text style={styles.headerText}>Harga</Text></View>
-              <View style={styles.colTotal}><Text style={styles.headerText}>Subtotal</Text></View>
-            </View>
-            {data.items?.map((item, i) => (
-              <View key={i} style={styles.tableRow}>
-                <View style={styles.colItem}><Text>{item.name}</Text></View>
-                <View style={styles.colQty}><Text>{item.qty}</Text></View>
-                <View style={styles.colPrice}><Text>{fmt(item.price)}</Text></View>
-                <View style={styles.colTotal}><Text>{fmt(item.subtotal)}</Text></View>
-              </View>
-            ))}
-            <View style={[styles.tableRow, { backgroundColor: '#f9fafb' }]}>
-              <View style={styles.colItem}><Text style={{ fontWeight: 'bold' }}>Total Item</Text></View>
-              <View style={styles.colQty}></View>
-              <View style={styles.colPrice}></View>
-              <View style={styles.colTotal}><Text style={{ fontWeight: 'bold' }}>{fmt(itemsCost)}</Text></View>
-            </View>
+      {data.payments && data.payments.length > 0 && (
+        <View style={{ marginTop: 20 }}>
+          <Text style={styles.sectionTitle}>{t.paymentHistory}</Text>
+          <View style={[styles.tableHeader, { marginTop: 5 }]}>
+            <View style={styles.colDesc}><Text style={styles.headerText}>{t.date}</Text></View>
+            <View style={{ width: '30%' }}><Text style={styles.headerText}>{t.method}</Text></View>
+            <View style={styles.colCost}><Text style={styles.headerText}>{t.amount}</Text></View>
           </View>
-        ) : (
-          <View style={{ marginBottom: 10 }}>
-            <View style={styles.tableHeader}>
-              <View style={styles.colDesc}><Text style={styles.headerText}>Deskripsi</Text></View>
-              <View style={styles.colCost}><Text style={styles.headerText}>Biaya</Text></View>
+          {data.payments.map((p, i) => (
+            <View key={i} style={styles.tableRow}>
+              <View style={styles.colDesc}><Text>{formatDateTime(p.date)}</Text></View>
+              <View style={{ width: '30%' }}><Text style={{ textTransform: 'capitalize' }}>{p.method}</Text></View>
+              <View style={styles.colCost}><Text>{fmt(p.amount)}</Text></View>
             </View>
-            <View style={styles.tableRow}>
-              <View style={styles.colDesc}><Text>Jasa Servis - {data.device}</Text></View>
-              <View style={styles.colCost}><Text>{fmt(data.cost)}</Text></View>
-            </View>
-          </View>
-        )}
-
-        <View style={styles.totalsSection}>
-          <View style={styles.totalsTable}>
-            <View style={styles.totalsRowBold}>
-              <Text>Total Biaya</Text>
-              <Text>{fmt(data.cost)}</Text>
-            </View>
-            <View style={styles.totalsRow}>
-              <Text>Dibayar</Text>
-              <Text>{fmt(data.summary.paidTotal)}</Text>
-            </View>
-            {remaining > 0 && (
-              <View style={styles.totalsRowBold}>
-                <Text>Sisa Tagihan</Text>
-                <Text>{fmt(remaining)}</Text>
-              </View>
-            )}
-          </View>
+          ))}
         </View>
+      )}
 
-        {data.payments && data.payments.length > 0 && (
-          <View style={{ marginTop: 20 }}>
-            <Text style={styles.sectionTitle}>Riwayat Pembayaran</Text>
-            <View style={[styles.tableHeader, { marginTop: 5 }]}>
-              <View style={styles.colDesc}><Text style={styles.headerText}>Tanggal</Text></View>
-              <View style={{ width: '30%' }}><Text style={styles.headerText}>Metode</Text></View>
-              <View style={styles.colCost}><Text style={styles.headerText}>Nominal</Text></View>
-            </View>
-            {data.payments.map((p, i) => (
-              <View key={i} style={styles.tableRow}>
-                <View style={styles.colDesc}><Text>{formatDateTime(p.date)}</Text></View>
-                <View style={{ width: '30%' }}><Text style={{ textTransform: 'capitalize' }}>{p.method}</Text></View>
-                <View style={styles.colCost}><Text>{fmt(p.amount)}</Text></View>
-              </View>
-            ))}
-          </View>
-        )}
+      <View style={styles.footer}>
+        <Text>{settings.receiptFooter || t.footerFallback}</Text>
+      </View>
+    </Page>
+  )
+}
 
-        <View style={styles.footer}>
-          <Text>{settings.receiptFooter || 'Terima kasih atas kepercayaan Anda.'}</Text>
-        </View>
-      </Page>
+export function ServicePDF({ data, settings }: { data: PdfServiceData; settings: PdfCompanySettings }) {
+  return (
+    <Document>
+      <ServicePage data={data} settings={settings} lang="id" />
+      <ServicePage data={data} settings={settings} lang="en" />
     </Document>
   )
 }
