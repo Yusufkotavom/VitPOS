@@ -47,6 +47,10 @@ export function ServiceOrderDetailPage() {
   const payments = useLiveQuery(() => 
     id ? localDb.payments.where('serviceOrderId').equals(id).toArray() : []
   , [id])
+
+  const customer = useLiveQuery(() =>
+    order?.customerId ? localDb.customers.get(order.customerId) : undefined
+  , [order?.customerId])
   
   const paymentMethods = usePaymentMethods()
   const activeMethods = paymentMethods && paymentMethods.length > 0 ? paymentMethods.filter(m => m.status === 'Aktif') : [
@@ -91,7 +95,11 @@ export function ServiceOrderDetailPage() {
     type: 'service',
     code: order.code,
     date: formatDateTime(order.date),
-    customer: { name: order.customerName },
+    customer: {
+      name: order.customerName,
+      phone: customer?.phone,
+      address: customer?.address || customer?.city,
+    },
     device: order.description.split('\n')[0] || order.description,
     problem: order.description,
     cost: order.cost,
