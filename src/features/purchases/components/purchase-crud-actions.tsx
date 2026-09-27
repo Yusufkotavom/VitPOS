@@ -7,12 +7,11 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { PurchaseForm } from '@/features/purchases/components/purchase-form'
 import { receivePurchaseOrder, syncSupplierPurchaseMetrics } from '@/features/purchases/services/purchase-receiving.service'
 import { recordPurchasePayment } from '@/features/purchases/services/purchase-payment.service'
-import { mapPurchaseFormToRecord, mapPurchaseRecordToFormValues, type PurchaseFormValues } from '@/features/purchases/schemas/purchase-form-schema'
+import { generatePurchaseCode, mapPurchaseFormToRecord, mapPurchaseRecordToFormValues, type PurchaseFormValues } from '@/features/purchases/schemas/purchase-form-schema'
 import { localDb } from '@/services/local-db/client'
 import { purchaseRepository } from '@/services/local-db/repository'
 import { formatCurrency } from '@/lib/format-currency'
@@ -31,12 +30,17 @@ export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) 
     try {
       const id = purchase?.id ?? crypto.randomUUID()
       const tenantId = requireActiveTenantId()
-      const supplierName = values.supplierName.trim()
+      let code = values.code?.trim()
+      if (!code) {
+        code = await generatePurchaseCode()
+      }
+      const valuesWithCode = { ...values, code }
+      const supplierName = valuesWithCode.supplierName.trim()
       const supplier = supplierName
         ? await localDb.suppliers.where('[tenantId+name]').equals([tenantId, supplierName]).first()
         : undefined
       const tenantProducts = await localDb.products.where('tenantId').equals(tenantId).toArray()
-      const mappedPurchase = mapPurchaseFormToRecord(values, id, purchase)
+      const mappedPurchase = mapPurchaseFormToRecord(valuesWithCode, id, purchase)
       const nextPurchase = {
         ...mappedPurchase,
         supplierId: supplier?.id,
@@ -94,18 +98,37 @@ export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) 
 
   return (
     <div className="flex flex-wrap gap-2">
-      <Sheet open={formOpen} onOpenChange={setFormOpen}>
-        <SheetTrigger asChild>
-          {purchase ? <Button variant="outline" size="sm"><PencilIcon data-icon="inline-start" />{t('common.edit')}</Button> : <Button><PlusIcon data-icon="inline-start" />{t('purchases.create')}</Button>}
-        </SheetTrigger>
-        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
-          <SheetHeader>
-            <SheetTitle>{isEdit ? t('purchases.edit_title') : t('purchases.create_title')}</SheetTitle>
-            <SheetDescription>{t('purchases.form_sheet_description')}</SheetDescription>
-          </SheetHeader>
-          <PurchaseForm defaultValues={purchase ? mapPurchaseRecordToFormValues(purchase) : undefined} submitLabel={isEdit ? t('common.save_changes') : t('purchases.create')} onCancel={() => setFormOpen(false)} onSubmit={handleSubmit} />
-        </SheetContent>
-      </Sheet>
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogTrigger asChild>
+          {purchase ? (
+            <Button variant="outline" size="sm">
+              <PencilIcon data-icon="inline-start" />
+              {t('common.edit')}
+            </Button>
+          ) : (
+            <Button>
+              <PlusIcon data-icon="inline-start" />
+              {t('purchases.create')}
+            </Button>
+          )}
+        </DialogTrigger>
+        <DialogContent className="w-[95vw] max-w-5xl max-h-[92vh] overflow-y-auto p-0 sm:max-w-4xl lg:max-w-5xl">
+          <DialogHeader className="p-6 pb-4 border-b sticky top-0 bg-background/95 backdrop-blur-xs z-10">
+            <DialogTitle className="text-xl font-bold">
+              {isEdit ? t('purchases.edit_title') : t('purchases.create_title')}
+            </DialogTitle>
+            <DialogDescription>{t('purchases.form_sheet_description')}</DialogDescription>
+          </DialogHeader>
+          <div className="p-6 pt-4">
+            <PurchaseForm
+              defaultValues={purchase ? mapPurchaseRecordToFormValues(purchase) : undefined}
+              submitLabel={isEdit ? t('common.save_changes') : t('purchases.create')}
+              onCancel={() => setFormOpen(false)}
+              onSubmit={handleSubmit}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
       {purchase ? (
         <>
           {purchase.status !== 'Diterima' && purchase.status !== 'Batal' ? <Button size="sm" onClick={handleReceive}>{t('purchases.receive_goods')}</Button> : null}
