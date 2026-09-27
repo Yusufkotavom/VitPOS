@@ -8,6 +8,7 @@ import type { LocalSalesOrder, LocalSalesOrderItem } from '@/services/local-db/s
 export const salesOrderStatusOptions = ['Draft', 'Lunas', 'Sebagian', 'Belum Bayar', 'Batal'] as const
 
 export const salesOrderItemSchema = z.object({
+  productId: z.string().trim(),
   name: z.string().trim().min(1, 'Nama produk wajib diisi'),
   qty: z.string().trim().min(1, 'Qty wajib diisi'),
   unitPrice: z.string().trim().min(1, 'Harga wajib diisi'),
@@ -32,7 +33,7 @@ export const salesOrderInitialValues: SalesOrderFormValues = {
   discountTotal: '0',
   taxTotal: '0',
   status: 'Draft',
-  items: [{ name: '', qty: '1', unitPrice: '0' }],
+  items: [{ productId: '', name: '', qty: '1', unitPrice: '0' }],
 }
 
 export function mapSalesOrderFormToRecord(values: SalesOrderFormValues, id: string, base?: LocalSalesOrder): LocalSalesOrder {
@@ -44,7 +45,7 @@ export function mapSalesOrderFormToRecord(values: SalesOrderFormValues, id: stri
       id: base?.items[idx]?.id ?? crypto.randomUUID(),
       tenantId: base?.items[idx]?.tenantId ?? tenantId,
       salesOrderId: id,
-      productId: base?.items[idx]?.productId ?? '',
+      productId: item.productId?.trim() || base?.items[idx]?.productId || '',
       name: item.name.trim(),
       qty,
       unitPrice,
@@ -95,7 +96,7 @@ export function mapSalesOrderRecordToFormValues(order: LocalSalesOrder): SalesOr
     taxTotal: String(order.taxTotal),
     status: order.status,
     items: (order.items?.length ?? 0) > 0
-      ? order.items.map((item) => ({ name: item.name, qty: String(item.qty), unitPrice: String(item.unitPrice) }))
-      : [{ name: '', qty: '1', unitPrice: '0' }],
+      ? order.items.map((item) => ({ productId: item.productId ?? '', name: item.name, qty: String(item.qty), unitPrice: String(item.unitPrice) }))
+      : [{ productId: '', name: '', qty: '1', unitPrice: '0' }],
   }
 }

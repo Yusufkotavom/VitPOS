@@ -5,6 +5,8 @@ config({ path: '.env.local' })
 config()
 
 import { createApp } from './app'
+import { db } from './lib/db'
+import { branches, customers, products, tenants } from '../../../src/db/schema/index.js'
 
 const originalFetch = global.fetch
 
@@ -95,6 +97,15 @@ describe('createApp', () => {
       const branchId = 'eda41760-b27e-4eeb-a625-814719c58c6c'
       const serviceOrderId = crypto.randomUUID()
       const customerId = '881d6bfd-4c1e-4201-aef3-d40c15a2b92b'
+      const productId = '384ba7fe-7061-4cd7-9c56-e0aea9580615'
+
+      // Seed the referenced parent rows so foreign keys resolve. Idempotent
+      // across repeated runs against a shared database.
+      const seedNow = new Date()
+      await db.insert(tenants).values({ id: tenantId, name: 'Tenant Tes SRV', isActive: true, createdAt: seedNow, updatedAt: seedNow }).onConflictDoNothing()
+      await db.insert(branches).values({ id: branchId, tenantId, name: 'Cabang Tes', isDefault: true, isActive: true, createdAt: seedNow, updatedAt: seedNow }).onConflictDoNothing()
+      await db.insert(customers).values({ id: customerId, tenantId, name: 'Yusuf Bahtiyar', isActive: true, version: 1, createdAt: seedNow, updatedAt: seedNow }).onConflictDoNothing()
+      await db.insert(products).values({ id: productId, tenantId, name: 'Jasa Bongkar', type: 'service', salePrice: '12345', isActive: true, version: 1, createdAt: seedNow, updatedAt: seedNow }).onConflictDoNothing()
 
       const pushResponse = await app.request('/api/v1/sync/push', {
         method: 'POST',

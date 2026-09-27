@@ -42,7 +42,7 @@ export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) 
         supplierId: supplier?.id,
         items: mappedPurchase.items.map((item) => ({
           ...item,
-          productId: tenantProducts.find((product) => product.name.toLowerCase() === item.name.toLowerCase())?.id ?? item.productId,
+          productId: item.productId || tenantProducts.find((product) => product.name.toLowerCase() === item.name.toLowerCase())?.id || '',
         })),
       }
       await purchaseRepository.upsert(nextPurchase)

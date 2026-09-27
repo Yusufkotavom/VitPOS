@@ -28,9 +28,15 @@ export function SalesOrderCrudActions({ order }: { order?: LocalSalesOrder }) {
       const existingCustomer = customerName
         ? await localDb.customers.where('[tenantId+name]').equals([tenantId, customerName]).first()
         : undefined
+      const tenantProducts = await localDb.products.where('tenantId').equals(tenantId).toArray()
+      const mappedOrder = mapSalesOrderFormToRecord(values, id, order)
       const nextOrder = {
-        ...mapSalesOrderFormToRecord(values, id, order),
+        ...mappedOrder,
         customerId: existingCustomer?.id,
+        items: mappedOrder.items.map((item) => ({
+          ...item,
+          productId: item.productId || tenantProducts.find((product) => product.name.toLowerCase() === item.name.toLowerCase())?.id || '',
+        })),
       }
       await salesOrderRepository.upsert(nextOrder)
       await syncCustomerSalesMetrics(order?.customerId)

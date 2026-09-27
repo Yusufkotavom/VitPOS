@@ -165,7 +165,7 @@ export const demoOutboxItems: (OutboxItem & { tenantId: string })[] = [
     entityType: 'sale',
     entityId: baimRuntime.salesOrderId,
     mutationType: 'create',
-    payload: { orderNumber: 'SO-240608-001', grandTotal: 450000, source: 'POS', id: baimRuntime.salesOrderId },
+    payload: { orderNumber: 'INV-240608-001', grandTotal: 450000, source: 'POS', id: baimRuntime.salesOrderId },
     status: 'queued',
     attempts: 0,
     createdAt: now(),

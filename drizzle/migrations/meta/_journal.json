@@ -71,6 +71,13 @@
       "when": 1786028878388,
       "tag": "0009_invoice_edit_sync",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786028878389,
+      "tag": "0010_service_order_sync_payload",
+      "breakpoints": true
     }
   ]
 }

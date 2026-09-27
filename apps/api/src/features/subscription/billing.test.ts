@@ -10,7 +10,7 @@ const { dbMock, makeChain } = vi.hoisted(() => {
       returning: vi.fn(),
       values: vi.fn(),
       set: vi.fn(),
-    }) as Promise<unknown[]> & Record<string, ReturnType<typeof vi.fn>>
+    }) as unknown as Promise<unknown[]> & Record<string, ReturnType<typeof vi.fn>>
     for (const key of ['from', 'where', 'orderBy', 'returning', 'values', 'set']) {
       chain[key].mockReturnValue(chain)
     }

@@ -55,13 +55,14 @@ export function ComboboxInput({
   className,
   value,
   onChange,
+  ...rest
 }: {
   id?: string
   placeholder?: string
   className?: string
   value?: string
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
-}) {
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "id" | "placeholder" | "className" | "value" | "onChange" | "type" | "onFocus">) {
   const context = React.useContext(ComboboxContext)
   if (!context) throw new Error("ComboboxInput must be used within Combobox")
 
@@ -80,9 +81,10 @@ export function ComboboxInput({
         }}
         onFocus={() => context.setOpen(true)}
         className={cn(
-          "h-11 w-full rounded-xl border border-input bg-background pl-10 pr-4 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+          "h-11 w-full rounded-xl border border-input bg-background pl-10 pr-4 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20",
           className
         )}
+        {...rest}
       />
     </div>
   )
@@ -164,10 +166,12 @@ export function ComboboxItem({
   value,
   children,
   className,
+  onSelect,
 }: {
   value: string
   children: React.ReactNode
   className?: string
+  onSelect?: (value: string) => void
 }) {
   const context = React.useContext(ComboboxContext)
   if (!context) throw new Error("ComboboxItem must be used within Combobox")
@@ -175,7 +179,10 @@ export function ComboboxItem({
   return (
     <button
       type="button"
-      onClick={() => context.setSelectedValue(value)}
+      onClick={() => {
+        context.setSelectedValue(value)
+        onSelect?.(value)
+      }}
       className={cn(
         "relative flex w-full cursor-pointer select-none items-center rounded-lg px-3 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         context.selectedValue === value && "bg-accent text-accent-foreground",

@@ -8,6 +8,7 @@ import type { LocalPurchase, LocalPurchaseItem } from '@/services/local-db/schem
 export const purchaseStatusOptions = ['Draft', 'Dikirim', 'Diterima', 'Batal'] as const
 
 export const purchaseItemSchema = z.object({
+  productId: z.string().trim(),
   name: z.string().trim().min(1, 'Nama produk wajib diisi'),
   qty: z.string().trim().min(1, 'Qty wajib diisi'),
   unitPrice: z.string().trim().min(1, 'Harga wajib diisi'),
@@ -28,7 +29,7 @@ export const purchaseInitialValues: PurchaseFormValues = {
   supplierName: '',
   date: new Date().toISOString().slice(0, 10),
   status: 'Draft',
-  items: [{ name: '', qty: '1', unitPrice: '0' }],
+  items: [{ productId: '', name: '', qty: '1', unitPrice: '0' }],
 }
 
 export function mapPurchaseFormToRecord(values: PurchaseFormValues, id: string, base?: LocalPurchase): LocalPurchase {
@@ -40,7 +41,7 @@ export function mapPurchaseFormToRecord(values: PurchaseFormValues, id: string, 
       id: base?.items[idx]?.id ?? crypto.randomUUID(),
       tenantId: base?.items[idx]?.tenantId ?? tenantId,
       purchaseId: id,
-      productId: base?.items[idx]?.productId ?? '',
+      productId: item.productId?.trim() || base?.items[idx]?.productId || '',
       name: item.name.trim(),
       qty,
       unitPrice,
@@ -74,7 +75,7 @@ export function mapPurchaseRecordToFormValues(purchase: LocalPurchase): Purchase
     date: toDateInput(purchase.date),
     status: purchase.status,
     items: purchase.items.length > 0
-      ? purchase.items.map((item) => ({ name: item.name, qty: String(item.qty), unitPrice: String(item.unitPrice) }))
-      : [{ name: '', qty: '1', unitPrice: '0' }],
+      ? purchase.items.map((item) => ({ productId: item.productId ?? '', name: item.name, qty: String(item.qty), unitPrice: String(item.unitPrice) }))
+      : [{ productId: '', name: '', qty: '1', unitPrice: '0' }],
   }
 }

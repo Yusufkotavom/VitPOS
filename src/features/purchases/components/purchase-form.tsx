@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect } from 'react'
-import { useFieldArray, useForm } from 'react-hook-form'
+import { Controller, useFieldArray, useForm } from 'react-hook-form'
 import { Trash2Icon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { purchaseFormSchema, purchaseInitialValues, purchaseStatusOptions, type PurchaseFormValues } from '@/features/purchases/schemas/purchase-form-schema'
 import { FormSelect } from '@/shared/components/form/form-select'
 import { FormSection } from '@/shared/components/forms/form-section'
+import { ProductLineItemSelect } from '@/shared/components/forms/product-line-item-select'
 
 export function PurchaseForm({ defaultValues, submitLabel, onCancel, onSubmit }: { defaultValues?: PurchaseFormValues; submitLabel: string; onCancel: () => void; onSubmit: (values: PurchaseFormValues) => Promise<void> }) {
   const { t } = useTranslation()
@@ -27,7 +28,7 @@ export function PurchaseForm({ defaultValues, submitLabel, onCancel, onSubmit }:
 
   return (
     <form className="flex flex-col gap-4 p-4" onSubmit={form.handleSubmit(onSubmit)}>
-      <FormSection title={t('purchases.info')} description={t('purchases.info_description')}>
+      <div className="grid gap-4 md:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm font-medium">
           {t('purchases.po_number_label')}
           <Input aria-invalid={Boolean(errors.code)} {...form.register('code')} placeholder={t('purchases.po_number_placeholder')} />
@@ -47,15 +48,38 @@ export function PurchaseForm({ defaultValues, submitLabel, onCancel, onSubmit }:
           {t('common.status')}
           <FormSelect control={form.control} name="status" options={purchaseStatusOptions.map(o => ({ label: o, value: o }))} />
         </label>
-      </FormSection>
+      </div>
 
       <FormSection title={t('purchases.items')} description={t('purchases.items_description')}>
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 md:col-span-2">
           {fields.map((field, index) => (
             <div key={field.id} className="grid grid-cols-1 items-start gap-2 rounded-xl border bg-muted/20 p-3 sm:grid-cols-[minmax(0,1fr)_80px_120px_auto] sm:border-0 sm:bg-transparent sm:p-0">
               <label className="flex flex-col gap-1 text-sm font-medium" htmlFor={`purchase-item-name-${index}`}>
                 <span className="sm:sr-only">{t('purchases.item_name_sr_label', { index: index + 1 })}</span>
-                <Input id={`purchase-item-name-${index}`} aria-label={t('purchases.item_name_aria_label', { index: index + 1 })} aria-invalid={Boolean(errors.items?.[index]?.name)} {...form.register(`items.${index}.name`)} placeholder={t('purchases.item_name_placeholder')} />
+                <Controller
+                  control={form.control}
+                  name={`items.${index}.name`}
+                  render={({ field: nameField }) => (
+                    <ProductLineItemSelect
+                      id={`purchase-item-name-${index}`}
+                      ariaLabel={t('purchases.item_name_aria_label', { index: index + 1 })}
+                      placeholder={t('purchases.item_name_placeholder')}
+                      emptyLabel={t('purchases.select_product_title')}
+                      invalid={Boolean(errors.items?.[index]?.name)}
+                      priceField="cost"
+                      value={nameField.value}
+                      onChange={(name) => {
+                        nameField.onChange(name)
+                        form.setValue(`items.${index}.productId`, '')
+                      }}
+                      onSelectProduct={(selection) => {
+                        nameField.onChange(selection.name)
+                        form.setValue(`items.${index}.productId`, selection.productId)
+                        form.setValue(`items.${index}.unitPrice`, String(selection.unitPrice), { shouldValidate: true })
+                      }}
+                    />
+                  )}
+                />
                 {errors.items?.[index]?.name ? <span className="text-xs text-destructive">{errors.items[index].name?.message}</span> : null}
               </label>
               <label className="flex flex-col gap-1 text-sm font-medium" htmlFor={`purchase-item-qty-${index}`}>
@@ -74,8 +98,8 @@ export function PurchaseForm({ defaultValues, submitLabel, onCancel, onSubmit }:
             </div>
           ))}
         </div>
-        {errors.items?.message ? <span className="text-xs text-destructive">{errors.items.message}</span> : null}
-        <Button type="button" variant="outline" size="sm" onClick={() => append({ name: '', qty: '1', unitPrice: '0' })}>{t('purchases.add_item')}</Button>
+        {errors.items?.message ? <span className="text-xs text-destructive md:col-span-2">{errors.items.message}</span> : null}
+        <Button className="md:col-span-2 md:w-fit" type="button" variant="outline" size="sm" onClick={() => append({ productId: '', name: '', qty: '1', unitPrice: '0' })}>{t('purchases.add_item')}</Button>
       </FormSection>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

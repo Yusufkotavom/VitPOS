@@ -34,8 +34,12 @@ export async function syncSupplierPurchaseMetrics(supplierId?: string, tenantId:
   })
 }
 
-async function findOrCreateProduct(tenantId: string, name: string, unitPrice: number) {
+async function findOrCreateProduct(tenantId: string, name: string, unitPrice: number, productId?: string) {
   const products = await localDb.products.where('tenantId').equals(tenantId).toArray()
+  if (productId) {
+    const linked = products.find((product) => product.id === productId)
+    if (linked) return linked
+  }
   const existing = products.find((product) => product.name.toLowerCase() === name.toLowerCase())
   if (existing) return existing
 
@@ -67,7 +71,7 @@ export async function receivePurchaseOrder(purchase: LocalPurchase, warehouseNam
 
   await localDb.transaction('rw', [localDb.products, localDb.purchases, localDb.stockMovements, localDb.inventory, localDb.outbox], async () => {
     for (const item of purchase.items) {
-      const product = await findOrCreateProduct(tenantId, item.name, item.unitPrice)
+      const product = await findOrCreateProduct(tenantId, item.name, item.unitPrice, item.productId)
       const nextStock = product.stock + item.qty
 
       await productRepository.upsert({

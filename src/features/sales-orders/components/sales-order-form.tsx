@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect } from 'react'
-import { useFieldArray, useForm } from 'react-hook-form'
+import { Controller, useFieldArray, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { Trash2Icon } from 'lucide-react'
 
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { salesOrderFormSchema, salesOrderInitialValues, salesOrderStatusOptions, type SalesOrderFormValues } from '@/features/sales-orders/schemas/sales-order-form-schema'
 import { FormSelect } from '@/shared/components/form/form-select'
 import { FormSection } from '@/shared/components/forms/form-section'
+import { ProductLineItemSelect } from '@/shared/components/forms/product-line-item-select'
 
 export function SalesOrderForm({ defaultValues, submitLabel, onCancel, onSubmit }: { defaultValues?: SalesOrderFormValues; submitLabel: string; onCancel: () => void; onSubmit: (values: SalesOrderFormValues) => Promise<void> }) {
   const { t } = useTranslation()
@@ -55,7 +56,30 @@ export function SalesOrderForm({ defaultValues, submitLabel, onCancel, onSubmit 
             <div key={field.id} className="grid grid-cols-1 items-start gap-2 rounded-xl border bg-muted/20 p-3 sm:grid-cols-[minmax(0,1fr)_80px_120px_auto] sm:border-0 sm:bg-transparent sm:p-0">
               <label className="flex flex-col gap-1 text-sm font-medium" htmlFor={`sales-order-item-name-${index}`}>
                 <span className="sm:sr-only">{t('sales_orders.item_name_sr_label', { index: index + 1 })}</span>
-                <Input id={`sales-order-item-name-${index}`} aria-label={t('sales_orders.item_name_aria_label', { index: index + 1 })} aria-invalid={Boolean(errors.items?.[index]?.name)} {...form.register(`items.${index}.name`)} placeholder={t('sales_orders.item_name_placeholder')} />
+                <Controller
+                  control={form.control}
+                  name={`items.${index}.name`}
+                  render={({ field: nameField }) => (
+                    <ProductLineItemSelect
+                      id={`sales-order-item-name-${index}`}
+                      ariaLabel={t('sales_orders.item_name_aria_label', { index: index + 1 })}
+                      placeholder={t('sales_orders.item_name_placeholder')}
+                      emptyLabel={t('sales_orders.select_product_title')}
+                      invalid={Boolean(errors.items?.[index]?.name)}
+                      priceField="sell"
+                      value={nameField.value}
+                      onChange={(name) => {
+                        nameField.onChange(name)
+                        form.setValue(`items.${index}.productId`, '')
+                      }}
+                      onSelectProduct={(selection) => {
+                        nameField.onChange(selection.name)
+                        form.setValue(`items.${index}.productId`, selection.productId)
+                        form.setValue(`items.${index}.unitPrice`, String(selection.unitPrice), { shouldValidate: true })
+                      }}
+                    />
+                  )}
+                />
                 {errors.items?.[index]?.name ? <span className="text-xs text-destructive">{errors.items[index].name?.message}</span> : null}
               </label>
               <label className="flex flex-col gap-1 text-sm font-medium" htmlFor={`sales-order-item-qty-${index}`}>
@@ -75,7 +99,7 @@ export function SalesOrderForm({ defaultValues, submitLabel, onCancel, onSubmit 
           ))}
         </div>
         {errors.items?.message ? <span className="text-xs text-destructive">{errors.items.message}</span> : null}
-        <Button type="button" variant="outline" size="sm" onClick={() => append({ name: '', qty: '1', unitPrice: '0' })}>{t('sales_orders.add_item')}</Button>
+        <Button type="button" variant="outline" size="sm" onClick={() => append({ productId: '', name: '', qty: '1', unitPrice: '0' })}>{t('sales_orders.add_item')}</Button>
       </FormSection>
 
       <FormSection title={t('sales_orders.discount_tax_section_title')} description={t('sales_orders.discount_tax_section_description')}>
