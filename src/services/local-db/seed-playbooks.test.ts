@@ -51,4 +51,29 @@ describe('createPlaybookSeedBundle', () => {
     expect(seed.settings.some((item) => item.setting === 'business_mode')).toBe(true)
     expect(seed.settings.some((item) => item.setting === 'kas_awal' && item.value === '500000')).toBe(true)
   })
+
+  it('builds minimal general business seed rows with single customer, supplier, and product', () => {
+    const seed = buildAtkPrintingSeed({
+      tenantId: 'tenant-gen',
+      businessMode: 'general_standard',
+      tenantName: 'Toko Sumber Rejeki',
+      ownerName: 'Budi',
+      city: 'Bandung',
+      initialCash: 500000,
+    })
+
+    expect(seed.businessVertical).toBe('general')
+    expect(seed.businessMode).toBe('general_standard')
+    expect(seed.categories).toHaveLength(1)
+    expect(seed.categories[0].name).toBe('Umum')
+    expect(seed.products).toHaveLength(1)
+    expect(seed.products[0].name).toBe('Produk Contoh')
+    expect(seed.products[0].manageStock).toBe(true)
+    expect(seed.products[0].stock).toBe(10)
+    expect(seed.customers).toHaveLength(1)
+    expect(seed.customers[0].name).toBe('Pelanggan Umum')
+    expect(seed.suppliers).toHaveLength(1)
+    expect(seed.suppliers[0].name).toBe('Supplier Umum')
+    expect(seed.settings.find((s) => s.setting === 'business_vertical')?.value).toBe('general')
+  })
 })

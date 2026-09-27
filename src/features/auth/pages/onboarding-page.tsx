@@ -90,6 +90,18 @@ export function OnboardingPage() {
     { label: 'Kas awal', value: 'Rp 500.000' },
   ], [editable])
 
+  function handleVerticalChange(value: BusinessVerticalId) {
+    setBusinessVertical(value)
+    const vert = BUSINESS_PLAYBOOKS[value]
+    if (vert && vert.modes.length > 0) {
+      const firstMode = vert.modes[0].id
+      setBusinessMode(firstMode)
+      const next = clonePreset(firstMode)
+      setEditable(next)
+      setSelectedPayments(Object.fromEntries(next.paymentMethods.map((item) => [item.name, true])))
+    }
+  }
+
   function handleModeChange(value: BusinessModeId) {
     const next = clonePreset(value)
     setBusinessMode(value)
@@ -203,8 +215,11 @@ export function OnboardingPage() {
         await enqueueOutboxItem({ entityType: 'cash_category', entityId: id, mutationType: 'create', payload: { name: cashCategory.name, type: cashCategory.type } })
       }
 
-      await localDb.customers.put({ id: crypto.randomUUID(), tenantId, name: 'Pelanggan Umum', phone: identityForm.whatsapp, city: 'Surabaya', receivable: 0, orders: 0, status: 'Aktif', syncStatus: 'pending', version: 1, updatedAt: now })
-      await localDb.suppliers.put({ id: crypto.randomUUID(), tenantId, name: 'Supplier ATK Utama', phone: '', city: 'Surabaya', payable: 0, orders: 0, status: 'Aktif', syncStatus: 'pending', version: 1, updatedAt: now })
+      const customerName = editable.customer?.name || 'Pelanggan Umum'
+      const supplierName = editable.supplier?.name || (businessVertical === 'general' ? 'Supplier Umum' : 'Supplier ATK Utama')
+
+      await localDb.customers.put({ id: crypto.randomUUID(), tenantId, name: customerName, phone: identityForm.whatsapp, city: 'Surabaya', receivable: 0, orders: 0, status: 'Aktif', syncStatus: 'pending', version: 1, updatedAt: now })
+      await localDb.suppliers.put({ id: crypto.randomUUID(), tenantId, name: supplierName, phone: '', city: 'Surabaya', payable: 0, orders: 0, status: 'Aktif', syncStatus: 'pending', version: 1, updatedAt: now })
 
       for (const setting of [
         { id: 'company-name', area: 'Profil Usaha', setting: 'Nama Usaha', value: identityForm.tenantName.trim() },
@@ -224,7 +239,7 @@ export function OnboardingPage() {
 
       if (defaultBranchId) await settingRepository.upsert({ id: `${tenantId}:default-branch-id`, area: 'System', setting: 'default_branch_id', value: defaultBranchId, status: 'Lengkap', updatedAt: now, tenantId })
       if (defaultWarehouseId) await settingRepository.upsert({ id: `${tenantId}:default-warehouse-id`, area: 'System', setting: 'default_warehouse_id', value: defaultWarehouseId, status: 'Lengkap', updatedAt: now, tenantId })
-      navigate('/dashboard')
+      navigate('/')
     } catch (err) {
       setError(`Terjadi kesalahan saat menyimpan data: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
@@ -261,12 +276,12 @@ export function OnboardingPage() {
           <CardHeader>
             <CardTitle>{steps[step - 1].title}</CardTitle>
             <CardDescription>
-              {step === 1 ? 'Pilih vertikal usaha yang paling sesuai, atau lewati untuk mengatur nanti.' : step === 2 ? 'Pilih mode usaha ATK & printing yang paling dekat dengan kebutuhan toko.' : step === 3 ? 'Lengkapi nama, nomor, dan alamat usaha.' : step === 4 ? 'Cek ringkasan template sebelum masuk review.' : 'Pastikan semua data sudah siap disimpan.'}
+              {step === 1 ? 'Pilih vertikal usaha yang paling sesuai, atau lewati untuk mengatur nanti.' : step === 2 ? `Pilih model usaha ${activeVertical.label} yang paling dekat dengan kebutuhan toko.` : step === 3 ? 'Lengkapi nama, nomor, dan alamat usaha.' : step === 4 ? 'Cek ringkasan template sebelum masuk review.' : 'Pastikan semua data sudah siap disimpan.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 space-y-6">
             {error ? <div className="rounded bg-destructive/10 p-3 text-sm font-medium text-destructive">{error}</div> : null}
-            {step === 1 ? <VerticalSelector verticals={Object.values(BUSINESS_PLAYBOOKS)} selectedVertical={businessVertical} onSelect={setBusinessVertical} onSkip={() => setStep(3)} /> : null}
+            {step === 1 ? <VerticalSelector verticals={Object.values(BUSINESS_PLAYBOOKS)} selectedVertical={businessVertical} onSelect={handleVerticalChange} onSkip={() => setStep(3)} /> : null}
             {step === 2 ? <BusinessModeSelector modes={activeVertical.modes} selectedMode={businessMode} onSelect={handleModeChange} /> : null}
             {step === 3 ? <BusinessIdentityForm value={identityForm} showOwnerFields={!currentUser} onChange={setIdentityForm} /> : null}
             {step === 4 ? <TemplatePreviewCard title={activeMode.label} description={activeMode.description} items={previewItems} /> : null}

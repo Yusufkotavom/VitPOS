@@ -36,4 +36,38 @@ describe('business playbooks', () => {
       'Piutang',
     ])
   })
+
+  it('defines general business vertical with minimal running starter data', () => {
+    const general = BUSINESS_PLAYBOOKS.general
+    expect(general).toBeDefined()
+    expect(general.label).toBe('Usaha Umum')
+    expect(general.modes.map((mode) => mode.id)).toEqual(['general_standard'])
+
+    const standard = general.modes[0]
+    expect(standard.label).toBe('Standar Toko')
+    expect(standard.categories).toEqual(['Umum'])
+    expect(standard.products).toHaveLength(1)
+    expect(standard.products[0]).toEqual({
+      name: 'Produk Contoh',
+      category: 'Umum',
+      price: 10000,
+      cost: 7000,
+      type: 'Produk Fisik',
+      unit: 'pcs',
+      stock: 10,
+      minStock: 2,
+      tags: ['umum', 'stok'],
+    })
+    expect(standard.paymentMethods.map((item) => item.name)).toEqual([
+      'Tunai',
+      'QRIS',
+      'Transfer',
+      'Piutang',
+    ])
+    expect(standard.cashCategories.map((item) => item.name)).toEqual([
+      'Penjualan',
+      'Pembelian Stok',
+      'Operasional',
+    ])
+  })
 })

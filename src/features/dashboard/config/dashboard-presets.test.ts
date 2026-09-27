@@ -14,5 +14,6 @@ describe('dashboard presets', () => {
   it('returns mode-specific focus blocks', () => {
     expect(getDashboardPreset('atk_only').focusBlocks).toContain('restok')
     expect(getDashboardPreset('printing_only').focusBlocks).toContain('jasa_laris')
+    expect(getDashboardPreset('general_standard').focusBlocks).toEqual(['stok', 'penjualan', 'kas'])
   })
 })

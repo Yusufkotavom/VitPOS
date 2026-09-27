@@ -50,7 +50,7 @@ describe('onboarding page data logic', () => {
       createElement(MemoryRouter, { initialEntries: ['/onboarding'] },
         createElement(Routes, null,
           createElement(Route, { path: '/onboarding', element: createElement(OnboardingPage) }),
-          createElement(Route, { path: '/dashboard', element: createElement('div', null, 'Dashboard Route') }),
+          createElement(Route, { path: '/', element: createElement('div', null, 'Dashboard Route') }),
         ),
       ),
     )
@@ -116,5 +116,74 @@ describe('onboarding page data logic', () => {
     const suppliers = await localDb.suppliers.toArray()
     expect(suppliers.length).toBe(1)
     expect(suppliers[0].name).toBe(seed.suppliers[0].name)
+  })
+
+  it('creates general business with minimal running data (1 product, 1 customer, 1 supplier)', async () => {
+    await localDb.tenants.clear()
+    await localDb.tenantMembers.clear()
+    await localDb.productCategories.clear()
+    await localDb.products.clear()
+    await localDb.paymentMethods.clear()
+    await localDb.cashCategories.clear()
+    await localDb.customers.clear()
+    await localDb.suppliers.clear()
+    useAuthStore.getState().logout()
+    useAuthStore.getState().setAuth({ id: 'u2', email: 'owner2', name: 'Owner 2', passwordHash: '', createdAt: '', updatedAt: '' })
+
+    render(
+      createElement(MemoryRouter, { initialEntries: ['/onboarding'] },
+        createElement(Routes, null,
+          createElement(Route, { path: '/onboarding', element: createElement(OnboardingPage) }),
+          createElement(Route, { path: '/', element: createElement('div', null, 'Root Home Route') }),
+        ),
+      ),
+    )
+
+    // Step 1: pilih vertikal usaha umum
+    expect(screen.getByText('Usaha Umum')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Usaha Umum/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Lanjut' }))
+
+    // Step 2: pilih model usaha umum (Standar Toko)
+    expect(screen.getByText('Standar Toko')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Standar Toko/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Lanjut' }))
+
+    // Step 3: data inti usaha
+    fireEvent.change(screen.getByLabelText(/Nama usaha/), { target: { value: 'Toko Kelontong Umum' } })
+    fireEvent.change(screen.getByLabelText(/Nomor WhatsApp/), { target: { value: '081987654321' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Lanjut' }))
+
+    // Step 4-5: preview and review
+    fireEvent.click(screen.getByRole('button', { name: 'Lanjut' }))
+    fireEvent.click(screen.getByRole('button', { name: /Masuk dan mulai transaksi/i }))
+
+    expect(await screen.findByText('Root Home Route')).toBeInTheDocument()
+
+    const state = useAuthStore.getState()
+    expect(state.activeTenant?.name).toBe('Toko Kelontong Umum')
+    expect(state.activeTenant?.type).toBe('general_standard')
+
+    // Minimal running data verification:
+    // Exactly 1 product category ('Umum')
+    const categories = await localDb.productCategories.toArray()
+    expect(categories.length).toBe(1)
+    expect(categories[0].name).toBe('Umum')
+
+    // Exactly 1 product ('Produk Contoh')
+    const products = await localDb.products.toArray()
+    expect(products.length).toBe(1)
+    expect(products[0].name).toBe('Produk Contoh')
+    expect(products[0].stock).toBe(10)
+
+    // Exactly 1 customer ('Pelanggan Umum')
+    const customers = await localDb.customers.toArray()
+    expect(customers.length).toBe(1)
+    expect(customers[0].name).toBe('Pelanggan Umum')
+
+    // Exactly 1 supplier ('Supplier Umum')
+    const suppliers = await localDb.suppliers.toArray()
+    expect(suppliers.length).toBe(1)
+    expect(suppliers[0].name).toBe('Supplier Umum')
   })
 })

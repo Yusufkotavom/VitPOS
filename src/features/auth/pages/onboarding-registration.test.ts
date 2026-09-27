@@ -22,7 +22,7 @@ import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { localDb } from '@/services/local-db/client'
 
 function renderOnboarding() {
-  return render(createElement(MemoryRouter, { initialEntries: ['/onboarding'] }, createElement(Routes, null, createElement(Route, { path: '/onboarding', element: createElement(OnboardingPage) }), createElement(Route, { path: '/dashboard', element: createElement('div', null, 'Dashboard Route') }))))
+  return render(createElement(MemoryRouter, { initialEntries: ['/onboarding'] }, createElement(Routes, null, createElement(Route, { path: '/onboarding', element: createElement(OnboardingPage) }), createElement(Route, { path: '/', element: createElement('div', null, 'Dashboard Route') }))))
 }
 
 afterEach(() => {

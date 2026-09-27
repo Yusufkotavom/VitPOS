@@ -1,8 +1,8 @@
 import {
   BUSINESS_PLAYBOOKS,
   DEFAULT_BUSINESS_MODE,
-  DEFAULT_VERTICAL,
   type BusinessModeId,
+  type BusinessVerticalId,
 } from '@/features/auth/data/business-playbooks'
 import type {
   LocalCashCategory,
@@ -25,7 +25,7 @@ export type BuildAtkPrintingSeedInput = {
 }
 
 export type PlaybookSeedBundle = {
-  businessVertical: typeof DEFAULT_VERTICAL
+  businessVertical: BusinessVerticalId
   businessMode: BusinessModeId
   categories: LocalProductCategory[]
   products: LocalProduct[]
@@ -41,17 +41,21 @@ function now() {
 }
 
 export function buildAtkPrintingSeed(input: BuildAtkPrintingSeedInput): PlaybookSeedBundle {
-  const vertical = BUSINESS_PLAYBOOKS[DEFAULT_VERTICAL]
-  const mode = vertical.modes.find((item) => item.id === input.businessMode)
+  const allModes = Object.values(BUSINESS_PLAYBOOKS).flatMap((vertical) =>
+    vertical.modes.map((mode) => ({ mode, verticalId: vertical.id }))
+  )
+  const match = allModes.find((item) => item.mode.id === input.businessMode)
 
-  if (!mode) {
+  if (!match) {
     throw new Error(`Unknown business mode: ${input.businessMode}`)
   }
 
+  const { mode, verticalId } = match
   const seedIdPrefix = input.seedIdPrefix ?? 'playbook'
+  const supplierName = verticalId === 'general' ? 'Supplier Umum' : 'Supplier ATK Utama'
 
   return {
-    businessVertical: DEFAULT_VERTICAL,
+    businessVertical: verticalId,
     businessMode: input.businessMode,
     categories: mode.categories.map((name, index) => ({
       id: `${seedIdPrefix}-category-${index + 1}`,
@@ -116,7 +120,7 @@ export function buildAtkPrintingSeed(input: BuildAtkPrintingSeedInput): Playbook
       {
         id: `${seedIdPrefix}-supplier-1`,
         tenantId: input.tenantId,
-        name: 'Supplier ATK Utama',
+        name: supplierName,
         phone: '081234567891',
         city: input.city,
         payable: 0,
@@ -133,7 +137,7 @@ export function buildAtkPrintingSeed(input: BuildAtkPrintingSeedInput): Playbook
         tenantId: input.tenantId,
         area: 'System',
         setting: 'business_vertical',
-        value: DEFAULT_VERTICAL,
+        value: verticalId,
         updatedAt: now(),
         status: 'Lengkap',
       },

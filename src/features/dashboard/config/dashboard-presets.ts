@@ -26,6 +26,12 @@ const DASHBOARD_PRESETS: Record<BusinessModeId, DashboardPreset> = {
     focusBlocks: ['barang', 'layanan', 'stok', 'kas'],
     quickActions: ['Transaksi baru', 'Tambah stok', 'Catat pengeluaran', 'Input piutang'],
   },
+  general_standard: {
+    heroTitle: 'Ringkasan usaha hari ini',
+    heroDescription: 'Pantau penjualan, stok, dan kas dari satu layar.',
+    focusBlocks: ['stok', 'penjualan', 'kas'],
+    quickActions: ['Transaksi baru', 'Tambah stok', 'Catat kas'],
+  },
 }
 
 export function getDashboardPreset(mode: BusinessModeId): DashboardPreset {

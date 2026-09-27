@@ -1,5 +1,5 @@
-export type BusinessVerticalId = 'atk_printing'
-export type BusinessModeId = 'atk_only' | 'printing_only' | 'atk_printing_combo'
+export type BusinessVerticalId = 'atk_printing' | 'general'
+export type BusinessModeId = 'atk_only' | 'printing_only' | 'atk_printing_combo' | 'general_standard'
 
 export type PlaybookItemType = 'Produk Fisik' | 'Jasa'
 
@@ -106,6 +106,41 @@ export const BUSINESS_PLAYBOOKS: Record<BusinessVerticalId, BusinessVerticalPlay
         quickActions: ['Transaksi baru', 'Tambah stok', 'Catat pengeluaran', 'Input piutang', 'Lihat barang hampir habis'],
         reportKeys: ['ringkasan', 'penjualan', 'stok', 'kas', 'piutang'],
         dashboardFocus: ['barang', 'layanan', 'stok', 'kas'],
+      },
+    ],
+  },
+  general: {
+    id: 'general',
+    label: 'Usaha Umum',
+    description: 'Toko atau usaha umum dengan starter data minimal siap transaksi.',
+    modes: [
+      {
+        id: 'general_standard',
+        label: 'Standar Toko',
+        description: 'Setup minimal untuk toko dan usaha umum (1 produk, 1 pelanggan, 1 supplier).',
+        categories: ['Umum'],
+        products: [
+          {
+            name: 'Produk Contoh',
+            category: 'Umum',
+            price: 10000,
+            cost: 7000,
+            type: 'Produk Fisik',
+            unit: 'pcs',
+            stock: 10,
+            minStock: 2,
+            tags: ['umum', 'stok'],
+          },
+        ],
+        paymentMethods: [...SHARED_PAYMENT_METHODS],
+        cashCategories: [
+          { name: 'Penjualan', type: 'Pemasukan' },
+          { name: 'Pembelian Stok', type: 'Pengeluaran' },
+          { name: 'Operasional', type: 'Pengeluaran' },
+        ],
+        quickActions: ['Transaksi baru', 'Tambah stok', 'Catat kas'],
+        reportKeys: ['ringkasan', 'penjualan', 'stok', 'kas', 'piutang'],
+        dashboardFocus: ['stok', 'penjualan', 'kas'],
       },
     ],
   },

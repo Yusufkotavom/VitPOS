@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ComponentType } from 'react'
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 
 import { AppLayout } from '@/shared/components/layout/app-layout'
 import { AuthGuard } from '@/features/auth/components/auth-guard'
@@ -69,6 +69,7 @@ export const router = createBrowserRouter([
   { path: '/tenants', element: <AuthGuard>{routeElement(TenantSelectorPage)}</AuthGuard> },
   { path: '/onboarding', element: <AuthGuard>{routeElement(OnboardingPage)}</AuthGuard> },
   { path: '/billing', element: <AuthGuard>{routeElement(BillingPage)}</AuthGuard> },
+  { path: '/dashboard', element: <Navigate to="/" replace /> },
   {
     path: '/',
     element: (
@@ -78,6 +79,7 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: routeElement(DashboardPage) },
+      { path: 'dashboard', element: <Navigate to="/" replace /> },
       { path: 'pos', element: routeElement(PosPage) },
       { path: 'products', element: routeElement(ProductsPage) },
       { path: 'products/categories', element: routeElement(CategoriesPage) },

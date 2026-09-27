@@ -35,6 +35,26 @@ export const TEMPLATE_PRESETS: Record<string, TemplatePreset> = {
     customer: { name: 'Pelanggan Umum', phone: '081234567890', city: 'Surabaya' },
     supplier: { name: 'Supplier ATK Utama', phone: '081234567891', city: 'Surabaya' },
   },
+  general: {
+    businessVertical: 'general',
+    businessMode: 'general_standard',
+    categories: [{ name: 'Umum', description: 'Kategori produk umum' }],
+    products: [
+      { name: 'Produk Contoh', category: 'Umum', price: 10000, type: 'Produk Fisik' },
+    ],
+    paymentMethods: [
+      { name: 'Tunai', provider: 'Tunai', type: 'tunai' },
+      { name: 'QRIS', provider: 'QRIS', type: 'qris' },
+      { name: 'Transfer Bank', provider: 'Bank', type: 'transfer' },
+    ],
+    cashCategories: [
+      { name: 'Penjualan', type: 'Pemasukan' },
+      { name: 'Pembelian Stok', type: 'Pengeluaran' },
+      { name: 'Operasional', type: 'Pengeluaran' },
+    ],
+    customer: { name: 'Pelanggan Umum', phone: '081234567890', city: 'Surabaya' },
+    supplier: { name: 'Supplier Umum', phone: '081234567891', city: 'Surabaya' },
+  },
   retail: {
     categories: [
       { name: 'Makanan & Minuman', description: 'Produk makanan dan minuman' },
@@ -189,6 +209,7 @@ export const TEMPLATE_PRESETS: Record<string, TemplatePreset> = {
 
 export const TEMPLATE_LABELS: Record<string, string> = {
   atk_printing: 'ATK & Printing',
+  general: 'Usaha Umum',
   retail: 'Toko Retail',
   fnb: 'F&B / Makanan Minuman',
   jasa: 'Jasa',
@@ -199,6 +220,7 @@ export const TEMPLATE_LABELS: Record<string, string> = {
 
 export const TEMPLATE_ICONS: Record<string, string> = {
   atk_printing: 'Package',
+  general: 'Store',
   retail: 'ShoppingCart',
   fnb: 'Coffee',
   jasa: 'Monitor',
