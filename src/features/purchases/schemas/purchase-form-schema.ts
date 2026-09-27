@@ -47,6 +47,8 @@ export const purchaseFormSchema = z.object({
   supplierName: z.string().trim().min(1, 'Nama supplier wajib diisi'),
   date: z.string().trim().min(1, 'Tanggal wajib diisi'),
   status: z.enum(purchaseStatusOptions),
+  isPaid: z.boolean().optional(),
+  payMethod: z.string().optional(),
   items: z.array(purchaseItemSchema).min(1, 'Minimal 1 item'),
 })
 
@@ -57,6 +59,8 @@ export const purchaseInitialValues: PurchaseFormValues = {
   supplierName: '',
   date: new Date().toISOString().slice(0, 10),
   status: 'Draft',
+  isPaid: false,
+  payMethod: 'tunai',
   items: [{ productId: '', name: '', qty: '1', unitPrice: '0' }],
 }
 
@@ -102,6 +106,8 @@ export function mapPurchaseRecordToFormValues(purchase: LocalPurchase): Purchase
     supplierName: purchase.supplierName,
     date: toDateInput(purchase.date),
     status: purchase.status,
+    isPaid: (purchase.paidTotal ?? 0) >= purchase.grandTotal && purchase.grandTotal > 0,
+    payMethod: 'tunai',
     items: purchase.items.length > 0
       ? purchase.items.map((item) => ({ productId: item.productId ?? '', name: item.name, qty: String(item.qty), unitPrice: String(item.unitPrice) }))
       : [{ productId: '', name: '', qty: '1', unitPrice: '0' }],

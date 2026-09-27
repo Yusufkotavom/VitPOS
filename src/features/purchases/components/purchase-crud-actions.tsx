@@ -41,7 +41,7 @@ export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) 
         : undefined
       const tenantProducts = await localDb.products.where('tenantId').equals(tenantId).toArray()
       const mappedPurchase = mapPurchaseFormToRecord(valuesWithCode, id, purchase)
-      const nextPurchase = {
+      const nextPurchase: LocalPurchase = {
         ...mappedPurchase,
         supplierId: supplier?.id,
         items: mappedPurchase.items.map((item) => ({
@@ -49,9 +49,24 @@ export function PurchaseCrudActions({ purchase }: { purchase?: LocalPurchase }) 
           productId: item.productId || tenantProducts.find((product) => product.name.toLowerCase() === item.name.toLowerCase())?.id || '',
         })),
       }
-      await purchaseRepository.upsert(nextPurchase)
+      let finalPurchase: LocalPurchase = nextPurchase
+      if (nextPurchase.status === 'Diterima') {
+        finalPurchase = await receivePurchaseOrder(nextPurchase)
+        if (values.isPaid && finalPurchase.grandTotal > 0 && (finalPurchase.paidTotal || 0) < finalPurchase.grandTotal) {
+          const toPay = finalPurchase.grandTotal - (finalPurchase.paidTotal || 0)
+          await recordPurchasePayment(
+            finalPurchase.id,
+            toPay,
+            values.payMethod || 'tunai',
+            'Pembelian',
+            tenantId,
+          )
+        }
+      } else {
+        await purchaseRepository.upsert(nextPurchase)
+      }
       await syncSupplierPurchaseMetrics(purchase?.supplierId)
-      await syncSupplierPurchaseMetrics(nextPurchase.supplierId)
+      await syncSupplierPurchaseMetrics(finalPurchase.supplierId)
       toast.success(isEdit ? t('purchases.updated') : t('purchases.created'))
       setFormOpen(false)
     } catch (error) {

@@ -6,6 +6,7 @@ import { Trash2Icon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   generatePurchaseCode,
   purchaseFormSchema,
@@ -54,6 +55,8 @@ export function PurchaseForm({
 
   const errors = form.formState.errors
   const watchItems = form.watch('items')
+  const watchStatus = form.watch('status')
+  const watchIsPaid = form.watch('isPaid')
   const totalAmount = (watchItems || []).reduce((sum, item) => {
     const qty = parseDigits(item?.qty || '0')
     const price = parseDigits(item?.unitPrice || '0')
@@ -251,6 +254,51 @@ export function PurchaseForm({
           </div>
         </div>
       </FormSection>
+
+      {watchStatus === 'Diterima' && (
+        <div className="rounded-xl border bg-muted/30 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <span className="text-sm font-semibold">Bayar Lunas Sekarang</span>
+              <p className="text-xs text-muted-foreground">Catat pengeluaran kas dan tandai PO lunas saat disimpan</p>
+            </div>
+            <input
+              type="checkbox"
+              id="purchase-is-paid"
+              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              {...form.register('isPaid')}
+            />
+          </div>
+          {watchIsPaid && (
+            <div className="grid gap-4 sm:grid-cols-2 pt-3 border-t">
+              <div className="flex flex-col gap-1.5 text-sm font-medium">
+                <label htmlFor="purchase-pay-method">Metode Pembayaran</label>
+                <Controller
+                  control={form.control}
+                  name="payMethod"
+                  render={({ field }) => (
+                    <Select value={field.value || 'tunai'} onValueChange={field.onChange}>
+                      <SelectTrigger id="purchase-pay-method">
+                        <SelectValue placeholder="Pilih metode" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="tunai">Tunai / Kas Toko</SelectItem>
+                        <SelectItem value="transfer">Transfer Bank</SelectItem>
+                        <SelectItem value="kartu">Kartu Debit/Kredit</SelectItem>
+                        <SelectItem value="qris">QRIS</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+              <div className="flex flex-col gap-1 text-sm font-medium justify-center bg-card p-3 rounded-lg border">
+                <span className="text-xs text-muted-foreground">Nominal yang akan dikeluarkan dari kas:</span>
+                <span className="text-lg font-bold text-rose-600">{formatCurrency(totalAmount)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end pt-3 border-t">
         <Button type="button" variant="outline" onClick={onCancel}>

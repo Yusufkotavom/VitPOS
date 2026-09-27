@@ -26,24 +26,66 @@ export function PurchasesPage() {
           data={purchaseRows}
           emptyTitle={t('purchases.empty')}
           columns={[
-            { key: 'code', header: 'PO', render: (row) => <Link to={`/purchases/${row.id}`} className="font-medium text-primary hover:underline">{row.code}</Link> },
-            { key: 'supplierName', header: t('common.supplier') },
-            { key: 'date', header: t('common.date') },
-            { key: 'grandTotal', header: t('common.total'), render: (row) => formatCurrency(row.grandTotal) },
-            { key: 'status', header: t('common.status'), render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
+            { key: 'code', header: 'PO', sortable: true, render: (row) => <Link to={`/purchases/${row.id}`} className="font-medium text-primary hover:underline">{row.code}</Link> },
+            { key: 'supplierName', header: t('common.supplier'), sortable: true },
+            { key: 'date', header: t('common.date'), sortable: true },
+            { key: 'grandTotal', header: t('common.total'), sortable: true, render: (row) => formatCurrency(row.grandTotal) },
+            {
+              key: 'paidTotal',
+              header: 'Pembayaran',
+              render: (row) => {
+                const paid = row.paidTotal || 0
+                const isLunas = paid >= row.grandTotal && row.grandTotal > 0
+                const isPartial = paid > 0 && paid < row.grandTotal
+                return (
+                  <div className="flex flex-col gap-1 items-start">
+                    <span className="text-xs font-medium">{formatCurrency(paid)}</span>
+                    <StatusBadge
+                      label={isLunas ? 'Lunas' : isPartial ? 'Sebagian' : 'Belum Bayar'}
+                      tone={isLunas ? 'success' : isPartial ? 'warning' : 'neutral'}
+                    />
+                  </div>
+                )
+              },
+            },
+            { key: 'status', header: t('common.status'), sortable: true, render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
+            {
+              key: 'actions',
+              header: t('common.actions'),
+              render: (row) => <PurchaseCrudActions purchase={row} />,
+            },
           ]}
-          mobileRender={(row) => (
-            <Link to={`/purchases/${row.id}`} className="flex flex-col gap-3 group">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium group-hover:underline text-primary">{row.code}</p>
-                  <p className="text-sm text-muted-foreground">{row.supplierName} · {row.date}</p>
+          mobileRender={(row) => {
+            const paid = row.paidTotal || 0
+            const isLunas = paid >= row.grandTotal && row.grandTotal > 0
+            const isPartial = paid > 0 && paid < row.grandTotal
+            return (
+              <div className="flex flex-col gap-3">
+                <Link to={`/purchases/${row.id}`} className="flex flex-col gap-2 group">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium group-hover:underline text-primary">{row.code}</p>
+                      <p className="text-sm text-muted-foreground">{row.supplierName} · {row.date}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <StatusBadge label={row.status} tone={tone(row.status)} />
+                      <StatusBadge
+                        label={isLunas ? 'Lunas' : isPartial ? 'Sebagian' : 'Belum Bayar'}
+                        tone={isLunas ? 'success' : isPartial ? 'warning' : 'neutral'}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Total:</span>
+                    <span className="font-semibold">{formatCurrency(row.grandTotal)}</span>
+                  </div>
+                </Link>
+                <div className="pt-2 border-t flex justify-end">
+                  <PurchaseCrudActions purchase={row} />
                 </div>
-                <StatusBadge label={row.status} tone={tone(row.status)} />
               </div>
-              <p className="text-sm font-semibold">{formatCurrency(row.grandTotal)}</p>
-            </Link>
-          )}
+            )
+          }}
         />
       </ContentCard>
     </PageShell>
