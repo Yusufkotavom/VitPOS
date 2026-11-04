@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Store, ShoppingCart, Coffee, Monitor, Image as ImageIcon, Upload } from 'lucide-react'
+import { Store, ShoppingCart, Coffee, Monitor, Image as ImageIcon, Upload, Copy, Check, ExternalLink } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +9,7 @@ import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { useSettings } from '@/features/settings/hooks/use-settings'
 import { settingRepository } from '@/services/local-db/repository'
 import { fileToDataUrl, uploadImageToR2 } from '@/services/upload.service'
+import { generateSlug } from '@/features/storefront/lib/slug'
 
 const ICONS = [
   { id: 'Store', component: Store },
@@ -41,6 +42,8 @@ export function CompanySettingsForm() {
   const hydrated = useRef(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null)
+  const [storeSlug, setStoreSlug] = useState<string>('')
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (hydrated.current || settings.length === 0) return
@@ -49,11 +52,21 @@ export function CompanySettingsForm() {
       vals[field.id] = settings.find((s) => s.id === field.id)?.value ?? (field.id === 'company-icon' ? 'Store' : '')
     }
     setValues(vals)
+    // Load existing store-slug
+    const existingSlug = settings.find((s) => s.id === 'store-slug')?.value ?? ''
+    setStoreSlug(existingSlug)
     hydrated.current = true
   }, [settings])
 
   function setField(field: FieldId, value: string) {
     setValues((current) => ({ ...current, [field]: value }))
+  }
+
+  async function handleCopyUrl() {
+    const url = `${window.location.origin}/store/${storeSlug}`
+    await navigator.clipboard.writeText(url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -106,6 +119,27 @@ export function CompanySettingsForm() {
           updatedAt: now,
         })
       }
+
+      // Auto-generate store slug from company name if not yet set
+      const existingSlug = settings.find((s) => s.id === 'store-slug')?.value ?? storeSlug
+      if (!existingSlug) {
+        const companyName = values['company-name']
+        if (companyName.trim()) {
+          const slug = generateSlug(companyName)
+          const tenantId = resolveTenantId(settings.find((s) => s.id === 'company-name')?.tenantId)
+          await settingRepository.upsert({
+            id: 'store-slug',
+            tenantId,
+            area: 'Storefront',
+            setting: 'store-slug',
+            value: slug,
+            status: 'Lengkap',
+            updatedAt: now,
+          })
+          setStoreSlug(slug)
+        }
+      }
+
       toast.success('Pengaturan usaha disimpan')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Gagal menyimpan pengaturan usaha')
@@ -189,6 +223,26 @@ export function CompanySettingsForm() {
           )
         })}
       </div>
+      {storeSlug && (
+        <div className="mt-4 rounded-xl border bg-muted/40 px-4 py-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs font-medium text-muted-foreground">URL Toko</span>
+            <span className="text-sm font-mono break-all">/store/{storeSlug}</span>
+          </div>
+          <div className="flex items-center gap-2 mt-2 sm:mt-0 shrink-0">
+            <Button type="button" variant="outline" size="sm" onClick={handleCopyUrl} className="gap-1.5">
+              {copied ? <Check className="size-3.5 text-green-600" /> : <Copy className="size-3.5" />}
+              {copied ? 'Disalin' : 'Salin URL'}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" asChild className="gap-1.5">
+              <a href={`/store/${storeSlug}`} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="size-3.5" />
+                Buka
+              </a>
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

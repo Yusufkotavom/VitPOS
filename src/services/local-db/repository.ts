@@ -70,16 +70,18 @@ async function enqueueMutation<T extends { id: string; tenantId: string }>(outbo
 
 export function createRepository<T extends { id: string; tenantId: string }>({ table, outboxTable, entityType }: RepositoryOptions<T>) {
   return {
-    async list(tenantId: string = requireActiveTenantId()) {
+    async list(tenantId?: string) {
+      const tid = tenantId ?? requireActiveTenantId()
       if (table.where) {
-        return table.where('tenantId').equals(tenantId).toArray()
+        return table.where('tenantId').equals(tid).toArray()
       }
       const rows = await table.toArray()
-      return rows.filter((row) => row.tenantId === tenantId)
+      return rows.filter((row) => row.tenantId === tid)
     },
-    async get(id: string, tenantId: string = requireActiveTenantId()) {
+    async get(id: string, tenantId?: string) {
+      const tid = tenantId ?? requireActiveTenantId()
       const item = await table.get(id)
-      if (item && item.tenantId === tenantId) return item
+      if (item && item.tenantId === tid) return item
       return undefined
     },
     async upsert(row: T) {
@@ -89,7 +91,7 @@ export function createRepository<T extends { id: string; tenantId: string }>({ t
       await enqueueMutation(outboxTable, entityType, existing ? 'update' : 'create', row)
       return row
     },
-    async remove(id: string, tenantId: string = requireActiveTenantId()) {
+    async remove(id: string, tenantId?: string) {
       const existing = await this.get(id, tenantId)
       if (existing) {
         await table.delete(id)

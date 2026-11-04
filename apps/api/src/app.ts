@@ -8,6 +8,7 @@ import { syncRoutes } from './features/sync/routes.js'
 import { platformRoutes } from './features/platform/routes.js'
 import { subscriptionRoutes } from './features/subscription/routes.js'
 import { tenantRoutes } from './features/tenants/routes.js'
+import { storefrontRoutes } from './features/storefront/routes.js'
 import { updateRoutes } from './features/updates/routes.js'
 import { uploadRoutes } from './features/upload/routes.js'
 
@@ -28,6 +29,7 @@ export function createApp() {
   app.route('/api/v1/tenants', tenantRoutes)
   app.route('/api/v1/updates', updateRoutes)
   app.route('/api/v1/upload', uploadRoutes)
+  app.route('/api/v1/store', storefrontRoutes)
 
   app.onError((error, c) => {
     return c.json({ ok: false, message: error.message }, 500)

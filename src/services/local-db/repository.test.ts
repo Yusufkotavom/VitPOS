@@ -26,11 +26,11 @@ function createTable<T extends { id: string; tenantId: string }>() {
 }
 
 function createOutboxTable() {
-  const rows = new Map<string, { id: string; entityType: string; entityId: string; mutationType: string; payload: unknown; status: string; attempts: number; createdAt: string; updatedAt: string; tenantId?: string }>()
+  const rows = new Map<string, { id: string; tenantId: string; entityType: string; entityId: string; mutationType: string; payload: unknown; status: string; attempts: number; createdAt: string; updatedAt: string }>()
 
   return {
     rows,
-    put: vi.fn(async (row: { id: string; entityType: string; entityId: string; mutationType: string; payload: unknown; status: string; attempts: number; createdAt: string; updatedAt: string; tenantId?: string }) => {
+    put: vi.fn(async (row: { id: string; tenantId: string; entityType: string; entityId: string; mutationType: string; payload: unknown; status: string; attempts: number; createdAt: string; updatedAt: string }) => {
       rows.set(row.id, row)
       return row.id
     }),

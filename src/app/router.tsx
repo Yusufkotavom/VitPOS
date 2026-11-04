@@ -45,6 +45,8 @@ const PurchaseDetailPage = lazy(() => import('@/features/purchases/pages/purchas
 const SuppliersPage = lazy(() => import('@/features/suppliers/pages/suppliers-page').then(pick('SuppliersPage')))
 const ReturnsPage = lazy(() => import('@/features/returns/pages/returns-page').then(pick('ReturnsPage')))
 const PlatformAdminPage = lazy(() => import('@/features/platform-admin/pages/platform-admin-page').then(pick('PlatformAdminPage')))
+const StoreHomePage = lazy(() => import('@/features/storefront/pages/store-home-page').then(pick('StoreHomePage')))
+const OrderTrackingPage = lazy(() => import('@/features/storefront/pages/order-tracking-page').then(pick('OrderTrackingPage')))
 const LoginPage = lazy(() => import('@/features/auth/pages/login-page').then(pick('LoginPage')))
 const BillingPage = lazy(() => import('@/features/auth/pages/billing-page').then(pick('BillingPage')))
 const RegisterPage = lazy(() => import('@/features/auth/pages/register-page').then(pick('RegisterPage')))
@@ -64,6 +66,8 @@ function routeElement(Page: ComponentType) {
 }
 
 export const router = createBrowserRouter([
+  { path: '/store/:slug', element: routeElement(StoreHomePage) },
+  { path: '/store/:slug/track', element: routeElement(OrderTrackingPage) },
   { path: '/login', element: routeElement(LoginPage) },
   { path: '/register', element: routeElement(RegisterPage) },
   { path: '/tenants', element: <AuthGuard>{routeElement(TenantSelectorPage)}</AuthGuard> },

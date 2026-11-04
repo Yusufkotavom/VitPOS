@@ -158,7 +158,7 @@ export const demoSettings: LocalSetting[] = [
   { id: 'set-3', tenantId: DEMO_TENANT_ID, area: 'Struk', setting: 'Header/footer struk', value: 'Template default', updatedAt: '8 Juni 2026', status: 'Lengkap' },
 ]
 
-export const demoOutboxItems: (OutboxItem & { tenantId: string })[] = [
+export const demoOutboxItems: OutboxItem[] = [
   {
     id: 'seed-outbox-pos-001',
     tenantId: DEMO_TENANT_ID,

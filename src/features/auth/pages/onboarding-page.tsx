@@ -17,6 +17,7 @@ import { localDb } from '@/services/local-db/client'
 import { settingRepository } from '@/services/local-db/repository'
 import { buildAtkPrintingSeed } from '@/services/local-db/seed-playbooks'
 import { enqueueOutboxItem } from '@/services/sync/outbox-service'
+import { generateSlug } from '@/features/storefront/lib/slug'
 
 type Uuid = ReturnType<typeof crypto.randomUUID>
 
@@ -233,6 +234,7 @@ export function OnboardingPage() {
         { id: 'receipt-header', area: 'Struk', setting: 'Header Struk (POS)', value: '' },
         { id: 'receipt-footer', area: 'Struk', setting: 'Footer Struk (POS)', value: 'Terima kasih atas kunjungan Anda.' },
         { id: 'invoice-term', area: 'Invoice', setting: 'Catatan / Term Invoice', value: 'Syarat & Ketentuan berlaku.' },
+        { id: 'store-slug', area: 'Storefront', setting: 'store-slug', value: generateSlug(identityForm.tenantName.trim()) },
       ]) {
         await settingRepository.upsert({ ...setting, status: 'Lengkap', updatedAt: now, tenantId })
       }
