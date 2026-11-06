@@ -5,6 +5,7 @@ import { db } from '../../lib/db.js'
 import {
   branches,
   customers,
+  productCategories,
   products,
   salesOrderItems,
   salesOrders,
@@ -83,10 +84,11 @@ storefrontRoutes.get('/:slug/products', async (c) => {
       price: products.salePrice,
       imageUrl: products.imageUrl,
       icon: products.icon,
-      category: products.categoryId,
+      category: productCategories.name,
       type: products.type,
     })
     .from(products)
+    .leftJoin(productCategories, eq(products.categoryId, productCategories.id))
     .where(
       and(
         eq(products.tenantId, tenantId),
@@ -202,16 +204,9 @@ storefrontRoutes.post('/:slug/checkout', async (c) => {
     }>
   } | null
 
-  const customerName = body?.customer?.name?.trim()
+  const customerName = body?.customer?.name?.trim() || 'Pelanggan Umum'
   const rawPhone = body?.customer?.phone?.trim() ?? ''
   const cleanPhone = rawPhone.replace(/\D/g, '')
-
-  if (!customerName) {
-    return c.json({ ok: false, message: 'Nama pemesan wajib diisi' }, 400)
-  }
-  if (!cleanPhone || cleanPhone.length < 8) {
-    return c.json({ ok: false, message: 'Nomor WhatsApp tidak valid (minimal 8 digit)' }, 400)
-  }
 
   const items = body?.items ?? []
   if (!Array.isArray(items) || items.length === 0) {
@@ -286,19 +281,22 @@ storefrontRoutes.post('/:slug/checkout', async (c) => {
   }
 
   // Find or create customer
-  const phoneVariants = new Set([cleanPhone])
-  if (cleanPhone.startsWith('62')) phoneVariants.add(`0${cleanPhone.slice(2)}`)
-  if (cleanPhone.startsWith('0')) phoneVariants.add(`62${cleanPhone.slice(1)}`)
+  let existingCustomer = null
+  if (cleanPhone && cleanPhone.length >= 8) {
+    const phoneVariants = new Set([cleanPhone])
+    if (cleanPhone.startsWith('62')) phoneVariants.add(`0${cleanPhone.slice(2)}`)
+    if (cleanPhone.startsWith('0')) phoneVariants.add(`62${cleanPhone.slice(1)}`)
 
-  const existingCustomer = await db.query.customers.findFirst({
-    where: and(
-      eq(customers.tenantId, tenantId),
-      inArray(
-        sql`regexp_replace(${customers.phone}, '[^0-9]', '', 'g')`,
-        [...phoneVariants],
+    existingCustomer = await db.query.customers.findFirst({
+      where: and(
+        eq(customers.tenantId, tenantId),
+        inArray(
+          sql`regexp_replace(${customers.phone}, '[^0-9]', '', 'g')`,
+          [...phoneVariants],
+        ),
       ),
-    ),
-  })
+    })
+  }
 
   const now = new Date()
   let customerId = existingCustomer?.id
@@ -310,7 +308,7 @@ storefrontRoutes.post('/:slug/checkout', async (c) => {
       tenantId,
       branchId: branch.id,
       name: customerName,
-      phone: cleanPhone,
+      phone: cleanPhone || null,
       address: body?.customer?.address?.trim() ?? null,
       isActive: true,
       version: 1,
@@ -384,12 +382,13 @@ storefrontRoutes.post('/:slug/checkout', async (c) => {
     .map((i) => `• ${i.qty}x ${i.name} (${formatRupiah(Number(i.unitPrice))}) = ${formatRupiah(Number(i.subtotal))}`)
     .join('\n')
 
+  const phoneLine = cleanPhone ? `📱 *No. WhatsApp:* ${cleanPhone}\n` : ''
+
   const waMessage = `Halo *${storeName}*, saya ingin konfirmasi pesanan dari web store:
 
 📋 *Nomor Pesanan:* ${orderNumber}
 👤 *Nama Pemesan:* ${customerName}
-📱 *No. WhatsApp:* ${cleanPhone}
-🚚 *Pengambilan:* ${orderTypeLabel}
+${phoneLine}🚚 *Pengambilan:* ${orderTypeLabel}
 ${customerAddress ? `📍 *Alamat:* ${customerAddress}\n` : ''}${customerNotes ? `📝 *Catatan:* ${customerNotes}\n` : ''}
 🛒 *Daftar Pesanan:*
 ${itemsText}

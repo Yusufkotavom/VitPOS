@@ -30,8 +30,8 @@ export interface TrackedOrder {
 
 export interface CheckoutInput {
   customer: {
-    name: string
-    phone: string
+    name?: string
+    phone?: string
     address?: string
     notes?: string
   }

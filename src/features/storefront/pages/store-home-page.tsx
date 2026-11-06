@@ -12,11 +12,20 @@ import {
   ShoppingBag,
   ArrowRight,
   X,
+  ArrowUpDown,
+  RotateCcw,
 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { formatCurrency } from '@/lib/format-currency'
 import {
   getStore,
@@ -41,6 +50,8 @@ export function StoreHomePage() {
   })
 
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<string>('default')
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [successOrder, setSuccessOrder] = useState<CheckoutResponse | null>(null)
 
@@ -74,16 +85,57 @@ export function StoreHomePage() {
 
   const isLoading = storeLoading || productsLoading
 
-  // Filter products by search
+  // Extract unique categories from products
+  const categories = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const p of products) {
+      const cat = p.category?.trim() || 'Lainnya'
+      map.set(cat, (map.get(cat) || 0) + 1)
+    }
+    return Array.from(map.entries()).map(([name, count]) => ({ name, count }))
+  }, [products])
+
+  // Filter & sort products
   const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return products
-    const q = searchQuery.toLowerCase().trim()
-    return products.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        (p.category && p.category.toLowerCase().includes(q)),
-    )
-  }, [products, searchQuery])
+    let result = products
+
+    // 1. Filter by category
+    if (selectedCategory !== 'all') {
+      result = result.filter((p) => {
+        const cat = p.category?.trim() || 'Lainnya'
+        return cat === selectedCategory
+      })
+    }
+
+    // 2. Filter by search query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim()
+      result = result.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (p.category && p.category.toLowerCase().includes(q)),
+      )
+    }
+
+    // 3. Sort
+    return [...result].sort((a, b) => {
+      const priceA = Number(a.price) || 0
+      const priceB = Number(b.price) || 0
+
+      switch (sortBy) {
+        case 'price-asc':
+          return priceA - priceB
+        case 'price-desc':
+          return priceB - priceA
+        case 'name-asc':
+          return a.name.localeCompare(b.name, 'id', { sensitivity: 'base' })
+        case 'name-desc':
+          return b.name.localeCompare(a.name, 'id', { sensitivity: 'base' })
+        default:
+          return 0
+      }
+    })
+  }, [products, searchQuery, selectedCategory, sortBy])
 
   // Cart item lines
   const cartItems = useMemo(() => {
@@ -210,31 +262,149 @@ export function StoreHomePage() {
 
       {/* Product Catalog Section */}
       <div className="mx-auto max-w-3xl px-4 py-6">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-primary" />
-            <h2 className="text-base font-semibold text-gray-900">Produk & Menu</h2>
+        <div className="mb-4 space-y-3">
+          {/* Top Title & Product Count */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-primary" />
+              <h2 className="text-base font-semibold text-gray-900">Produk & Menu</h2>
+            </div>
+            <span className="text-xs text-muted-foreground font-medium">
+              {filteredProducts.length} dari {products.length} produk
+            </span>
           </div>
 
-          {/* Search bar */}
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Cari produk..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-8 h-9 rounded-xl bg-white"
-            />
-            {searchQuery && (
+          {/* Search bar & Sort Controls */}
+          <div className="flex flex-col sm:flex-row gap-2.5">
+            {/* Search input */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Cari produk atau menu..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-8 h-10 rounded-xl bg-white shadow-xs"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gray-700"
+                  aria-label="Hapus pencarian"
+                >
+                  <X className="size-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Sort Select */}
+            <div className="w-full sm:w-48 shrink-0">
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="h-10 rounded-xl bg-white shadow-xs text-xs font-medium">
+                  <ArrowUpDown className="mr-2 size-3.5 text-muted-foreground" />
+                  <SelectValue placeholder="Urutkan" />
+                </SelectTrigger>
+                <SelectContent align="end">
+                  <SelectItem value="default">Urutan Standar</SelectItem>
+                  <SelectItem value="price-asc">Harga: Termurah</SelectItem>
+                  <SelectItem value="price-desc">Harga: Termahal</SelectItem>
+                  <SelectItem value="name-asc">Nama: A ke Z</SelectItem>
+                  <SelectItem value="name-desc">Nama: Z ke A</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Category Filter Pills (Horizontal Scrollable) */}
+          {categories.length > 0 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               <button
                 type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-gray-700"
+                onClick={() => setSelectedCategory('all')}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                  selectedCategory === 'all'
+                    ? 'bg-primary text-primary-foreground shadow-xs'
+                    : 'bg-white text-gray-700 border hover:bg-gray-100'
+                }`}
               >
-                <X className="size-3.5" />
+                Semua
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                    selectedCategory === 'all'
+                      ? 'bg-primary-foreground/20 text-white'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {products.length}
+                </span>
               </button>
-            )}
-          </div>
+
+              {categories.map((cat) => {
+                const isSelected = selectedCategory === cat.name
+                return (
+                  <button
+                    key={cat.name}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat.name)}
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                      isSelected
+                        ? 'bg-primary text-primary-foreground shadow-xs'
+                        : 'bg-white text-gray-700 border hover:bg-gray-100'
+                    }`}
+                  >
+                    {cat.name}
+                    <span
+                      className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                        isSelected
+                          ? 'bg-primary-foreground/20 text-white'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {cat.count}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Active Filters Summary & Reset */}
+          {(searchQuery || selectedCategory !== 'all' || sortBy !== 'default') && (
+            <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+              <span className="truncate pr-2">
+                Filter:{' '}
+                <strong className="text-gray-800">
+                  {[
+                    searchQuery ? `"${searchQuery}"` : null,
+                    selectedCategory !== 'all' ? selectedCategory : null,
+                    sortBy !== 'default'
+                      ? sortBy === 'price-asc'
+                        ? 'Termurah'
+                        : sortBy === 'price-desc'
+                        ? 'Termahal'
+                        : sortBy === 'name-asc'
+                        ? 'A-Z'
+                        : 'Z-A'
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' • ')}
+                </strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('')
+                  setSelectedCategory('all')
+                  setSortBy('default')
+                }}
+                className="inline-flex shrink-0 items-center gap-1 text-primary hover:underline font-medium"
+              >
+                <RotateCcw className="size-3" />
+                Reset
+              </button>
+            </div>
+          )}
         </div>
 
         {isLoading ? (
@@ -244,15 +414,32 @@ export function StoreHomePage() {
             ))}
           </div>
         ) : filteredProducts.length === 0 ? (
-          <div className="flex min-h-44 flex-col items-center justify-center rounded-2xl border border-dashed bg-white px-6 py-10 text-center">
+          <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed bg-white px-6 py-10 text-center">
             <Package className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
-            <p className="text-sm font-medium text-gray-700">
-              {searchQuery ? 'Produk tidak ditemukan' : 'Belum ada produk tersedia'}
+            <p className="text-sm font-semibold text-gray-800">
+              {searchQuery || selectedCategory !== 'all'
+                ? 'Tidak ada produk yang cocok'
+                : 'Belum ada produk tersedia'}
             </p>
-            {searchQuery && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Coba gunakan kata kunci pencarian yang lain.
-              </p>
+            <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+              {searchQuery || selectedCategory !== 'all'
+                ? 'Coba ganti kata kunci pencarian atau pilih kategori lain.'
+                : 'Toko ini belum menambahkan produk ke dalam etalase.'}
+            </p>
+            {(searchQuery || selectedCategory !== 'all' || sortBy !== 'default') && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4 rounded-xl text-xs"
+                onClick={() => {
+                  setSearchQuery('')
+                  setSelectedCategory('all')
+                  setSortBy('default')
+                }}
+              >
+                <RotateCcw className="mr-1.5 size-3.5" />
+                Reset Pencarian & Filter
+              </Button>
             )}
           </div>
         ) : (
@@ -264,8 +451,13 @@ export function StoreHomePage() {
               return (
                 <Card
                   key={product.id}
-                  className={`overflow-hidden rounded-2xl border bg-white transition-all shadow-sm ${
-                    qty > 0 ? 'border-primary ring-1 ring-primary/30 shadow-md' : 'hover:border-gray-300'
+                  onClick={() => {
+                    if (qty === 0) updateQty(product.id, 1)
+                  }}
+                  className={`group overflow-hidden rounded-2xl border bg-white transition-all shadow-sm select-none ${
+                    qty > 0
+                      ? 'border-primary ring-1 ring-primary/30 shadow-md'
+                      : 'hover:border-primary/50 hover:shadow-md cursor-pointer active:scale-[0.98]'
                   }`}
                 >
                   <div className="aspect-square w-full overflow-hidden bg-gray-100 relative">
@@ -273,18 +465,18 @@ export function StoreHomePage() {
                       <img
                         src={product.imageUrl}
                         alt={product.name}
-                        className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">
-                        <Package className="h-10 w-10 text-muted-foreground/30" />
+                        <Package className="h-10 w-10 text-muted-foreground/30 transition-transform duration-300 group-hover:scale-110" />
                       </div>
                     )}
                   </div>
 
                   <CardContent className="p-3 flex flex-col justify-between flex-1">
                     <div>
-                      <p className="line-clamp-2 text-sm font-medium leading-snug text-gray-900">
+                      <p className="line-clamp-2 text-sm font-medium leading-snug text-gray-900 group-hover:text-primary transition-colors">
                         {product.name}
                       </p>
                       {product.category && (
@@ -300,17 +492,26 @@ export function StoreHomePage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="w-full h-8 rounded-xl text-xs font-semibold hover:bg-primary hover:text-white transition-colors"
-                          onClick={() => updateQty(product.id, 1)}
+                          className="w-full h-8 rounded-xl text-xs font-semibold group-hover:bg-primary group-hover:text-white transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            updateQty(product.id, 1)
+                          }}
                         >
                           <Plus className="mr-1 size-3.5" />
                           Tambah
                         </Button>
                       ) : (
-                        <div className="flex items-center justify-between rounded-xl border bg-primary/5 p-1">
+                        <div
+                          className="flex items-center justify-between rounded-xl border bg-primary/5 p-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <button
                             type="button"
-                            onClick={() => updateQty(product.id, qty - 1)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              updateQty(product.id, qty - 1)
+                            }}
                             className="flex size-7 items-center justify-center rounded-lg bg-white shadow-xs hover:bg-gray-50 active:scale-95 transition-all text-gray-800"
                             aria-label="Kurang satu"
                           >
@@ -319,7 +520,10 @@ export function StoreHomePage() {
                           <span className="text-xs font-bold text-primary px-2">{qty}</span>
                           <button
                             type="button"
-                            onClick={() => updateQty(product.id, qty + 1)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              updateQty(product.id, qty + 1)
+                            }}
                             className="flex size-7 items-center justify-center rounded-lg bg-white shadow-xs hover:bg-gray-50 active:scale-95 transition-all text-gray-800"
                             aria-label="Tambah satu"
                           >

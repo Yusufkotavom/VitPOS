@@ -3972,9 +3972,9 @@ storefrontRoutes.get("/:slug/products", async (c) => {
     price: products.salePrice,
     imageUrl: products.imageUrl,
     icon: products.icon,
-    category: products.categoryId,
+    category: productCategories.name,
     type: products.type
-  }).from(products).where(
+  }).from(products).leftJoin(productCategories, eq12(products.categoryId, productCategories.id)).where(
     and9(
       eq12(products.tenantId, tenantId),
       eq12(products.isActive, true),
@@ -4050,15 +4050,9 @@ storefrontRoutes.post("/:slug/checkout", async (c) => {
     return c.json({ ok: false, message: "Toko tidak ditemukan" }, 404);
   }
   const body = await c.req.json().catch(() => null);
-  const customerName = body?.customer?.name?.trim();
+  const customerName = body?.customer?.name?.trim() || "Pelanggan Umum";
   const rawPhone = body?.customer?.phone?.trim() ?? "";
   const cleanPhone = rawPhone.replace(/\D/g, "");
-  if (!customerName) {
-    return c.json({ ok: false, message: "Nama pemesan wajib diisi" }, 400);
-  }
-  if (!cleanPhone || cleanPhone.length < 8) {
-    return c.json({ ok: false, message: "Nomor WhatsApp tidak valid (minimal 8 digit)" }, 400);
-  }
   const items = body?.items ?? [];
   if (!Array.isArray(items) || items.length === 0) {
     return c.json({ ok: false, message: "Keranjang belanja tidak boleh kosong" }, 400);
@@ -4111,18 +4105,21 @@ storefrontRoutes.post("/:slug/checkout", async (c) => {
       subtotal: sub.toFixed(2)
     });
   }
-  const phoneVariants = /* @__PURE__ */ new Set([cleanPhone]);
-  if (cleanPhone.startsWith("62")) phoneVariants.add(`0${cleanPhone.slice(2)}`);
-  if (cleanPhone.startsWith("0")) phoneVariants.add(`62${cleanPhone.slice(1)}`);
-  const existingCustomer = await db.query.customers.findFirst({
-    where: and9(
-      eq12(customers.tenantId, tenantId),
-      inArray2(
-        sql3`regexp_replace(${customers.phone}, '[^0-9]', '', 'g')`,
-        [...phoneVariants]
+  let existingCustomer = null;
+  if (cleanPhone && cleanPhone.length >= 8) {
+    const phoneVariants = /* @__PURE__ */ new Set([cleanPhone]);
+    if (cleanPhone.startsWith("62")) phoneVariants.add(`0${cleanPhone.slice(2)}`);
+    if (cleanPhone.startsWith("0")) phoneVariants.add(`62${cleanPhone.slice(1)}`);
+    existingCustomer = await db.query.customers.findFirst({
+      where: and9(
+        eq12(customers.tenantId, tenantId),
+        inArray2(
+          sql3`regexp_replace(${customers.phone}, '[^0-9]', '', 'g')`,
+          [...phoneVariants]
+        )
       )
-    )
-  });
+    });
+  }
   const now = /* @__PURE__ */ new Date();
   let customerId = existingCustomer?.id;
   if (!existingCustomer) {
@@ -4132,7 +4129,7 @@ storefrontRoutes.post("/:slug/checkout", async (c) => {
       tenantId,
       branchId: branch.id,
       name: customerName,
-      phone: cleanPhone,
+      phone: cleanPhone || null,
       address: body?.customer?.address?.trim() ?? null,
       isActive: true,
       version: 1,
@@ -4194,12 +4191,13 @@ storefrontRoutes.post("/:slug/checkout", async (c) => {
   const storePhone = storeSettings.find((s) => s.key === "company-phone")?.value || tenant?.phone || "";
   const formatRupiah = (num) => `Rp ${new Intl.NumberFormat("id-ID").format(num)}`;
   const itemsText = orderItemRecords.map((i) => `\u2022 ${i.qty}x ${i.name} (${formatRupiah(Number(i.unitPrice))}) = ${formatRupiah(Number(i.subtotal))}`).join("\n");
+  const phoneLine = cleanPhone ? `\u{1F4F1} *No. WhatsApp:* ${cleanPhone}
+` : "";
   const waMessage = `Halo *${storeName}*, saya ingin konfirmasi pesanan dari web store:
 
 \u{1F4CB} *Nomor Pesanan:* ${orderNumber}
 \u{1F464} *Nama Pemesan:* ${customerName}
-\u{1F4F1} *No. WhatsApp:* ${cleanPhone}
-\u{1F69A} *Pengambilan:* ${orderTypeLabel}
+${phoneLine}\u{1F69A} *Pengambilan:* ${orderTypeLabel}
 ${customerAddress ? `\u{1F4CD} *Alamat:* ${customerAddress}
 ` : ""}${customerNotes ? `\u{1F4DD} *Catatan:* ${customerNotes}
 ` : ""}

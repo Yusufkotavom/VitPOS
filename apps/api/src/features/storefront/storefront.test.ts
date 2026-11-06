@@ -125,5 +125,21 @@ describe('Storefront Public API & Checkout', () => {
     expect(trackData.ok).toBe(true)
     expect(trackData.orders.length).toBeGreaterThanOrEqual(1)
     expect(trackData.orders[0].grandTotal).toBe('36000.00')
+
+    // 4. Checkout without name or phone defaults to "Pelanggan Umum"
+    const anonymousCheckout = await app.request(`/api/v1/store/${slug}/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer: {},
+        orderType: 'pickup',
+        items: [{ productId, qty: 1 }],
+      }),
+    })
+    expect(anonymousCheckout.status).toBe(200)
+    const anonData = await anonymousCheckout.json()
+    expect(anonData.ok).toBe(true)
+    expect(anonData.customer.name).toBe('Pelanggan Umum')
+    expect(anonData.whatsappMessage).toContain('Pelanggan Umum')
   })
 })

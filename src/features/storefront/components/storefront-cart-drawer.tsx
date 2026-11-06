@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Minus, Trash2, ShoppingBag, Truck, Store, ArrowRight, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -43,12 +43,39 @@ export function StorefrontCartDrawer({
   onRemoveItem,
   onCheckoutSuccess,
 }: Props) {
-  const [orderType, setOrderType] = useState<'delivery' | 'pickup'>('delivery')
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [address, setAddress] = useState('')
+  // Autofill / cached form fields
+  const [orderType, setOrderType] = useState<'delivery' | 'pickup'>(() => {
+    if (typeof window === 'undefined') return 'delivery'
+    return (localStorage.getItem('storefront-order-type') as 'delivery' | 'pickup') || 'delivery'
+  })
+  const [name, setName] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    return localStorage.getItem('storefront-cust-name') || ''
+  })
+  const [phone, setPhone] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    return localStorage.getItem('storefront-cust-phone') || ''
+  })
+  const [address, setAddress] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    return localStorage.getItem('storefront-cust-address') || ''
+  })
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  // Persist form fields into localStorage for autofill
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('storefront-cust-name', name)
+        localStorage.setItem('storefront-cust-phone', phone)
+        localStorage.setItem('storefront-cust-address', address)
+        localStorage.setItem('storefront-order-type', orderType)
+      } catch {
+        // LocalStorage quota or disabled
+      }
+    }
+  }, [name, phone, address, orderType])
 
   const totalItems = items.reduce((sum, i) => sum + i.qty, 0)
   const totalPrice = items.reduce((sum, i) => sum + Number(i.product.price) * i.qty, 0)
@@ -59,16 +86,12 @@ export function StorefrontCartDrawer({
       return
     }
 
-    const trimmedName = name.trim()
+    const finalName = name.trim() || 'Pelanggan Umum'
     const cleanPhone = phone.replace(/\D/g, '')
 
-    if (!trimmedName) {
-      toast.error('Silakan isi nama lengkap pemesan')
-      return
-    }
-
-    if (cleanPhone.length < 8) {
-      toast.error('Silakan masukkan nomor WhatsApp yang valid (minimal 8 digit)')
+    // Phone is optional, but if entered, ensure valid length
+    if (cleanPhone && cleanPhone.length < 8) {
+      toast.error('Nomor WhatsApp minimal 8 digit jika diisi')
       return
     }
 
@@ -81,8 +104,8 @@ export function StorefrontCartDrawer({
     try {
       const response = await submitStoreCheckout(slug, {
         customer: {
-          name: trimmedName,
-          phone: cleanPhone,
+          name: finalName,
+          phone: cleanPhone || undefined,
           address: orderType === 'delivery' ? address.trim() : undefined,
           notes: notes.trim() || undefined,
         },
@@ -105,7 +128,7 @@ export function StorefrontCartDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex w-full flex-col p-0 sm:max-w-lg">
+      <SheetContent className="flex w-full max-w-full flex-col p-0 sm:max-w-lg">
         {/* Header */}
         <SheetHeader className="border-b px-6 py-4">
           <SheetTitle className="flex items-center gap-2 text-lg font-bold">
@@ -226,11 +249,11 @@ export function StorefrontCartDrawer({
 
                 <div className="space-y-1.5">
                   <Label htmlFor="order-name" className="text-xs">
-                    Nama Lengkap <span className="text-destructive">*</span>
+                    Nama Pemesan <span className="text-muted-foreground font-normal">(Opsional)</span>
                   </Label>
                   <Input
                     id="order-name"
-                    placeholder="Contoh: Budi Santoso"
+                    placeholder="Contoh: Budi Santoso (Bawaan: Pelanggan Umum)"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="rounded-xl"
@@ -239,7 +262,7 @@ export function StorefrontCartDrawer({
 
                 <div className="space-y-1.5">
                   <Label htmlFor="order-phone" className="text-xs">
-                    Nomor WhatsApp <span className="text-destructive">*</span>
+                    Nomor WhatsApp <span className="text-muted-foreground font-normal">(Opsional)</span>
                   </Label>
                   <Input
                     id="order-phone"
@@ -250,7 +273,7 @@ export function StorefrontCartDrawer({
                     className="rounded-xl"
                   />
                   <p className="text-[11px] text-muted-foreground">
-                    Digunakan untuk konfirmasi pesanan dan notifikasi pengiriman.
+                    Diisi jika Anda ingin pesanan terlacak di sistem kami.
                   </p>
                 </div>
 
