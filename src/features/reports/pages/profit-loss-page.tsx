@@ -109,17 +109,19 @@ export function ProfitLossPage() {
   return (
     <div className="flex flex-col gap-4">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate('/reports')}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-xl font-semibold">Laporan Laba Rugi</h1>
-          <p className="text-sm text-muted-foreground">
-            Ringkasan pendapatan, beban pokok penjualan (HPP), biaya operasional, dan laba bersih usaha.
-          </p>
+      <div className="flex flex-col gap-2.5">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate('/reports')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-xl font-semibold">Laporan Laba Rugi</h1>
+            <p className="text-sm text-muted-foreground">
+              Ringkasan pendapatan, beban pokok penjualan (HPP), biaya operasional, dan laba bersih usaha.
+            </p>
+          </div>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 pl-11">
           <Button
             variant="outline"
             size="sm"

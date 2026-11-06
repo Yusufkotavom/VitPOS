@@ -24,6 +24,8 @@ import { StatusBadge } from '@/shared/components/display/status-badge'
 import { PageShell } from '@/shared/components/layout/page-shell'
 import { BankTransferDialog } from '@/features/cash/components/bank-transfer-dialog'
 import { OpeningBalanceDialog } from '@/features/accounting/components/opening-balance-dialog'
+import { CapitalInjectionDialog } from '@/features/accounting/components/capital-injection-dialog'
+import { DebtPaymentDialog } from '@/features/accounting/components/debt-payment-dialog'
 
 function tone(status: string) {
   if (status === 'Tercatat') return 'success'
@@ -113,6 +115,8 @@ export function CashPage() {
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <OpeningBalanceDialog />
+          <CapitalInjectionDialog />
+          <DebtPaymentDialog />
           <BankTransferDialog />
           <CashCrudActions />
         </div>

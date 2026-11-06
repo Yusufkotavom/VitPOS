@@ -322,10 +322,38 @@ export async function recordCashJournal(
   try {
     if (amount <= 0) return
 
-    const catAccount = await resolveCashCategoryAccountCode(
-      tenantId,
-      categoryId,
-    )
+    // Resolve cash or bank account code from the cash record
+    let bankAccountCode = '1-1100'
+    try {
+      const cashRow = await dexieDb.cash.get(cashId)
+      if (cashRow?.account) {
+        const isCashAcc = cashRow.account.toLowerCase().includes('kas') || cashRow.account.toLowerCase().includes('tunai')
+        const pmAccount = await ensurePaymentMethodAccount(tenantId, {
+          name: cashRow.account,
+          provider: cashRow.account,
+          type: isCashAcc ? 'tunai' : 'transfer',
+        })
+        bankAccountCode = pmAccount.code
+      }
+    } catch {
+      bankAccountCode = '1-1100'
+    }
+
+    // Check if category is special accounting category (Modal, Prive, Hutang, Piutang)
+    let catAccount: string
+    const lowerCat = categoryId.toLowerCase()
+    if (lowerCat.includes('modal')) {
+      catAccount = '3-1000'
+    } else if (lowerCat.includes('prive')) {
+      catAccount = '3-1000'
+    } else if (lowerCat.includes('hutang')) {
+      catAccount = '2-1000'
+    } else if (lowerCat.includes('piutang')) {
+      catAccount = '1-3000'
+    } else {
+      catAccount = await resolveCashCategoryAccountCode(tenantId, categoryId)
+    }
+
     const isIncome = type === 'Pemasukan'
 
     await createJournalEntry(tenantId, {
@@ -337,12 +365,12 @@ export async function recordCashJournal(
       date: date.slice(0, 10),
       lines: isIncome
         ? [
-            { accountCode: '1-1100', debit: amount, credit: 0 },
+            { accountCode: bankAccountCode, debit: amount, credit: 0 },
             { accountCode: catAccount, debit: 0, credit: amount },
           ]
         : [
             { accountCode: catAccount, debit: amount, credit: 0 },
-            { accountCode: '1-1100', debit: 0, credit: amount },
+            { accountCode: bankAccountCode, debit: 0, credit: amount },
           ],
     })
   } catch (err) {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, FileSpreadsheet } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -119,16 +119,21 @@ export function PaymentReportPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate('/reports')}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-xl font-semibold">{t('reports.payment_title')}</h1>
-          <p className="text-sm text-muted-foreground">{t('reports.payment_description')}</p>
+      <div className="flex flex-col gap-2.5">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate('/reports')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-xl font-semibold">{t('reports.payment_title')}</h1>
+            <p className="text-sm text-muted-foreground">{t('reports.payment_description')}</p>
+          </div>
         </div>
-        <div className="ml-auto">
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={!data}>{t('common.export')} CSV</Button>
+        <div className="flex flex-wrap items-center gap-2 pl-11">
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={!data}>
+            <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
+            {t('common.export')} CSV
+          </Button>
         </div>
       </div>
 

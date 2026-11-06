@@ -21,6 +21,8 @@ import { FilterToolbar } from '@/shared/components/data-table/filter-toolbar'
 import { formatCurrency } from '@/lib/format-currency'
 import { exportToCsv } from '@/shared/utils/export-csv'
 import { OpeningBalanceDialog } from '@/features/accounting/components/opening-balance-dialog'
+import { CapitalInjectionDialog } from '@/features/accounting/components/capital-injection-dialog'
+import { DebtPaymentDialog } from '@/features/accounting/components/debt-payment-dialog'
 
 export function BalanceSheetPage() {
   const { t } = useTranslation()
@@ -110,18 +112,22 @@ export function BalanceSheetPage() {
   return (
     <div className="flex flex-col gap-4">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate('/reports')}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-xl font-semibold">Laporan Neraca Keuangan</h1>
-          <p className="text-sm text-muted-foreground">
-            Posisi aset, liabilitas (hutang), dan ekuitas (modal) usaha per tanggal laporan.
-          </p>
+      <div className="flex flex-col gap-2.5">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate('/reports')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-xl font-semibold">Laporan Neraca Keuangan</h1>
+            <p className="text-sm text-muted-foreground">
+              Posisi aset, liabilitas (hutang), dan ekuitas (modal) usaha per tanggal laporan.
+            </p>
+          </div>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 pl-11">
           <OpeningBalanceDialog onSaved={() => refetch()} />
+          <CapitalInjectionDialog onSuccess={() => refetch()} />
+          <DebtPaymentDialog onSuccess={() => refetch()} />
           <Button
             variant="outline"
             size="sm"
