@@ -1,67 +1,108 @@
 import { Hono } from 'hono'
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { randomUUID } from 'node:crypto'
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { basename, extname, join, resolve } from 'node:path'
 
-const r2Endpoint = process.env.R2_ENDPOINT
-const r2AccessKey = process.env.R2_ACCESS_KEY_ID
-const r2SecretKey = process.env.R2_SECRET_ACCESS_KEY
-const bucketName = process.env.R2_BUCKET_NAME ?? 'vitpos-uploads'
-const publicUrlBase = process.env.R2_PUBLIC_URL ?? ''
+/**
+ * Local disk storage for uploaded images.
+ *
+ * This app self-hosts: files live under UPLOAD_DIR (default /app/uploads), a
+ * Docker volume, so they survive redeploys. No cloud bucket is involved —
+ * `POST /api/v1/upload` takes the file directly and `GET /api/v1/upload/file/...`
+ * serves it back through the same `/api` proxy that serve.mjs exposes.
+ */
+const uploadRoot = resolve(process.env.UPLOAD_DIR ?? '/app/uploads')
+const maxBytes = 5 * 1024 * 1024
 
-const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
+const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'] as const
 const allowedFolders = ['products', 'company', 'invoices', 'uploads'] as const
 
 type UploadFolder = typeof allowedFolders[number]
 
+const mimeByExt: Record<string, string> = {
+	'.jpg': 'image/jpeg',
+	'.jpeg': 'image/jpeg',
+	'.png': 'image/png',
+	'.webp': 'image/webp',
+}
+
 function toUploadFolder(value: unknown): UploadFolder {
-  return allowedFolders.includes(value as UploadFolder) ? value as UploadFolder : 'uploads'
+	const asString = typeof value === 'string' ? value : ''
+	return (allowedFolders as readonly string[]).includes(asString)
+		? (asString as UploadFolder)
+		: 'uploads'
+}
+
+function sanitizeName(name: string, contentType: string): string {
+	const base = basename(name || 'image').replace(/[^a-zA-Z0-9._-]/g, '_')
+	const ext = extname(base).toLowerCase()
+	if (ext && mimeByExt[ext]) return base
+	// Fall back to an extension that matches the declared MIME type.
+	if (contentType === 'image/png') return `${base}.png`
+	if (contentType === 'image/webp') return `${base}.webp`
+	return `${base}.jpg`
 }
 
 export const uploadRoutes = new Hono()
 
-uploadRoutes.post('/presign', async (c) => {
-  try {
-    if (!r2Endpoint || !r2AccessKey || !r2SecretKey) {
-      return c.json({ ok: false, message: 'R2 tidak dikonfigurasi. Hubungi admin.' }, 501)
-    }
+// POST /api/v1/upload  (multipart/form-data: file, folder?)
+uploadRoutes.post('/', async (c) => {
+	try {
+		const body = await c.req.parseBody()
+		const file = body['file']
+		const folder = toUploadFolder(body['folder'])
 
-    const body = await c.req.json()
-    const filename = (body.filename as string ?? '').trim()
-    const contentType = (body.contentType as string ?? '').trim()
-    const folder = toUploadFolder(body.folder)
+		if (!(file instanceof File)) {
+			return c.json({ ok: false, message: 'File wajib diisi.' }, 400)
+		}
+		if (!(allowedTypes as readonly string[]).includes(file.type)) {
+			return c.json({ ok: false, message: 'Tipe file tidak didukung. Gunakan JPG, PNG, atau WebP.' }, 400)
+		}
+		if (file.size > maxBytes) {
+			return c.json({ ok: false, message: 'Ukuran gambar maksimal 5MB.' }, 400)
+		}
 
-    if (!filename || !contentType) {
-      return c.json({ ok: false, message: 'filename dan contentType wajib diisi.' }, 400)
-    }
+		const safeName = sanitizeName(file.name, file.type)
+		const key = `${folder}/${randomUUID()}-${safeName}`
 
-    if (!allowedTypes.includes(contentType)) {
-      return c.json({ ok: false, message: 'Tipe file tidak didukung. Gunakan JPG, PNG, atau WebP.' }, 400)
-    }
+		await mkdir(join(uploadRoot, folder), { recursive: true })
+		await writeFile(join(uploadRoot, key), Buffer.from(await file.arrayBuffer()))
 
-    const r2Client = new S3Client({
-      region: 'auto',
-      endpoint: r2Endpoint,
-      credentials: {
-        accessKeyId: r2AccessKey,
-        secretAccessKey: r2SecretKey,
-      },
-    })
+		return c.json({ ok: true, key, url: `/api/v1/upload/file/${key}` })
+	} catch (error) {
+		console.error('upload error:', error)
+		return c.json({ ok: false, message: 'Gagal menyimpan file.' }, 500)
+	}
+})
 
-    const safeName = filename.replace(/[^a-zA-Z0-9.-]/g, '_')
-    const r2Key = `${folder}/${crypto.randomUUID()}-${safeName}`
+// GET /api/v1/upload/file/:folder/:name
+uploadRoutes.get('/file/:folder/:name', async (c) => {
+	const folder = toUploadFolder(c.req.param('folder'))
+	const name = basename(c.req.param('name'))
+	const folderRoot = join(uploadRoot, folder)
+	const fullPath = join(folderRoot, name)
 
-    const command = new PutObjectCommand({
-      Bucket: bucketName,
-      Key: r2Key,
-      ContentType: contentType,
-    })
+	// Defence in depth: basename already strips slashes, but never serve outside the folder.
+	if (!resolve(fullPath).startsWith(resolve(folderRoot))) {
+		return c.text('Forbidden', 403)
+	}
 
-    const presignedUrl = await getSignedUrl(r2Client, command, { expiresIn: 300 })
-    const publicUrl = publicUrlBase ? `${publicUrlBase.replace(/\/$/, '')}/${r2Key}` : presignedUrl.split('?')[0]
+	try {
+		const info = await stat(fullPath)
+		if (!info.isFile()) return c.text('Not found', 404)
+	} catch {
+		return c.text('Not found', 404)
+	}
 
-    return c.json({ ok: true, presignedUrl, publicUrl, key: r2Key })
-  } catch (error) {
-    console.error('R2 presign error:', error)
-    return c.json({ ok: false, message: 'Gagal membuat URL upload. Periksa konfigurasi R2.' }, 500)
-  }
+	const buffer = await readFile(fullPath)
+	const contentType = mimeByExt[extname(name).toLowerCase()] ?? 'application/octet-stream'
+
+	return new Response(buffer, {
+		status: 200,
+		headers: {
+			'Content-Type': contentType,
+			'Content-Length': String(buffer.byteLength),
+			'Cache-Control': 'public, max-age=31536000, immutable',
+		},
+	})
 })

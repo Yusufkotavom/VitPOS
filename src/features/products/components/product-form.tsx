@@ -10,7 +10,7 @@ import { CurrencyInput } from '@/shared/components/forms/currency-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCategories } from '@/features/products/hooks/use-categories'
 import { productFormSchema, productInitialValues, productStatusOptions, productTypeOptions, type ProductFormValues } from '@/features/products/schemas/product-form-schema'
-import { fileToDataUrl, uploadImageToR2 } from '@/services/upload.service'
+import { fileToDataUrl, uploadImage } from '@/services/upload.service'
 
 import { Image, Upload, Package, Coffee, Shirt, MonitorSmartphone, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 
@@ -103,14 +103,14 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
     }
 
     try {
-      const imageUrl = await uploadImageToR2(pendingImageFile, 'products')
+      const imageUrl = await uploadImage(pendingImageFile, 'products')
       setPendingImageFile(null)
       setPreviewImage(imageUrl)
       form.setValue('imageUrl', imageUrl, { shouldDirty: true })
       await onSubmit({ ...values, imageUrl })
     } catch {
       const imageUrl = await fileToDataUrl(pendingImageFile)
-      toast.warning('Gagal upload ke cloud, gambar produk disimpan lokal. Konfigurasi R2 untuk cloud storage.')
+      toast.warning('Gagal mengunggah gambar ke server, gambar disimpan sementara di dalam data produk.')
       await onSubmit({ ...values, imageUrl })
     }
   }

@@ -3992,56 +3992,80 @@ updateRoutes.get("/desktop/:target/:arch/:currentVersion", async (c) => {
 
 // src/features/upload/routes.ts
 import { Hono as Hono12 } from "hono";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-var r2Endpoint = process.env.R2_ENDPOINT;
-var r2AccessKey = process.env.R2_ACCESS_KEY_ID;
-var r2SecretKey = process.env.R2_SECRET_ACCESS_KEY;
-var bucketName = process.env.R2_BUCKET_NAME ?? "vitpos-uploads";
-var publicUrlBase = process.env.R2_PUBLIC_URL ?? "";
+import { randomUUID } from "crypto";
+import { mkdir, readFile, stat, writeFile } from "fs/promises";
+import { basename, extname, join, resolve } from "path";
+var uploadRoot = resolve(process.env.UPLOAD_DIR ?? "/app/uploads");
+var maxBytes = 5 * 1024 * 1024;
 var allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 var allowedFolders = ["products", "company", "invoices", "uploads"];
+var mimeByExt = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp"
+};
 function toUploadFolder(value) {
-  return allowedFolders.includes(value) ? value : "uploads";
+  const asString = typeof value === "string" ? value : "";
+  return allowedFolders.includes(asString) ? asString : "uploads";
+}
+function sanitizeName(name, contentType) {
+  const base = basename(name || "image").replace(/[^a-zA-Z0-9._-]/g, "_");
+  const ext = extname(base).toLowerCase();
+  if (ext && mimeByExt[ext]) return base;
+  if (contentType === "image/png") return `${base}.png`;
+  if (contentType === "image/webp") return `${base}.webp`;
+  return `${base}.jpg`;
 }
 var uploadRoutes = new Hono12();
-uploadRoutes.post("/presign", async (c) => {
+uploadRoutes.post("/", async (c) => {
   try {
-    if (!r2Endpoint || !r2AccessKey || !r2SecretKey) {
-      return c.json({ ok: false, message: "R2 tidak dikonfigurasi. Hubungi admin." }, 501);
+    const body = await c.req.parseBody();
+    const file = body["file"];
+    const folder = toUploadFolder(body["folder"]);
+    if (!(file instanceof File)) {
+      return c.json({ ok: false, message: "File wajib diisi." }, 400);
     }
-    const body = await c.req.json();
-    const filename = (body.filename ?? "").trim();
-    const contentType = (body.contentType ?? "").trim();
-    const folder = toUploadFolder(body.folder);
-    if (!filename || !contentType) {
-      return c.json({ ok: false, message: "filename dan contentType wajib diisi." }, 400);
-    }
-    if (!allowedTypes.includes(contentType)) {
+    if (!allowedTypes.includes(file.type)) {
       return c.json({ ok: false, message: "Tipe file tidak didukung. Gunakan JPG, PNG, atau WebP." }, 400);
     }
-    const r2Client = new S3Client({
-      region: "auto",
-      endpoint: r2Endpoint,
-      credentials: {
-        accessKeyId: r2AccessKey,
-        secretAccessKey: r2SecretKey
-      }
-    });
-    const safeName = filename.replace(/[^a-zA-Z0-9.-]/g, "_");
-    const r2Key = `${folder}/${crypto.randomUUID()}-${safeName}`;
-    const command = new PutObjectCommand({
-      Bucket: bucketName,
-      Key: r2Key,
-      ContentType: contentType
-    });
-    const presignedUrl = await getSignedUrl(r2Client, command, { expiresIn: 300 });
-    const publicUrl = publicUrlBase ? `${publicUrlBase.replace(/\/$/, "")}/${r2Key}` : presignedUrl.split("?")[0];
-    return c.json({ ok: true, presignedUrl, publicUrl, key: r2Key });
+    if (file.size > maxBytes) {
+      return c.json({ ok: false, message: "Ukuran gambar maksimal 5MB." }, 400);
+    }
+    const safeName = sanitizeName(file.name, file.type);
+    const key = `${folder}/${randomUUID()}-${safeName}`;
+    await mkdir(join(uploadRoot, folder), { recursive: true });
+    await writeFile(join(uploadRoot, key), Buffer.from(await file.arrayBuffer()));
+    return c.json({ ok: true, key, url: `/api/v1/upload/file/${key}` });
   } catch (error) {
-    console.error("R2 presign error:", error);
-    return c.json({ ok: false, message: "Gagal membuat URL upload. Periksa konfigurasi R2." }, 500);
+    console.error("upload error:", error);
+    return c.json({ ok: false, message: "Gagal menyimpan file." }, 500);
   }
+});
+uploadRoutes.get("/file/:folder/:name", async (c) => {
+  const folder = toUploadFolder(c.req.param("folder"));
+  const name = basename(c.req.param("name"));
+  const folderRoot = join(uploadRoot, folder);
+  const fullPath = join(folderRoot, name);
+  if (!resolve(fullPath).startsWith(resolve(folderRoot))) {
+    return c.text("Forbidden", 403);
+  }
+  try {
+    const info = await stat(fullPath);
+    if (!info.isFile()) return c.text("Not found", 404);
+  } catch {
+    return c.text("Not found", 404);
+  }
+  const buffer = await readFile(fullPath);
+  const contentType = mimeByExt[extname(name).toLowerCase()] ?? "application/octet-stream";
+  return new Response(buffer, {
+    status: 200,
+    headers: {
+      "Content-Type": contentType,
+      "Content-Length": String(buffer.byteLength),
+      "Cache-Control": "public, max-age=31536000, immutable"
+    }
+  });
 });
 
 // src/app.ts

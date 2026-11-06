@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { useSettings } from '@/features/settings/hooks/use-settings'
 import { settingRepository } from '@/services/local-db/repository'
-import { fileToDataUrl, uploadImageToR2 } from '@/services/upload.service'
+import { fileToDataUrl, uploadImage } from '@/services/upload.service'
 import { generateSlug } from '@/features/storefront/lib/slug'
 
 const ICONS = [
@@ -99,12 +99,12 @@ export function CompanySettingsForm() {
       let companyLogo = values['company-logo']
       if (pendingLogoFile) {
         try {
-          companyLogo = await uploadImageToR2(pendingLogoFile, 'company')
+          companyLogo = await uploadImage(pendingLogoFile, 'company')
           setField('company-logo', companyLogo)
           setPendingLogoFile(null)
         } catch {
           companyLogo = await fileToDataUrl(pendingLogoFile)
-          toast.warning('Gagal upload ke cloud, logo disimpan lokal. Konfigurasi R2 untuk cloud storage.')
+          toast.warning('Gagal mengunggah logo ke server, logo disimpan sementara di dalam data.')
         }
       }
       for (const field of fields) {

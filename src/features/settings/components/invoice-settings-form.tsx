@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { useSettings } from '@/features/settings/hooks/use-settings'
 import { settingRepository } from '@/services/local-db/repository'
-import { fileToDataUrl, uploadImageToR2 } from '@/services/upload.service'
+import { fileToDataUrl, uploadImage } from '@/services/upload.service'
 import { invoiceThemeOptions, type InvoiceThemeName } from '@/shared/components/pdf/types'
 import { invoiceThemes } from '@/shared/components/pdf/invoice-themes'
 
@@ -111,12 +111,12 @@ export function InvoiceSettingsForm() {
 
       if (pendingLogoFile) {
         try {
-          finalLogoUrl = await uploadImageToR2(pendingLogoFile, 'invoices')
+          finalLogoUrl = await uploadImage(pendingLogoFile, 'invoices')
           setPendingLogoFile(null)
           setLogoUrl(finalLogoUrl)
         } catch {
           finalLogoUrl = await fileToDataUrl(pendingLogoFile)
-          toast.warning('Gagal upload ke cloud, logo disimpan lokal. Konfigurasi R2 untuk cloud storage.')
+          toast.warning('Gagal mengunggah logo ke server, logo disimpan sementara di dalam data.')
         }
       }
 
@@ -186,7 +186,7 @@ export function InvoiceSettingsForm() {
       <div className="mb-6 space-y-3 rounded-xl border p-4">
         <Label className="text-sm font-medium">Logo Perusahaan</Label>
         <p className="text-xs text-muted-foreground mb-1">Upload logo untuk ditampilkan di invoice A4. Maks 2MB, format JPG/PNG/WebP.</p>
-        <p className="text-xs text-muted-foreground mb-3">Otomatis tersimpan di Cloudflare R2 jika dikonfigurasi, atau lokal jika offline.</p>
+        <p className="text-xs text-muted-foreground mb-3">Disimpan di server VitPOS (portable, tidak hilang saat redeploy).</p>
         <div className="flex items-center gap-4">
           <div className="flex h-16 w-40 items-center justify-center rounded-lg border bg-muted/20 overflow-hidden">
             {logoUrl ? (

@@ -16,6 +16,10 @@ RUN npm run build
 FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production PORT=3000
+# Uploaded images are written here; mount a volume over /app/uploads so they
+# survive redeploys (see Dokploy mount "vitpos-uploads").
+ENV UPLOAD_DIR=/app/uploads
 COPY --from=build /app /app
+RUN mkdir -p /app/uploads
 EXPOSE 3000
 CMD ["node", "serve.mjs"]

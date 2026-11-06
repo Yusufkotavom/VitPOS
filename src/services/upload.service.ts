@@ -1,36 +1,44 @@
-import { apiPost } from '@/services/api/client'
+import { useAuthStore } from '@/features/auth/stores/auth-store'
 
-type PresignResponse = {
+type UploadResponse = {
   ok: boolean
-  presignedUrl: string
-  publicUrl: string
+  url?: string
+  key?: string
   message?: string
 }
 
-type UploadFolder = 'products' | 'company' | 'invoices' | 'uploads'
+export type UploadFolder = 'products' | 'company' | 'invoices' | 'uploads'
 
-export async function uploadImageToR2(file: File, folder: UploadFolder = 'uploads'): Promise<string> {
-  const res = await apiPost<PresignResponse>('/upload/presign', {
-    filename: file.name,
-    contentType: file.type,
-    folder,
+/**
+ * Upload an image to this server (not a cloud bucket). The API stores the file
+ * under UPLOAD_DIR and returns a relative `/api/v1/upload/file/...` URL; we make
+ * it absolute so it stays valid wherever the value is later rendered (product
+ * card, invoice PDF, storefront on another host).
+ */
+export async function uploadImage(file: File, folder: UploadFolder = 'uploads'): Promise<string> {
+  const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
+  const form = new FormData()
+  form.append('file', file)
+  form.append('folder', folder)
+
+  const headers: Record<string, string> = {}
+  const user = useAuthStore.getState().currentUser
+  if (user) headers['x-user-id'] = user.id
+
+  const response = await fetch(`${baseUrl}/api/v1/upload`, {
+    method: 'POST',
+    headers,
+    body: form,
   })
 
-  if (!res.ok || !res.presignedUrl) {
-    throw new Error(res.message ?? 'Gagal mendapatkan URL upload')
+  const payload = (await response.json().catch(() => null)) as UploadResponse | null
+  if (!response.ok || !payload?.ok || !payload.url) {
+    throw new Error(payload?.message ?? `Gagal mengunggah gambar (${response.status})`)
   }
 
-  const uploadRes = await fetch(res.presignedUrl, {
-    method: 'PUT',
-    body: file,
-    headers: { 'Content-Type': file.type },
-  })
-
-  if (!uploadRes.ok) {
-    throw new Error('Gagal mengunggah file ke penyimpanan')
-  }
-
-  return res.publicUrl
+  return payload.url.startsWith('http')
+    ? payload.url
+    : `${window.location.origin}${payload.url}`
 }
 
 export function fileToDataUrl(file: File): Promise<string> {
@@ -40,8 +48,4 @@ export function fileToDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(new Error('Gagal membaca file'))
     reader.readAsDataURL(file)
   })
-}
-
-export function isR2Configured(): boolean {
-  return !!import.meta.env.VITE_API_BASE_URL
 }
