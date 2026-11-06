@@ -28,7 +28,158 @@ export interface OpeningBalanceSummary {
   lastUpdated?: string
 }
 
+export interface CurrentSystemBalances {
+  cashOnHand: number
+  bankAccounts: Array<{ name: string; balance: number; provider: string }>
+  totalBank: number
+  accountsReceivable: number
+  inventoryValue: number
+  productCount: number
+  fixedAssets: number
+  accountsPayable: number
+  otherLiabilities: number
+  hasExistingOpeningBalance: boolean
+  lastSavedDate?: string
+}
+
 const SETTING_KEY = 'accounting-opening-balance'
+
+export async function getCurrentSystemBalances(tenantId: string): Promise<CurrentSystemBalances> {
+  const existingSetting = await getOpeningBalance(tenantId)
+  const hasExistingOpeningBalance = !!existingSetting
+
+  // 1. Read cash rows
+  const cashRows = await dexieDb.cash.where('tenantId').equals(tenantId).toArray()
+  const accountTotals = new Map<string, number>()
+  for (const c of cashRows) {
+    const acc = (c.account || 'Kas Toko').trim()
+    const net = (Number(c.income) || 0) - (Number(c.expense) || 0)
+    accountTotals.set(acc, (accountTotals.get(acc) || 0) + net)
+  }
+
+  // Active payment methods
+  const paymentMethods = await dexieDb.paymentMethods
+    .where('tenantId')
+    .equals(tenantId)
+    .filter((pm) => pm.status === 'Aktif')
+    .toArray()
+
+  let cashOnHand = 0
+  const bankAccountsMap = new Map<string, { balance: number; provider: string }>()
+
+  for (const [accName, total] of accountTotals.entries()) {
+    const lower = accName.toLowerCase()
+    const isCash = lower.includes('kas') || lower.includes('tunai') || lower === 'cash'
+    if (isCash) {
+      cashOnHand += total
+    } else {
+      bankAccountsMap.set(accName, {
+        balance: total,
+        provider: accName.replace(/^bank\s+/i, '').trim() || 'Bank',
+      })
+    }
+  }
+
+  // Ensure any active bank/transfer/qris payment methods exist
+  for (const pm of paymentMethods) {
+    const lower = pm.name.toLowerCase()
+    const isCash = lower.includes('kas') || lower.includes('tunai') || pm.type === 'cash'
+    if (!isCash && !bankAccountsMap.has(pm.name)) {
+      bankAccountsMap.set(pm.name, {
+        balance: accountTotals.get(pm.name) || 0,
+        provider: pm.provider || pm.name,
+      })
+    }
+  }
+
+  // Also include banks from existing setting if any
+  if (existingSetting?.bankAccounts) {
+    for (const b of existingSetting.bankAccounts) {
+      if (!bankAccountsMap.has(b.name)) {
+        bankAccountsMap.set(b.name, {
+          balance: Number(b.balance) || 0,
+          provider: b.provider || b.name,
+        })
+      }
+    }
+  }
+
+  const bankAccounts: Array<{ name: string; balance: number; provider: string }> = []
+  for (const [name, info] of bankAccountsMap.entries()) {
+    bankAccounts.push({
+      name,
+      balance: Math.max(0, info.balance),
+      provider: info.provider,
+    })
+  }
+
+  if (bankAccounts.length === 0) {
+    bankAccounts.push({ name: 'Bank BCA', balance: 0, provider: 'BCA' })
+  }
+
+  const totalBank = bankAccounts.reduce((sum, b) => sum + (Number(b.balance) || 0), 0)
+
+  // 2. Inventory Valuation
+  const products = await dexieDb.products.where('tenantId').equals(tenantId).toArray()
+  let inventoryValue = 0
+  let productCount = 0
+  for (const p of products) {
+    if (p.type !== 'Jasa' && p.status !== 'Arsip') {
+      const stock = Math.max(0, Number(p.stock) || 0)
+      const cost = Number(p.costPrice) || Number(p.price) || 0
+      if (stock > 0) {
+        inventoryValue += stock * cost
+        productCount++
+      }
+    }
+  }
+
+  // 3. Accounts Receivable
+  const customers = await dexieDb.customers.where('tenantId').equals(tenantId).toArray()
+  const customerReceivable = customers.reduce((sum, c) => sum + Math.max(0, Number(c.receivable) || 0), 0)
+
+  const orders = await dexieDb.salesOrders.where('tenantId').equals(tenantId).toArray()
+  let orderReceivable = 0
+  for (const o of orders) {
+    if (o.status !== 'Draft' && o.status !== 'Batal' && o.status !== 'Lunas') {
+      const unpaid = (Number(o.grandTotal) || 0) - (Number(o.paidTotal) || 0)
+      if (unpaid > 0) orderReceivable += unpaid
+    }
+  }
+  const accountsReceivable = Math.max(customerReceivable, orderReceivable)
+
+  // 4. Accounts Payable
+  const suppliers = await dexieDb.suppliers.where('tenantId').equals(tenantId).toArray()
+  const supplierPayable = suppliers.reduce((sum, s) => sum + Math.max(0, Number(s.payable) || 0), 0)
+
+  const purchases = await dexieDb.purchases.where('tenantId').equals(tenantId).toArray()
+  let purchasePayable = 0
+  for (const p of purchases) {
+    if (p.status !== 'Draft' && p.status !== 'Batal') {
+      const unpaid = (Number(p.grandTotal) || 0) - (Number(p.paidTotal) || 0)
+      if (unpaid > 0) purchasePayable += unpaid
+    }
+  }
+  const accountsPayable = Math.max(supplierPayable, purchasePayable)
+
+  // 5. Fixed Assets & Other Liabilities
+  const fixedAssets = existingSetting ? Number(existingSetting.fixedAssets) || 0 : 0
+  const otherLiabilities = existingSetting ? Number(existingSetting.otherLiabilities) || 0 : 0
+
+  return {
+    cashOnHand: Math.max(0, cashOnHand),
+    bankAccounts,
+    totalBank,
+    accountsReceivable,
+    inventoryValue,
+    productCount,
+    fixedAssets,
+    accountsPayable,
+    otherLiabilities,
+    hasExistingOpeningBalance,
+    lastSavedDate: existingSetting?.date,
+  }
+}
 
 export async function getOpeningBalance(tenantId: string): Promise<OpeningBalanceInput | null> {
   const setting = await dexieDb.settings

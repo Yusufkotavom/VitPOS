@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, CheckCircle2, BookOpen } from 'lucide-react'
+import { Plus, Trash2, CheckCircle2, BookOpen, Sparkles, Download } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -17,8 +18,10 @@ import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { formatCurrency } from '@/lib/format-currency'
 import {
   getOpeningBalance,
+  getCurrentSystemBalances,
   saveOpeningBalance,
   type OpeningBalanceInput,
+  type CurrentSystemBalances,
 } from '@/features/accounting/services/opening-balance.service'
 
 interface OpeningBalanceDialogProps {
@@ -30,6 +33,8 @@ export function OpeningBalanceDialog({ trigger, onSaved }: OpeningBalanceDialogP
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [systemBalances, setSystemBalances] = useState<CurrentSystemBalances | null>(null)
+  const [isEditingExisting, setIsEditingExisting] = useState(false)
   const tenantId = resolveTenantId()
 
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
@@ -47,9 +52,14 @@ export function OpeningBalanceDialog({ trigger, onSaved }: OpeningBalanceDialogP
   useEffect(() => {
     if (open && tenantId) {
       setLoading(true)
-      getOpeningBalance(tenantId)
-        .then((existing) => {
+      Promise.all([
+        getOpeningBalance(tenantId),
+        getCurrentSystemBalances(tenantId),
+      ])
+        .then(([existing, sys]) => {
+          setSystemBalances(sys)
           if (existing) {
+            setIsEditingExisting(true)
             setDate(existing.date || new Date().toISOString().slice(0, 10))
             setCashOnHand(String(existing.cashOnHand || 0))
             if (existing.bankAccounts && existing.bankAccounts.length > 0) {
@@ -67,11 +77,49 @@ export function OpeningBalanceDialog({ trigger, onSaved }: OpeningBalanceDialogP
             setAccountsPayable(String(existing.accountsPayable || 0))
             setOtherLiabilities(String(existing.otherLiabilities || 0))
             if (existing.notes) setNotes(existing.notes)
+          } else {
+            // Belum pernah menyimpan saldo awal -> otomatis baca dari saldo berjalan saat ini
+            setIsEditingExisting(false)
+            setCashOnHand(String(sys.cashOnHand || 0))
+            if (sys.bankAccounts && sys.bankAccounts.length > 0) {
+              setBankAccounts(
+                sys.bankAccounts.map((b) => ({
+                  name: b.name,
+                  balance: String(b.balance || 0),
+                  provider: b.provider || b.name,
+                })),
+              )
+            }
+            setAccountsReceivable(String(sys.accountsReceivable || 0))
+            setInventoryValue(String(sys.inventoryValue || 0))
+            setFixedAssets(String(sys.fixedAssets || 0))
+            setAccountsPayable(String(sys.accountsPayable || 0))
+            setOtherLiabilities(String(sys.otherLiabilities || 0))
           }
         })
         .finally(() => setLoading(false))
     }
   }, [open, tenantId])
+
+  function loadFromCurrentSystem() {
+    if (!systemBalances) return
+    setCashOnHand(String(systemBalances.cashOnHand || 0))
+    if (systemBalances.bankAccounts && systemBalances.bankAccounts.length > 0) {
+      setBankAccounts(
+        systemBalances.bankAccounts.map((b) => ({
+          name: b.name,
+          balance: String(b.balance || 0),
+          provider: b.provider || b.name,
+        })),
+      )
+    }
+    setAccountsReceivable(String(systemBalances.accountsReceivable || 0))
+    setInventoryValue(String(systemBalances.inventoryValue || 0))
+    setFixedAssets(String(systemBalances.fixedAssets || 0))
+    setAccountsPayable(String(systemBalances.accountsPayable || 0))
+    setOtherLiabilities(String(systemBalances.otherLiabilities || 0))
+    toast.success('Formulir diisi dengan saldo berjalan sistem saat ini!')
+  }
 
   // Calculations
   const numCash = Number(cashOnHand) || 0
@@ -126,10 +174,16 @@ export function OpeningBalanceDialog({ trigger, onSaved }: OpeningBalanceDialogP
       }
 
       await saveOpeningBalance(tenantId, payload)
+      toast.success(
+        isEditingExisting
+          ? 'Saldo awal akuntansi berhasil diperbarui'
+          : 'Saldo awal akuntansi berhasil disimpan',
+      )
       setOpen(false)
       onSaved?.()
     } catch (err) {
       console.error('Error saving opening balance:', err)
+      toast.error('Gagal menyimpan saldo awal')
     } finally {
       setSaving(false)
     }
@@ -139,8 +193,8 @@ export function OpeningBalanceDialog({ trigger, onSaved }: OpeningBalanceDialogP
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <BookOpen className="h-4 w-4" />
+          <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs font-medium">
+            <BookOpen className="h-3.5 w-3.5" />
             <span>Atur Saldo Awal</span>
           </Button>
         )}
@@ -148,12 +202,19 @@ export function OpeningBalanceDialog({ trigger, onSaved }: OpeningBalanceDialogP
 
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-lg font-semibold">
-            <BookOpen className="h-5 w-5 text-primary" />
-            Saldo Awal Akuntansi
-          </DialogTitle>
+          <div className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 text-lg font-semibold">
+              <BookOpen className="h-5 w-5 text-primary" />
+              {isEditingExisting ? 'Edit / Sesuaikan Saldo Awal' : 'Saldo Awal Akuntansi'}
+            </DialogTitle>
+            {isEditingExisting && (
+              <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/20">
+                Tersimpan
+              </Badge>
+            )}
+          </div>
           <DialogDescription>
-            Masukkan posisi saldo awal kas, bank, persediaan, piutang, dan hutang usaha untuk memulai pembukuan yang akurat.
+            Masukkan atau sesuaikan posisi saldo awal kas, rekening bank, persediaan, piutang, dan hutang usaha.
           </DialogDescription>
         </DialogHeader>
 
@@ -161,6 +222,61 @@ export function OpeningBalanceDialog({ trigger, onSaved }: OpeningBalanceDialogP
           <div className="py-8 text-center text-sm text-muted-foreground">Memuat data saldo awal...</div>
         ) : (
           <div className="flex flex-col gap-5 py-2">
+            {/* Card Saldo Sistem Saat Ini & Opsi Tarik Saldo */}
+            {systemBalances && (
+              <div className="rounded-xl border bg-accent/40 p-3.5 space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <p className="text-xs font-bold text-foreground tracking-wide">
+                        Saldo Berjalan di Sistem Saat Ini
+                      </p>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {isEditingExisting
+                        ? 'Data di bawah ini mencerminkan transaksi berjalan saat ini. Klik tombol di kanan jika ingin menyamakan formulir dengan saldo sistem.'
+                        : 'Formulir telah otomatis diisi membaca posisi kas, persediaan stok produk, piutang, dan hutang supplier Anda saat ini.'}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={loadFromCurrentSystem}
+                    className="h-8 text-xs font-semibold gap-1.5 shrink-0 bg-background hover:bg-accent border-primary/30 text-primary"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Tarik Saldo Berjalan
+                  </Button>
+                </div>
+
+                {/* Mini metric pills */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1 text-[11px]">
+                  <div className="rounded-lg border bg-background/80 p-2">
+                    <span className="text-muted-foreground block text-[10px]">Kas Tunai</span>
+                    <span className="font-semibold text-foreground">{formatCurrency(systemBalances.cashOnHand)}</span>
+                  </div>
+                  <div className="rounded-lg border bg-background/80 p-2">
+                    <span className="text-muted-foreground block text-[10px]">Rekening Bank</span>
+                    <span className="font-semibold text-foreground">{formatCurrency(systemBalances.totalBank)}</span>
+                  </div>
+                  <div className="rounded-lg border bg-background/80 p-2">
+                    <span className="text-muted-foreground block text-[10px]">Nilai Stok ({systemBalances.productCount} item)</span>
+                    <span className="font-semibold text-foreground">{formatCurrency(systemBalances.inventoryValue)}</span>
+                  </div>
+                  <div className="rounded-lg border bg-background/80 p-2">
+                    <span className="text-muted-foreground block text-[10px]">Piutang Pelanggan</span>
+                    <span className="font-semibold text-foreground">{formatCurrency(systemBalances.accountsReceivable)}</span>
+                  </div>
+                  <div className="rounded-lg border bg-background/80 p-2">
+                    <span className="text-muted-foreground block text-[10px]">Hutang Supplier</span>
+                    <span className="font-semibold text-rose-600">{formatCurrency(systemBalances.accountsPayable)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* 1. Tanggal Saldo Awal */}
             <div className="rounded-xl border bg-muted/20 p-4">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -175,7 +291,7 @@ export function OpeningBalanceDialog({ trigger, onSaved }: OpeningBalanceDialogP
                     className="h-9 text-sm"
                   />
                   <p className="text-[11px] text-muted-foreground mt-1">
-                    Biasanya tanggal awal pembukuan (misal: 1 Januari atau awal bulan operasional).
+                    Tanggal awal pembukuan toko (misal: awal tahun atau tanggal mulai operasional).
                   </p>
                 </div>
                 <div>
@@ -208,6 +324,16 @@ export function OpeningBalanceDialog({ trigger, onSaved }: OpeningBalanceDialogP
                 <div>
                   <p className="text-sm font-medium">Kas Tunai di Kasir / Brankas</p>
                   <p className="text-xs text-muted-foreground">Uang tunai fisik siap pakai</p>
+                  {systemBalances && numCash !== systemBalances.cashOnHand && (
+                    <button
+                      type="button"
+                      onClick={() => setCashOnHand(String(systemBalances.cashOnHand))}
+                      className="text-[11px] text-primary hover:underline flex items-center gap-1 mt-0.5 font-medium"
+                    >
+                      <span>Sistem saat ini: {formatCurrency(systemBalances.cashOnHand)}</span>
+                      <span className="font-semibold underline">(Gunakan)</span>
+                    </button>
+                  )}
                 </div>
                 <CurrencyInput
                   prefix="Rp"
@@ -221,7 +347,10 @@ export function OpeningBalanceDialog({ trigger, onSaved }: OpeningBalanceDialogP
               {/* Rekening Bank */}
               <div className="space-y-2 pt-2 border-t">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">Rekening Bank & QRIS</p>
+                  <div>
+                    <p className="text-sm font-medium">Rekening Bank & QRIS</p>
+                    <p className="text-xs text-muted-foreground">Saldo giro/tabungan usaha</p>
+                  </div>
                   <Button
                     type="button"
                     variant="ghost"
@@ -238,7 +367,7 @@ export function OpeningBalanceDialog({ trigger, onSaved }: OpeningBalanceDialogP
                     <Input
                       value={bank.name}
                       onChange={(e) => updateBankAccount(idx, 'name', e.target.value)}
-                      placeholder="Nama Bank (misal BCA)"
+                      placeholder="Nama Bank (misal Bank BCA)"
                       className="h-9 text-sm w-44"
                     />
                     <div className="flex-1">
@@ -278,7 +407,18 @@ export function OpeningBalanceDialog({ trigger, onSaved }: OpeningBalanceDialogP
                     placeholder="0"
                     className="h-9"
                   />
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Nilai total modal barang di gudang/toko</p>
+                  {systemBalances && numInv !== systemBalances.inventoryValue ? (
+                    <button
+                      type="button"
+                      onClick={() => setInventoryValue(String(systemBalances.inventoryValue))}
+                      className="text-[11px] text-primary hover:underline flex items-center gap-1 mt-1 font-medium"
+                    >
+                      <span>Nilai stok sistem: {formatCurrency(systemBalances.inventoryValue)}</span>
+                      <span className="font-semibold underline">(Gunakan)</span>
+                    </button>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Nilai total modal barang di toko</p>
+                  )}
                 </div>
                 <div>
                   <label className="text-xs font-medium block mb-1">
@@ -291,7 +431,18 @@ export function OpeningBalanceDialog({ trigger, onSaved }: OpeningBalanceDialogP
                     placeholder="0"
                     className="h-9"
                   />
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Tagihan penjualan periode sebelumnya</p>
+                  {systemBalances && numAr !== systemBalances.accountsReceivable ? (
+                    <button
+                      type="button"
+                      onClick={() => setAccountsReceivable(String(systemBalances.accountsReceivable))}
+                      className="text-[11px] text-primary hover:underline flex items-center gap-1 mt-1 font-medium"
+                    >
+                      <span>Piutang sistem: {formatCurrency(systemBalances.accountsReceivable)}</span>
+                      <span className="font-semibold underline">(Gunakan)</span>
+                    </button>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Tagihan penjualan tempo sebelumnya</p>
+                  )}
                 </div>
               </div>
 
@@ -308,7 +459,7 @@ export function OpeningBalanceDialog({ trigger, onSaved }: OpeningBalanceDialogP
                   className="h-9"
                 />
                 <p className="text-[10px] text-muted-foreground mt-0.5">
-                  Nilai aset fisik jangka panjang (mesin kasir, rak, laptop, kendaraan operasional)
+                  Nilai aset fisik jangka panjang (mesin kasir, rak etalase, laptop, kendaraan operasional)
                 </p>
               </div>
             </div>
@@ -336,7 +487,18 @@ export function OpeningBalanceDialog({ trigger, onSaved }: OpeningBalanceDialogP
                     placeholder="0"
                     className="h-9"
                   />
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Tagihan pembelian belum dibayar</p>
+                  {systemBalances && numAp !== systemBalances.accountsPayable ? (
+                    <button
+                      type="button"
+                      onClick={() => setAccountsPayable(String(systemBalances.accountsPayable))}
+                      className="text-[11px] text-primary hover:underline flex items-center gap-1 mt-1 font-medium"
+                    >
+                      <span>Hutang sistem: {formatCurrency(systemBalances.accountsPayable)}</span>
+                      <span className="font-semibold underline">(Gunakan)</span>
+                    </button>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Tagihan pembelian barang ke supplier</p>
+                  )}
                 </div>
                 <div>
                   <label className="text-xs font-medium block mb-1">
@@ -384,7 +546,11 @@ export function OpeningBalanceDialog({ trigger, onSaved }: OpeningBalanceDialogP
             Batal
           </Button>
           <Button onClick={handleSave} disabled={saving || loading}>
-            {saving ? 'Menyimpan...' : 'Simpan Saldo Awal'}
+            {saving
+              ? 'Menyimpan...'
+              : isEditingExisting
+                ? 'Perbarui Saldo Awal'
+                : 'Simpan Saldo Awal'}
           </Button>
         </DialogFooter>
       </DialogContent>
