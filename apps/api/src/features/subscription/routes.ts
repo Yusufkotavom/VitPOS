@@ -16,9 +16,6 @@ type Env = { Variables: { userId: string } }
 
 export const subscriptionRoutes = new Hono<Env>()
 
-subscriptionRoutes.use('*', authMiddleware)
-subscriptionRoutes.route('/', subscriptionBillingRoutes)
-
 subscriptionRoutes.get('/plans', async (c) => {
   const period = c.req.query('period')
   const conditions = [eq(subscriptionPlans.isActive, true)]
@@ -44,6 +41,9 @@ subscriptionRoutes.get('/plans/:code', async (c) => {
   if (rows.length === 0) return c.json({ ok: false, message: 'Plan not found' }, 404)
   return c.json({ ok: true, item: rows[0] })
 })
+
+subscriptionRoutes.use('*', authMiddleware)
+subscriptionRoutes.route('/', subscriptionBillingRoutes)
 
 const subscribeSchema = z.object({
   planCode: z.string().min(1).max(40),

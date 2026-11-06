@@ -153,4 +153,23 @@ describe('tenant subscription billing API', () => {
     expect(body.item.status).toBe('applied')
     expect(dbMock.update).toHaveBeenCalled()
   })
+
+  it('activates trial plan with trial duration limit', async () => {
+    dbMock.select
+      .mockReturnValueOnce(makeChain([{ role: 'owner' }]))
+      .mockReturnValueOnce(makeChain([{ id: 'tenant-id', planCode: 'free', planValidUntil: null }]))
+      .mockReturnValueOnce(makeChain([{ code: 'trial-monthly', trialDays: 14, monthlyPrice: '0', yearlyPrice: null, durationDays: 14, isActive: true }]))
+    dbMock.insert.mockReturnValueOnce(makeChain([{ id: 'request-id', changeType: 'upgrade', status: 'applied' }]))
+
+    const response = await buildApp().request('/api/v1/subscription/tenants/tenant-id/change-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-id': 'user-id' },
+      body: JSON.stringify({ toPlanCode: 'trial-monthly', changeType: 'upgrade', billingPeriod: 'monthly' }),
+    })
+    const body = await response.json()
+
+    expect(response.status).toBe(201)
+    expect(body.item.status).toBe('applied')
+    expect(dbMock.update).toHaveBeenCalled()
+  })
 })

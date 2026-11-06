@@ -805,7 +805,7 @@ authRoutes.post("/register", async (c) => {
   const plan = planRows[0];
   const now = /* @__PURE__ */ new Date();
   let planValidUntil = null;
-  let subscriptionStatus = "active";
+  let subscriptionStatus = "trial";
   let storageLimitMb = 1024;
   let maxBranches = 1;
   if (plan) {
@@ -819,7 +819,7 @@ authRoutes.post("/register", async (c) => {
       subscriptionStatus = "active";
       planValidUntil = null;
     } else {
-      subscriptionStatus = "active";
+      subscriptionStatus = "pending_payment";
       planValidUntil = new Date(now);
       planValidUntil.setDate(planValidUntil.getDate() + plan.durationDays);
     }
@@ -3651,8 +3651,18 @@ subscriptionBillingRoutes.post("/tenants/:tenantId/change-plan", async (c) => {
   const now = /* @__PURE__ */ new Date();
   let invoiceId = null;
   let status = "pending_payment";
-  const isFreePlan = plan.code === "free" || Number(plan.monthlyPrice) === 0;
-  if (isFreePlan) {
+  const isTrulyFree = (plan.code === "free" || plan.code.startsWith("free")) && (!plan.trialDays || plan.trialDays === 0);
+  const isTrialPlan = Boolean(plan.trialDays && plan.trialDays > 0);
+  if (isTrialPlan) {
+    status = "applied";
+    const trialEnd = addDays2(now, plan.trialDays);
+    await db.update(tenants).set({
+      planCode: plan.code,
+      subscriptionStatus: "trial",
+      planValidUntil: trialEnd,
+      updatedAt: now
+    }).where(eq9(tenants.id, tenantId));
+  } else if (isTrulyFree) {
     status = "applied";
     await db.update(tenants).set({
       planCode: plan.code,
@@ -3685,14 +3695,14 @@ subscriptionBillingRoutes.post("/tenants/:tenantId/change-plan", async (c) => {
     toPlanCode: plan.code,
     changeType: body.changeType,
     status,
-    effectiveAt: isFreePlan ? now : body.changeType === "downgrade" ? tenant.planValidUntil : null,
+    effectiveAt: isTrialPlan || isTrulyFree ? now : body.changeType === "downgrade" ? tenant.planValidUntil : null,
     invoiceId,
     requestedByUserId: userId
   }).returning();
   await writeSubscriptionEvent2({
     tenantId,
     actorUserId: userId,
-    eventType: isFreePlan ? "plan_change.applied" : "plan_change.requested",
+    eventType: isTrialPlan || isTrulyFree ? "plan_change.applied" : "plan_change.requested",
     metadata: { requestId: request.id, changeType: body.changeType, toPlanCode: plan.code, status }
   });
   return c.json({ ok: true, item: request, invoiceId }, 201);
@@ -3700,8 +3710,6 @@ subscriptionBillingRoutes.post("/tenants/:tenantId/change-plan", async (c) => {
 
 // src/features/subscription/routes.ts
 var subscriptionRoutes = new Hono8();
-subscriptionRoutes.use("*", authMiddleware);
-subscriptionRoutes.route("/", subscriptionBillingRoutes);
 subscriptionRoutes.get("/plans", async (c) => {
   const period = c.req.query("period");
   const conditions = [eq10(subscriptionPlans.isActive, true)];
@@ -3717,6 +3725,8 @@ subscriptionRoutes.get("/plans/:code", async (c) => {
   if (rows.length === 0) return c.json({ ok: false, message: "Plan not found" }, 404);
   return c.json({ ok: true, item: rows[0] });
 });
+subscriptionRoutes.use("*", authMiddleware);
+subscriptionRoutes.route("/", subscriptionBillingRoutes);
 var subscribeSchema = z4.object({
   planCode: z4.string().min(1).max(40),
   billingPeriod: z4.enum(["monthly", "yearly"]).optional()
@@ -3820,22 +3830,43 @@ tenantRoutes.post("/", async (c) => {
   const body = await c.req.json().catch(() => null);
   const tenantId = body?.id || crypto.randomUUID();
   const tenantName = body?.name?.trim();
+  const planCode = body?.planCode?.trim() || "trial-monthly";
+  const billingPeriod = body?.billingPeriod === "yearly" ? "yearly" : "monthly";
   if (!tenantName) {
     return c.json({ ok: false, message: "name required" }, 400);
   }
   const branchId = crypto.randomUUID();
   const warehouseId = crypto.randomUUID();
   const now = /* @__PURE__ */ new Date();
+  const [plan] = await db.select().from(subscriptionPlans).where(and8(eq11(subscriptionPlans.code, planCode), eq11(subscriptionPlans.isActive, true)));
+  const storageLimitMb = plan?.storageLimitMb ?? 1024;
+  const maxBranches = plan?.maxBranches ?? 1;
+  let subscriptionStatus = "trial";
+  let planValidUntil = null;
+  if (plan) {
+    if (plan.trialDays > 0) {
+      subscriptionStatus = "trial";
+      planValidUntil = new Date(now.getTime() + plan.trialDays * 864e5);
+    } else if (plan.code.startsWith("free")) {
+      subscriptionStatus = "active";
+      planValidUntil = null;
+    } else {
+      subscriptionStatus = "pending_payment";
+      planValidUntil = new Date(now.getTime() + plan.durationDays * 864e5);
+    }
+  } else {
+    planValidUntil = new Date(now.getTime() + 14 * 864e5);
+  }
   await db.transaction(async (tx) => {
     await tx.insert(tenants).values({
       id: tenantId,
       name: tenantName,
-      planCode: "trial-monthly",
-      billingPeriod: "monthly",
-      subscriptionStatus: "trial",
-      planValidUntil: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1e3),
-      storageLimitMb: 1024,
-      maxBranches: 1,
+      planCode,
+      billingPeriod,
+      subscriptionStatus,
+      planValidUntil,
+      storageLimitMb,
+      maxBranches,
       isActive: true,
       createdAt: now,
       updatedAt: now

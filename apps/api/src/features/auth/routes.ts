@@ -128,7 +128,7 @@ authRoutes.post('/register', async (c) => {
 
   const now = new Date()
   let planValidUntil: Date | null = null
-  let subscriptionStatus: 'trial' | 'active' = 'active'
+  let subscriptionStatus: 'trial' | 'active' | 'pending_payment' = 'trial'
   let storageLimitMb = 1024
   let maxBranches = 1
 
@@ -143,7 +143,7 @@ authRoutes.post('/register', async (c) => {
       subscriptionStatus = 'active'
       planValidUntil = null
     } else {
-      subscriptionStatus = 'active'
+      subscriptionStatus = 'pending_payment'
       planValidUntil = new Date(now)
       planValidUntil.setDate(planValidUntil.getDate() + plan.durationDays)
     }

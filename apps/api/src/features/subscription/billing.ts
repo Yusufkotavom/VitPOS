@@ -196,9 +196,19 @@ subscriptionBillingRoutes.post('/tenants/:tenantId/change-plan', async (c) => {
   let invoiceId: string | null = null
   let status: 'pending_payment' | 'scheduled' | 'applied' = 'pending_payment'
 
-  const isFreePlan = plan.code === 'free' || Number(plan.monthlyPrice) === 0
+  const isTrulyFree = (plan.code === 'free' || plan.code.startsWith('free')) && (!plan.trialDays || plan.trialDays === 0)
+  const isTrialPlan = Boolean(plan.trialDays && plan.trialDays > 0)
 
-  if (isFreePlan) {
+  if (isTrialPlan) {
+    status = 'applied'
+    const trialEnd = addDays(now, plan.trialDays)
+    await db.update(tenants).set({
+      planCode: plan.code,
+      subscriptionStatus: 'trial',
+      planValidUntil: trialEnd,
+      updatedAt: now,
+    }).where(eq(tenants.id, tenantId))
+  } else if (isTrulyFree) {
     status = 'applied'
     await db.update(tenants).set({
       planCode: plan.code,
@@ -232,7 +242,7 @@ subscriptionBillingRoutes.post('/tenants/:tenantId/change-plan', async (c) => {
     toPlanCode: plan.code,
     changeType: body.changeType,
     status,
-    effectiveAt: isFreePlan ? now : (body.changeType === 'downgrade' ? tenant.planValidUntil : null),
+    effectiveAt: (isTrialPlan || isTrulyFree) ? now : (body.changeType === 'downgrade' ? tenant.planValidUntil : null),
     invoiceId,
     requestedByUserId: userId,
   }).returning()
@@ -240,7 +250,7 @@ subscriptionBillingRoutes.post('/tenants/:tenantId/change-plan', async (c) => {
   await writeSubscriptionEvent({
     tenantId,
     actorUserId: userId,
-    eventType: isFreePlan ? 'plan_change.applied' : 'plan_change.requested',
+    eventType: (isTrialPlan || isTrulyFree) ? 'plan_change.applied' : 'plan_change.requested',
     metadata: { requestId: request.id, changeType: body.changeType, toPlanCode: plan.code, status },
   })
 

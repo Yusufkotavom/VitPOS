@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 
 import { db } from '../../lib/db.js'
-import { branches, tenantMembers, tenants, warehouses } from '../../../../../src/db/schema/index.js'
+import { branches, subscriptionPlans, tenantMembers, tenants, warehouses } from '../../../../../src/db/schema/index.js'
 import { authMiddleware, verifyTenantMembership } from '../auth/middleware.js'
 
 type Env = { Variables: { userId: string } }
@@ -36,10 +36,14 @@ tenantRoutes.post('/', async (c) => {
   const body = await c.req.json().catch(() => null) as {
     id?: string
     name?: string
+    planCode?: string
+    billingPeriod?: 'monthly' | 'yearly'
   } | null
 
   const tenantId = body?.id || crypto.randomUUID()
   const tenantName = body?.name?.trim()
+  const planCode = body?.planCode?.trim() || 'trial-monthly'
+  const billingPeriod = body?.billingPeriod === 'yearly' ? 'yearly' : 'monthly'
 
   if (!tenantName) {
     return c.json({ ok: false, message: 'name required' }, 400)
@@ -49,16 +53,41 @@ tenantRoutes.post('/', async (c) => {
   const warehouseId = crypto.randomUUID()
   const now = new Date()
 
+  const [plan] = await db
+    .select()
+    .from(subscriptionPlans)
+    .where(and(eq(subscriptionPlans.code, planCode), eq(subscriptionPlans.isActive, true)))
+
+  const storageLimitMb = plan?.storageLimitMb ?? 1024
+  const maxBranches = plan?.maxBranches ?? 1
+  let subscriptionStatus: 'trial' | 'active' | 'pending_payment' = 'trial'
+  let planValidUntil: Date | null = null
+
+  if (plan) {
+    if (plan.trialDays > 0) {
+      subscriptionStatus = 'trial'
+      planValidUntil = new Date(now.getTime() + plan.trialDays * 86400000)
+    } else if (plan.code.startsWith('free')) {
+      subscriptionStatus = 'active'
+      planValidUntil = null
+    } else {
+      subscriptionStatus = 'pending_payment'
+      planValidUntil = new Date(now.getTime() + plan.durationDays * 86400000)
+    }
+  } else {
+    planValidUntil = new Date(now.getTime() + 14 * 86400000)
+  }
+
   await db.transaction(async (tx) => {
     await tx.insert(tenants).values({
       id: tenantId,
       name: tenantName,
-      planCode: 'trial-monthly',
-      billingPeriod: 'monthly',
-      subscriptionStatus: 'trial',
-      planValidUntil: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000),
-      storageLimitMb: 1024,
-      maxBranches: 1,
+      planCode,
+      billingPeriod,
+      subscriptionStatus,
+      planValidUntil,
+      storageLimitMb,
+      maxBranches,
       isActive: true,
       createdAt: now,
       updatedAt: now,

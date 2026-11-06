@@ -13,12 +13,14 @@ import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { DashboardPage } from '@/features/dashboard/pages/dashboard-page'
 import { localDb } from '@/services/local-db/client'
 
-const { apiPostMock } = vi.hoisted(() => ({
+const { apiPostMock, apiGetMock } = vi.hoisted(() => ({
   apiPostMock: vi.fn(),
+  apiGetMock: vi.fn(async () => ({ ok: true, items: [] })),
 }))
 
 vi.mock('@/services/api/client', () => ({
   apiPost: apiPostMock,
+  apiGet: apiGetMock,
 }))
 
 describe('auth polish behavior', () => {

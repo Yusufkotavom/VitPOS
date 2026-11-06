@@ -5,7 +5,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-const { apiPostMock } = vi.hoisted(() => ({
+const { apiPostMock, apiGetMock } = vi.hoisted(() => ({
+  apiGetMock: vi.fn(async () => ({ ok: true, items: [] })),
   apiPostMock: vi.fn(async () => ({
     ok: true,
     user: { id: '11111111-1111-4111-8111-111111111111', email: 'budi@toko.id', name: 'Budi' },
@@ -15,7 +16,7 @@ const { apiPostMock } = vi.hoisted(() => ({
   })),
 }))
 
-vi.mock('@/services/api/client', () => ({ apiPost: apiPostMock }))
+vi.mock('@/services/api/client', () => ({ apiPost: apiPostMock, apiGet: apiGetMock }))
 
 import { OnboardingPage } from '@/features/auth/pages/onboarding-page'
 import { useAuthStore } from '@/features/auth/stores/auth-store'

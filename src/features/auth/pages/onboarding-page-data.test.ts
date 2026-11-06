@@ -5,7 +5,8 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 
-const { apiPostMock } = vi.hoisted(() => ({
+const { apiPostMock, apiGetMock } = vi.hoisted(() => ({
+  apiGetMock: vi.fn(async () => ({ ok: true, items: [] })),
   apiPostMock: vi.fn(async () => ({
   ok: true,
   user: {
@@ -26,6 +27,7 @@ const { apiPostMock } = vi.hoisted(() => ({
 
 vi.mock('@/services/api/client', () => ({
   apiPost: apiPostMock,
+  apiGet: apiGetMock,
 }))
 
 import { OnboardingPage } from '@/features/auth/pages/onboarding-page'

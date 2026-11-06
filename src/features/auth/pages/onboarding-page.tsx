@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, ChevronRight, Loader2 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -6,18 +6,20 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { BusinessIdentityForm, type BusinessIdentityFormValue } from '@/features/auth/components/onboarding/business-identity-form'
 import { BusinessModeSelector } from '@/features/auth/components/onboarding/business-mode-selector'
+import { PlanSelector } from '@/features/auth/components/onboarding/plan-selector'
 import { PostSetupChecklist } from '@/features/auth/components/onboarding/post-setup-checklist'
 import { SetupReviewPanel } from '@/features/auth/components/onboarding/setup-review-panel'
-import { TemplatePreviewCard } from '@/features/auth/components/onboarding/template-preview-card'
 import { VerticalSelector } from '@/features/auth/components/onboarding/vertical-selector'
 import { BUSINESS_PLAYBOOKS, DEFAULT_BUSINESS_MODE, DEFAULT_VERTICAL, type BusinessModeId, type BusinessVerticalId } from '@/features/auth/data/business-playbooks'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
-import { apiPost } from '@/services/api/client'
+import { apiGet, apiPost } from '@/services/api/client'
 import { localDb } from '@/services/local-db/client'
 import { settingRepository } from '@/services/local-db/repository'
 import { buildAtkPrintingSeed } from '@/services/local-db/seed-playbooks'
 import { enqueueOutboxItem } from '@/services/sync/outbox-service'
 import { generateSlug } from '@/features/storefront/lib/slug'
+import type { SubscriptionPlan } from '@/services/api/subscription.service'
+import type { LocalTenant } from '@/services/local-db/schema'
 
 type Uuid = ReturnType<typeof crypto.randomUUID>
 
@@ -27,15 +29,58 @@ type RegisterResponse = {
   defaultBranchId?: Uuid
   defaultWarehouseId?: Uuid
   user: { id: string; email: string; name: string; role?: 'user' | 'platform_admin' }
-  memberships: Array<{ tenantId: Uuid; role: string; tenantName: string; tenantPlan: string }>
+  memberships: Array<{
+    tenantId: Uuid
+    role: string
+    tenantName: string
+    tenantPlan: string
+    tenantBillingPeriod?: 'monthly' | 'yearly'
+    tenantSubscriptionStatus?: 'trial' | 'active' | 'pending_payment'
+    tenantPlanValidUntil?: string | null
+    tenantStorageLimitMb?: number
+    tenantMaxBranches?: number
+  }>
 }
 
 const steps = [
   { id: 1, title: 'Pilih jenis usaha' },
   { id: 2, title: 'Pilih model usaha' },
   { id: 3, title: 'Data inti usaha' },
-  { id: 4, title: 'Preview template' },
+  { id: 4, title: 'Pilih paket usaha' },
   { id: 5, title: 'Review setup' },
+]
+
+const DEFAULT_PLANS: SubscriptionPlan[] = [
+  {
+    id: 'plan-trial',
+    code: 'trial-monthly',
+    name: 'Free Trial 14 Hari',
+    billingPeriod: 'monthly',
+    durationDays: 14,
+    trialDays: 14,
+    monthlyPrice: '0',
+    yearlyPrice: null,
+    storageLimitMb: 2048,
+    maxBranches: 3,
+    maxUsers: 5,
+    features: {},
+    isActive: true,
+  },
+  {
+    id: 'plan-go',
+    code: 'Go',
+    name: 'Go',
+    billingPeriod: 'monthly',
+    durationDays: 30,
+    trialDays: 14,
+    monthlyPrice: '25000',
+    yearlyPrice: null,
+    storageLimitMb: 2048,
+    maxBranches: 2,
+    maxUsers: 3,
+    features: {},
+    isActive: true,
+  },
 ]
 
 const initialIdentity: BusinessIdentityFormValue = {
@@ -80,17 +125,46 @@ export function OnboardingPage() {
   const [selectedPayments, setSelectedPayments] = useState<Record<string, boolean>>({})
   const [editable, setEditable] = useState(() => clonePreset(DEFAULT_BUSINESS_MODE))
 
+  const [availablePlans, setAvailablePlans] = useState<SubscriptionPlan[]>(DEFAULT_PLANS)
+  const [plansLoading, setPlansLoading] = useState(false)
+  const [selectedPlanCode, setSelectedPlanCode] = useState('trial-monthly')
+
+  useEffect(() => {
+    let mounted = true
+    setPlansLoading(true)
+    if (typeof apiGet === 'function') {
+      apiGet<{ ok: boolean; items: SubscriptionPlan[] }>('/subscription/plans')
+        .then((res) => {
+          if (mounted && res?.ok && res.items?.length > 0) {
+            setAvailablePlans(res.items)
+            if (!res.items.some((p) => p.code === selectedPlanCode)) {
+              setSelectedPlanCode(res.items[0].code)
+            }
+          }
+        })
+        .catch(() => {
+          // use DEFAULT_PLANS
+        })
+        .finally(() => {
+          if (mounted) setPlansLoading(false)
+        })
+    } else {
+      setPlansLoading(false)
+    }
+    return () => {
+      mounted = false
+    }
+  }, [selectedPlanCode])
+
+  const selectedPlan = useMemo(
+    () => availablePlans.find((p) => p.code === selectedPlanCode) ?? availablePlans[0] ?? DEFAULT_PLANS[0],
+    [availablePlans, selectedPlanCode],
+  )
+
   const activeVertical = BUSINESS_PLAYBOOKS[businessVertical]
   const activeMode = activeVertical.modes.find((mode) => mode.id === businessMode) ?? activeVertical.modes[0]
   const canGoNextStep3 = identityForm.tenantName.trim() !== '' && identityForm.whatsapp.trim() !== '' && (currentUser || (identityForm.ownerName && identityForm.ownerEmail && identityForm.ownerPassword))
   const canProceed = step === 3 ? Boolean(canGoNextStep3) : true
-
-  const previewItems = useMemo(() => [
-    { label: 'Kategori', value: String(editable.categories.length) },
-    { label: 'Produk / jasa', value: String(editable.products.length) },
-    { label: 'Pembayaran', value: String(editable.paymentMethods.length) },
-    { label: 'Kas awal', value: 'Rp 500.000' },
-  ], [editable])
 
   function handleVerticalChange(value: BusinessVerticalId) {
     setBusinessVertical(value)
@@ -136,6 +210,7 @@ export function OnboardingPage() {
       let defaultWarehouseId: string | undefined
       let tenantRole = 'owner'
       let accessToken: string | undefined
+      let membershipData: RegisterResponse['memberships'][0] | undefined
 
       if (shouldProvisionCloudTenant) {
         let registerResponse: RegisterResponse | null = null
@@ -145,6 +220,8 @@ export function OnboardingPage() {
             email: normalizedEmail,
             password: normalizedPassword,
             tenantName: identityForm.tenantName.trim(),
+            planCode: selectedPlan.code,
+            billingPeriod: selectedPlan.billingPeriod,
           })
         } catch (err) {
           const message = err instanceof Error ? err.message : ''
@@ -154,8 +231,9 @@ export function OnboardingPage() {
 
         if (!registerResponse?.memberships?.[0]) throw new Error('Membership cloud tidak ditemukan setelah registrasi')
         cloudUser = registerResponse.user
-        tenantId = registerResponse.memberships[0].tenantId
-        tenantRole = registerResponse.memberships[0].role
+        membershipData = registerResponse.memberships[0]
+        tenantId = membershipData.tenantId
+        tenantRole = membershipData.role
         defaultBranchId = registerResponse.defaultBranchId
         defaultWarehouseId = registerResponse.defaultWarehouseId
         accessToken = registerResponse.accessToken
@@ -163,6 +241,8 @@ export function OnboardingPage() {
         const res = await apiPost<{ ok: boolean; tenantId: Uuid; defaultBranchId: Uuid; defaultWarehouseId: Uuid }>('/tenants', {
           id: tenantId,
           name: identityForm.tenantName.trim(),
+          planCode: selectedPlan.code,
+          billingPeriod: selectedPlan.billingPeriod,
         })
         if (!res?.ok) throw new Error('Gagal mendaftarkan unit usaha baru di server cloud.')
         tenantId = res.tenantId
@@ -183,12 +263,28 @@ export function OnboardingPage() {
       if (currentUser && currentUser.id !== nextUser.id) await localDb.users.delete(currentUser.id)
       setAuth(nextUser, accessToken)
 
-      const tenant = {
+      const isTrial = selectedPlan.trialDays > 0
+      const planValidUntilIso = isTrial
+        ? new Date(Date.now() + selectedPlan.trialDays * 86400000).toISOString()
+        : membershipData?.tenantPlanValidUntil ?? undefined
+
+      const localSubscriptionStatus: LocalTenant['subscriptionStatus'] = isTrial
+        ? 'trial'
+        : Number(selectedPlan.monthlyPrice) === 0
+          ? 'active'
+          : 'pending_payment'
+
+      const tenant: LocalTenant = {
         id: tenantId,
         name: identityForm.tenantName.trim(),
         type: businessMode,
         phone: identityForm.whatsapp,
-        planCode: 'trial',
+        planCode: membershipData?.tenantPlan ?? selectedPlan.code,
+        billingPeriod: membershipData?.tenantBillingPeriod ?? selectedPlan.billingPeriod,
+        subscriptionStatus: membershipData?.tenantSubscriptionStatus ?? localSubscriptionStatus,
+        planValidUntil: planValidUntilIso,
+        storageLimitMb: membershipData?.tenantStorageLimitMb ?? selectedPlan.storageLimitMb,
+        maxBranches: membershipData?.tenantMaxBranches ?? selectedPlan.maxBranches,
         isActive: true,
         createdAt: now,
         updatedAt: now,
@@ -281,7 +377,15 @@ export function OnboardingPage() {
           <CardHeader>
             <CardTitle>{steps[step - 1].title}</CardTitle>
             <CardDescription>
-              {step === 1 ? 'Pilih vertikal usaha yang paling sesuai, atau lewati untuk mengatur nanti.' : step === 2 ? `Pilih model usaha ${activeVertical.label} yang paling dekat dengan kebutuhan toko.` : step === 3 ? 'Lengkapi nama, nomor, dan alamat usaha.' : step === 4 ? 'Cek ringkasan template sebelum masuk review.' : 'Pastikan semua data sudah siap disimpan.'}
+              {step === 1
+                ? 'Pilih vertikal usaha yang paling sesuai, atau lewati untuk mengatur nanti.'
+                : step === 2
+                  ? `Pilih model usaha ${activeVertical.label} yang paling dekat dengan kebutuhan toko.`
+                  : step === 3
+                    ? 'Lengkapi nama, nomor, dan alamat usaha.'
+                    : step === 4
+                      ? 'Pilih paket langganan yang tersedia untuk memulai operasional toko Anda.'
+                      : 'Pastikan semua data sudah siap disimpan.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 space-y-6">
@@ -289,11 +393,51 @@ export function OnboardingPage() {
             {step === 1 ? <VerticalSelector verticals={Object.values(BUSINESS_PLAYBOOKS)} selectedVertical={businessVertical} onSelect={handleVerticalChange} onSkip={() => setStep(3)} /> : null}
             {step === 2 ? <BusinessModeSelector modes={activeVertical.modes} selectedMode={businessMode} onSelect={handleModeChange} /> : null}
             {step === 3 ? <BusinessIdentityForm value={identityForm} showOwnerFields={!currentUser} onChange={setIdentityForm} /> : null}
-            {step === 4 ? <TemplatePreviewCard title={activeMode.label} description={activeMode.description} items={previewItems} /> : null}
+            {step === 4 ? (
+              <PlanSelector
+                plans={availablePlans}
+                selectedPlanCode={selectedPlanCode}
+                isLoading={plansLoading}
+                onSelectPlan={(plan) => setSelectedPlanCode(plan.code)}
+              />
+            ) : null}
             {step === 5 ? (
               <div className="space-y-4">
-                <SetupReviewPanel title="Data usaha" items={[{ label: 'Nama usaha', value: identityForm.tenantName || '-' }, { label: 'WhatsApp', value: identityForm.whatsapp || '-' }, { label: 'Alamat', value: identityForm.address || '-' }]} onEdit={() => setStep(3)} />
-                <SetupReviewPanel title="Template aktif" items={[{ label: 'Vertikal', value: activeVertical.label }, { label: 'Mode', value: activeMode.label }, { label: 'Produk / jasa', value: String(editable.products.length) }, { label: 'Pembayaran aktif', value: String(Object.values(selectedPayments).filter(Boolean).length || editable.paymentMethods.length) }]} onEdit={() => setStep(4)} />
+                <SetupReviewPanel
+                  title="Data usaha"
+                  items={[
+                    { label: 'Nama usaha', value: identityForm.tenantName || '-' },
+                    { label: 'WhatsApp', value: identityForm.whatsapp || '-' },
+                    { label: 'Alamat', value: identityForm.address || '-' },
+                  ]}
+                  onEdit={() => setStep(3)}
+                />
+                <SetupReviewPanel
+                  title="Paket langganan terpilih"
+                  items={[
+                    { label: 'Paket', value: selectedPlan.name },
+                    {
+                      label: 'Biaya',
+                      value: Number(selectedPlan.monthlyPrice) === 0 ? 'Gratis' : `Rp ${Number(selectedPlan.monthlyPrice).toLocaleString('id-ID')}/bulan`,
+                    },
+                    {
+                      label: 'Masa aktif',
+                      value: selectedPlan.trialDays > 0 ? `Trial ${selectedPlan.trialDays} hari gratis` : `${selectedPlan.durationDays} hari`,
+                    },
+                    { label: 'Kapasitas', value: `${selectedPlan.maxBranches} Cabang • ${selectedPlan.maxUsers} User` },
+                  ]}
+                  onEdit={() => setStep(4)}
+                />
+                <SetupReviewPanel
+                  title="Template aktif"
+                  items={[
+                    { label: 'Vertikal', value: activeVertical.label },
+                    { label: 'Mode', value: activeMode.label },
+                    { label: 'Produk / jasa', value: String(editable.products.length) },
+                    { label: 'Pembayaran aktif', value: String(Object.values(selectedPayments).filter(Boolean).length || editable.paymentMethods.length) },
+                  ]}
+                  onEdit={() => setStep(2)}
+                />
                 <PostSetupChecklist />
               </div>
             ) : null}
