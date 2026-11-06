@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, extname, join, resolve } from 'node:path'
 
+import { authMiddleware } from '../auth/middleware.js'
+
 /**
  * Local disk storage for uploaded images.
  *
@@ -46,7 +48,7 @@ function sanitizeName(name: string, contentType: string): string {
 export const uploadRoutes = new Hono()
 
 // POST /api/v1/upload  (multipart/form-data: file, folder?)
-uploadRoutes.post('/', async (c) => {
+uploadRoutes.post('/', authMiddleware, async (c) => {
 	try {
 		const body = await c.req.parseBody()
 		const file = body['file']

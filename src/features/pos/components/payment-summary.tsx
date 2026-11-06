@@ -20,6 +20,7 @@ import type { PdfData } from '@/shared/components/pdf/types'
 import { User } from 'lucide-react'
 import { ReceiptPrintLayout } from './receipt-print-layout'
 import { printPage } from '@/lib/print'
+import { useSubscription } from '@/features/settings/hooks/use-subscription'
 
 const defaultMethods = [
   { id: 'tunai', name: 'Tunai' },
@@ -31,6 +32,7 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
   const { t } = useTranslation()
   const store = usePosStore()
   const totals = selectPosTotals(store)
+  const subscription = useSubscription()
   const dbMethods = usePaymentMethods()
   const activeMethods = dbMethods && dbMethods.length > 0 ? dbMethods.filter((m) => m.status === 'Aktif') : defaultMethods
 
@@ -51,6 +53,11 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
 
   async function handleCheckout() {
     if (store.cartItems.length === 0 || isProcessingRef.current) return
+
+    if (subscription.isEnforced) {
+      toast.error('Langganan unit usaha Anda telah berakhir atau ditangguhkan. Silakan perpanjang paket di menu Tagihan & Langganan.')
+      return
+    }
 
     if (!store.paymentMethod) {
       setHasAttemptedCheckout(true)
@@ -285,8 +292,19 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
         </div>
       </div>
 
-      <Button size="lg" className="h-14 text-lg font-semibold w-full mt-2" disabled={store.cartItems.length === 0 || isProcessing} onClick={handleCheckout}>
-        {isProcessing ? t('pos.processing') : selectedMethodObj?.qrImageUrl ? t('pos.verify_complete') : t('pos.complete_payment')}
+      <Button
+        size="lg"
+        className="h-14 text-lg font-semibold w-full mt-2"
+        disabled={store.cartItems.length === 0 || isProcessing || subscription.isEnforced}
+        onClick={handleCheckout}
+      >
+        {subscription.isEnforced
+          ? 'Langganan Berakhir / Ditangguhkan'
+          : isProcessing
+            ? t('pos.processing')
+            : selectedMethodObj?.qrImageUrl
+              ? t('pos.verify_complete')
+              : t('pos.complete_payment')}
       </Button>
 
       {successOrder && <ReceiptPrintLayout order={successOrder} />}

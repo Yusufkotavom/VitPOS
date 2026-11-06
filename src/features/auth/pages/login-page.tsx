@@ -99,7 +99,7 @@ export function LoginPage() {
         })
       }
 
-      setAuth(user)
+      setAuth(user, response.accessToken)
       if (user.role === 'platform_admin' && response.memberships.length > 0) {
         const membership = response.memberships[0]
         setActiveTenant(

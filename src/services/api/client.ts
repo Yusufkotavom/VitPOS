@@ -23,9 +23,12 @@ export function buildTenantQuery(input: { tenantId: string; branchId?: string; f
 
 function getAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = { 'content-type': 'application/json' }
-  const user = useAuthStore.getState().currentUser
-  if (user) {
-    headers['x-user-id'] = user.id
+  const state = useAuthStore.getState()
+  if (state.token) {
+    headers['authorization'] = `Bearer ${state.token}`
+  } else if (state.currentUser) {
+    headers['authorization'] = `Bearer dev-${state.currentUser.id}`
+    headers['x-user-id'] = state.currentUser.id
   }
   return headers
 }

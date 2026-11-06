@@ -22,8 +22,13 @@ export async function uploadImage(file: File, folder: UploadFolder = 'uploads'):
   form.append('folder', folder)
 
   const headers: Record<string, string> = {}
-  const user = useAuthStore.getState().currentUser
-  if (user) headers['x-user-id'] = user.id
+  const authState = useAuthStore.getState()
+  if (authState.token) {
+    headers['authorization'] = `Bearer ${authState.token}`
+  } else if (authState.currentUser) {
+    headers['authorization'] = `Bearer dev-${authState.currentUser.id}`
+    headers['x-user-id'] = authState.currentUser.id
+  }
 
   const response = await fetch(`${baseUrl}/api/v1/upload`, {
     method: 'POST',

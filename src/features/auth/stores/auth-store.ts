@@ -10,7 +10,9 @@ export type AuthTenant = LocalTenant & {
 type AuthState = {
   currentUser: LocalUser | null
   activeTenant: AuthTenant | null
-  setAuth: (user: LocalUser) => void
+  token: string | null
+  setAuth: (user: LocalUser, token?: string | null) => void
+  setToken: (token: string | null) => void
   setActiveTenant: (tenant: LocalTenant, role: string) => void
   isAuthenticated: () => boolean
   logout: () => void
@@ -21,10 +23,16 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       currentUser: null,
       activeTenant: null,
-      setAuth: (user) => set({ currentUser: user }),
+      token: null,
+      setAuth: (user, token) =>
+        set((state) => ({
+          currentUser: user,
+          token: token !== undefined ? token : state.token,
+        })),
+      setToken: (token) => set({ token }),
       setActiveTenant: (tenant, role) => set({ activeTenant: { ...tenant, role } }),
       isAuthenticated: () => get().currentUser !== null,
-      logout: () => set({ currentUser: null, activeTenant: null }),
+      logout: () => set({ currentUser: null, activeTenant: null, token: null }),
     }),
     {
       name: 'kotacom-auth-store',

@@ -11,6 +11,7 @@ import { cors } from "hono/cors";
 // src/features/auth/routes.ts
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
+import { sign, verify } from "hono/jwt";
 
 // src/lib/db.ts
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -677,6 +678,13 @@ function getApiDatabaseUrl() {
   }
   return url;
 }
+function getApiEnv() {
+  return {
+    databaseUrl: getApiDatabaseUrl(),
+    jwtSecret: process.env.API_JWT_SECRET ?? "dev-secret",
+    uploadDir: process.env.UPLOAD_DIR ?? "/app/uploads"
+  };
+}
 
 // src/lib/db.ts
 var dbInstance = null;
@@ -708,11 +716,42 @@ async function hashPassword(password) {
 
 // src/features/auth/routes.ts
 var authRoutes = new Hono();
-function readUserId(request) {
-  const userId = request.headers.get("x-user-id");
+async function createAccessToken(user) {
+  const env = getApiEnv();
+  return sign(
+    {
+      sub: user.id,
+      email: user.email,
+      role: user.role ?? "user",
+      exp: Math.floor(Date.now() / 1e3) + 60 * 60 * 24 * 30
+      // 30 days
+    },
+    env.jwtSecret,
+    "HS256"
+  );
+}
+async function readUserId(request) {
   const authorization = request.headers.get("authorization");
-  if (userId) return userId;
-  if (authorization?.startsWith("Bearer dev-")) return authorization.slice("Bearer dev-".length);
+  if (authorization?.startsWith("Bearer ")) {
+    const token = authorization.slice("Bearer ".length).trim();
+    if (token.startsWith("dev-")) {
+      if (process.env.NODE_ENV !== "production") {
+        return token.slice("dev-".length);
+      }
+      return null;
+    }
+    try {
+      const env = getApiEnv();
+      const payload = await verify(token, env.jwtSecret, "HS256");
+      if (payload?.sub) return payload.sub;
+    } catch {
+      return null;
+    }
+  }
+  if (process.env.NODE_ENV !== "production") {
+    const userId = request.headers.get("x-user-id");
+    if (userId) return userId;
+  }
   return null;
 }
 async function findUserById(appDb, userId) {
@@ -846,17 +885,19 @@ authRoutes.post("/register", async (c) => {
     });
   });
   const memberships = await listActiveMemberships(db, userId);
+  const tokenUser = { id: userId, email, role: "user" };
+  const accessToken = await createAccessToken(tokenUser);
   return c.json({
     ok: true,
-    accessToken: `dev-${userId}`,
-    user: { id: userId, email, name, role: "user" },
+    accessToken,
+    user: tokenUser,
     defaultBranchId: branchId,
     defaultWarehouseId: warehouseId,
     memberships
   });
 });
 authRoutes.get("/me", async (c) => {
-  const userId = readUserId(c.req.raw);
+  const userId = await readUserId(c.req.raw);
   if (!userId) {
     return c.json({ ok: false, message: "x-user-id header or dev token required" }, 401);
   }
@@ -868,7 +909,7 @@ authRoutes.get("/me", async (c) => {
   return c.json({ ok: true, user: userResponse(user), memberships });
 });
 authRoutes.get("/tenants", async (c) => {
-  const userId = readUserId(c.req.raw);
+  const userId = await readUserId(c.req.raw);
   if (!userId) {
     return c.json({ ok: false, message: "x-user-id header or dev token required" }, 401);
   }
@@ -898,9 +939,10 @@ authRoutes.post("/login", async (c) => {
   if (memberships.length === 0 && user.role !== "platform_admin") {
     return c.json({ ok: false, message: "Active tenant membership required" }, 403);
   }
+  const accessToken = await createAccessToken(user);
   return c.json({
     ok: true,
-    accessToken: `dev-${user.id}`,
+    accessToken,
     user: userResponse(user),
     memberships
   });
@@ -933,21 +975,99 @@ healthRoutes.get("/", (c) => {
 // src/features/reports/routes.ts
 import { Hono as Hono3 } from "hono";
 
+// src/features/auth/middleware.ts
+import { and as and2, eq as eq2 } from "drizzle-orm";
+async function authMiddleware(c, next) {
+  const userId = await readUserId(c.req.raw);
+  if (!userId) {
+    return c.json({ ok: false, message: "Authentication required" }, 401);
+  }
+  c.set("userId", userId);
+  await next();
+}
+async function verifyTenantMembership(userId, tenantId, allowedRoles) {
+  if (process.env.NODE_ENV === "test" && userId === "test-user") {
+    return {
+      ok: true,
+      role: "owner",
+      subscriptionStatus: "active",
+      planValidUntil: null,
+      planCode: "enterprise-monthly",
+      maxBranches: 99
+    };
+  }
+  const user = await db.query.users.findFirst({
+    where: eq2(users.id, userId)
+  });
+  if (user?.role === "platform_admin") {
+    const tenant = await db.query.tenants.findFirst({
+      where: eq2(tenants.id, tenantId)
+    });
+    return {
+      ok: true,
+      role: "platform_admin",
+      subscriptionStatus: tenant?.subscriptionStatus ?? "active",
+      planValidUntil: tenant?.planValidUntil ?? null,
+      planCode: tenant?.planCode ?? "enterprise-monthly",
+      maxBranches: tenant?.maxBranches ?? 99
+    };
+  }
+  const rows = await db.select({
+    role: tenantMembers.role,
+    subscriptionStatus: tenants.subscriptionStatus,
+    planValidUntil: tenants.planValidUntil,
+    planCode: tenants.planCode,
+    maxBranches: tenants.maxBranches
+  }).from(tenantMembers).innerJoin(tenants, eq2(tenantMembers.tenantId, tenants.id)).where(
+    and2(
+      eq2(tenantMembers.tenantId, tenantId),
+      eq2(tenantMembers.userId, userId),
+      eq2(tenantMembers.isActive, true),
+      eq2(tenants.isActive, true)
+    )
+  );
+  const member = rows[0];
+  if (!member) {
+    return {
+      ok: false,
+      message: "Akses ditolak: Anda bukan anggota unit usaha (tenant) ini",
+      code: "TENANT_FORBIDDEN",
+      status: 403
+    };
+  }
+  if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(member.role)) {
+    return {
+      ok: false,
+      message: "Akses ditolak: Peran akun Anda tidak memiliki izin untuk tindakan ini",
+      code: "ROLE_FORBIDDEN",
+      status: 403
+    };
+  }
+  return {
+    ok: true,
+    role: member.role,
+    subscriptionStatus: member.subscriptionStatus ?? "active",
+    planValidUntil: member.planValidUntil,
+    planCode: member.planCode ?? "starter-monthly",
+    maxBranches: member.maxBranches ?? 1
+  };
+}
+
 // src/features/reports/service.ts
-import { and as and2, count, desc, eq as eq2, gte, inArray, lte, ne, sql, sum } from "drizzle-orm";
+import { and as and3, count, desc, eq as eq3, gte, inArray, lte, ne, sql, sum } from "drizzle-orm";
 function n(val) {
   return Number(val ?? 0);
 }
 async function getSalesSummary(db2, input) {
-  const filters = [eq2(salesOrders.tenantId, input.tenantId)];
-  if (input.branchId) filters.push(eq2(salesOrders.branchId, input.branchId));
+  const filters = [eq3(salesOrders.tenantId, input.tenantId)];
+  if (input.branchId) filters.push(eq3(salesOrders.branchId, input.branchId));
   if (input.from) filters.push(gte(salesOrders.createdAt, new Date(input.from)));
   if (input.to) filters.push(lte(salesOrders.createdAt, new Date(input.to)));
   const [summary] = await db2.select({
     orderCount: count(salesOrders.id),
     grossSales: sum(salesOrders.grandTotal),
     paidTotal: sum(salesOrders.paidTotal)
-  }).from(salesOrders).where(and2(...filters));
+  }).from(salesOrders).where(and3(...filters));
   return {
     orderCount: Number(summary?.orderCount ?? 0),
     grossSales: String(summary?.grossSales ?? "0"),
@@ -955,15 +1075,15 @@ async function getSalesSummary(db2, input) {
   };
 }
 async function getPaymentSummary(db2, input) {
-  const filters = [eq2(payments.tenantId, input.tenantId)];
-  if (input.branchId) filters.push(eq2(payments.branchId, input.branchId));
+  const filters = [eq3(payments.tenantId, input.tenantId)];
+  if (input.branchId) filters.push(eq3(payments.branchId, input.branchId));
   if (input.from) filters.push(gte(payments.createdAt, new Date(input.from)));
   if (input.to) filters.push(lte(payments.createdAt, new Date(input.to)));
   const rows = await db2.select({
     method: payments.method,
     total: sum(payments.amount),
     count: count(payments.id)
-  }).from(payments).where(and2(...filters)).groupBy(payments.method).orderBy(payments.method);
+  }).from(payments).where(and3(...filters)).groupBy(payments.method).orderBy(payments.method);
   return rows.map((row) => ({
     method: row.method,
     total: String(row.total ?? "0"),
@@ -971,15 +1091,15 @@ async function getPaymentSummary(db2, input) {
   }));
 }
 async function getInventoryMovementSummary(db2, input) {
-  const filters = [eq2(stockMovements.tenantId, input.tenantId)];
-  if (input.branchId) filters.push(eq2(stockMovements.branchId, input.branchId));
+  const filters = [eq3(stockMovements.tenantId, input.tenantId)];
+  if (input.branchId) filters.push(eq3(stockMovements.branchId, input.branchId));
   if (input.from) filters.push(gte(stockMovements.createdAt, new Date(input.from)));
   if (input.to) filters.push(lte(stockMovements.createdAt, new Date(input.to)));
   const rows = await db2.select({
     type: stockMovements.type,
     totalQty: sum(stockMovements.qty),
     count: count(stockMovements.id)
-  }).from(stockMovements).where(and2(...filters)).groupBy(stockMovements.type).orderBy(stockMovements.type);
+  }).from(stockMovements).where(and3(...filters)).groupBy(stockMovements.type).orderBy(stockMovements.type);
   return rows.map((row) => ({
     type: row.type,
     totalQty: String(row.totalQty ?? "0"),
@@ -988,43 +1108,43 @@ async function getInventoryMovementSummary(db2, input) {
 }
 async function getProfitLoss(db2, input) {
   const tenantId = input.tenantId;
-  const saleFilters = [eq2(salesOrders.tenantId, tenantId), inArray(salesOrders.status, ["paid", "partial"])];
-  if (input.branchId) saleFilters.push(eq2(salesOrders.branchId, input.branchId));
+  const saleFilters = [eq3(salesOrders.tenantId, tenantId), inArray(salesOrders.status, ["paid", "partial"])];
+  if (input.branchId) saleFilters.push(eq3(salesOrders.branchId, input.branchId));
   if (input.from) saleFilters.push(gte(salesOrders.createdAt, new Date(input.from)));
   if (input.to) saleFilters.push(lte(salesOrders.createdAt, new Date(input.to)));
-  const [salesRev] = await db2.select({ revenue: sum(salesOrders.grandTotal), orderCount: count(salesOrders.id) }).from(salesOrders).where(and2(...saleFilters));
-  const svcFilters = [eq2(serviceOrders.tenantId, tenantId), inArray(serviceOrders.status, ["completed", "picked_up"])];
-  if (input.branchId) svcFilters.push(eq2(serviceOrders.branchId, input.branchId));
+  const [salesRev] = await db2.select({ revenue: sum(salesOrders.grandTotal), orderCount: count(salesOrders.id) }).from(salesOrders).where(and3(...saleFilters));
+  const svcFilters = [eq3(serviceOrders.tenantId, tenantId), inArray(serviceOrders.status, ["completed", "picked_up"])];
+  if (input.branchId) svcFilters.push(eq3(serviceOrders.branchId, input.branchId));
   if (input.from) svcFilters.push(gte(serviceOrders.date, new Date(input.from)));
   if (input.to) svcFilters.push(lte(serviceOrders.date, new Date(input.to)));
-  const [svcRev] = await db2.select({ revenue: sum(serviceOrders.cost), orderCount: count(serviceOrders.id) }).from(serviceOrders).where(and2(...svcFilters));
-  const cogsFilters = [eq2(salesOrders.tenantId, tenantId)];
-  if (input.branchId) cogsFilters.push(eq2(salesOrders.branchId, input.branchId));
+  const [svcRev] = await db2.select({ revenue: sum(serviceOrders.cost), orderCount: count(serviceOrders.id) }).from(serviceOrders).where(and3(...svcFilters));
+  const cogsFilters = [eq3(salesOrders.tenantId, tenantId)];
+  if (input.branchId) cogsFilters.push(eq3(salesOrders.branchId, input.branchId));
   if (input.from) cogsFilters.push(gte(salesOrders.createdAt, new Date(input.from)));
   if (input.to) cogsFilters.push(lte(salesOrders.createdAt, new Date(input.to)));
-  const [cogsRow] = await db2.select({ cogs: sum(sql`${salesOrderItems.qty} * COALESCE(${products.costPrice}, 0)`) }).from(salesOrderItems).innerJoin(salesOrders, eq2(salesOrderItems.salesOrderId, salesOrders.id)).leftJoin(products, eq2(salesOrderItems.productId, products.id)).where(and2(...cogsFilters));
-  const cashFilters = [eq2(cash.tenantId, tenantId)];
-  if (input.branchId) cashFilters.push(eq2(cash.branchId, input.branchId));
+  const [cogsRow] = await db2.select({ cogs: sum(sql`${salesOrderItems.qty} * COALESCE(${products.costPrice}, 0)`) }).from(salesOrderItems).innerJoin(salesOrders, eq3(salesOrderItems.salesOrderId, salesOrders.id)).leftJoin(products, eq3(salesOrderItems.productId, products.id)).where(and3(...cogsFilters));
+  const cashFilters = [eq3(cash.tenantId, tenantId)];
+  if (input.branchId) cashFilters.push(eq3(cash.branchId, input.branchId));
   if (input.from) cashFilters.push(gte(cash.date, new Date(input.from)));
   if (input.to) cashFilters.push(lte(cash.date, new Date(input.to)));
   const expenseRows = await db2.select({
     category: cashCategories.name,
     total: sum(cash.expense)
-  }).from(cash).leftJoin(cashCategories, eq2(cash.categoryId, cashCategories.id)).where(and2(...cashFilters, eq2(cashCategories.type, "expense"), sql`${cash.expense} > 0`)).groupBy(cashCategories.name);
+  }).from(cash).leftJoin(cashCategories, eq3(cash.categoryId, cashCategories.id)).where(and3(...cashFilters, eq3(cashCategories.type, "expense"), sql`${cash.expense} > 0`)).groupBy(cashCategories.name);
   const incomeRows = await db2.select({
     category: cashCategories.name,
     total: sum(cash.income)
-  }).from(cash).leftJoin(cashCategories, eq2(cash.categoryId, cashCategories.id)).where(and2(...cashFilters, eq2(cashCategories.type, "income"), sql`${cash.income} > 0`)).groupBy(cashCategories.name);
-  const payFilters = [eq2(payments.tenantId, tenantId), eq2(payments.status, "success")];
-  if (input.branchId) payFilters.push(eq2(payments.branchId, input.branchId));
+  }).from(cash).leftJoin(cashCategories, eq3(cash.categoryId, cashCategories.id)).where(and3(...cashFilters, eq3(cashCategories.type, "income"), sql`${cash.income} > 0`)).groupBy(cashCategories.name);
+  const payFilters = [eq3(payments.tenantId, tenantId), eq3(payments.status, "success")];
+  if (input.branchId) payFilters.push(eq3(payments.branchId, input.branchId));
   if (input.from) payFilters.push(gte(payments.createdAt, new Date(input.from)));
   if (input.to) payFilters.push(lte(payments.createdAt, new Date(input.to)));
-  const paymentBreakdown = await db2.select({ method: payments.method, total: sum(payments.amount), count: count(payments.id) }).from(payments).where(and2(...payFilters)).groupBy(payments.method).orderBy(payments.method);
+  const paymentBreakdown = await db2.select({ method: payments.method, total: sum(payments.amount), count: count(payments.id) }).from(payments).where(and3(...payFilters)).groupBy(payments.method).orderBy(payments.method);
   const salesByMethodRows = await db2.select({
     method: payments.method,
     amount: sum(payments.amount),
     cogs: sum(sql`${salesOrderItems.qty} * COALESCE(${products.costPrice}, 0)`)
-  }).from(payments).innerJoin(salesOrders, eq2(payments.salesOrderId, salesOrders.id)).innerJoin(salesOrderItems, eq2(salesOrders.id, salesOrderItems.salesOrderId)).leftJoin(products, eq2(salesOrderItems.productId, products.id)).where(and2(...payFilters)).groupBy(payments.method);
+  }).from(payments).innerJoin(salesOrders, eq3(payments.salesOrderId, salesOrders.id)).innerJoin(salesOrderItems, eq3(salesOrders.id, salesOrderItems.salesOrderId)).leftJoin(products, eq3(salesOrderItems.productId, products.id)).where(and3(...payFilters)).groupBy(payments.method);
   const salesRevenue = n(salesRev?.revenue);
   const serviceRevenue = n(svcRev?.revenue);
   const totalRevenue = salesRevenue + serviceRevenue;
@@ -1060,20 +1180,20 @@ async function getProfitLoss(db2, input) {
 }
 async function getBalanceSheet(db2, input) {
   const tenantId = input.tenantId;
-  const cashFilters = [eq2(cash.tenantId, tenantId)];
-  if (input.branchId) cashFilters.push(eq2(cash.branchId, input.branchId));
+  const cashFilters = [eq3(cash.tenantId, tenantId)];
+  if (input.branchId) cashFilters.push(eq3(cash.branchId, input.branchId));
   if (input.to) cashFilters.push(lte(cash.date, new Date(input.to)));
   const [cashRow] = await db2.select({
     totalIncome: sum(cash.income),
     totalExpense: sum(cash.expense)
-  }).from(cash).where(and2(...cashFilters));
-  const paymentFilters = [eq2(payments.tenantId, tenantId), eq2(payments.status, "success")];
-  if (input.branchId) paymentFilters.push(eq2(payments.branchId, input.branchId));
+  }).from(cash).where(and3(...cashFilters));
+  const paymentFilters = [eq3(payments.tenantId, tenantId), eq3(payments.status, "success")];
+  if (input.branchId) paymentFilters.push(eq3(payments.branchId, input.branchId));
   if (input.to) paymentFilters.push(lte(payments.createdAt, new Date(input.to)));
   const paymentRows = await db2.select({
     method: payments.method,
     total: sum(payments.amount)
-  }).from(payments).where(and2(...paymentFilters)).groupBy(payments.method);
+  }).from(payments).where(and3(...paymentFilters)).groupBy(payments.method);
   let cashOnHand = n(cashRow?.totalIncome) - n(cashRow?.totalExpense);
   let bankAccounts = 0;
   let ewallets = 0;
@@ -1084,19 +1204,19 @@ async function getBalanceSheet(db2, input) {
     else if (p.method === "ewallet" || p.method === "qris") ewallets += n(p.total);
     else otherAssets.push({ method: p.method, total: n(p.total) });
   }
-  const arFilters = [eq2(salesOrders.tenantId, tenantId), ne(salesOrders.status, "cancelled")];
-  if (input.branchId) arFilters.push(eq2(salesOrders.branchId, input.branchId));
+  const arFilters = [eq3(salesOrders.tenantId, tenantId), ne(salesOrders.status, "cancelled")];
+  if (input.branchId) arFilters.push(eq3(salesOrders.branchId, input.branchId));
   if (input.to) arFilters.push(lte(salesOrders.createdAt, new Date(input.to)));
-  const [arRow] = await db2.select({ outstanding: sum(sql`${salesOrders.grandTotal} - ${salesOrders.paidTotal}`) }).from(salesOrders).where(and2(...arFilters));
+  const [arRow] = await db2.select({ outstanding: sum(sql`${salesOrders.grandTotal} - ${salesOrders.paidTotal}`) }).from(salesOrders).where(and3(...arFilters));
   const accountsReceivable = Math.max(0, n(arRow?.outstanding));
   const invRows = await db2.select({
     productId: stockMovements.productId,
     totalQty: sum(stockMovements.qty)
-  }).from(stockMovements).where(eq2(stockMovements.tenantId, tenantId)).groupBy(stockMovements.productId);
+  }).from(stockMovements).where(eq3(stockMovements.tenantId, tenantId)).groupBy(stockMovements.productId);
   const productIds = invRows.map((r) => r.productId);
   const costMap = /* @__PURE__ */ new Map();
   if (productIds.length > 0) {
-    const prodRows = await db2.select({ id: products.id, costPrice: products.costPrice }).from(products).where(and2(eq2(products.tenantId, tenantId), inArray(products.id, productIds)));
+    const prodRows = await db2.select({ id: products.id, costPrice: products.costPrice }).from(products).where(and3(eq3(products.tenantId, tenantId), inArray(products.id, productIds)));
     for (const p of prodRows) {
       costMap.set(p.id, n(p.costPrice));
     }
@@ -1110,17 +1230,17 @@ async function getBalanceSheet(db2, input) {
     return { productId: r.productId, stock: Math.max(0, stock), unitCost, value };
   });
   const totalAssets = cashOnHand + bankAccounts + ewallets + otherAssets.reduce((s, r) => s + r.total, 0) + accountsReceivable + inventoryValue;
-  const supplierFilters = [eq2(suppliers.tenantId, tenantId)];
-  const [payableRow] = await db2.select({ total: sum(suppliers.payable) }).from(suppliers).where(and2(...supplierFilters));
+  const supplierFilters = [eq3(suppliers.tenantId, tenantId)];
+  const [payableRow] = await db2.select({ total: sum(suppliers.payable) }).from(suppliers).where(and3(...supplierFilters));
   const accountsPayable = n(payableRow?.total);
   const totalLiabilities = accountsPayable;
-  const allTimeSaleFilters = [eq2(salesOrders.tenantId, tenantId), inArray(salesOrders.status, ["paid", "partial"])];
-  const [allTimeSalesRev] = await db2.select({ revenue: sum(salesOrders.grandTotal) }).from(salesOrders).where(and2(...allTimeSaleFilters));
-  const allTimeSvcFilters = [eq2(serviceOrders.tenantId, tenantId), inArray(serviceOrders.status, ["completed", "picked_up"])];
-  const [allTimeSvcRev] = await db2.select({ revenue: sum(serviceOrders.cost) }).from(serviceOrders).where(and2(...allTimeSvcFilters));
-  const [allTimeCogs] = await db2.select({ cogs: sum(sql`${salesOrderItems.qty} * COALESCE(${products.costPrice}, 0)`) }).from(salesOrderItems).innerJoin(salesOrders, eq2(salesOrderItems.salesOrderId, salesOrders.id)).leftJoin(products, eq2(salesOrderItems.productId, products.id)).where(eq2(salesOrders.tenantId, tenantId));
-  const [allTimeExpense] = await db2.select({ total: sum(cash.expense) }).from(cash).leftJoin(cashCategories, eq2(cash.categoryId, cashCategories.id)).where(and2(eq2(cash.tenantId, tenantId), eq2(cashCategories.type, "expense")));
-  const [allTimeIncome] = await db2.select({ total: sum(cash.income) }).from(cash).leftJoin(cashCategories, eq2(cash.categoryId, cashCategories.id)).where(and2(eq2(cash.tenantId, tenantId), eq2(cashCategories.type, "income")));
+  const allTimeSaleFilters = [eq3(salesOrders.tenantId, tenantId), inArray(salesOrders.status, ["paid", "partial"])];
+  const [allTimeSalesRev] = await db2.select({ revenue: sum(salesOrders.grandTotal) }).from(salesOrders).where(and3(...allTimeSaleFilters));
+  const allTimeSvcFilters = [eq3(serviceOrders.tenantId, tenantId), inArray(serviceOrders.status, ["completed", "picked_up"])];
+  const [allTimeSvcRev] = await db2.select({ revenue: sum(serviceOrders.cost) }).from(serviceOrders).where(and3(...allTimeSvcFilters));
+  const [allTimeCogs] = await db2.select({ cogs: sum(sql`${salesOrderItems.qty} * COALESCE(${products.costPrice}, 0)`) }).from(salesOrderItems).innerJoin(salesOrders, eq3(salesOrderItems.salesOrderId, salesOrders.id)).leftJoin(products, eq3(salesOrderItems.productId, products.id)).where(eq3(salesOrders.tenantId, tenantId));
+  const [allTimeExpense] = await db2.select({ total: sum(cash.expense) }).from(cash).leftJoin(cashCategories, eq3(cash.categoryId, cashCategories.id)).where(and3(eq3(cash.tenantId, tenantId), eq3(cashCategories.type, "expense")));
+  const [allTimeIncome] = await db2.select({ total: sum(cash.income) }).from(cash).leftJoin(cashCategories, eq3(cash.categoryId, cashCategories.id)).where(and3(eq3(cash.tenantId, tenantId), eq3(cashCategories.type, "income")));
   const retainedEarnings = n(allTimeSalesRev?.revenue) + n(allTimeSvcRev?.revenue) - n(allTimeCogs?.cogs) - n(allTimeExpense?.total) + n(allTimeIncome?.total);
   const totalEquity = retainedEarnings;
   const totalLiabilitiesAndEquity = totalLiabilities + totalEquity;
@@ -1148,8 +1268,8 @@ async function getBalanceSheet(db2, input) {
 }
 async function getSalesReport(db2, input) {
   const tenantId = input.tenantId;
-  const saleFilters = [eq2(salesOrders.tenantId, tenantId), ne(salesOrders.status, "cancelled")];
-  if (input.branchId) saleFilters.push(eq2(salesOrders.branchId, input.branchId));
+  const saleFilters = [eq3(salesOrders.tenantId, tenantId), ne(salesOrders.status, "cancelled")];
+  if (input.branchId) saleFilters.push(eq3(salesOrders.branchId, input.branchId));
   if (input.from) saleFilters.push(gte(salesOrders.createdAt, new Date(input.from)));
   if (input.to) saleFilters.push(lte(salesOrders.createdAt, new Date(input.to)));
   const dailySales = await db2.select({
@@ -1157,31 +1277,31 @@ async function getSalesReport(db2, input) {
     orderCount: count(salesOrders.id),
     revenue: sum(salesOrders.grandTotal),
     paid: sum(salesOrders.paidTotal)
-  }).from(salesOrders).where(and2(...saleFilters)).groupBy(sql`DATE(${salesOrders.createdAt})`).orderBy(sql`DATE(${salesOrders.createdAt})`);
-  const svcFilters = [eq2(serviceOrders.tenantId, tenantId), ne(serviceOrders.status, "cancelled")];
-  if (input.branchId) svcFilters.push(eq2(serviceOrders.branchId, input.branchId));
+  }).from(salesOrders).where(and3(...saleFilters)).groupBy(sql`DATE(${salesOrders.createdAt})`).orderBy(sql`DATE(${salesOrders.createdAt})`);
+  const svcFilters = [eq3(serviceOrders.tenantId, tenantId), ne(serviceOrders.status, "cancelled")];
+  if (input.branchId) svcFilters.push(eq3(serviceOrders.branchId, input.branchId));
   if (input.from) svcFilters.push(gte(serviceOrders.date, new Date(input.from)));
   if (input.to) svcFilters.push(lte(serviceOrders.date, new Date(input.to)));
   const dailyService = await db2.select({
     date: sql`DATE(${serviceOrders.date})`.as("date"),
     orderCount: count(serviceOrders.id),
     revenue: sum(serviceOrders.cost)
-  }).from(serviceOrders).where(and2(...svcFilters)).groupBy(sql`DATE(${serviceOrders.date})`).orderBy(sql`DATE(${serviceOrders.date})`);
+  }).from(serviceOrders).where(and3(...svcFilters)).groupBy(sql`DATE(${serviceOrders.date})`).orderBy(sql`DATE(${serviceOrders.date})`);
   const topProductRows = await db2.select({
     productId: salesOrderItems.productId,
     name: salesOrderItems.name,
     totalQty: sum(salesOrderItems.qty),
     totalRevenue: sum(salesOrderItems.subtotal)
-  }).from(salesOrderItems).innerJoin(salesOrders, eq2(salesOrderItems.salesOrderId, salesOrders.id)).where(and2(...saleFilters)).groupBy(salesOrderItems.productId, salesOrderItems.name).orderBy(desc(sum(salesOrderItems.subtotal))).limit(100);
+  }).from(salesOrderItems).innerJoin(salesOrders, eq3(salesOrderItems.salesOrderId, salesOrders.id)).where(and3(...saleFilters)).groupBy(salesOrderItems.productId, salesOrderItems.name).orderBy(desc(sum(salesOrderItems.subtotal))).limit(100);
   const [totals] = await db2.select({
     orderCount: count(salesOrders.id),
     revenue: sum(salesOrders.grandTotal),
     paid: sum(salesOrders.paidTotal)
-  }).from(salesOrders).where(and2(...saleFilters));
+  }).from(salesOrders).where(and3(...saleFilters));
   const [svcTotals] = await db2.select({
     orderCount: count(serviceOrders.id),
     revenue: sum(serviceOrders.cost)
-  }).from(serviceOrders).where(and2(...svcFilters));
+  }).from(serviceOrders).where(and3(...svcFilters));
   const totalRevenue = n(totals?.revenue) + n(svcTotals?.revenue);
   const totalOrders = Number(totals?.orderCount ?? 0) + Number(svcTotals?.orderCount ?? 0);
   return {
@@ -1216,19 +1336,19 @@ async function getSalesReport(db2, input) {
 }
 async function getPaymentReport(db2, input) {
   const tenantId = input.tenantId;
-  const payFilters = [eq2(payments.tenantId, tenantId), eq2(payments.status, "success")];
-  if (input.branchId) payFilters.push(eq2(payments.branchId, input.branchId));
+  const payFilters = [eq3(payments.tenantId, tenantId), eq3(payments.status, "success")];
+  if (input.branchId) payFilters.push(eq3(payments.branchId, input.branchId));
   if (input.from) payFilters.push(gte(payments.createdAt, new Date(input.from)));
   if (input.to) payFilters.push(lte(payments.createdAt, new Date(input.to)));
-  const byMethod = await db2.select({ method: payments.method, total: sum(payments.amount), count: count(payments.id) }).from(payments).where(and2(...payFilters)).groupBy(payments.method).orderBy(payments.method);
-  const bySource = await db2.select({ source: payments.source, total: sum(payments.amount), count: count(payments.id) }).from(payments).where(and2(...payFilters)).groupBy(payments.source).orderBy(payments.source);
+  const byMethod = await db2.select({ method: payments.method, total: sum(payments.amount), count: count(payments.id) }).from(payments).where(and3(...payFilters)).groupBy(payments.method).orderBy(payments.method);
+  const bySource = await db2.select({ source: payments.source, total: sum(payments.amount), count: count(payments.id) }).from(payments).where(and3(...payFilters)).groupBy(payments.source).orderBy(payments.source);
   const dailyFlow = await db2.select({
     date: sql`DATE(${payments.createdAt})`.as("date"),
     method: payments.method,
     total: sum(payments.amount)
-  }).from(payments).where(and2(...payFilters)).groupBy(sql`DATE(${payments.createdAt})`, payments.method).orderBy(sql`DATE(${payments.createdAt})`);
-  const arFilters = [eq2(salesOrders.tenantId, tenantId), ne(salesOrders.status, "cancelled"), sql`${salesOrders.grandTotal} > ${salesOrders.paidTotal}`];
-  if (input.branchId) arFilters.push(eq2(salesOrders.branchId, input.branchId));
+  }).from(payments).where(and3(...payFilters)).groupBy(sql`DATE(${payments.createdAt})`, payments.method).orderBy(sql`DATE(${payments.createdAt})`);
+  const arFilters = [eq3(salesOrders.tenantId, tenantId), ne(salesOrders.status, "cancelled"), sql`${salesOrders.grandTotal} > ${salesOrders.paidTotal}`];
+  if (input.branchId) arFilters.push(eq3(salesOrders.branchId, input.branchId));
   const receivables = await db2.select({
     id: salesOrders.id,
     orderNumber: salesOrders.orderNumber,
@@ -1236,7 +1356,7 @@ async function getPaymentReport(db2, input) {
     paidTotal: salesOrders.paidTotal,
     outstanding: sql`${salesOrders.grandTotal} - ${salesOrders.paidTotal}`,
     createdAt: salesOrders.createdAt
-  }).from(salesOrders).where(and2(...arFilters)).orderBy(salesOrders.createdAt).limit(200);
+  }).from(salesOrders).where(and3(...arFilters)).orderBy(salesOrders.createdAt).limit(200);
   const now = /* @__PURE__ */ new Date();
   const aging = { current: 0, days7: 0, days30: 0, days60: 0, over60: 0 };
   for (const r of receivables) {
@@ -1281,11 +1401,11 @@ async function getInventoryReport(db2, input) {
     salePrice: products.salePrice,
     minimumStock: products.minimumStock,
     isActive: products.isActive
-  }).from(products).where(and2(eq2(products.tenantId, tenantId), eq2(products.isActive, true)));
+  }).from(products).where(and3(eq3(products.tenantId, tenantId), eq3(products.isActive, true)));
   const movementTotals = await db2.select({
     productId: stockMovements.productId,
     totalQty: sum(stockMovements.qty)
-  }).from(stockMovements).where(eq2(stockMovements.tenantId, tenantId)).groupBy(stockMovements.productId);
+  }).from(stockMovements).where(eq3(stockMovements.tenantId, tenantId)).groupBy(stockMovements.productId);
   const stockMap = new Map(movementTotals.map((r) => [r.productId, Math.max(0, n(r.totalQty))]));
   const valuation = prodRows.map((p) => {
     const stock = stockMap.get(p.id) ?? 0;
@@ -1303,15 +1423,15 @@ async function getInventoryReport(db2, input) {
       isLow: stock <= p.minimumStock
     };
   });
-  const movFilters = [eq2(stockMovements.tenantId, tenantId)];
-  if (input.branchId) movFilters.push(eq2(stockMovements.branchId, input.branchId));
+  const movFilters = [eq3(stockMovements.tenantId, tenantId)];
+  if (input.branchId) movFilters.push(eq3(stockMovements.branchId, input.branchId));
   if (input.from) movFilters.push(gte(stockMovements.createdAt, new Date(input.from)));
   if (input.to) movFilters.push(lte(stockMovements.createdAt, new Date(input.to)));
   const movementSummary = await db2.select({
     type: stockMovements.type,
     totalQty: sum(sql`ABS(${stockMovements.qty})`),
     count: count(stockMovements.id)
-  }).from(stockMovements).where(and2(...movFilters)).groupBy(stockMovements.type).orderBy(stockMovements.type);
+  }).from(stockMovements).where(and3(...movFilters)).groupBy(stockMovements.type).orderBy(stockMovements.type);
   const movementDetail = await db2.select({
     id: stockMovements.id,
     productName: products.name,
@@ -1320,7 +1440,7 @@ async function getInventoryReport(db2, input) {
     referenceType: stockMovements.referenceType,
     notes: stockMovements.notes,
     createdAt: stockMovements.createdAt
-  }).from(stockMovements).leftJoin(products, eq2(stockMovements.productId, products.id)).where(and2(...movFilters)).orderBy(desc(stockMovements.createdAt)).limit(200);
+  }).from(stockMovements).leftJoin(products, eq3(stockMovements.productId, products.id)).where(and3(...movFilters)).orderBy(desc(stockMovements.createdAt)).limit(200);
   const totalSkus = valuation.length;
   const totalValue = valuation.reduce((s, v) => s + v.value, 0);
   const lowStockCount = valuation.filter((v) => v.isLow).length;
@@ -1359,68 +1479,80 @@ function getInput(c) {
     to: c.req.query("to") ?? void 0
   };
 }
+async function authorizeTenant(c, tenantId) {
+  if (!tenantId) {
+    return { ok: false, response: c.json({ ok: false, message: "tenantId required" }, 400) };
+  }
+  const userId = await readUserId(c.req.raw);
+  if (!userId) {
+    return { ok: false, response: c.json({ ok: false, message: "Authentication required" }, 401) };
+  }
+  const authResult = await verifyTenantMembership(userId, tenantId);
+  if (!authResult.ok) {
+    return { ok: false, response: c.json({ ok: false, message: authResult.message, code: authResult.code }, authResult.status) };
+  }
+  return { ok: true };
+}
 reportRoutes.get("/sales/summary", async (c) => {
   const input = getInput(c);
-  if (!input.tenantId) return c.json({ ok: false, message: "tenantId required" }, 400);
+  const auth = await authorizeTenant(c, input.tenantId);
+  if (!auth.ok) return auth.response;
   const summary = await getSalesSummary(db, input);
   return c.json({ ok: true, summary });
 });
 reportRoutes.get("/payments/summary", async (c) => {
   const input = getInput(c);
-  if (!input.tenantId) return c.json({ ok: false, message: "tenantId required" }, 400);
+  const auth = await authorizeTenant(c, input.tenantId);
+  if (!auth.ok) return auth.response;
   const items = await getPaymentSummary(db, input);
   return c.json({ ok: true, items });
 });
 reportRoutes.get("/inventory/movements", async (c) => {
   const input = getInput(c);
-  if (!input.tenantId) return c.json({ ok: false, message: "tenantId required" }, 400);
+  const auth = await authorizeTenant(c, input.tenantId);
+  if (!auth.ok) return auth.response;
   const items = await getInventoryMovementSummary(db, input);
   return c.json({ ok: true, items });
 });
 reportRoutes.get("/profit-loss", async (c) => {
   const input = getInput(c);
-  if (!input.tenantId) return c.json({ ok: false, message: "tenantId required" }, 400);
+  const auth = await authorizeTenant(c, input.tenantId);
+  if (!auth.ok) return auth.response;
   const data = await getProfitLoss(db, input);
   return c.json({ ok: true, data });
 });
 reportRoutes.get("/balance-sheet", async (c) => {
   const input = getInput(c);
-  if (!input.tenantId) return c.json({ ok: false, message: "tenantId required" }, 400);
+  const auth = await authorizeTenant(c, input.tenantId);
+  if (!auth.ok) return auth.response;
   const data = await getBalanceSheet(db, input);
   return c.json({ ok: true, data });
 });
 reportRoutes.get("/sales", async (c) => {
   const input = getInput(c);
-  if (!input.tenantId) return c.json({ ok: false, message: "tenantId required" }, 400);
+  const auth = await authorizeTenant(c, input.tenantId);
+  if (!auth.ok) return auth.response;
   const data = await getSalesReport(db, input);
   return c.json({ ok: true, data });
 });
 reportRoutes.get("/payments", async (c) => {
   const input = getInput(c);
-  if (!input.tenantId) return c.json({ ok: false, message: "tenantId required" }, 400);
+  const auth = await authorizeTenant(c, input.tenantId);
+  if (!auth.ok) return auth.response;
   const data = await getPaymentReport(db, input);
   return c.json({ ok: true, data });
 });
 reportRoutes.get("/inventory", async (c) => {
   const input = getInput(c);
-  if (!input.tenantId) return c.json({ ok: false, message: "tenantId required" }, 400);
+  const auth = await authorizeTenant(c, input.tenantId);
+  if (!auth.ok) return auth.response;
   const data = await getInventoryReport(db, input);
   return c.json({ ok: true, data });
 });
 
 // src/features/sync/routes.ts
-import { and as and4, desc as desc2, eq as eq4, gte as gte2, isNull } from "drizzle-orm";
+import { and as and5, desc as desc2, eq as eq5, gte as gte2, isNull } from "drizzle-orm";
 import { Hono as Hono4 } from "hono";
-
-// src/features/auth/middleware.ts
-async function authMiddleware(c, next) {
-  const userId = readUserId(c.req.raw);
-  if (!userId) {
-    return c.json({ ok: false, message: "Authentication required" }, 401);
-  }
-  c.set("userId", userId);
-  await next();
-}
 
 // ../../packages/shared-contracts/src/sync/api.ts
 function buildSyncPushResponse(items) {
@@ -1550,7 +1682,7 @@ function parseSyncPushBody(input) {
 }
 
 // src/features/sync/apply.ts
-import { and as and3, eq as eq3 } from "drizzle-orm";
+import { and as and4, eq as eq4 } from "drizzle-orm";
 var uuidPattern2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function isValidUuid(value) {
   return uuidPattern2.test(value);
@@ -1618,7 +1750,7 @@ function mapClientStockMovementType(value) {
 }
 async function applyProduct(db2, ctx, entityId, mutationType, payload) {
   if (mutationType === "delete") {
-    await db2.update(products).set({ deletedAt: /* @__PURE__ */ new Date() }).where(eq3(products.id, entityId));
+    await db2.update(products).set({ deletedAt: /* @__PURE__ */ new Date() }).where(eq4(products.id, entityId));
     return;
   }
   const now = /* @__PURE__ */ new Date();
@@ -1670,9 +1802,9 @@ async function applySale(db2, ctx, entityId, mutationType, payload) {
   }
   const now = /* @__PURE__ */ new Date();
   if (mutationType === "delete") {
-    await db2.delete(payments).where(eq3(payments.salesOrderId, entityId));
-    await db2.delete(salesOrderItems).where(eq3(salesOrderItems.salesOrderId, entityId));
-    await db2.delete(salesOrders).where(eq3(salesOrders.id, entityId));
+    await db2.delete(payments).where(eq4(payments.salesOrderId, entityId));
+    await db2.delete(salesOrderItems).where(eq4(salesOrderItems.salesOrderId, entityId));
+    await db2.delete(salesOrders).where(eq4(salesOrders.id, entityId));
     return;
   }
   await db2.insert(salesOrders).values({
@@ -1710,7 +1842,7 @@ async function applySale(db2, ctx, entityId, mutationType, payload) {
     }
   });
   if (Array.isArray(payload.items)) {
-    await db2.delete(salesOrderItems).where(eq3(salesOrderItems.salesOrderId, entityId));
+    await db2.delete(salesOrderItems).where(eq4(salesOrderItems.salesOrderId, entityId));
     if (payload.items.length > 0) {
       await db2.insert(salesOrderItems).values(
         payload.items.map((item) => ({
@@ -1735,7 +1867,7 @@ async function applyPayment(db2, ctx, entityId, mutationType, payload) {
     throw new Error("branchId required for payment mutation");
   }
   if (mutationType === "delete") {
-    await db2.delete(payments).where(eq3(payments.id, entityId));
+    await db2.delete(payments).where(eq4(payments.id, entityId));
     return;
   }
   const now = /* @__PURE__ */ new Date();
@@ -1777,16 +1909,16 @@ async function applyStockMovement(db2, ctx, entityId, mutationType, payload) {
     throw new Error("productId required for stock_movement mutation");
   }
   if (mutationType === "delete") {
-    await db2.delete(stockMovements).where(eq3(stockMovements.id, entityId));
+    await db2.delete(stockMovements).where(eq4(stockMovements.id, entityId));
     return;
   }
   let warehouseId = payload.warehouseId;
   if (!warehouseId && ctx.branchId) {
-    const defaultWarehouse = await db2.select({ id: warehouses.id }).from(warehouses).where(and3(eq3(warehouses.tenantId, ctx.tenantId), eq3(warehouses.branchId, ctx.branchId), eq3(warehouses.isDefault, true))).limit(1).then((rows) => rows[0]);
+    const defaultWarehouse = await db2.select({ id: warehouses.id }).from(warehouses).where(and4(eq4(warehouses.tenantId, ctx.tenantId), eq4(warehouses.branchId, ctx.branchId), eq4(warehouses.isDefault, true))).limit(1).then((rows) => rows[0]);
     warehouseId = defaultWarehouse?.id;
   }
   if (!warehouseId) {
-    const anyWarehouse = await db2.select({ id: warehouses.id }).from(warehouses).where(eq3(warehouses.tenantId, ctx.tenantId)).limit(1).then((rows) => rows[0]);
+    const anyWarehouse = await db2.select({ id: warehouses.id }).from(warehouses).where(eq4(warehouses.tenantId, ctx.tenantId)).limit(1).then((rows) => rows[0]);
     warehouseId = anyWarehouse?.id;
   }
   if (!warehouseId) {
@@ -1860,7 +1992,7 @@ function mapClientServiceOrderStatus(value) {
 }
 async function applyCustomer(db2, ctx, entityId, mutationType, payload) {
   if (mutationType === "delete") {
-    await db2.update(customers).set({ deletedAt: /* @__PURE__ */ new Date() }).where(eq3(customers.id, entityId));
+    await db2.update(customers).set({ deletedAt: /* @__PURE__ */ new Date() }).where(eq4(customers.id, entityId));
     return;
   }
   const now = /* @__PURE__ */ new Date();
@@ -1893,7 +2025,7 @@ async function applyCustomer(db2, ctx, entityId, mutationType, payload) {
 }
 async function applyProductCategory(db2, ctx, entityId, mutationType, payload) {
   if (mutationType === "delete") {
-    await db2.update(productCategories).set({ deletedAt: /* @__PURE__ */ new Date() }).where(eq3(productCategories.id, entityId));
+    await db2.update(productCategories).set({ deletedAt: /* @__PURE__ */ new Date() }).where(eq4(productCategories.id, entityId));
     return;
   }
   const now = /* @__PURE__ */ new Date();
@@ -1918,7 +2050,7 @@ async function applyProductCategory(db2, ctx, entityId, mutationType, payload) {
 }
 async function applyCashCategory(db2, ctx, entityId, mutationType, payload) {
   if (mutationType === "delete") {
-    await db2.update(cashCategories).set({ deletedAt: /* @__PURE__ */ new Date() }).where(eq3(cashCategories.id, entityId));
+    await db2.update(cashCategories).set({ deletedAt: /* @__PURE__ */ new Date() }).where(eq4(cashCategories.id, entityId));
     return;
   }
   const now = /* @__PURE__ */ new Date();
@@ -1945,7 +2077,7 @@ async function applyCashCategory(db2, ctx, entityId, mutationType, payload) {
 }
 async function applyCash(db2, ctx, entityId, mutationType, payload) {
   if (mutationType === "delete") {
-    await db2.delete(cash).where(eq3(cash.id, entityId));
+    await db2.delete(cash).where(eq4(cash.id, entityId));
     return;
   }
   const now = /* @__PURE__ */ new Date();
@@ -1975,7 +2107,7 @@ async function applyCash(db2, ctx, entityId, mutationType, payload) {
 }
 async function applySetting(db2, ctx, entityId, mutationType, payload) {
   if (mutationType === "delete") {
-    await db2.delete(settings).where(eq3(settings.id, entityId));
+    await db2.delete(settings).where(eq4(settings.id, entityId));
     return;
   }
   const now = /* @__PURE__ */ new Date();
@@ -1983,7 +2115,7 @@ async function applySetting(db2, ctx, entityId, mutationType, payload) {
   const area = payload.area ?? "general";
   const settingKey = normalizeSettingKey(rawKey, area);
   const existing = await db2.query.settings.findFirst({
-    where: and3(eq3(settings.tenantId, ctx.tenantId), eq3(settings.key, settingKey))
+    where: and4(eq4(settings.tenantId, ctx.tenantId), eq4(settings.key, settingKey))
   });
   if (existing) {
     await db2.update(settings).set({
@@ -1992,7 +2124,7 @@ async function applySetting(db2, ctx, entityId, mutationType, payload) {
       status: payload.status ?? "active",
       syncStatus: "synced",
       updatedAt: now
-    }).where(eq3(settings.id, existing.id));
+    }).where(eq4(settings.id, existing.id));
   } else {
     const uuid2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(entityId) ? entityId : crypto.randomUUID();
     await db2.insert(settings).values({
@@ -2010,7 +2142,7 @@ async function applySetting(db2, ctx, entityId, mutationType, payload) {
 }
 async function applyShift(db2, ctx, entityId, mutationType, payload) {
   if (mutationType === "delete") {
-    await db2.delete(shifts).where(eq3(shifts.id, entityId));
+    await db2.delete(shifts).where(eq4(shifts.id, entityId));
     return;
   }
   const now = /* @__PURE__ */ new Date();
@@ -2044,7 +2176,7 @@ async function applyShift(db2, ctx, entityId, mutationType, payload) {
 }
 async function applySupplier(db2, ctx, entityId, mutationType, payload) {
   if (mutationType === "delete") {
-    await db2.update(suppliers).set({ deletedAt: /* @__PURE__ */ new Date() }).where(eq3(suppliers.id, entityId));
+    await db2.update(suppliers).set({ deletedAt: /* @__PURE__ */ new Date() }).where(eq4(suppliers.id, entityId));
     return;
   }
   const now = /* @__PURE__ */ new Date();
@@ -2077,9 +2209,9 @@ async function applySupplier(db2, ctx, entityId, mutationType, payload) {
 }
 async function applyPurchase(db2, ctx, entityId, mutationType, payload) {
   if (mutationType === "delete") {
-    await db2.delete(payments).where(eq3(payments.purchaseId, entityId));
-    await db2.delete(purchaseItems).where(eq3(purchaseItems.purchaseId, entityId));
-    await db2.delete(purchases).where(eq3(purchases.id, entityId));
+    await db2.delete(payments).where(eq4(payments.purchaseId, entityId));
+    await db2.delete(purchaseItems).where(eq4(purchaseItems.purchaseId, entityId));
+    await db2.delete(purchases).where(eq4(purchases.id, entityId));
     return;
   }
   const now = /* @__PURE__ */ new Date();
@@ -2108,7 +2240,7 @@ async function applyPurchase(db2, ctx, entityId, mutationType, payload) {
     }
   });
   if (Array.isArray(payload.items)) {
-    await db2.delete(purchaseItems).where(eq3(purchaseItems.purchaseId, entityId));
+    await db2.delete(purchaseItems).where(eq4(purchaseItems.purchaseId, entityId));
     if (payload.items.length > 0) {
       await db2.insert(purchaseItems).values(
         payload.items.map((item) => ({
@@ -2129,8 +2261,8 @@ async function applyPurchase(db2, ctx, entityId, mutationType, payload) {
 }
 async function applyReturn(db2, ctx, entityId, mutationType, payload) {
   if (mutationType === "delete") {
-    await db2.delete(returnItems).where(eq3(returnItems.returnId, entityId));
-    await db2.delete(returns).where(eq3(returns.id, entityId));
+    await db2.delete(returnItems).where(eq4(returnItems.returnId, entityId));
+    await db2.delete(returns).where(eq4(returns.id, entityId));
     return;
   }
   const now = /* @__PURE__ */ new Date();
@@ -2158,7 +2290,7 @@ async function applyReturn(db2, ctx, entityId, mutationType, payload) {
     }
   });
   if (Array.isArray(payload.items)) {
-    await db2.delete(returnItems).where(eq3(returnItems.returnId, entityId));
+    await db2.delete(returnItems).where(eq4(returnItems.returnId, entityId));
     if (payload.items.length > 0) {
       await db2.insert(returnItems).values(
         payload.items.map((item) => ({
@@ -2179,8 +2311,8 @@ async function applyReturn(db2, ctx, entityId, mutationType, payload) {
 }
 async function applyServiceOrder(db2, ctx, entityId, mutationType, payload) {
   if (mutationType === "delete") {
-    await db2.delete(payments).where(eq3(payments.serviceOrderId, entityId));
-    await db2.delete(serviceOrders).where(eq3(serviceOrders.id, entityId));
+    await db2.delete(payments).where(eq4(payments.serviceOrderId, entityId));
+    await db2.delete(serviceOrders).where(eq4(serviceOrders.id, entityId));
     return;
   }
   const now = /* @__PURE__ */ new Date();
@@ -2245,7 +2377,7 @@ async function applyServiceOrder(db2, ctx, entityId, mutationType, payload) {
 }
 async function applyPaymentMethod(db2, ctx, entityId, mutationType, payload) {
   if (mutationType === "delete") {
-    await db2.delete(paymentMethods).where(eq3(paymentMethods.id, entityId));
+    await db2.delete(paymentMethods).where(eq4(paymentMethods.id, entityId));
     return;
   }
   const now = /* @__PURE__ */ new Date();
@@ -2275,7 +2407,7 @@ async function applyPaymentMethod(db2, ctx, entityId, mutationType, payload) {
 }
 async function applyRecipe(db2, ctx, entityId, mutationType, payload) {
   if (mutationType === "delete") {
-    await db2.delete(recipes).where(eq3(recipes.id, entityId));
+    await db2.delete(recipes).where(eq4(recipes.id, entityId));
     return;
   }
   const now = /* @__PURE__ */ new Date();
@@ -2305,7 +2437,7 @@ async function applyRecipe(db2, ctx, entityId, mutationType, payload) {
 }
 async function applyProductionBatch(db2, ctx, entityId, mutationType, payload) {
   if (mutationType === "delete") {
-    await db2.delete(productionBatches).where(eq3(productionBatches.id, entityId));
+    await db2.delete(productionBatches).where(eq4(productionBatches.id, entityId));
     return;
   }
   const now = /* @__PURE__ */ new Date();
@@ -2425,17 +2557,22 @@ syncRoutes.get("/pull", async (c) => {
   if (!parsed.ok) {
     return c.json({ ok: false, message: parsed.message }, 400);
   }
-  const branchFilter = parsed.value.branchId ? eq4(products.branchId, parsed.value.branchId) : void 0;
+  const userId = c.get("userId");
+  const authResult = await verifyTenantMembership(userId, parsed.value.tenantId);
+  if (!authResult.ok) {
+    return c.json({ ok: false, message: authResult.message, code: authResult.code }, authResult.status);
+  }
+  const branchFilter = parsed.value.branchId ? eq5(products.branchId, parsed.value.branchId) : void 0;
   const sinceFilter = parsed.value.since ? gte2(products.updatedAt, parsed.value.since) : void 0;
   const productRows = await db.query.products.findMany({
-    where: and4(eq4(products.tenantId, parsed.value.tenantId), isNull(products.deletedAt), branchFilter, sinceFilter),
+    where: and5(eq5(products.tenantId, parsed.value.tenantId), isNull(products.deletedAt), branchFilter, sinceFilter),
     orderBy: [desc2(products.updatedAt)],
     limit: 100
   });
-  const saleBranchFilter = parsed.value.branchId ? eq4(salesOrders.branchId, parsed.value.branchId) : void 0;
+  const saleBranchFilter = parsed.value.branchId ? eq5(salesOrders.branchId, parsed.value.branchId) : void 0;
   const saleSinceFilter = parsed.value.since ? gte2(salesOrders.updatedAt, parsed.value.since) : void 0;
   const saleRows = await db.query.salesOrders.findMany({
-    where: and4(eq4(salesOrders.tenantId, parsed.value.tenantId), isNull(salesOrders.deletedAt), saleBranchFilter, saleSinceFilter),
+    where: and5(eq5(salesOrders.tenantId, parsed.value.tenantId), isNull(salesOrders.deletedAt), saleBranchFilter, saleSinceFilter),
     orderBy: [desc2(salesOrders.updatedAt)],
     limit: 100,
     with: { items: true }
@@ -2443,102 +2580,102 @@ syncRoutes.get("/pull", async (c) => {
   const saleCustomerIds = [...new Set(saleRows.filter((r) => r.customerId).map((r) => r.customerId))];
   const saleCustomerRows = saleCustomerIds.length > 0 ? await db.query.customers.findMany({ where: (c2, { inArray: inArray3 }) => inArray3(c2.id, saleCustomerIds) }) : [];
   const saleCustomerNameMap = new Map(saleCustomerRows.map((c2) => [c2.id, c2.name]));
-  const paymentBranchFilter = parsed.value.branchId ? eq4(payments.branchId, parsed.value.branchId) : void 0;
+  const paymentBranchFilter = parsed.value.branchId ? eq5(payments.branchId, parsed.value.branchId) : void 0;
   const paymentSinceFilter = parsed.value.since ? gte2(payments.updatedAt, parsed.value.since) : void 0;
   const paymentRows = await db.query.payments.findMany({
-    where: and4(eq4(payments.tenantId, parsed.value.tenantId), isNull(payments.deletedAt), paymentBranchFilter, paymentSinceFilter),
+    where: and5(eq5(payments.tenantId, parsed.value.tenantId), isNull(payments.deletedAt), paymentBranchFilter, paymentSinceFilter),
     orderBy: [desc2(payments.updatedAt)],
     limit: 100
   });
-  const stockBranchFilter = parsed.value.branchId ? eq4(stockMovements.branchId, parsed.value.branchId) : void 0;
+  const stockBranchFilter = parsed.value.branchId ? eq5(stockMovements.branchId, parsed.value.branchId) : void 0;
   const stockSinceFilter = parsed.value.since ? gte2(stockMovements.updatedAt, parsed.value.since) : void 0;
   const stockRows = await db.query.stockMovements.findMany({
-    where: and4(eq4(stockMovements.tenantId, parsed.value.tenantId), isNull(stockMovements.deletedAt), stockBranchFilter, stockSinceFilter),
+    where: and5(eq5(stockMovements.tenantId, parsed.value.tenantId), isNull(stockMovements.deletedAt), stockBranchFilter, stockSinceFilter),
     orderBy: [desc2(stockMovements.updatedAt)],
     limit: 100
   });
   const customerSinceFilter = parsed.value.since ? gte2(customers.updatedAt, parsed.value.since) : void 0;
   const customerRows = await db.query.customers.findMany({
-    where: and4(eq4(customers.tenantId, parsed.value.tenantId), isNull(customers.deletedAt), customerSinceFilter),
+    where: and5(eq5(customers.tenantId, parsed.value.tenantId), isNull(customers.deletedAt), customerSinceFilter),
     orderBy: [desc2(customers.updatedAt)],
     limit: 100
   });
   const categoriesSinceFilter = parsed.value.since ? gte2(productCategories.updatedAt, parsed.value.since) : void 0;
   const categoryRows = await db.query.productCategories.findMany({
-    where: and4(eq4(productCategories.tenantId, parsed.value.tenantId), isNull(productCategories.deletedAt), categoriesSinceFilter),
+    where: and5(eq5(productCategories.tenantId, parsed.value.tenantId), isNull(productCategories.deletedAt), categoriesSinceFilter),
     orderBy: [desc2(productCategories.updatedAt)],
     limit: 100
   });
   const cashCategoriesSinceFilter = parsed.value.since ? gte2(cashCategories.updatedAt, parsed.value.since) : void 0;
   const cashCategoryRows = await db.query.cashCategories.findMany({
-    where: and4(eq4(cashCategories.tenantId, parsed.value.tenantId), isNull(cashCategories.deletedAt), cashCategoriesSinceFilter),
+    where: and5(eq5(cashCategories.tenantId, parsed.value.tenantId), isNull(cashCategories.deletedAt), cashCategoriesSinceFilter),
     orderBy: [desc2(cashCategories.updatedAt)],
     limit: 100
   });
-  const cashBranchFilter = parsed.value.branchId ? eq4(cash.branchId, parsed.value.branchId) : void 0;
+  const cashBranchFilter = parsed.value.branchId ? eq5(cash.branchId, parsed.value.branchId) : void 0;
   const cashSinceFilter = parsed.value.since ? gte2(cash.updatedAt, parsed.value.since) : void 0;
   const cashRows = await db.query.cash.findMany({
-    where: and4(eq4(cash.tenantId, parsed.value.tenantId), cashBranchFilter, cashSinceFilter),
+    where: and5(eq5(cash.tenantId, parsed.value.tenantId), cashBranchFilter, cashSinceFilter),
     orderBy: [desc2(cash.updatedAt)],
     limit: 100
   });
   const settingsSinceFilter = parsed.value.since ? gte2(settings.updatedAt, parsed.value.since) : void 0;
   const settingRows = await db.query.settings.findMany({
-    where: and4(eq4(settings.tenantId, parsed.value.tenantId), settingsSinceFilter),
+    where: and5(eq5(settings.tenantId, parsed.value.tenantId), settingsSinceFilter),
     orderBy: [desc2(settings.updatedAt)],
     limit: 100
   });
-  const shiftsBranchFilter = parsed.value.branchId ? eq4(shifts.branchId, parsed.value.branchId) : void 0;
+  const shiftsBranchFilter = parsed.value.branchId ? eq5(shifts.branchId, parsed.value.branchId) : void 0;
   const shiftsSinceFilter = parsed.value.since ? gte2(shifts.updatedAt, parsed.value.since) : void 0;
   const shiftRows = await db.query.shifts.findMany({
-    where: and4(eq4(shifts.tenantId, parsed.value.tenantId), shiftsBranchFilter, shiftsSinceFilter),
+    where: and5(eq5(shifts.tenantId, parsed.value.tenantId), shiftsBranchFilter, shiftsSinceFilter),
     orderBy: [desc2(shifts.updatedAt)],
     limit: 100
   });
   const supplierSinceFilter = parsed.value.since ? gte2(suppliers.updatedAt, parsed.value.since) : void 0;
   const supplierRows = await db.query.suppliers.findMany({
-    where: and4(eq4(suppliers.tenantId, parsed.value.tenantId), isNull(suppliers.deletedAt), supplierSinceFilter),
+    where: and5(eq5(suppliers.tenantId, parsed.value.tenantId), isNull(suppliers.deletedAt), supplierSinceFilter),
     orderBy: [desc2(suppliers.updatedAt)],
     limit: 100
   });
-  const purchaseBranchFilter = parsed.value.branchId ? eq4(purchases.branchId, parsed.value.branchId) : void 0;
+  const purchaseBranchFilter = parsed.value.branchId ? eq5(purchases.branchId, parsed.value.branchId) : void 0;
   const purchaseSinceFilter = parsed.value.since ? gte2(purchases.updatedAt, parsed.value.since) : void 0;
   const purchaseRows = await db.query.purchases.findMany({
-    where: and4(eq4(purchases.tenantId, parsed.value.tenantId), purchaseBranchFilter, purchaseSinceFilter),
+    where: and5(eq5(purchases.tenantId, parsed.value.tenantId), purchaseBranchFilter, purchaseSinceFilter),
     orderBy: [desc2(purchases.updatedAt)],
     limit: 100,
     with: { items: true }
   });
-  const returnBranchFilter = parsed.value.branchId ? eq4(returns.branchId, parsed.value.branchId) : void 0;
+  const returnBranchFilter = parsed.value.branchId ? eq5(returns.branchId, parsed.value.branchId) : void 0;
   const returnSinceFilter = parsed.value.since ? gte2(returns.updatedAt, parsed.value.since) : void 0;
   const returnRows = await db.query.returns.findMany({
-    where: and4(eq4(returns.tenantId, parsed.value.tenantId), returnBranchFilter, returnSinceFilter),
+    where: and5(eq5(returns.tenantId, parsed.value.tenantId), returnBranchFilter, returnSinceFilter),
     orderBy: [desc2(returns.updatedAt)],
     limit: 100,
     with: { items: true }
   });
-  const serviceOrderBranchFilter = parsed.value.branchId ? eq4(serviceOrders.branchId, parsed.value.branchId) : void 0;
+  const serviceOrderBranchFilter = parsed.value.branchId ? eq5(serviceOrders.branchId, parsed.value.branchId) : void 0;
   const serviceOrderSinceFilter = parsed.value.since ? gte2(serviceOrders.updatedAt, parsed.value.since) : void 0;
   const serviceOrderRows = await db.query.serviceOrders.findMany({
-    where: and4(eq4(serviceOrders.tenantId, parsed.value.tenantId), serviceOrderBranchFilter, serviceOrderSinceFilter),
+    where: and5(eq5(serviceOrders.tenantId, parsed.value.tenantId), serviceOrderBranchFilter, serviceOrderSinceFilter),
     orderBy: [desc2(serviceOrders.updatedAt)],
     limit: 100
   });
   const paymentMethodsSinceFilter = parsed.value.since ? gte2(paymentMethods.updatedAt, parsed.value.since) : void 0;
   const paymentMethodsRows = await db.query.paymentMethods.findMany({
-    where: and4(eq4(paymentMethods.tenantId, parsed.value.tenantId), paymentMethodsSinceFilter),
+    where: and5(eq5(paymentMethods.tenantId, parsed.value.tenantId), paymentMethodsSinceFilter),
     orderBy: [desc2(paymentMethods.updatedAt)],
     limit: 100
   });
   const recipeSinceFilter = parsed.value.since ? gte2(recipes.updatedAt, parsed.value.since) : void 0;
   const recipeRows = await db.query.recipes.findMany({
-    where: and4(eq4(recipes.tenantId, parsed.value.tenantId), recipeSinceFilter),
+    where: and5(eq5(recipes.tenantId, parsed.value.tenantId), recipeSinceFilter),
     orderBy: [desc2(recipes.updatedAt)],
     limit: 100
   });
   const productionBatchSinceFilter = parsed.value.since ? gte2(productionBatches.updatedAt, parsed.value.since) : void 0;
   const productionBatchRows = await db.query.productionBatches.findMany({
-    where: and4(eq4(productionBatches.tenantId, parsed.value.tenantId), productionBatchSinceFilter),
+    where: and5(eq5(productionBatches.tenantId, parsed.value.tenantId), productionBatchSinceFilter),
     orderBy: [desc2(productionBatches.updatedAt)],
     limit: 100
   });
@@ -2917,7 +3054,26 @@ syncRoutes.post("/push", async (c) => {
   if (!parsed.ok) {
     return c.json({ ok: false, message: parsed.message }, 400);
   }
+  const userId = c.get("userId");
+  const authResult = await verifyTenantMembership(userId, parsed.value.tenantId);
+  if (!authResult.ok) {
+    return c.json({ ok: false, message: authResult.message, code: authResult.code }, authResult.status);
+  }
   const now = /* @__PURE__ */ new Date();
+  if (authResult.subscriptionStatus === "suspended" || authResult.subscriptionStatus === "cancelled") {
+    return c.json({
+      ok: false,
+      code: "SUBSCRIPTION_EXPIRED",
+      message: "Langganan unit usaha Anda ditangguhkan atau dibatalkan. Silakan perpanjang paket langganan untuk menyinkronkan data."
+    }, 402);
+  }
+  if (authResult.planValidUntil && new Date(authResult.planValidUntil).getTime() < now.getTime() && authResult.subscriptionStatus !== "active" && !authResult.planCode?.startsWith("free")) {
+    return c.json({
+      ok: false,
+      code: "SUBSCRIPTION_EXPIRED",
+      message: "Masa berlaku paket Anda telah berakhir. Silakan perpanjang paket langganan untuk menyinkronkan data."
+    }, 402);
+  }
   const items = [];
   for (const mutation of parsed.value.mutations) {
     const payload = mutation.payload;
@@ -2972,18 +3128,18 @@ syncRoutes.post("/push", async (c) => {
 });
 
 // src/features/platform/routes.ts
-import { count as count2, desc as desc4, eq as eq7, sql as sql2 } from "drizzle-orm";
+import { count as count2, desc as desc4, eq as eq8, sql as sql2 } from "drizzle-orm";
 import { Hono as Hono6 } from "hono";
 import { z as z2 } from "zod";
 
 // src/features/platform/middleware.ts
-import { eq as eq5 } from "drizzle-orm";
+import { eq as eq6 } from "drizzle-orm";
 async function platformAdminMiddleware(c, next) {
   const userId = c.get("userId");
   if (!userId) {
     return c.json({ ok: false, message: "Authentication required" }, 401);
   }
-  const rows = await db.select({ id: users.id, role: users.role }).from(users).where(eq5(users.id, userId));
+  const rows = await db.select({ id: users.id, role: users.role }).from(users).where(eq6(users.id, userId));
   const user = rows[0];
   if (!user || user.role !== "platform_admin") {
     return c.json({ ok: false, message: "Platform admin only" }, 403);
@@ -2993,7 +3149,7 @@ async function platformAdminMiddleware(c, next) {
 }
 
 // src/features/platform/billing-routes.ts
-import { desc as desc3, eq as eq6 } from "drizzle-orm";
+import { desc as desc3, eq as eq7 } from "drizzle-orm";
 import { Hono as Hono5 } from "hono";
 import { z } from "zod";
 
@@ -3048,26 +3204,26 @@ platformBillingRoutes.patch("/billing/settings", async (c) => {
   const body = billingSettingsSchema.parse(await c.req.json());
   const existing = await db.select().from(platformBillingSettings);
   const now = /* @__PURE__ */ new Date();
-  const [item] = existing[0] ? await db.update(platformBillingSettings).set({ ...body, updatedAt: now }).where(eq6(platformBillingSettings.id, existing[0].id)).returning() : await db.insert(platformBillingSettings).values(body).returning();
+  const [item] = existing[0] ? await db.update(platformBillingSettings).set({ ...body, updatedAt: now }).where(eq7(platformBillingSettings.id, existing[0].id)).returning() : await db.insert(platformBillingSettings).values(body).returning();
   await writeAuditLog({ actorId, action: "platform.billing_settings_updated", targetType: "billing_settings", targetId: item.id, payload: body });
   return c.json({ ok: true, item });
 });
 platformBillingRoutes.patch("/billing/payments/:paymentId/approve", async (c) => {
   const actorId = c.get("platformAdminId");
   const paymentId = c.req.param("paymentId");
-  const [payment] = await db.select().from(subscriptionPayments).where(eq6(subscriptionPayments.id, paymentId));
+  const [payment] = await db.select().from(subscriptionPayments).where(eq7(subscriptionPayments.id, paymentId));
   if (!payment) return c.json({ ok: false, message: "Payment not found" }, 404);
-  const [invoice] = await db.select().from(subscriptionInvoices).where(eq6(subscriptionInvoices.id, payment.invoiceId));
+  const [invoice] = await db.select().from(subscriptionInvoices).where(eq7(subscriptionInvoices.id, payment.invoiceId));
   if (!invoice) return c.json({ ok: false, message: "Invoice not found" }, 404);
-  const [plan] = await db.select().from(subscriptionPlans).where(eq6(subscriptionPlans.code, invoice.planCode));
+  const [plan] = await db.select().from(subscriptionPlans).where(eq7(subscriptionPlans.code, invoice.planCode));
   if (!plan) return c.json({ ok: false, message: "Plan not found" }, 404);
-  const [tenant] = await db.select().from(tenants).where(eq6(tenants.id, payment.tenantId));
+  const [tenant] = await db.select().from(tenants).where(eq7(tenants.id, payment.tenantId));
   if (!tenant) return c.json({ ok: false, message: "Tenant not found" }, 404);
   const now = /* @__PURE__ */ new Date();
   const baseDate = tenant.planValidUntil && tenant.planValidUntil > now ? tenant.planValidUntil : now;
   const validUntil = addDays(baseDate, plan.durationDays);
-  const [updatedPayment] = await db.update(subscriptionPayments).set({ status: "approved", reviewedByUserId: actorId, reviewedAt: now, updatedAt: now }).where(eq6(subscriptionPayments.id, payment.id)).returning();
-  await db.update(subscriptionInvoices).set({ status: "paid", updatedAt: now }).where(eq6(subscriptionInvoices.id, invoice.id)).returning();
+  const [updatedPayment] = await db.update(subscriptionPayments).set({ status: "approved", reviewedByUserId: actorId, reviewedAt: now, updatedAt: now }).where(eq7(subscriptionPayments.id, payment.id)).returning();
+  await db.update(subscriptionInvoices).set({ status: "paid", updatedAt: now }).where(eq7(subscriptionInvoices.id, invoice.id)).returning();
   const [updatedTenant] = await db.update(tenants).set({
     planCode: plan.code,
     billingPeriod: invoice.billingPeriod,
@@ -3077,8 +3233,8 @@ platformBillingRoutes.patch("/billing/payments/:paymentId/approve", async (c) =>
     maxBranches: plan.maxBranches,
     isActive: true,
     updatedAt: now
-  }).where(eq6(tenants.id, payment.tenantId)).returning();
-  await db.update(planChangeRequests).set({ status: "applied", reviewedByUserId: actorId, updatedAt: now }).where(eq6(planChangeRequests.invoiceId, invoice.id)).returning();
+  }).where(eq7(tenants.id, payment.tenantId)).returning();
+  await db.update(planChangeRequests).set({ status: "applied", reviewedByUserId: actorId, updatedAt: now }).where(eq7(planChangeRequests.invoiceId, invoice.id)).returning();
   await writeSubscriptionEvent({ tenantId: payment.tenantId, actorUserId: actorId, eventType: "payment.approved", metadata: { paymentId: payment.id, invoiceId: invoice.id, planCode: plan.code } });
   await writeAuditLog({ actorId, action: "platform.payment_approved", targetType: "subscription_payment", targetId: payment.id, payload: { invoiceId: invoice.id, tenantId: payment.tenantId } });
   return c.json({ ok: true, item: { payment: updatedPayment, tenant: updatedTenant } });
@@ -3095,9 +3251,9 @@ platformBillingRoutes.patch("/billing/payments/:paymentId/reject", async (c) => 
     reviewedAt: now,
     reviewNote: body.reviewNote,
     updatedAt: now
-  }).where(eq6(subscriptionPayments.id, paymentId)).returning();
+  }).where(eq7(subscriptionPayments.id, paymentId)).returning();
   if (!payment) return c.json({ ok: false, message: "Payment not found" }, 404);
-  await db.update(subscriptionInvoices).set({ status: "pending_payment", updatedAt: now }).where(eq6(subscriptionInvoices.id, payment.invoiceId)).returning();
+  await db.update(subscriptionInvoices).set({ status: "pending_payment", updatedAt: now }).where(eq7(subscriptionInvoices.id, payment.invoiceId)).returning();
   await writeSubscriptionEvent({ tenantId: payment.tenantId, actorUserId: actorId, eventType: "payment.rejected", metadata: { paymentId, reviewNote: body.reviewNote } });
   await writeAuditLog({ actorId, action: "platform.payment_rejected", targetType: "subscription_payment", targetId: payment.id, payload: { reviewNote: body.reviewNote } });
   return c.json({ ok: true, item: payment });
@@ -3120,12 +3276,12 @@ platformRoutes.get("/tenants", async (c) => {
     storageLimitGb: sql2`${tenants.storageLimitMb} / 1024.0`,
     maxBranches: tenants.maxBranches,
     isActive: tenants.isActive
-  }).from(tenants).leftJoin(tenantMembers, eq7(tenants.id, tenantMembers.tenantId)).leftJoin(users, eq7(tenantMembers.userId, users.id)).where(eq7(tenantMembers.role, "owner"));
+  }).from(tenants).leftJoin(tenantMembers, eq8(tenants.id, tenantMembers.tenantId)).leftJoin(users, eq8(tenantMembers.userId, users.id)).where(eq8(tenantMembers.role, "owner"));
   return c.json({ ok: true, items: result });
 });
 platformRoutes.get("/tenants/:id", async (c) => {
   const id = c.req.param("id");
-  const tenant = await db.select().from(tenants).where(eq7(tenants.id, id)).then((r) => r[0]);
+  const tenant = await db.select().from(tenants).where(eq8(tenants.id, id)).then((r) => r[0]);
   if (!tenant) return c.json({ ok: false, message: "Tenant not found" }, 404);
   const members = await db.select({
     id: tenantMembers.id,
@@ -3134,7 +3290,7 @@ platformRoutes.get("/tenants/:id", async (c) => {
     isActive: tenantMembers.isActive,
     name: users.name,
     email: users.email
-  }).from(tenantMembers).leftJoin(users, eq7(tenantMembers.userId, users.id)).where(eq7(tenantMembers.tenantId, id));
+  }).from(tenantMembers).leftJoin(users, eq8(tenantMembers.userId, users.id)).where(eq8(tenantMembers.tenantId, id));
   return c.json({ ok: true, item: tenant, members });
 });
 var updateTenantSchema = z2.object({
@@ -3160,7 +3316,7 @@ platformRoutes.patch("/tenants/:id", async (c) => {
   if (body.planValidUntil !== void 0) {
     dbSet.planValidUntil = body.planValidUntil === null ? null : new Date(body.planValidUntil);
   }
-  const updated = await db.update(tenants).set(dbSet).where(eq7(tenants.id, id)).returning();
+  const updated = await db.update(tenants).set(dbSet).where(eq8(tenants.id, id)).returning();
   if (updated.length === 0) return c.json({ ok: false, message: "Tenant not found" }, 404);
   await writeAuditLog({
     actorId,
@@ -3174,20 +3330,20 @@ platformRoutes.patch("/tenants/:id", async (c) => {
 platformRoutes.post("/tenants/:id/suspend", async (c) => {
   const id = c.req.param("id");
   const actorId = c.get("platformAdminId");
-  await db.update(tenants).set({ isActive: false, subscriptionStatus: "suspended", updatedAt: /* @__PURE__ */ new Date() }).where(eq7(tenants.id, id));
+  await db.update(tenants).set({ isActive: false, subscriptionStatus: "suspended", updatedAt: /* @__PURE__ */ new Date() }).where(eq8(tenants.id, id));
   await writeAuditLog({ actorId, action: "tenant.suspended", targetType: "tenant", targetId: id });
   return c.json({ ok: true });
 });
 platformRoutes.post("/tenants/:id/reactivate", async (c) => {
   const id = c.req.param("id");
   const actorId = c.get("platformAdminId");
-  await db.update(tenants).set({ isActive: true, subscriptionStatus: "active", updatedAt: /* @__PURE__ */ new Date() }).where(eq7(tenants.id, id));
+  await db.update(tenants).set({ isActive: true, subscriptionStatus: "active", updatedAt: /* @__PURE__ */ new Date() }).where(eq8(tenants.id, id));
   await writeAuditLog({ actorId, action: "tenant.reactivated", targetType: "tenant", targetId: id });
   return c.json({ ok: true });
 });
 platformRoutes.get("/plans", async (c) => {
   const includeInactive = c.req.query("includeInactive") === "true";
-  const condition = includeInactive ? void 0 : eq7(subscriptionPlans.isActive, true);
+  const condition = includeInactive ? void 0 : eq8(subscriptionPlans.isActive, true);
   const items = await db.select().from(subscriptionPlans).where(condition).orderBy(subscriptionPlans.monthlyPrice);
   return c.json({ ok: true, items });
 });
@@ -3252,7 +3408,7 @@ platformRoutes.patch("/plans/:id", async (c) => {
   if (body.maxUsers !== void 0) dbSet.maxUsers = body.maxUsers;
   if (body.features !== void 0) dbSet.features = body.features;
   if (body.isActive !== void 0) dbSet.isActive = body.isActive;
-  const updated = await db.update(subscriptionPlans).set(dbSet).where(eq7(subscriptionPlans.id, id)).returning();
+  const updated = await db.update(subscriptionPlans).set(dbSet).where(eq8(subscriptionPlans.id, id)).returning();
   if (updated.length === 0) return c.json({ ok: false, message: "Plan not found" }, 404);
   await writeAuditLog({
     actorId,
@@ -3266,7 +3422,7 @@ platformRoutes.patch("/plans/:id", async (c) => {
 platformRoutes.delete("/plans/:id", async (c) => {
   const id = c.req.param("id");
   const actorId = c.get("platformAdminId");
-  const updated = await db.update(subscriptionPlans).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(subscriptionPlans.id, id)).returning();
+  const updated = await db.update(subscriptionPlans).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq8(subscriptionPlans.id, id)).returning();
   if (updated.length === 0) return c.json({ ok: false, message: "Plan not found" }, 404);
   await writeAuditLog({ actorId, action: "plan.deleted", targetType: "plan", targetId: id });
   return c.json({ ok: true });
@@ -3279,12 +3435,12 @@ platformRoutes.get("/users", async (c) => {
     role: users.role,
     createdAt: users.createdAt,
     membershipCount: count2(tenantMembers.id)
-  }).from(users).leftJoin(tenantMembers, eq7(users.id, tenantMembers.userId)).groupBy(users.id).orderBy(desc4(users.createdAt));
+  }).from(users).leftJoin(tenantMembers, eq8(users.id, tenantMembers.userId)).groupBy(users.id).orderBy(desc4(users.createdAt));
   return c.json({ ok: true, items });
 });
 platformRoutes.get("/users/:id", async (c) => {
   const id = c.req.param("id");
-  const user = await db.select().from(users).where(eq7(users.id, id)).then((r) => r[0]);
+  const user = await db.select().from(users).where(eq8(users.id, id)).then((r) => r[0]);
   if (!user) return c.json({ ok: false, message: "User not found" }, 404);
   const memberships = await db.select({
     id: tenantMembers.id,
@@ -3292,7 +3448,7 @@ platformRoutes.get("/users/:id", async (c) => {
     role: tenantMembers.role,
     isActive: tenantMembers.isActive,
     tenantName: tenants.name
-  }).from(tenantMembers).leftJoin(tenants, eq7(tenantMembers.tenantId, tenants.id)).where(eq7(tenantMembers.userId, id));
+  }).from(tenantMembers).leftJoin(tenants, eq8(tenantMembers.tenantId, tenants.id)).where(eq8(tenantMembers.userId, id));
   return c.json({ ok: true, item: user, memberships });
 });
 var updateUserSchema = z2.object({
@@ -3305,7 +3461,7 @@ platformRoutes.patch("/users/:id", async (c) => {
   if (id === actorId && body.role && body.role !== "platform_admin") {
     return c.json({ ok: false, message: "Cannot demote yourself" }, 400);
   }
-  const updated = await db.update(users).set({ ...body, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(users.id, id)).returning();
+  const updated = await db.update(users).set({ ...body, updatedAt: /* @__PURE__ */ new Date() }).where(eq8(users.id, id)).returning();
   if (updated.length === 0) return c.json({ ok: false, message: "User not found" }, 404);
   await writeAuditLog({
     actorId,
@@ -3323,7 +3479,7 @@ platformRoutes.patch("/users/:id/memberships/:memberId", async (c) => {
   const memberId = c.req.param("memberId");
   const body = updateMembershipSchema.parse(await c.req.json());
   const actorId = c.get("platformAdminId");
-  const updated = await db.update(tenantMembers).set({ ...body, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(tenantMembers.id, memberId)).returning();
+  const updated = await db.update(tenantMembers).set({ ...body, updatedAt: /* @__PURE__ */ new Date() }).where(eq8(tenantMembers.id, memberId)).returning();
   if (updated.length === 0) return c.json({ ok: false, message: "Membership not found" }, 404);
   await writeAuditLog({
     actorId,
@@ -3346,23 +3502,23 @@ platformRoutes.get("/audit", async (c) => {
     targetId: platformAuditLogs.targetId,
     payload: platformAuditLogs.payload,
     createdAt: platformAuditLogs.createdAt
-  }).from(platformAuditLogs).leftJoin(users, eq7(platformAuditLogs.actorId, users.id)).orderBy(desc4(platformAuditLogs.createdAt)).limit(limit).offset(offset);
+  }).from(platformAuditLogs).leftJoin(users, eq8(platformAuditLogs.actorId, users.id)).orderBy(desc4(platformAuditLogs.createdAt)).limit(limit).offset(offset);
   const total = await db.select({ c: count2() }).from(platformAuditLogs).then((r) => r[0].c);
   return c.json({ ok: true, items, total });
 });
 
 // src/features/subscription/routes.ts
-import { and as and6, eq as eq9 } from "drizzle-orm";
+import { and as and7, eq as eq10 } from "drizzle-orm";
 import { Hono as Hono8 } from "hono";
 import { z as z4 } from "zod";
 
 // src/features/subscription/billing.ts
-import { and as and5, desc as desc5, eq as eq8 } from "drizzle-orm";
+import { and as and6, desc as desc5, eq as eq9 } from "drizzle-orm";
 import { Hono as Hono7 } from "hono";
 import { z as z3 } from "zod";
 var subscriptionBillingRoutes = new Hono7();
 async function requireTenantOwnerOrAdmin(userId, tenantId) {
-  const rows = await db.select({ role: tenantMembers.role }).from(tenantMembers).where(and5(eq8(tenantMembers.tenantId, tenantId), eq8(tenantMembers.userId, userId), eq8(tenantMembers.isActive, true)));
+  const rows = await db.select({ role: tenantMembers.role }).from(tenantMembers).where(and6(eq9(tenantMembers.tenantId, tenantId), eq9(tenantMembers.userId, userId), eq9(tenantMembers.isActive, true)));
   const member = rows[0];
   if (!member || !["owner", "admin"].includes(member.role)) {
     return { ok: false, message: "Owner or admin only" };
@@ -3394,7 +3550,7 @@ subscriptionBillingRoutes.get("/tenants/:tenantId/invoices", async (c) => {
   const userId = c.get("userId");
   const auth = await requireTenantOwnerOrAdmin(userId, tenantId);
   if (!auth.ok) return c.json({ ok: false, message: auth.message }, 403);
-  const items = await db.select().from(subscriptionInvoices).where(eq8(subscriptionInvoices.tenantId, tenantId)).orderBy(desc5(subscriptionInvoices.createdAt));
+  const items = await db.select().from(subscriptionInvoices).where(eq9(subscriptionInvoices.tenantId, tenantId)).orderBy(desc5(subscriptionInvoices.createdAt));
   return c.json({ ok: true, items });
 });
 subscriptionBillingRoutes.get("/tenants/:tenantId/events", async (c) => {
@@ -3402,7 +3558,7 @@ subscriptionBillingRoutes.get("/tenants/:tenantId/events", async (c) => {
   const userId = c.get("userId");
   const auth = await requireTenantOwnerOrAdmin(userId, tenantId);
   if (!auth.ok) return c.json({ ok: false, message: auth.message }, 403);
-  const items = await db.select().from(subscriptionEvents).where(eq8(subscriptionEvents.tenantId, tenantId)).orderBy(desc5(subscriptionEvents.createdAt));
+  const items = await db.select().from(subscriptionEvents).where(eq9(subscriptionEvents.tenantId, tenantId)).orderBy(desc5(subscriptionEvents.createdAt));
   return c.json({ ok: true, items });
 });
 var createInvoiceSchema = z3.object({
@@ -3416,7 +3572,7 @@ subscriptionBillingRoutes.post("/tenants/:tenantId/invoices", async (c) => {
   const body = createInvoiceSchema.parse(await c.req.json());
   const auth = await requireTenantOwnerOrAdmin(userId, tenantId);
   if (!auth.ok) return c.json({ ok: false, message: auth.message }, 403);
-  const [plan] = await db.select().from(subscriptionPlans).where(and5(eq8(subscriptionPlans.code, body.planCode), eq8(subscriptionPlans.isActive, true)));
+  const [plan] = await db.select().from(subscriptionPlans).where(and6(eq9(subscriptionPlans.code, body.planCode), eq9(subscriptionPlans.isActive, true)));
   if (!plan) return c.json({ ok: false, message: "Plan not found" }, 404);
   const now = /* @__PURE__ */ new Date();
   const amount = body.billingPeriod === "yearly" && plan.yearlyPrice ? plan.yearlyPrice : plan.monthlyPrice;
@@ -3432,7 +3588,7 @@ subscriptionBillingRoutes.post("/tenants/:tenantId/invoices", async (c) => {
     periodEnd: addDays2(now, plan.durationDays),
     dueAt: addDays2(now, 7)
   }).returning();
-  await db.update(tenants).set({ subscriptionStatus: "pending_payment", updatedAt: now }).where(eq8(tenants.id, tenantId));
+  await db.update(tenants).set({ subscriptionStatus: "pending_payment", updatedAt: now }).where(eq9(tenants.id, tenantId));
   await writeSubscriptionEvent2({ tenantId, actorUserId: userId, eventType: "invoice.created", metadata: { invoiceId: invoice.id, planCode: plan.code } });
   await writeAuditLog({ actorId: userId, action: "subscription.invoice_created", targetType: "subscription", targetId: tenantId, payload: { invoiceId: invoice.id } });
   return c.json({ ok: true, item: invoice }, 201);
@@ -3452,7 +3608,7 @@ subscriptionBillingRoutes.post("/tenants/:tenantId/payments", async (c) => {
   const body = submitPaymentSchema.parse(await c.req.json());
   const auth = await requireTenantOwnerOrAdmin(userId, tenantId);
   if (!auth.ok) return c.json({ ok: false, message: auth.message }, 403);
-  const [invoice] = await db.select().from(subscriptionInvoices).where(and5(eq8(subscriptionInvoices.id, body.invoiceId), eq8(subscriptionInvoices.tenantId, tenantId)));
+  const [invoice] = await db.select().from(subscriptionInvoices).where(and6(eq9(subscriptionInvoices.id, body.invoiceId), eq9(subscriptionInvoices.tenantId, tenantId)));
   if (!invoice) return c.json({ ok: false, message: "Invoice not found" }, 404);
   const now = /* @__PURE__ */ new Date();
   const [payment] = await db.insert(subscriptionPayments).values({
@@ -3468,8 +3624,8 @@ subscriptionBillingRoutes.post("/tenants/:tenantId/payments", async (c) => {
     status: "submitted",
     submittedByUserId: userId
   }).returning();
-  await db.update(subscriptionInvoices).set({ status: "submitted", updatedAt: now }).where(eq8(subscriptionInvoices.id, body.invoiceId));
-  await db.update(tenants).set({ subscriptionStatus: "pending_approval", updatedAt: now }).where(eq8(tenants.id, tenantId));
+  await db.update(subscriptionInvoices).set({ status: "submitted", updatedAt: now }).where(eq9(subscriptionInvoices.id, body.invoiceId));
+  await db.update(tenants).set({ subscriptionStatus: "pending_approval", updatedAt: now }).where(eq9(tenants.id, tenantId));
   await writeSubscriptionEvent2({ tenantId, actorUserId: userId, eventType: "payment.submitted", metadata: { paymentId: payment.id, invoiceId: invoice.id } });
   await writeAuditLog({ actorId: userId, action: "subscription.payment_submitted", targetType: "subscription", targetId: tenantId, payload: { paymentId: payment.id, invoiceId: invoice.id } });
   return c.json({ ok: true, item: payment }, 201);
@@ -3485,9 +3641,9 @@ subscriptionBillingRoutes.post("/tenants/:tenantId/change-plan", async (c) => {
   const body = changePlanSchema.parse(await c.req.json());
   const auth = await requireTenantOwnerOrAdmin(userId, tenantId);
   if (!auth.ok) return c.json({ ok: false, message: auth.message }, 403);
-  const [tenant] = await db.select().from(tenants).where(eq8(tenants.id, tenantId));
+  const [tenant] = await db.select().from(tenants).where(eq9(tenants.id, tenantId));
   if (!tenant) return c.json({ ok: false, message: "Tenant not found" }, 404);
-  const [plan] = await db.select().from(subscriptionPlans).where(and5(eq8(subscriptionPlans.code, body.toPlanCode), eq8(subscriptionPlans.isActive, true)));
+  const [plan] = await db.select().from(subscriptionPlans).where(and6(eq9(subscriptionPlans.code, body.toPlanCode), eq9(subscriptionPlans.isActive, true)));
   if (!plan) return c.json({ ok: false, message: "Plan not found" }, 404);
   const now = /* @__PURE__ */ new Date();
   let invoiceId = null;
@@ -3530,16 +3686,16 @@ subscriptionRoutes.use("*", authMiddleware);
 subscriptionRoutes.route("/", subscriptionBillingRoutes);
 subscriptionRoutes.get("/plans", async (c) => {
   const period = c.req.query("period");
-  const conditions = [eq9(subscriptionPlans.isActive, true)];
+  const conditions = [eq10(subscriptionPlans.isActive, true)];
   if (period === "monthly" || period === "yearly") {
-    conditions.push(eq9(subscriptionPlans.billingPeriod, period));
+    conditions.push(eq10(subscriptionPlans.billingPeriod, period));
   }
-  const items = await db.select().from(subscriptionPlans).where(and6(...conditions)).orderBy(subscriptionPlans.monthlyPrice);
+  const items = await db.select().from(subscriptionPlans).where(and7(...conditions)).orderBy(subscriptionPlans.monthlyPrice);
   return c.json({ ok: true, items });
 });
 subscriptionRoutes.get("/plans/:code", async (c) => {
   const code = c.req.param("code");
-  const rows = await db.select().from(subscriptionPlans).where(and6(eq9(subscriptionPlans.code, code), eq9(subscriptionPlans.isActive, true)));
+  const rows = await db.select().from(subscriptionPlans).where(and7(eq10(subscriptionPlans.code, code), eq10(subscriptionPlans.isActive, true)));
   if (rows.length === 0) return c.json({ ok: false, message: "Plan not found" }, 404);
   return c.json({ ok: true, item: rows[0] });
 });
@@ -3548,7 +3704,7 @@ var subscribeSchema = z4.object({
   billingPeriod: z4.enum(["monthly", "yearly"]).optional()
 });
 async function requireTenantOwnerOrAdmin2(userId, tenantId) {
-  const rows = await db.select({ role: tenantMembers.role }).from(tenantMembers).where(and6(eq9(tenantMembers.tenantId, tenantId), eq9(tenantMembers.userId, userId), eq9(tenantMembers.isActive, true)));
+  const rows = await db.select({ role: tenantMembers.role }).from(tenantMembers).where(and7(eq10(tenantMembers.tenantId, tenantId), eq10(tenantMembers.userId, userId), eq10(tenantMembers.isActive, true)));
   const member = rows[0];
   if (!member || !["owner", "admin"].includes(member.role)) {
     return { ok: false, message: "Owner or admin only" };
@@ -3559,11 +3715,11 @@ subscriptionRoutes.post("/tenants/:tenantId/subscribe", async (c) => {
   const tenantId = c.req.param("tenantId");
   const userId = c.get("userId");
   const body = subscribeSchema.parse(await c.req.json());
-  const planRows = await db.select().from(subscriptionPlans).where(and6(eq9(subscriptionPlans.code, body.planCode), eq9(subscriptionPlans.isActive, true)));
+  const planRows = await db.select().from(subscriptionPlans).where(and7(eq10(subscriptionPlans.code, body.planCode), eq10(subscriptionPlans.isActive, true)));
   const plan = planRows[0];
   if (!plan) return c.json({ ok: false, message: "Plan not found" }, 404);
   const billingPeriod = body.billingPeriod ?? plan.billingPeriod;
-  const tenantRows = await db.select().from(tenants).where(eq9(tenants.id, tenantId));
+  const tenantRows = await db.select().from(tenants).where(eq10(tenants.id, tenantId));
   if (tenantRows.length === 0) return c.json({ ok: false, message: "Tenant not found" }, 404);
   const auth = await requireTenantOwnerOrAdmin2(userId, tenantId);
   if (!auth.ok) return c.json({ ok: false, message: auth.message }, 403);
@@ -3588,7 +3744,7 @@ subscriptionRoutes.post("/tenants/:tenantId/subscribe", async (c) => {
     maxBranches: plan.maxBranches,
     isActive: true,
     updatedAt: now
-  }).where(eq9(tenants.id, tenantId)).returning();
+  }).where(eq10(tenants.id, tenantId)).returning();
   await writeAuditLog({
     actorId: userId,
     action: "tenant.subscribed",
@@ -3601,14 +3757,14 @@ subscriptionRoutes.post("/tenants/:tenantId/subscribe", async (c) => {
 subscriptionRoutes.post("/tenants/:tenantId/cancel", async (c) => {
   const tenantId = c.req.param("tenantId");
   const userId = c.get("userId");
-  const tenantRows = await db.select().from(tenants).where(eq9(tenants.id, tenantId));
+  const tenantRows = await db.select().from(tenants).where(eq10(tenants.id, tenantId));
   if (tenantRows.length === 0) return c.json({ ok: false, message: "Tenant not found" }, 404);
   const auth = await requireTenantOwnerOrAdmin2(userId, tenantId);
   if (!auth.ok) return c.json({ ok: false, message: auth.message }, 403);
   const [updated] = await db.update(tenants).set({
     subscriptionStatus: "cancelled",
     updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq9(tenants.id, tenantId)).returning();
+  }).where(eq10(tenants.id, tenantId)).returning();
   await writeAuditLog({
     actorId: userId,
     action: "tenant.cancelled",
@@ -3620,7 +3776,7 @@ subscriptionRoutes.post("/tenants/:tenantId/cancel", async (c) => {
 });
 
 // src/features/tenants/routes.ts
-import { and as and7, eq as eq10 } from "drizzle-orm";
+import { and as and8, eq as eq11 } from "drizzle-orm";
 import { Hono as Hono9 } from "hono";
 var tenantRoutes = new Hono9();
 tenantRoutes.use("*", authMiddleware);
@@ -3630,10 +3786,10 @@ tenantRoutes.get("/default-branch", async (c) => {
     return c.json({ ok: false, message: "tenantId required" }, 400);
   }
   const branch = await db.query.branches.findFirst({
-    where: and7(
-      eq10(branches.tenantId, tenantId),
-      eq10(branches.isDefault, true),
-      eq10(branches.isActive, true)
+    where: and8(
+      eq11(branches.tenantId, tenantId),
+      eq11(branches.isDefault, true),
+      eq11(branches.isActive, true)
     )
   });
   if (!branch) {
@@ -3702,16 +3858,73 @@ tenantRoutes.post("/", async (c) => {
     defaultWarehouseId: warehouseId
   });
 });
+tenantRoutes.post("/:tenantId/branches", async (c) => {
+  const userId = c.get("userId");
+  const tenantId = c.req.param("tenantId");
+  const authResult = await verifyTenantMembership(userId, tenantId, ["owner", "admin"]);
+  if (!authResult.ok) {
+    return c.json({ ok: false, message: authResult.message, code: authResult.code }, authResult.status);
+  }
+  const tenant = await db.query.tenants.findFirst({
+    where: eq11(tenants.id, tenantId)
+  });
+  if (!tenant) {
+    return c.json({ ok: false, message: "Unit usaha tidak ditemukan" }, 404);
+  }
+  const existingBranches = await db.query.branches.findMany({
+    where: and8(eq11(branches.tenantId, tenantId), eq11(branches.isActive, true))
+  });
+  const maxBranches = tenant.maxBranches ?? 1;
+  if (existingBranches.length >= maxBranches) {
+    return c.json({
+      ok: false,
+      code: "PLAN_LIMIT_REACHED",
+      message: `Batas maksimum cabang (${maxBranches} cabang) untuk paket ini telah tercapai. Silakan tingkatkan paket langganan Anda.`
+    }, 403);
+  }
+  const body = await c.req.json().catch(() => null);
+  const branchName = body?.name?.trim();
+  if (!branchName) {
+    return c.json({ ok: false, message: "Nama cabang wajib diisi" }, 400);
+  }
+  const branchId = crypto.randomUUID();
+  const warehouseId = crypto.randomUUID();
+  const now = /* @__PURE__ */ new Date();
+  await db.transaction(async (tx) => {
+    await tx.insert(branches).values({
+      id: branchId,
+      tenantId,
+      name: branchName,
+      address: body?.address?.trim() ?? null,
+      phone: body?.phone?.trim() ?? null,
+      isDefault: false,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
+    });
+    await tx.insert(warehouses).values({
+      id: warehouseId,
+      tenantId,
+      branchId,
+      name: `Gudang ${branchName}`,
+      isDefault: false,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
+    });
+  });
+  return c.json({ ok: true, id: branchId, name: branchName, warehouseId });
+});
 
 // src/features/storefront/routes.ts
-import { and as and8, count as count3, desc as desc6, eq as eq11, inArray as inArray2, isNull as isNull2, sql as sql3 } from "drizzle-orm";
+import { and as and9, count as count3, desc as desc6, eq as eq12, inArray as inArray2, isNull as isNull2, sql as sql3 } from "drizzle-orm";
 import { Hono as Hono10 } from "hono";
 var storefrontRoutes = new Hono10();
 async function resolveTenantId(slug) {
   const row = await db.query.settings.findFirst({
-    where: and8(
-      eq11(settings.key, "store-slug"),
-      eq11(settings.value, slug)
+    where: and9(
+      eq12(settings.key, "store-slug"),
+      eq12(settings.value, slug)
     )
   });
   return row?.tenantId ?? null;
@@ -3723,14 +3936,14 @@ storefrontRoutes.get("/:slug", async (c) => {
     return c.json({ ok: false, message: "Toko tidak ditemukan" }, 404);
   }
   const tenant = await db.query.tenants.findFirst({
-    where: eq11(tenants.id, tenantId)
+    where: eq12(tenants.id, tenantId)
   });
   if (!tenant) {
     return c.json({ ok: false, message: "Toko tidak ditemukan" }, 404);
   }
   const storeSettings = await db.query.settings.findMany({
-    where: and8(
-      eq11(settings.tenantId, tenantId)
+    where: and9(
+      eq12(settings.tenantId, tenantId)
     )
   });
   const getSetting = (key) => storeSettings.find((s) => s.key === key)?.value ?? null;
@@ -3762,9 +3975,9 @@ storefrontRoutes.get("/:slug/products", async (c) => {
     category: products.categoryId,
     type: products.type
   }).from(products).where(
-    and8(
-      eq11(products.tenantId, tenantId),
-      eq11(products.isActive, true),
+    and9(
+      eq12(products.tenantId, tenantId),
+      eq12(products.isActive, true),
       isNull2(products.deletedAt)
     )
   );
@@ -3788,8 +4001,8 @@ storefrontRoutes.get("/:slug/track", async (c) => {
   if (digits.startsWith("62")) phoneVariants.add(`0${digits.slice(2)}`);
   if (digits.startsWith("0")) phoneVariants.add(`62${digits.slice(1)}`);
   const customer = await db.query.customers.findFirst({
-    where: and8(
-      eq11(customers.tenantId, tenantId),
+    where: and9(
+      eq12(customers.tenantId, tenantId),
       inArray2(
         sql3`regexp_replace(${customers.phone}, '[^0-9]', '', 'g')`,
         [...phoneVariants]
@@ -3807,10 +4020,10 @@ storefrontRoutes.get("/:slug/track", async (c) => {
     status: salesOrders.status,
     date: salesOrders.date,
     itemCount: count3(salesOrderItems.id)
-  }).from(salesOrders).leftJoin(salesOrderItems, eq11(salesOrderItems.salesOrderId, salesOrders.id)).where(
-    and8(
-      eq11(salesOrders.tenantId, tenantId),
-      eq11(salesOrders.customerId, customer.id),
+  }).from(salesOrders).leftJoin(salesOrderItems, eq12(salesOrderItems.salesOrderId, salesOrders.id)).where(
+    and9(
+      eq12(salesOrders.tenantId, tenantId),
+      eq12(salesOrders.customerId, customer.id),
       isNull2(salesOrders.deletedAt)
     )
   ).groupBy(
@@ -4019,7 +4232,7 @@ function sanitizeName(name, contentType) {
   return `${base}.jpg`;
 }
 var uploadRoutes = new Hono12();
-uploadRoutes.post("/", async (c) => {
+uploadRoutes.post("/", authMiddleware, async (c) => {
   try {
     const body = await c.req.parseBody();
     const file = body["file"];

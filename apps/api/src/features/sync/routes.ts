@@ -2,7 +2,7 @@ import { and, desc, eq, gte, isNull } from 'drizzle-orm'
 import { Hono } from 'hono'
 
 import { db } from '../../lib/db.js'
-import { authMiddleware } from '../auth/middleware.js'
+import { authMiddleware, verifyTenantMembership } from '../auth/middleware.js'
 import {
   buildSyncPushResponse,
   serverSyncStatusToApiItemStatus,
@@ -47,7 +47,8 @@ function normalizeSettingKey(key: string, area: string) {
   return key
 }
 
-export const syncRoutes = new Hono()
+type SyncEnv = { Variables: { userId: string } }
+export const syncRoutes = new Hono<SyncEnv>()
 
 syncRoutes.use('*', authMiddleware)
 
@@ -60,6 +61,12 @@ syncRoutes.get('/pull', async (c) => {
 
   if (!parsed.ok) {
     return c.json({ ok: false, message: parsed.message }, 400)
+  }
+
+  const userId = c.get('userId')
+  const authResult = await verifyTenantMembership(userId, parsed.value.tenantId)
+  if (!authResult.ok) {
+    return c.json({ ok: false, message: authResult.message, code: authResult.code }, authResult.status)
   }
 
   const branchFilter = parsed.value.branchId ? eq(products.branchId, parsed.value.branchId) : undefined
@@ -584,7 +591,36 @@ syncRoutes.post('/push', async (c) => {
     return c.json({ ok: false, message: parsed.message }, 400)
   }
 
+  const userId = c.get('userId')
+  const authResult = await verifyTenantMembership(userId, parsed.value.tenantId)
+  if (!authResult.ok) {
+    return c.json({ ok: false, message: authResult.message, code: authResult.code }, authResult.status)
+  }
+
   const now = new Date()
+
+  // Subscription hard gating: block sync writes if subscription is suspended or cancelled
+  if (authResult.subscriptionStatus === 'suspended' || authResult.subscriptionStatus === 'cancelled') {
+    return c.json({
+      ok: false,
+      code: 'SUBSCRIPTION_EXPIRED',
+      message: 'Langganan unit usaha Anda ditangguhkan atau dibatalkan. Silakan perpanjang paket langganan untuk menyinkronkan data.',
+    }, 402)
+  }
+
+  if (
+    authResult.planValidUntil &&
+    new Date(authResult.planValidUntil).getTime() < now.getTime() &&
+    authResult.subscriptionStatus !== 'active' &&
+    !authResult.planCode?.startsWith('free')
+  ) {
+    return c.json({
+      ok: false,
+      code: 'SUBSCRIPTION_EXPIRED',
+      message: 'Masa berlaku paket Anda telah berakhir. Silakan perpanjang paket langganan untuk menyinkronkan data.',
+    }, 402)
+  }
+
   const items: SyncPushItemResult[] = []
 
   for (const mutation of parsed.value.mutations) {

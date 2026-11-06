@@ -23,6 +23,7 @@ type Uuid = ReturnType<typeof crypto.randomUUID>
 
 type RegisterResponse = {
   ok: boolean
+  accessToken?: string
   defaultBranchId?: Uuid
   defaultWarehouseId?: Uuid
   user: { id: string; email: string; name: string; role?: 'user' | 'platform_admin' }
@@ -134,6 +135,7 @@ export function OnboardingPage() {
       let defaultBranchId: string | undefined
       let defaultWarehouseId: string | undefined
       let tenantRole = 'owner'
+      let accessToken: string | undefined
 
       if (shouldProvisionCloudTenant) {
         let registerResponse: RegisterResponse | null = null
@@ -156,6 +158,7 @@ export function OnboardingPage() {
         tenantRole = registerResponse.memberships[0].role
         defaultBranchId = registerResponse.defaultBranchId
         defaultWarehouseId = registerResponse.defaultWarehouseId
+        accessToken = registerResponse.accessToken
       } else {
         const res = await apiPost<{ ok: boolean; tenantId: Uuid; defaultBranchId: Uuid; defaultWarehouseId: Uuid }>('/tenants', {
           id: tenantId,
@@ -178,7 +181,7 @@ export function OnboardingPage() {
       }
       await localDb.users.put(nextUser)
       if (currentUser && currentUser.id !== nextUser.id) await localDb.users.delete(currentUser.id)
-      setAuth(nextUser)
+      setAuth(nextUser, accessToken)
 
       const tenant = {
         id: tenantId,

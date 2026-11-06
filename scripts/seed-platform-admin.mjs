@@ -167,6 +167,32 @@ try {
       `
     }
     console.log('✅ Admin linked to', platformTenant.name, 'as owner')
+
+    const defaultBankAccounts = JSON.stringify([
+      { bank: 'BCA', accountNumber: '8001234567', accountHolder: 'PT KOTACOM SOLUSI DIGITAL' },
+      { bank: 'Mandiri', accountNumber: '1370012345678', accountHolder: 'PT KOTACOM SOLUSI DIGITAL' },
+    ])
+
+    const [existingBilling] = await tx`SELECT id FROM platform_billing_settings LIMIT 1`
+    if (!existingBilling) {
+      await tx`
+        INSERT INTO platform_billing_settings (
+          id, support_whatsapp, support_text, support_url, payment_instructions, bank_accounts, created_at, updated_at
+        ) VALUES (
+          gen_random_uuid(),
+          '6281234567890',
+          'Hubungi kami via WhatsApp untuk bantuan aktivasi paket dan kendala teknis.',
+          'https://wa.me/6281234567890',
+          'Silakan transfer sesuai total tagihan ke salah satu rekening bank tertera. Setelah transfer, konfirmasi pembayaran dengan mengunggah bukti transfer.',
+          ${defaultBankAccounts}::jsonb,
+          ${now},
+          ${now}
+        )
+      `
+      console.log('✅ Default platform billing settings seeded')
+    } else {
+      console.log('ℹ️ Platform billing settings already present')
+    }
   })
 
   console.log(`\n🔑 Login as: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`)

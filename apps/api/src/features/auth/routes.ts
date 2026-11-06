@@ -1,7 +1,9 @@
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
+import { sign, verify } from 'hono/jwt'
 
 import { db, type AppDb } from '../../lib/db.js'
+import { getApiEnv } from '../../lib/env.js'
 import { branches, subscriptionPlans, tenantMembers, tenants, users, warehouses } from '../../../../../src/db/schema/index.js'
 import { hashPassword } from '../../../../../src/lib/crypto.js'
 
@@ -9,12 +11,46 @@ export const authRoutes = new Hono()
 
 type AuthUser = typeof users.$inferSelect
 
-export function readUserId(request: Request) {
-  const userId = request.headers.get('x-user-id')
-  const authorization = request.headers.get('authorization')
+export async function createAccessToken(user: { id: string; email: string; role?: string }): Promise<string> {
+  const env = getApiEnv()
+  return sign(
+    {
+      sub: user.id,
+      email: user.email,
+      role: user.role ?? 'user',
+      exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30, // 30 days
+    },
+    env.jwtSecret,
+    'HS256',
+  )
+}
 
-  if (userId) return userId
-  if (authorization?.startsWith('Bearer dev-')) return authorization.slice('Bearer dev-'.length)
+export async function readUserId(request: Request): Promise<string | null> {
+  const authorization = request.headers.get('authorization')
+  if (authorization?.startsWith('Bearer ')) {
+    const token = authorization.slice('Bearer '.length).trim()
+    if (token.startsWith('dev-')) {
+      if (process.env.NODE_ENV !== 'production') {
+        return token.slice('dev-'.length)
+      }
+      return null
+    }
+
+    try {
+      const env = getApiEnv()
+      const payload = (await verify(token, env.jwtSecret, 'HS256')) as { sub?: string }
+      if (payload?.sub) return payload.sub
+    } catch {
+      return null
+    }
+  }
+
+  // Fallback to x-user-id only in non-production
+  if (process.env.NODE_ENV !== 'production') {
+    const userId = request.headers.get('x-user-id')
+    if (userId) return userId
+  }
+
   return null
 }
 
@@ -180,11 +216,13 @@ authRoutes.post('/register', async (c) => {
   })
 
   const memberships = await listActiveMemberships(db, userId)
+  const tokenUser = { id: userId, email, role: 'user' }
+  const accessToken = await createAccessToken(tokenUser)
 
   return c.json({
     ok: true,
-    accessToken: `dev-${userId}`,
-    user: { id: userId, email, name, role: 'user' },
+    accessToken,
+    user: tokenUser,
     defaultBranchId: branchId,
     defaultWarehouseId: warehouseId,
     memberships,
@@ -192,7 +230,7 @@ authRoutes.post('/register', async (c) => {
 })
 
 authRoutes.get('/me', async (c) => {
-  const userId = readUserId(c.req.raw)
+  const userId = await readUserId(c.req.raw)
 
   if (!userId) {
     return c.json({ ok: false, message: 'x-user-id header or dev token required' }, 401)
@@ -210,7 +248,7 @@ authRoutes.get('/me', async (c) => {
 })
 
 authRoutes.get('/tenants', async (c) => {
-  const userId = readUserId(c.req.raw)
+  const userId = await readUserId(c.req.raw)
 
   if (!userId) {
     return c.json({ ok: false, message: 'x-user-id header or dev token required' }, 401)
@@ -253,9 +291,11 @@ authRoutes.post('/login', async (c) => {
     return c.json({ ok: false, message: 'Active tenant membership required' }, 403)
   }
 
+  const accessToken = await createAccessToken(user)
+
   return c.json({
     ok: true,
-    accessToken: `dev-${user.id}`,
+    accessToken,
     user: userResponse(user),
     memberships,
   })

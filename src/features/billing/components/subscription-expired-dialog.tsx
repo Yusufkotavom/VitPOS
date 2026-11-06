@@ -43,8 +43,9 @@ function buildWhatsappUrl(value?: string | null) {
   return cleaned ? `https://wa.me/${cleaned}` : null
 }
 
-export function SubscriptionExpiredDialog({ open, planName, planValidUntil, warningKind = 'expired', tenantId }: Props) {
+export function SubscriptionExpiredDialog({ open, status, planName, planValidUntil, warningKind = 'expired', tenantId }: Props) {
   const navigate = useNavigate()
+  const isHardGated = warningKind === 'expired' || status === 'suspended' || status === 'cancelled'
   const [dismissed, setDismissed] = useState(() => {
     try {
       return typeof window !== 'undefined' && window.localStorage.getItem(dismissalKey(tenantId)) === '1'
@@ -63,10 +64,13 @@ export function SubscriptionExpiredDialog({ open, planName, planValidUntil, warn
     return buildWhatsappUrl(settings?.supportWhatsapp) ?? settings?.supportUrl ?? null
   }, [billingSettingsQuery.data])
 
-  if (!open || dismissed) return null
+  if (!open || (!isHardGated && dismissed)) return null
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => {
+      if (isHardGated) {
+        return
+      }
       if (!nextOpen) {
         try {
           window.localStorage.setItem(dismissalKey(tenantId), '1')
