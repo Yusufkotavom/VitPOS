@@ -3917,7 +3917,7 @@ tenantRoutes.post("/:tenantId/branches", async (c) => {
 });
 
 // src/features/storefront/routes.ts
-import { and as and9, count as count3, desc as desc6, eq as eq12, inArray as inArray2, isNull as isNull2, sql as sql3 } from "drizzle-orm";
+import { and as and9, desc as desc6, eq as eq12, inArray as inArray2, isNull as isNull2, sql as sql3 } from "drizzle-orm";
 import { Hono as Hono10 } from "hono";
 var storefrontRoutes = new Hono10();
 async function resolveTenantId(slug) {
@@ -3985,62 +3985,108 @@ storefrontRoutes.get("/:slug/products", async (c) => {
 });
 storefrontRoutes.get("/:slug/track", async (c) => {
   const slug = c.req.param("slug");
-  const phone = c.req.query("phone");
-  if (!phone) {
-    return c.json({ ok: false, message: "Parameter phone wajib diisi" }, 400);
+  const queryParam = c.req.query("phone") ?? c.req.query("q") ?? "";
+  const trimmed = queryParam.trim();
+  if (!trimmed) {
+    return c.json({ ok: false, message: "Parameter phone atau nomor pesanan wajib diisi" }, 400);
   }
   const tenantId = await resolveTenantId(slug);
   if (!tenantId) {
     return c.json({ ok: false, message: "Toko tidak ditemukan" }, 404);
   }
-  const digits = phone.replace(/\D/g, "");
-  if (!digits) {
-    return c.json({ ok: false, message: "Nomor telepon tidak valid" }, 400);
+  let orderRows = [];
+  let customerInfo = null;
+  if (trimmed.toUpperCase().startsWith("SO-")) {
+    orderRows = await db.query.salesOrders.findMany({
+      where: and9(
+        eq12(salesOrders.tenantId, tenantId),
+        sql3`upper(${salesOrders.orderNumber}) = upper(${trimmed})`,
+        isNull2(salesOrders.deletedAt)
+      ),
+      limit: 10
+    });
+    if (orderRows.length > 0 && orderRows[0].customerId) {
+      const cust = await db.query.customers.findFirst({
+        where: and9(
+          eq12(customers.tenantId, tenantId),
+          eq12(customers.id, orderRows[0].customerId)
+        )
+      });
+      if (cust) {
+        customerInfo = { name: cust.name, phone: cust.phone };
+      }
+    }
+  } else {
+    const digits = trimmed.replace(/\D/g, "");
+    if (digits) {
+      const phoneVariants = /* @__PURE__ */ new Set([digits]);
+      if (digits.startsWith("62")) phoneVariants.add(`0${digits.slice(2)}`);
+      if (digits.startsWith("0")) phoneVariants.add(`62${digits.slice(1)}`);
+      const customer = await db.query.customers.findFirst({
+        where: and9(
+          eq12(customers.tenantId, tenantId),
+          inArray2(
+            sql3`regexp_replace(${customers.phone}, '[^0-9]', '', 'g')`,
+            [...phoneVariants]
+          )
+        )
+      });
+      if (customer) {
+        customerInfo = { name: customer.name, phone: customer.phone };
+        orderRows = await db.query.salesOrders.findMany({
+          where: and9(
+            eq12(salesOrders.tenantId, tenantId),
+            eq12(salesOrders.customerId, customer.id),
+            isNull2(salesOrders.deletedAt)
+          ),
+          orderBy: [desc6(salesOrders.date)],
+          limit: 20
+        });
+      }
+    }
   }
-  const phoneVariants = /* @__PURE__ */ new Set([digits]);
-  if (digits.startsWith("62")) phoneVariants.add(`0${digits.slice(2)}`);
-  if (digits.startsWith("0")) phoneVariants.add(`62${digits.slice(1)}`);
-  const customer = await db.query.customers.findFirst({
+  if (orderRows.length === 0) {
+    return c.json({ ok: true, customer: customerInfo, orders: [] });
+  }
+  const orderIds = orderRows.map((o) => o.id);
+  const itemRows = await db.query.salesOrderItems.findMany({
     where: and9(
-      eq12(customers.tenantId, tenantId),
-      inArray2(
-        sql3`regexp_replace(${customers.phone}, '[^0-9]', '', 'g')`,
-        [...phoneVariants]
-      )
+      eq12(salesOrderItems.tenantId, tenantId),
+      inArray2(salesOrderItems.salesOrderId, orderIds)
     )
   });
-  if (!customer) {
-    return c.json({ ok: true, customer: null, orders: [] });
+  const itemsByOrderId = /* @__PURE__ */ new Map();
+  for (const it of itemRows) {
+    const list = itemsByOrderId.get(it.salesOrderId) || [];
+    list.push(it);
+    itemsByOrderId.set(it.salesOrderId, list);
   }
-  const rows = await db.select({
-    id: salesOrders.id,
-    orderNumber: salesOrders.orderNumber,
-    grandTotal: salesOrders.grandTotal,
-    paidTotal: salesOrders.paidTotal,
-    status: salesOrders.status,
-    date: salesOrders.date,
-    itemCount: count3(salesOrderItems.id)
-  }).from(salesOrders).leftJoin(salesOrderItems, eq12(salesOrderItems.salesOrderId, salesOrders.id)).where(
-    and9(
-      eq12(salesOrders.tenantId, tenantId),
-      eq12(salesOrders.customerId, customer.id),
-      isNull2(salesOrders.deletedAt)
-    )
-  ).groupBy(
-    salesOrders.id,
-    salesOrders.orderNumber,
-    salesOrders.grandTotal,
-    salesOrders.paidTotal,
-    salesOrders.status,
-    salesOrders.date
-  ).orderBy(desc6(salesOrders.date)).limit(20);
+  const orders = orderRows.map((o) => {
+    const items = itemsByOrderId.get(o.id) || [];
+    return {
+      id: o.id,
+      orderNumber: o.orderNumber,
+      grandTotal: o.grandTotal,
+      paidTotal: o.paidTotal,
+      subtotal: o.subtotal,
+      status: o.status,
+      date: o.date,
+      notes: o.notes,
+      itemCount: items.length,
+      items: items.map((it) => ({
+        id: it.id,
+        productId: it.productId,
+        name: it.name,
+        qty: Number(it.qty) || 0,
+        unitPrice: Number(it.unitPrice) || 0,
+        subtotal: Number(it.subtotal) || 0
+      }))
+    };
+  });
   return c.json({
     ok: true,
-    customer: {
-      name: customer.name,
-      phone: customer.phone
-    },
-    orders: rows
+    customer: customerInfo,
+    orders
   });
 });
 storefrontRoutes.post("/:slug/checkout", async (c) => {

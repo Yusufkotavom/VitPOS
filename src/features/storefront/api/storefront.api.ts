@@ -18,6 +18,15 @@ export interface StoreProduct {
   type?: string
 }
 
+export interface TrackedOrderItem {
+  id: string
+  productId?: string | null
+  name: string
+  qty: number
+  unitPrice: number
+  subtotal: number
+}
+
 export interface TrackedOrder {
   id: string
   orderNumber?: string
@@ -25,7 +34,11 @@ export interface TrackedOrder {
   date: string
   grandTotal: number
   paidTotal: number
+  subtotal?: number
   status: string
+  notes?: string | null
+  itemCount?: number
+  items?: TrackedOrderItem[]
 }
 
 export interface CheckoutInput {

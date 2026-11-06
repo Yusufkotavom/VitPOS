@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 
 import { db } from '../../lib/db.js'
@@ -103,10 +103,11 @@ storefrontRoutes.get('/:slug/products', async (c) => {
 // GET /api/v1/store/:slug/track?phone=...
 storefrontRoutes.get('/:slug/track', async (c) => {
   const slug = c.req.param('slug')
-  const phone = c.req.query('phone')
+  const queryParam = c.req.query('phone') ?? c.req.query('q') ?? ''
+  const trimmed = queryParam.trim()
 
-  if (!phone) {
-    return c.json({ ok: false, message: 'Parameter phone wajib diisi' }, 400)
+  if (!trimmed) {
+    return c.json({ ok: false, message: 'Parameter phone atau nomor pesanan wajib diisi' }, 400)
   }
 
   const tenantId = await resolveTenantId(slug)
@@ -114,69 +115,113 @@ storefrontRoutes.get('/:slug/track', async (c) => {
     return c.json({ ok: false, message: 'Toko tidak ditemukan' }, 404)
   }
 
-  // Phones are stored inconsistently (dashes/spaces, and either `0…` or `62…`
-  // country prefix), so match on digits only and accept both national forms.
-  const digits = phone.replace(/\D/g, '')
-  if (!digits) {
-    return c.json({ ok: false, message: 'Nomor telepon tidak valid' }, 400)
-  }
-  const phoneVariants = new Set([digits])
-  if (digits.startsWith('62')) phoneVariants.add(`0${digits.slice(2)}`)
-  if (digits.startsWith('0')) phoneVariants.add(`62${digits.slice(1)}`)
+  type OrderRow = typeof salesOrders.$inferSelect
+  let orderRows: OrderRow[] = []
+  let customerInfo: { name: string; phone: string | null } | null = null
 
-  // Find customer by phone
-  const customer = await db.query.customers.findFirst({
-    where: and(
-      eq(customers.tenantId, tenantId),
-      inArray(
-        sql`regexp_replace(${customers.phone}, '[^0-9]', '', 'g')`,
-        [...phoneVariants],
+  // 1. Search by order number if starts with "SO-"
+  if (trimmed.toUpperCase().startsWith('SO-')) {
+    orderRows = await db.query.salesOrders.findMany({
+      where: and(
+        eq(salesOrders.tenantId, tenantId),
+        sql`upper(${salesOrders.orderNumber}) = upper(${trimmed})`,
+        isNull(salesOrders.deletedAt),
       ),
+      limit: 10,
+    })
+
+    if (orderRows.length > 0 && orderRows[0].customerId) {
+      const cust = await db.query.customers.findFirst({
+        where: and(
+          eq(customers.tenantId, tenantId),
+          eq(customers.id, orderRows[0].customerId),
+        ),
+      })
+      if (cust) {
+        customerInfo = { name: cust.name, phone: cust.phone }
+      }
+    }
+  } else {
+    // 2. Search by customer phone
+    const digits = trimmed.replace(/\D/g, '')
+    if (digits) {
+      const phoneVariants = new Set([digits])
+      if (digits.startsWith('62')) phoneVariants.add(`0${digits.slice(2)}`)
+      if (digits.startsWith('0')) phoneVariants.add(`62${digits.slice(1)}`)
+
+      const customer = await db.query.customers.findFirst({
+        where: and(
+          eq(customers.tenantId, tenantId),
+          inArray(
+            sql`regexp_replace(${customers.phone}, '[^0-9]', '', 'g')`,
+            [...phoneVariants],
+          ),
+        ),
+      })
+
+      if (customer) {
+        customerInfo = { name: customer.name, phone: customer.phone }
+        orderRows = await db.query.salesOrders.findMany({
+          where: and(
+            eq(salesOrders.tenantId, tenantId),
+            eq(salesOrders.customerId, customer.id),
+            isNull(salesOrders.deletedAt),
+          ),
+          orderBy: [desc(salesOrders.date)],
+          limit: 20,
+        })
+      }
+    }
+  }
+
+  if (orderRows.length === 0) {
+    return c.json({ ok: true, customer: customerInfo, orders: [] })
+  }
+
+  // Fetch items for the orders
+  const orderIds = orderRows.map((o) => o.id)
+  const itemRows = await db.query.salesOrderItems.findMany({
+    where: and(
+      eq(salesOrderItems.tenantId, tenantId),
+      inArray(salesOrderItems.salesOrderId, orderIds),
     ),
   })
 
-  if (!customer) {
-    return c.json({ ok: true, customer: null, orders: [] })
+  type ItemRow = typeof salesOrderItems.$inferSelect
+  const itemsByOrderId = new Map<string, ItemRow[]>()
+  for (const it of itemRows) {
+    const list = itemsByOrderId.get(it.salesOrderId) || []
+    list.push(it)
+    itemsByOrderId.set(it.salesOrderId, list)
   }
 
-  // Query sales orders with item counts
-  const rows = await db
-    .select({
-      id: salesOrders.id,
-      orderNumber: salesOrders.orderNumber,
-      grandTotal: salesOrders.grandTotal,
-      paidTotal: salesOrders.paidTotal,
-      status: salesOrders.status,
-      date: salesOrders.date,
-      itemCount: count(salesOrderItems.id),
-    })
-    .from(salesOrders)
-    .leftJoin(salesOrderItems, eq(salesOrderItems.salesOrderId, salesOrders.id))
-    .where(
-      and(
-        eq(salesOrders.tenantId, tenantId),
-        eq(salesOrders.customerId, customer.id),
-        isNull(salesOrders.deletedAt),
-      ),
-    )
-    .groupBy(
-      salesOrders.id,
-      salesOrders.orderNumber,
-      salesOrders.grandTotal,
-      salesOrders.paidTotal,
-      salesOrders.status,
-      salesOrders.date,
-    )
-    .orderBy(desc(salesOrders.date))
-    .limit(20)
+  const orders = orderRows.map((o) => {
+    const items = itemsByOrderId.get(o.id) || []
+    return {
+      id: o.id,
+      orderNumber: o.orderNumber,
+      grandTotal: o.grandTotal,
+      paidTotal: o.paidTotal,
+      subtotal: o.subtotal,
+      status: o.status,
+      date: o.date,
+      notes: o.notes,
+      itemCount: items.length,
+      items: items.map((it) => ({
+        id: it.id,
+        productId: it.productId,
+        name: it.name,
+        qty: Number(it.qty) || 0,
+        unitPrice: Number(it.unitPrice) || 0,
+        subtotal: Number(it.subtotal) || 0,
+      })),
+    }
+  })
 
   return c.json({
     ok: true,
-    customer: {
-      name: customer.name,
-      phone: customer.phone,
-    },
-    orders: rows,
+    customer: customerInfo,
+    orders,
   })
 })
 

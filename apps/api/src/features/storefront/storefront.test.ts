@@ -125,6 +125,16 @@ describe('Storefront Public API & Checkout', () => {
     expect(trackData.ok).toBe(true)
     expect(trackData.orders.length).toBeGreaterThanOrEqual(1)
     expect(trackData.orders[0].grandTotal).toBe('36000.00')
+    expect(trackData.orders[0].items.length).toBe(1)
+    expect(trackData.orders[0].items[0].name).toBe('Kopi Susu Gula Aren')
+
+    // 3b. Track orders by order number
+    const trackOrderNumRes = await app.request(`/api/v1/store/${slug}/track?phone=${checkoutData.order.orderNumber}`)
+    expect(trackOrderNumRes.status).toBe(200)
+    const trackNumData = await trackOrderNumRes.json()
+    expect(trackNumData.ok).toBe(true)
+    expect(trackNumData.orders.length).toBe(1)
+    expect(trackNumData.orders[0].orderNumber).toBe(checkoutData.order.orderNumber)
 
     // 4. Checkout without name or phone defaults to "Pelanggan Umum"
     const anonymousCheckout = await app.request(`/api/v1/store/${slug}/checkout`, {

@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useParams, Link } from 'react-router-dom'
-import { Search, ArrowLeft, ClipboardList, Store } from 'lucide-react'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
+import { Search, ArrowLeft, ClipboardList, Store, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/lib/format-currency'
 import { getStore, trackOrders, type TrackedOrder } from '@/features/storefront/api/storefront.api'
+import { OrderTrackDetailDialog } from '@/features/storefront/components/order-track-detail-dialog'
 
 type StatusTone = 'green' | 'yellow' | 'red' | 'gray'
 
@@ -14,6 +15,7 @@ function getStatusStyle(status: string): { tone: StatusTone; label: string } {
   const s = status?.toLowerCase() ?? ''
   if (s === 'paid' || s === 'lunas') return { tone: 'green', label: 'Lunas' }
   if (s === 'partial' || s === 'sebagian') return { tone: 'yellow', label: 'Sebagian' }
+  if (s === 'confirmed' || s === 'dikonfirmasi') return { tone: 'green', label: 'Dikonfirmasi' }
   if (s === 'unpaid' || s === 'belum bayar' || s === 'pending') return { tone: 'red', label: 'Belum Bayar' }
   if (s === 'cancelled' || s === 'batal') return { tone: 'gray', label: 'Batal' }
   if (s === 'draft') return { tone: 'gray', label: 'Draft' }
@@ -39,23 +41,31 @@ function formatDate(dateStr: string) {
   }
 }
 
-function OrderCard({ order }: { order: TrackedOrder }) {
+function OrderCard({ order, onClick }: { order: TrackedOrder; onClick: () => void }) {
   const { tone, label } = getStatusStyle(order.status)
   const identifier = order.code ?? order.orderNumber ?? order.id
 
   return (
-    <div className="rounded-2xl border bg-white p-4 shadow-sm">
+    <div
+      onClick={onClick}
+      className="group rounded-2xl border bg-white p-4 shadow-xs hover:border-primary/50 hover:shadow-md transition-all cursor-pointer active:scale-[0.99]"
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="font-semibold text-gray-900 truncate">#{identifier}</p>
+          <p className="font-semibold text-gray-900 truncate group-hover:text-primary transition-colors">
+            #{identifier}
+          </p>
           <p className="mt-0.5 text-xs text-muted-foreground">{formatDate(order.date)}</p>
         </div>
-        <Badge
-          className={`shrink-0 border text-xs font-medium ${badgeClass[tone]}`}
-          variant="outline"
-        >
-          {label}
-        </Badge>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Badge
+            className={`border text-xs font-medium ${badgeClass[tone]}`}
+            variant="outline"
+          >
+            {label}
+          </Badge>
+          <ChevronRight className="size-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+        </div>
       </div>
 
       <div className="mt-3 flex flex-col gap-1.5 border-t pt-3">
@@ -76,14 +86,30 @@ function OrderCard({ order }: { order: TrackedOrder }) {
           </div>
         )}
       </div>
+
+      <div className="mt-3 flex items-center justify-between border-t border-dashed pt-2.5 text-xs text-primary font-medium">
+        <span>{order.itemCount ? `${order.itemCount} produk dipesan` : 'Detail pesanan'}</span>
+        <span className="group-hover:underline">Klik untuk rincian &rarr;</span>
+      </div>
     </div>
   )
 }
 
 export function OrderTrackingPage() {
   const { slug } = useParams<{ slug: string }>()
-  const [phone, setPhone] = useState('')
-  const [submittedPhone, setSubmittedPhone] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialPhone = searchParams.get('phone') || searchParams.get('q') || ''
+  const [phone, setPhone] = useState(initialPhone)
+  const [submittedPhone, setSubmittedPhone] = useState(initialPhone)
+  const [selectedOrder, setSelectedOrder] = useState<TrackedOrder | null>(null)
+
+  useEffect(() => {
+    const p = searchParams.get('phone') || searchParams.get('q') || ''
+    if (p && p !== submittedPhone) {
+      setPhone(p)
+      setSubmittedPhone(p)
+    }
+  }, [searchParams, submittedPhone])
 
   const { data: store } = useQuery({
     queryKey: ['public-store', slug],
@@ -110,6 +136,7 @@ export function OrderTrackingPage() {
     const trimmed = phone.trim()
     if (!trimmed) return
     setSubmittedPhone(trimmed)
+    setSearchParams({ phone: trimmed })
   }
 
   const hasSearched = !!submittedPhone
@@ -147,20 +174,20 @@ export function OrderTrackingPage() {
       <div className="mx-auto max-w-lg px-4 py-6">
         <form onSubmit={handleSubmit} className="rounded-2xl bg-white p-5 shadow-sm">
           <label htmlFor="phone-input" className="mb-1.5 block text-sm font-medium text-gray-700">
-            Nomor HP / WhatsApp
+            Nomor WhatsApp atau Nomor Pesanan
           </label>
           <p className="mb-3 text-xs text-muted-foreground">
-            Masukkan nomor yang digunakan saat memesan
+            Masukkan nomor WhatsApp atau kode pesanan (contoh: 08123... atau SO-...)
           </p>
           <div className="flex gap-2">
             <Input
               id="phone-input"
-              type="tel"
-              placeholder="Contoh: 08123456789"
+              type="text"
+              placeholder="Contoh: 08123456789 atau SO-..."
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               className="flex-1"
-              autoComplete="tel"
+              autoComplete="off"
             />
             <Button
               type="submit"
@@ -223,12 +250,26 @@ export function OrderTrackingPage() {
                 <span className="font-medium text-gray-700">{submittedPhone}</span>
               </p>
               {orders.map((order) => (
-                <OrderCard key={order.id} order={order} />
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  onClick={() => setSelectedOrder(order)}
+                />
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {/* Order Detail Modal */}
+      <OrderTrackDetailDialog
+        open={!!selectedOrder}
+        onOpenChange={(open) => {
+          if (!open) setSelectedOrder(null)
+        }}
+        order={selectedOrder}
+        store={store || null}
+      />
 
       {/* Footer */}
       <div className="pb-8 text-center">
