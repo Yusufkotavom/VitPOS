@@ -1304,6 +1304,75 @@ async function getSalesReport(db2, input) {
   }).from(serviceOrders).where(and3(...svcFilters));
   const totalRevenue = n(totals?.revenue) + n(svcTotals?.revenue);
   const totalOrders = Number(totals?.orderCount ?? 0) + Number(svcTotals?.orderCount ?? 0);
+  const transactionRows = await db2.select({
+    id: salesOrders.id,
+    orderNumber: salesOrders.orderNumber,
+    createdAt: salesOrders.createdAt,
+    customerId: salesOrders.customerId,
+    customerName: customers.name,
+    status: salesOrders.status,
+    subtotal: salesOrders.subtotal,
+    discountTotal: salesOrders.discountTotal,
+    taxTotal: salesOrders.taxTotal,
+    grandTotal: salesOrders.grandTotal,
+    paidTotal: salesOrders.paidTotal
+  }).from(salesOrders).leftJoin(customers, eq3(salesOrders.customerId, customers.id)).where(and3(...saleFilters)).orderBy(desc(salesOrders.createdAt)).limit(100);
+  const orderIds = transactionRows.map((t) => t.id);
+  const itemsByOrder = /* @__PURE__ */ new Map();
+  const paymentsByOrder = /* @__PURE__ */ new Map();
+  if (orderIds.length > 0) {
+    const itemRows = await db2.select({
+      salesOrderId: salesOrderItems.salesOrderId,
+      name: salesOrderItems.name,
+      qty: salesOrderItems.qty
+    }).from(salesOrderItems).where(and3(eq3(salesOrderItems.tenantId, tenantId), inArray(salesOrderItems.salesOrderId, orderIds)));
+    for (const item of itemRows) {
+      const arr = itemsByOrder.get(item.salesOrderId) ?? [];
+      arr.push({ name: item.name, qty: n(item.qty) });
+      itemsByOrder.set(item.salesOrderId, arr);
+    }
+    const payRows = await db2.select({
+      salesOrderId: payments.salesOrderId,
+      method: payments.method
+    }).from(payments).where(and3(eq3(payments.tenantId, tenantId), inArray(payments.salesOrderId, orderIds)));
+    for (const p of payRows) {
+      if (p.salesOrderId) {
+        const arr = paymentsByOrder.get(p.salesOrderId) ?? [];
+        if (!arr.includes(p.method)) arr.push(p.method);
+        paymentsByOrder.set(p.salesOrderId, arr);
+      }
+    }
+  }
+  const transactions = transactionRows.map((t) => {
+    const items = itemsByOrder.get(t.id) ?? [];
+    const methods = paymentsByOrder.get(t.id) ?? [];
+    const grandTotal = n(t.grandTotal);
+    const paidTotal = n(t.paidTotal);
+    const balanceDue = Math.max(0, grandTotal - paidTotal);
+    let paymentStatus = "unpaid";
+    if (paidTotal >= grandTotal && grandTotal > 0) {
+      paymentStatus = "paid";
+    } else if (paidTotal > 0) {
+      paymentStatus = "partial";
+    }
+    return {
+      id: t.id,
+      orderNumber: t.orderNumber,
+      createdAt: t.createdAt ? new Date(t.createdAt).toISOString() : (/* @__PURE__ */ new Date()).toISOString(),
+      customerName: t.customerName || "Pelanggan Umum",
+      status: t.status,
+      paymentStatus,
+      paymentMethod: methods.length > 0 ? methods.join(", ") : "tunai",
+      itemCount: items.reduce((s, it) => s + it.qty, 0),
+      itemsSummary: items.length > 0 ? items.map((i) => `${i.name} (x${i.qty})`).join(", ") : "-",
+      subtotal: n(t.subtotal),
+      discountTotal: n(t.discountTotal),
+      taxTotal: n(t.taxTotal),
+      grandTotal,
+      paidTotal,
+      balanceDue
+    };
+  });
   return {
     summary: {
       totalRevenue,
@@ -1331,7 +1400,8 @@ async function getSalesReport(db2, input) {
       name: r.name,
       totalQty: n(r.totalQty),
       totalRevenue: n(r.totalRevenue)
-    }))
+    })),
+    transactions
   };
 }
 async function getPaymentReport(db2, input) {

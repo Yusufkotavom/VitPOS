@@ -4,6 +4,7 @@ import type { AppDb } from '../../lib/db.js'
 import {
   cash,
   cashCategories,
+  customers,
   payments,
   products,
   salesOrderItems,
@@ -444,6 +445,95 @@ export async function getSalesReport(db: AppDb, input: ReportInput) {
   const totalRevenue = n(totals?.revenue) + n(svcTotals?.revenue)
   const totalOrders = Number(totals?.orderCount ?? 0) + Number(svcTotals?.orderCount ?? 0)
 
+  const transactionRows = await db
+    .select({
+      id: salesOrders.id,
+      orderNumber: salesOrders.orderNumber,
+      createdAt: salesOrders.createdAt,
+      customerId: salesOrders.customerId,
+      customerName: customers.name,
+      status: salesOrders.status,
+      subtotal: salesOrders.subtotal,
+      discountTotal: salesOrders.discountTotal,
+      taxTotal: salesOrders.taxTotal,
+      grandTotal: salesOrders.grandTotal,
+      paidTotal: salesOrders.paidTotal,
+    })
+    .from(salesOrders)
+    .leftJoin(customers, eq(salesOrders.customerId, customers.id))
+    .where(and(...saleFilters))
+    .orderBy(desc(salesOrders.createdAt))
+    .limit(100)
+
+  const orderIds = transactionRows.map((t) => t.id)
+  const itemsByOrder = new Map<string, Array<{ name: string; qty: number }>>()
+  const paymentsByOrder = new Map<string, string[]>()
+
+  if (orderIds.length > 0) {
+    const itemRows = await db
+      .select({
+        salesOrderId: salesOrderItems.salesOrderId,
+        name: salesOrderItems.name,
+        qty: salesOrderItems.qty,
+      })
+      .from(salesOrderItems)
+      .where(and(eq(salesOrderItems.tenantId, tenantId), inArray(salesOrderItems.salesOrderId, orderIds)))
+
+    for (const item of itemRows) {
+      const arr = itemsByOrder.get(item.salesOrderId) ?? []
+      arr.push({ name: item.name, qty: n(item.qty) })
+      itemsByOrder.set(item.salesOrderId, arr)
+    }
+
+    const payRows = await db
+      .select({
+        salesOrderId: payments.salesOrderId,
+        method: payments.method,
+      })
+      .from(payments)
+      .where(and(eq(payments.tenantId, tenantId), inArray(payments.salesOrderId, orderIds)))
+
+    for (const p of payRows) {
+      if (p.salesOrderId) {
+        const arr = paymentsByOrder.get(p.salesOrderId) ?? []
+        if (!arr.includes(p.method)) arr.push(p.method)
+        paymentsByOrder.set(p.salesOrderId, arr)
+      }
+    }
+  }
+
+  const transactions = transactionRows.map((t) => {
+    const items = itemsByOrder.get(t.id) ?? []
+    const methods = paymentsByOrder.get(t.id) ?? []
+    const grandTotal = n(t.grandTotal)
+    const paidTotal = n(t.paidTotal)
+    const balanceDue = Math.max(0, grandTotal - paidTotal)
+    let paymentStatus: 'paid' | 'partial' | 'unpaid' = 'unpaid'
+    if (paidTotal >= grandTotal && grandTotal > 0) {
+      paymentStatus = 'paid'
+    } else if (paidTotal > 0) {
+      paymentStatus = 'partial'
+    }
+
+    return {
+      id: t.id,
+      orderNumber: t.orderNumber,
+      createdAt: t.createdAt ? new Date(t.createdAt).toISOString() : new Date().toISOString(),
+      customerName: t.customerName || 'Pelanggan Umum',
+      status: t.status,
+      paymentStatus,
+      paymentMethod: methods.length > 0 ? methods.join(', ') : 'tunai',
+      itemCount: items.reduce((s, it) => s + it.qty, 0),
+      itemsSummary: items.length > 0 ? items.map((i) => `${i.name} (x${i.qty})`).join(', ') : '-',
+      subtotal: n(t.subtotal),
+      discountTotal: n(t.discountTotal),
+      taxTotal: n(t.taxTotal),
+      grandTotal,
+      paidTotal,
+      balanceDue,
+    }
+  })
+
   return {
     summary: {
       totalRevenue,
@@ -472,6 +562,7 @@ export async function getSalesReport(db: AppDb, input: ReportInput) {
       totalQty: n(r.totalQty),
       totalRevenue: n(r.totalRevenue),
     })),
+    transactions,
   }
 }
 

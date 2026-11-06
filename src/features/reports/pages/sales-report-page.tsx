@@ -1,18 +1,25 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
+import { ArrowLeft, ExternalLink, FileSpreadsheet, ReceiptText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ReportDateFilter, useReportDateParams } from '@/features/reports/components/report-date-filter'
 import { ReportSection, ReportMetricCard } from '@/features/reports/components/report-section'
 import { ReportCorrelationNav } from '@/features/reports/components/report-correlation-nav'
 import { useSalesReport } from '@/features/reports/hooks/use-sales-report'
+import type { SalesReportTransaction } from '@/features/reports/api/fetch-sales-report'
 import { DataTable } from '@/shared/components/data-table/data-table'
 import { FilterToolbar } from '@/shared/components/data-table/filter-toolbar'
 import { formatCurrency } from '@/lib/format-currency'
 import { exportToCsv } from '@/shared/utils/export-csv'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { useLiveQuery } from '@/shared/hooks/use-live-query'
+import { dexieDb } from '@/services/local-db/dexie-instance'
+import type { LocalSalesOrder, LocalSalesOrderItem } from '@/services/local-db/schema'
+import { resolveTenantId } from '@/features/auth/stores/auth-store'
 
 type TopProductRow = {
   id: string
@@ -30,13 +37,90 @@ type DailySalesRow = {
   total: number
 }
 
+function getPaymentBadgeTone(status: string) {
+  if (status === 'paid' || status === 'Lunas') {
+    return 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300'
+  }
+  if (status === 'partial' || status === 'Sebagian') {
+    return 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-300'
+  }
+  return 'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-950 dark:text-rose-300'
+}
+
+function getPaymentBadgeLabel(status: string) {
+  if (status === 'paid' || status === 'Lunas') return 'Lunas'
+  if (status === 'partial' || status === 'Sebagian') return 'Sebagian'
+  return 'Belum Lunas'
+}
+
 export function SalesReportPage() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const params = useReportDateParams()
   const { data, isLoading } = useSalesReport(params)
+  const tenantId = resolveTenantId()
+
   const [productSearch, setProductSearch] = useState('')
   const [dailySearch, setDailySearch] = useState('')
+  const [txSearch, setTxSearch] = useState('')
+  const [txStatusFilter, setTxStatusFilter] = useState('all')
+  const [txMethodFilter, setTxMethodFilter] = useState('all')
+
+  // Fallback to local Dexie orders if offline / server transactions empty
+  const localOrders = useLiveQuery<LocalSalesOrder[], LocalSalesOrder[]>(
+    async () => {
+      if (!tenantId) return []
+      const list = await dexieDb.salesOrders.where('tenantId').equals(tenantId).toArray()
+      return list.filter((o: LocalSalesOrder) => {
+        if (o.status === 'Batal') return false
+        if (params.from && o.date < params.from) return false
+        if (params.to && o.date > params.to) return false
+        return true
+      })
+    },
+    [tenantId, params.from, params.to],
+    [],
+  )
+
+  const transactions: SalesReportTransaction[] = useMemo(() => {
+    if (data?.transactions && data.transactions.length > 0) {
+      return data.transactions
+    }
+    // Fallback mapping from local Dexie sales orders
+    const ordersList: LocalSalesOrder[] = Array.isArray(localOrders) ? localOrders : []
+    return ordersList.map((o: LocalSalesOrder) => {
+      const grandTotal = Number(o.grandTotal ?? 0)
+      const paidTotal = Number(o.paidTotal ?? 0)
+      const balanceDue = Math.max(0, grandTotal - paidTotal)
+      let paymentStatus: 'paid' | 'partial' | 'unpaid' = 'unpaid'
+      if (paidTotal >= grandTotal && grandTotal > 0) {
+        paymentStatus = 'paid'
+      } else if (paidTotal > 0) {
+        paymentStatus = 'partial'
+      }
+
+      const itemsSummary = (o.items ?? []).map((it: LocalSalesOrderItem) => `${it.name} (x${it.qty})`).join(', ')
+      const itemCount = (o.items ?? []).reduce((s: number, it: LocalSalesOrderItem) => s + (Number(it.qty) || 0), 0)
+
+      return {
+        id: o.id,
+        orderNumber: o.code || o.id,
+        createdAt: o.date || new Date().toISOString(),
+        customerName: o.customerName || 'Pelanggan Umum',
+        status: o.status,
+        paymentStatus,
+        paymentMethod: 'tunai',
+        itemCount,
+        itemsSummary: itemsSummary || '-',
+        subtotal: Number(o.subtotal ?? 0),
+        discountTotal: Number(o.discountTotal ?? 0),
+        taxTotal: Number(o.taxTotal ?? 0),
+        grandTotal,
+        paidTotal,
+        balanceDue,
+      }
+    })
+  }, [data?.transactions, localOrders])
 
   const trendData = (data?.dailySales ?? []).map((d) => {
     const svc = data?.dailyService.find((s) => s.date === d.date)
@@ -78,7 +162,21 @@ export function SalesReportPage() {
     ? dailySalesRows.filter((d) => d.date.includes(dailySearch))
     : dailySalesRows
 
-  function handleExport() {
+  const filteredTransactions = useMemo(() => {
+    const q = txSearch.toLowerCase().trim()
+    return transactions.filter((tx) => {
+      if (txStatusFilter !== 'all' && tx.paymentStatus !== txStatusFilter) return false
+      if (txMethodFilter !== 'all' && !tx.paymentMethod.toLowerCase().includes(txMethodFilter.toLowerCase())) return false
+      if (!q) return true
+      return (
+        tx.orderNumber.toLowerCase().includes(q) ||
+        tx.customerName.toLowerCase().includes(q) ||
+        tx.itemsSummary.toLowerCase().includes(q)
+      )
+    })
+  }, [transactions, txSearch, txStatusFilter, txMethodFilter])
+
+  function handleExportDaily() {
     if (!data) return
     const rows = allTrend.map((d) => ({
       id: d.date,
@@ -87,11 +185,44 @@ export function SalesReportPage() {
       service: d.service,
       total: d.total,
     }))
-    exportToCsv(`sales-report-${params.from ?? 'awal'}-${params.to ?? 'akhir'}.csv`, [
+    exportToCsv(`sales-daily-${params.from ?? 'awal'}-${params.to ?? 'akhir'}.csv`, [
       { key: 'tanggal', header: t('common.date') },
       { key: 'penjualan', header: t('reports.sales') },
       { key: 'service', header: 'Service' },
       { key: 'total', header: t('common.total') },
+    ], rows)
+  }
+
+  function handleExportTransactions() {
+    if (!filteredTransactions.length) return
+    const rows = filteredTransactions.map((tx) => ({
+      id: tx.id,
+      no_order: tx.orderNumber,
+      tanggal: tx.createdAt.replace('T', ' ').slice(0, 19),
+      pelanggan: tx.customerName,
+      rincian_item: tx.itemsSummary,
+      metode_bayar: tx.paymentMethod.toUpperCase(),
+      status_bayar: getPaymentBadgeLabel(tx.paymentStatus),
+      subtotal: tx.subtotal,
+      diskon: tx.discountTotal,
+      pajak: tx.taxTotal,
+      total: tx.grandTotal,
+      terbayar: tx.paidTotal,
+      sisa_tagihan: tx.balanceDue,
+    }))
+    exportToCsv(`daftar-penjualan-${params.from ?? 'awal'}-${params.to ?? 'akhir'}.csv`, [
+      { key: 'no_order', header: 'No. Faktur / Pesanan' },
+      { key: 'tanggal', header: 'Tanggal & Jam' },
+      { key: 'pelanggan', header: 'Pelanggan' },
+      { key: 'rincian_item', header: 'Rincian Produk' },
+      { key: 'metode_bayar', header: 'Metode Pembayaran' },
+      { key: 'status_bayar', header: 'Status Pembayaran' },
+      { key: 'subtotal', header: 'Subtotal' },
+      { key: 'diskon', header: 'Diskon' },
+      { key: 'pajak', header: 'Pajak' },
+      { key: 'total', header: 'Total Penjualan' },
+      { key: 'terbayar', header: 'Total Terbayar' },
+      { key: 'sisa_tagihan', header: 'Sisa Tagihan' },
     ], rows)
   }
 
@@ -106,8 +237,12 @@ export function SalesReportPage() {
           <p className="text-sm text-muted-foreground">{t('reports.sales_description')}</p>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={!data}>
-            {t('common.export')} CSV
+          <Button variant="outline" size="sm" onClick={handleExportTransactions} disabled={filteredTransactions.length === 0}>
+            <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
+            Export Transaksi CSV
+          </Button>
+          <Button variant="ghost" size="sm" onClick={handleExportDaily} disabled={!data}>
+            Export Harian
           </Button>
         </div>
       </div>
@@ -133,6 +268,158 @@ export function SalesReportPage() {
             <ReportMetricCard label={t('reports.avg_order_value')} value={formatCurrency(data.summary.avgOrderValue)} />
             <ReportMetricCard label={t('reports.total_paid')} value={formatCurrency(data.summary.totalPaid)} />
           </div>
+
+          {/* 1. Detail Transaksi Penjualan Section */}
+          <ReportSection title="Daftar Transaksi Penjualan">
+            <p className="-mt-1 text-xs text-muted-foreground">
+              Menampilkan {filteredTransactions.length} transaksi penjualan pada periode terpilih.
+            </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="flex-1">
+                <FilterToolbar
+                  placeholder="Cari no faktur, pelanggan, atau produk..."
+                  searchQuery={txSearch}
+                  onSearchChange={setTxSearch}
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Select value={txStatusFilter} onValueChange={setTxStatusFilter}>
+                  <SelectTrigger className="w-36 h-9 text-xs">
+                    <SelectValue placeholder="Status Bayar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Status</SelectItem>
+                    <SelectItem value="paid">Lunas</SelectItem>
+                    <SelectItem value="partial">Sebagian</SelectItem>
+                    <SelectItem value="unpaid">Belum Lunas</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={txMethodFilter} onValueChange={setTxMethodFilter}>
+                  <SelectTrigger className="w-36 h-9 text-xs">
+                    <SelectValue placeholder="Metode Bayar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Metode</SelectItem>
+                    <SelectItem value="tunai">Tunai</SelectItem>
+                    <SelectItem value="qris">QRIS</SelectItem>
+                    <SelectItem value="transfer">Transfer</SelectItem>
+                    <SelectItem value="kartu">Kartu</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <DataTable<SalesReportTransaction>
+              columns={[
+                {
+                  key: 'orderNumber',
+                  header: 'No. Faktur',
+                  sortable: true,
+                  render: (row) => (
+                    <Link
+                      to={`/sales-orders/${row.id}`}
+                      className="font-medium text-primary hover:underline inline-flex items-center gap-1 group"
+                      title="Lihat rincian pesanan"
+                    >
+                      <ReceiptText className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary" />
+                      <span>{row.orderNumber}</span>
+                    </Link>
+                  ),
+                },
+                {
+                  key: 'createdAt',
+                  header: 'Tanggal & Jam',
+                  sortable: true,
+                  render: (row) => (
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {row.createdAt.replace('T', ' ').slice(0, 16)}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'customerName',
+                  header: 'Pelanggan',
+                  sortable: true,
+                  render: (row) => (
+                    <span className="text-sm font-medium">{row.customerName}</span>
+                  ),
+                },
+                {
+                  key: 'itemsSummary',
+                  header: 'Rincian Item',
+                  render: (row) => (
+                    <div className="max-w-[260px] truncate" title={row.itemsSummary}>
+                      <span className="text-xs text-muted-foreground">
+                        {row.itemCount > 0 && (
+                          <Badge variant="outline" className="mr-1.5 px-1 py-0 text-[10px] h-4">
+                            {row.itemCount} item
+                          </Badge>
+                        )}
+                        {row.itemsSummary}
+                      </span>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'paymentMethod',
+                  header: 'Metode',
+                  render: (row) => (
+                    <Badge variant="outline" className="text-[11px] capitalize">
+                      {row.paymentMethod}
+                    </Badge>
+                  ),
+                },
+                {
+                  key: 'paymentStatus',
+                  header: 'Status Bayar',
+                  render: (row) => (
+                    <Badge
+                      variant="outline"
+                      className={`text-[11px] font-medium border ${getPaymentBadgeTone(row.paymentStatus)}`}
+                    >
+                      {getPaymentBadgeLabel(row.paymentStatus)}
+                    </Badge>
+                  ),
+                },
+                {
+                  key: 'grandTotal',
+                  header: 'Total',
+                  sortable: true,
+                  render: (row) => (
+                    <span className="font-semibold">{formatCurrency(row.grandTotal)}</span>
+                  ),
+                },
+                {
+                  key: 'balanceDue',
+                  header: 'Sisa Tagihan',
+                  sortable: true,
+                  render: (row) => (
+                    <span
+                      className={`text-xs ${
+                        row.balanceDue > 0 ? 'text-rose-600 font-medium' : 'text-muted-foreground'
+                      }`}
+                    >
+                      {row.balanceDue > 0 ? formatCurrency(row.balanceDue) : 'Rp 0'}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'id',
+                  header: 'Aksi',
+                  render: (row) => (
+                    <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                      <Link to={`/sales-orders/${row.id}`} title="Buka Detail Pesanan">
+                        <ExternalLink className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />
+                      </Link>
+                    </Button>
+                  ),
+                },
+              ]}
+              data={filteredTransactions}
+              emptyTitle="Tidak ada transaksi penjualan pada filter ini"
+            />
+          </ReportSection>
 
           {allTrend.length > 0 && (
             <ReportSection title={t('reports.revenue_trend')}>
