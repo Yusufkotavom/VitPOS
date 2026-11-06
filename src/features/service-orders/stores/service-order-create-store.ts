@@ -33,7 +33,9 @@ interface ServiceOrderCreateState {
   setWarrantyValue: (value: string) => void
   setWarrantyUnit: (value: 'hari' | 'bulan' | 'tahun') => void
   addItem: (item: { productId: string; name: string; price: number; wholesaleTiers?: WholesaleTier[] }) => void
+  addCustomItem: () => void
   updateItemQty: (productId: string, qty: number) => void
+  updateItem: (productId: string, changes: Partial<Pick<ServiceItem, 'name' | 'price'>>) => void
   removeItem: (productId: string) => void
   clear: () => void
 }
@@ -77,6 +79,18 @@ export const useServiceOrderCreateStore = create<ServiceOrderCreateState>((set) 
     })
   },
 
+  addCustomItem: () => {
+    set((state) => ({
+      items: [...state.items, {
+        productId: `custom-${Date.now()}`,
+        name: '',
+        qty: 1,
+        price: 0,
+        subtotal: 0,
+      }],
+    }))
+  },
+
   updateItemQty: (productId, qty) => {
     set((state) => ({
       items: state.items.map((i) =>
@@ -84,6 +98,16 @@ export const useServiceOrderCreateStore = create<ServiceOrderCreateState>((set) 
           ? { ...i, qty, price: getWholesalePrice(i.price, i.wholesaleTiers, qty), subtotal: qty * getWholesalePrice(i.price, i.wholesaleTiers, qty) }
           : i,
       ),
+    }))
+  },
+
+  updateItem: (productId, changes) => {
+    set((state) => ({
+      items: state.items.map((i) => {
+        if (i.productId !== productId) return i
+        const newPrice = changes.price !== undefined ? changes.price : i.price
+        return { ...i, ...changes, subtotal: i.qty * newPrice }
+      }),
     }))
   },
 

@@ -217,51 +217,62 @@ export function ServiceOrderCreatePage() {
 
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-muted-foreground">{t('service_orders.items_and_cost')}</span>
-          <Dialog open={isProductModalOpen} onOpenChange={setIsProductModalOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline" className="gap-1.5">
-                <PlusCircle className="h-3.5 w-3.5" />
-                {t('common.add')}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col">
-              <DialogHeader>
-                <DialogTitle>{t('service_orders.select_product_service')}</DialogTitle>
-              </DialogHeader>
-              <div className="relative mt-2">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder={t('service_orders.search_product_service')}
-                  className="pl-8"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-              <div className="flex-1 overflow-y-auto space-y-1 mt-4">
-                {filteredProducts.map(p => (
-                  <div key={p.id} className="flex items-center justify-between p-2.5 rounded-lg hover:bg-muted/50">
-                    <div>
-                      <p className="font-medium text-sm">{p.name}</p>
-                      <p className="text-xs text-muted-foreground">{formatCurrency(p.price)}</p>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="gap-1.5 text-muted-foreground"
+              onClick={() => store.addCustomItem()}
+            >
+              <PlusCircle className="h-3.5 w-3.5" />
+              Item Custom
+            </Button>
+            <Dialog open={isProductModalOpen} onOpenChange={setIsProductModalOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline" className="gap-1.5">
+                  <PlusCircle className="h-3.5 w-3.5" />
+                  {t('common.add')}
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col">
+                <DialogHeader>
+                  <DialogTitle>{t('service_orders.select_product_service')}</DialogTitle>
+                </DialogHeader>
+                <div className="relative mt-2">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder={t('service_orders.search_product_service')}
+                    className="pl-8"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+                <div className="flex-1 overflow-y-auto space-y-1 mt-4">
+                  {filteredProducts.map(p => (
+                    <div key={p.id} className="flex items-center justify-between p-2.5 rounded-lg hover:bg-muted/50">
+                      <div>
+                        <p className="font-medium text-sm">{p.name}</p>
+                        <p className="text-xs text-muted-foreground">{formatCurrency(p.price)}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          store.addItem({ productId: p.id, name: p.name, price: p.price, wholesaleTiers: p.wholesaleTiers })
+                          toast.success(t('service_orders.item_added', { name: p.name }))
+                        }}
+                      >
+                        {t('common.add')}
+                      </Button>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        store.addItem({ productId: p.id, name: p.name, price: p.price, wholesaleTiers: p.wholesaleTiers })
-                        toast.success(t('service_orders.item_added', { name: p.name }))
-                      }}
-                    >
-                      {t('common.add')}
-                    </Button>
-                  </div>
-                ))}
-                {filteredProducts.length === 0 && (
-                  <p className="text-center text-sm text-muted-foreground py-8">{t('service_orders.no_products')}</p>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
+                  ))}
+                  {filteredProducts.length === 0 && (
+                    <p className="text-center text-sm text-muted-foreground py-8">{t('service_orders.no_products')}</p>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         <div className="space-y-1">
@@ -271,24 +282,57 @@ export function ServiceOrderCreatePage() {
             </div>
           ) : (
             store.items.map(item => (
-              <div key={item.productId} className="flex items-center gap-3 py-2.5 border-b last:border-0">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">{formatCurrency(item.price)}</p>
-                </div>
-                <div className="flex items-center rounded-lg border bg-background">
-                  <Button variant="secondary" className="flex h-7 w-7 items-center justify-center rounded-l-lg text-muted-foreground hover:bg-muted" onClick={() => item.qty > 1 ? store.updateItemQty(item.productId, item.qty - 1) : store.removeItem(item.productId)}>
-                    <Minus className="h-3 w-3" />
+              <div key={item.productId} className="rounded-lg border bg-background p-2.5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    className="h-8 text-sm font-medium flex-1 min-w-0"
+                    placeholder="Nama item / jasa"
+                    value={item.name}
+                    onChange={e => store.updateItem(item.productId, { name: e.target.value })}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => store.removeItem(item.productId)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
-                  <span className="w-7 text-center text-sm font-medium">{item.qty}</span>
-                  <Button variant="secondary" className="flex h-7 w-7 items-center justify-center rounded-r-lg text-muted-foreground hover:bg-muted" onClick={() => store.updateItemQty(item.productId, item.qty + 1)}>
-                    <Plus className="h-3 w-3" />
-                  </Button>
                 </div>
-                <span className="text-sm font-semibold w-24 text-right">{formatCurrency(item.subtotal)}</span>
-                <Button variant="ghost" onClick={() => store.removeItem(item.productId)} className="text-muted-foreground hover:text-destructive shrink-0">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+                    <span>Rp</span>
+                    <Input
+                      className="h-7 w-28 text-xs"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={item.price === 0 ? '' : String(item.price)}
+                      onChange={e => {
+                        const val = e.target.value.replace(/\D/g, '')
+                        store.updateItem(item.productId, { price: val ? Number(val) : 0 })
+                      }}
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground">×</span>
+                  <div className="flex items-center rounded-md border bg-background">
+                    <Button
+                      variant="ghost"
+                      className="h-7 w-7 p-0 text-muted-foreground"
+                      onClick={() => item.qty > 1 ? store.updateItemQty(item.productId, item.qty - 1) : store.removeItem(item.productId)}
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                    <span className="w-7 text-center text-xs font-medium">{item.qty}</span>
+                    <Button
+                      variant="ghost"
+                      className="h-7 w-7 p-0 text-muted-foreground"
+                      onClick={() => store.updateItemQty(item.productId, item.qty + 1)}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <span className="ml-auto text-sm font-semibold">{formatCurrency(item.subtotal)}</span>
+                </div>
               </div>
             ))
           )}
