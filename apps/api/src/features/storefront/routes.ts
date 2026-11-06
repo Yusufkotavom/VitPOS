@@ -1,4 +1,4 @@
-import { and, count, desc, eq, isNull } from 'drizzle-orm'
+import { and, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 
 import { db } from '../../lib/db.js'
@@ -111,11 +111,24 @@ storefrontRoutes.get('/:slug/track', async (c) => {
     return c.json({ ok: false, message: 'Toko tidak ditemukan' }, 404)
   }
 
+  // Phones are stored inconsistently (dashes/spaces, and either `0…` or `62…`
+  // country prefix), so match on digits only and accept both national forms.
+  const digits = phone.replace(/\D/g, '')
+  if (!digits) {
+    return c.json({ ok: false, message: 'Nomor telepon tidak valid' }, 400)
+  }
+  const phoneVariants = new Set([digits])
+  if (digits.startsWith('62')) phoneVariants.add(`0${digits.slice(2)}`)
+  if (digits.startsWith('0')) phoneVariants.add(`62${digits.slice(1)}`)
+
   // Find customer by phone
   const customer = await db.query.customers.findFirst({
     where: and(
       eq(customers.tenantId, tenantId),
-      eq(customers.phone, phone),
+      inArray(
+        sql`regexp_replace(${customers.phone}, '[^0-9]', '', 'g')`,
+        [...phoneVariants],
+      ),
     ),
   })
 
