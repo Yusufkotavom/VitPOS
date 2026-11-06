@@ -1,20 +1,21 @@
 export interface StoreInfo {
-  id: string
-  slug: string
+  tenantId: string
   name: string
-  address?: string
-  phone?: string
-  logoUrl?: string
-  description?: string
+  address?: string | null
+  phone?: string | null
+  icon?: string | null
+  logoUrl?: string | null
+  description?: string | null
 }
 
 export interface StoreProduct {
   id: string
   name: string
-  price: number
-  imageUrl?: string
-  category?: string
-  description?: string
+  price: number | string
+  imageUrl?: string | null
+  icon?: string | null
+  category?: string | null
+  type?: string
 }
 
 export interface TrackedOrder {
@@ -43,20 +44,29 @@ async function publicFetch<T>(url: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
+// The API always answers with an `ok` envelope (`{ ok, store }`, `{ ok, products }`,
+// `{ ok, customer, orders }`), so unwrap it here rather than leaking it to callers.
 export async function getStore(slug: string): Promise<StoreInfo> {
   const baseUrl = getBaseUrl()
-  return publicFetch<StoreInfo>(`${baseUrl}/api/v1/store/${encodeURIComponent(slug)}`)
+  const res = await publicFetch<{ ok: boolean; store: StoreInfo }>(
+    `${baseUrl}/api/v1/store/${encodeURIComponent(slug)}`,
+  )
+  return res.store
 }
 
 export async function getStoreProducts(slug: string): Promise<StoreProduct[]> {
   const baseUrl = getBaseUrl()
-  return publicFetch<StoreProduct[]>(`${baseUrl}/api/v1/store/${encodeURIComponent(slug)}/products`)
+  const res = await publicFetch<{ ok: boolean; products: StoreProduct[] }>(
+    `${baseUrl}/api/v1/store/${encodeURIComponent(slug)}/products`,
+  )
+  return res.products ?? []
 }
 
 export async function trackOrders(slug: string, phone: string): Promise<TrackedOrder[]> {
   const baseUrl = getBaseUrl()
   const params = new URLSearchParams({ phone })
-  return publicFetch<TrackedOrder[]>(
+  const res = await publicFetch<{ ok: boolean; orders: TrackedOrder[] }>(
     `${baseUrl}/api/v1/store/${encodeURIComponent(slug)}/track?${params.toString()}`,
   )
+  return res.orders ?? []
 }
