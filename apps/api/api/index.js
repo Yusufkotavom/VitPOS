@@ -5,7 +5,7 @@ var __export = (target, all) => {
 };
 
 // src/app.ts
-import { Hono as Hono12 } from "hono";
+import { Hono as Hono13 } from "hono";
 import { cors } from "hono/cors";
 
 // src/features/auth/routes.ts
@@ -2440,7 +2440,7 @@ syncRoutes.get("/pull", async (c) => {
     with: { items: true }
   });
   const saleCustomerIds = [...new Set(saleRows.filter((r) => r.customerId).map((r) => r.customerId))];
-  const saleCustomerRows = saleCustomerIds.length > 0 ? await db.query.customers.findMany({ where: (c2, { inArray: inArray2 }) => inArray2(c2.id, saleCustomerIds) }) : [];
+  const saleCustomerRows = saleCustomerIds.length > 0 ? await db.query.customers.findMany({ where: (c2, { inArray: inArray3 }) => inArray3(c2.id, saleCustomerIds) }) : [];
   const saleCustomerNameMap = new Map(saleCustomerRows.map((c2) => [c2.id, c2.name]));
   const paymentBranchFilter = parsed.value.branchId ? eq4(payments.branchId, parsed.value.branchId) : void 0;
   const paymentSinceFilter = parsed.value.since ? gte2(payments.updatedAt, parsed.value.since) : void 0;
@@ -3702,8 +3702,136 @@ tenantRoutes.post("/", async (c) => {
   });
 });
 
-// src/features/updates/routes.ts
+// src/features/storefront/routes.ts
+import { and as and8, count as count3, desc as desc6, eq as eq11, inArray as inArray2, isNull as isNull2, sql as sql3 } from "drizzle-orm";
 import { Hono as Hono10 } from "hono";
+var storefrontRoutes = new Hono10();
+async function resolveTenantId(slug) {
+  const row = await db.query.settings.findFirst({
+    where: and8(
+      eq11(settings.key, "store-slug"),
+      eq11(settings.value, slug)
+    )
+  });
+  return row?.tenantId ?? null;
+}
+storefrontRoutes.get("/:slug", async (c) => {
+  const slug = c.req.param("slug");
+  const tenantId = await resolveTenantId(slug);
+  if (!tenantId) {
+    return c.json({ ok: false, message: "Toko tidak ditemukan" }, 404);
+  }
+  const tenant = await db.query.tenants.findFirst({
+    where: eq11(tenants.id, tenantId)
+  });
+  if (!tenant) {
+    return c.json({ ok: false, message: "Toko tidak ditemukan" }, 404);
+  }
+  const storeSettings = await db.query.settings.findMany({
+    where: and8(
+      eq11(settings.tenantId, tenantId)
+    )
+  });
+  const getSetting = (key) => storeSettings.find((s) => s.key === key)?.value ?? null;
+  return c.json({
+    ok: true,
+    store: {
+      tenantId,
+      name: getSetting("company-name") ?? tenant.name,
+      phone: getSetting("company-phone") ?? tenant.phone ?? null,
+      address: getSetting("company-address") ?? tenant.address ?? null,
+      icon: getSetting("company-icon") ?? null,
+      logoUrl: getSetting("company-logo") ?? null,
+      description: getSetting("company-description") ?? null
+    }
+  });
+});
+storefrontRoutes.get("/:slug/products", async (c) => {
+  const slug = c.req.param("slug");
+  const tenantId = await resolveTenantId(slug);
+  if (!tenantId) {
+    return c.json({ ok: false, message: "Toko tidak ditemukan" }, 404);
+  }
+  const rows = await db.select({
+    id: products.id,
+    name: products.name,
+    price: products.salePrice,
+    imageUrl: products.imageUrl,
+    icon: products.icon,
+    category: products.categoryId,
+    type: products.type
+  }).from(products).where(
+    and8(
+      eq11(products.tenantId, tenantId),
+      eq11(products.isActive, true),
+      isNull2(products.deletedAt)
+    )
+  );
+  return c.json({ ok: true, products: rows });
+});
+storefrontRoutes.get("/:slug/track", async (c) => {
+  const slug = c.req.param("slug");
+  const phone = c.req.query("phone");
+  if (!phone) {
+    return c.json({ ok: false, message: "Parameter phone wajib diisi" }, 400);
+  }
+  const tenantId = await resolveTenantId(slug);
+  if (!tenantId) {
+    return c.json({ ok: false, message: "Toko tidak ditemukan" }, 404);
+  }
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) {
+    return c.json({ ok: false, message: "Nomor telepon tidak valid" }, 400);
+  }
+  const phoneVariants = /* @__PURE__ */ new Set([digits]);
+  if (digits.startsWith("62")) phoneVariants.add(`0${digits.slice(2)}`);
+  if (digits.startsWith("0")) phoneVariants.add(`62${digits.slice(1)}`);
+  const customer = await db.query.customers.findFirst({
+    where: and8(
+      eq11(customers.tenantId, tenantId),
+      inArray2(
+        sql3`regexp_replace(${customers.phone}, '[^0-9]', '', 'g')`,
+        [...phoneVariants]
+      )
+    )
+  });
+  if (!customer) {
+    return c.json({ ok: true, customer: null, orders: [] });
+  }
+  const rows = await db.select({
+    id: salesOrders.id,
+    orderNumber: salesOrders.orderNumber,
+    grandTotal: salesOrders.grandTotal,
+    paidTotal: salesOrders.paidTotal,
+    status: salesOrders.status,
+    date: salesOrders.date,
+    itemCount: count3(salesOrderItems.id)
+  }).from(salesOrders).leftJoin(salesOrderItems, eq11(salesOrderItems.salesOrderId, salesOrders.id)).where(
+    and8(
+      eq11(salesOrders.tenantId, tenantId),
+      eq11(salesOrders.customerId, customer.id),
+      isNull2(salesOrders.deletedAt)
+    )
+  ).groupBy(
+    salesOrders.id,
+    salesOrders.orderNumber,
+    salesOrders.grandTotal,
+    salesOrders.paidTotal,
+    salesOrders.status,
+    salesOrders.date
+  ).orderBy(desc6(salesOrders.date)).limit(20);
+  return c.json({
+    ok: true,
+    customer: {
+      name: customer.name,
+      phone: customer.phone
+    },
+    orders: rows
+  });
+});
+
+// src/features/updates/routes.ts
+import { Hono as Hono11 } from "hono";
 
 // src/features/updates/service.ts
 var GITHUB_RELEASES_API_URL = process.env.GITHUB_RELEASES_API_URL ?? "https://api.github.com/repos/Yusufkotavom/VitPOS/releases/latest";
@@ -3841,7 +3969,7 @@ async function resolveAppUpdate(platform, currentVersion) {
 }
 
 // src/features/updates/routes.ts
-var updateRoutes = new Hono10();
+var updateRoutes = new Hono11();
 updateRoutes.get("/latest", async (c) => {
   const platform = c.req.query("platform");
   const currentVersion = c.req.query("currentVersion");
@@ -3863,7 +3991,7 @@ updateRoutes.get("/desktop/:target/:arch/:currentVersion", async (c) => {
 });
 
 // src/features/upload/routes.ts
-import { Hono as Hono11 } from "hono";
+import { Hono as Hono12 } from "hono";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 var r2Endpoint = process.env.R2_ENDPOINT;
@@ -3876,7 +4004,7 @@ var allowedFolders = ["products", "company", "invoices", "uploads"];
 function toUploadFolder(value) {
   return allowedFolders.includes(value) ? value : "uploads";
 }
-var uploadRoutes = new Hono11();
+var uploadRoutes = new Hono12();
 uploadRoutes.post("/presign", async (c) => {
   try {
     if (!r2Endpoint || !r2AccessKey || !r2SecretKey) {
@@ -3918,7 +4046,7 @@ uploadRoutes.post("/presign", async (c) => {
 
 // src/app.ts
 function createApp() {
-  const app2 = new Hono12();
+  const app2 = new Hono13();
   app2.use("*", cors());
   app2.get("/", (c) => c.json({ message: "VitPOS API is running!" }));
   app2.route("/health", healthRoutes);
@@ -3931,6 +4059,7 @@ function createApp() {
   app2.route("/api/v1/tenants", tenantRoutes);
   app2.route("/api/v1/updates", updateRoutes);
   app2.route("/api/v1/upload", uploadRoutes);
+  app2.route("/api/v1/store", storefrontRoutes);
   app2.onError((error, c) => {
     return c.json({ ok: false, message: error.message }, 500);
   });
