@@ -1,13 +1,16 @@
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { ReportDateFilter, useReportDateParams } from '@/features/reports/components/report-date-filter'
 import { ReportSection, ReportMetricCard } from '@/features/reports/components/report-section'
+import { ReportCorrelationNav } from '@/features/reports/components/report-correlation-nav'
 import { usePaymentReport } from '@/features/reports/hooks/use-payment-report'
+import { DataTable } from '@/shared/components/data-table/data-table'
+import { FilterToolbar } from '@/shared/components/data-table/filter-toolbar'
 import { formatCurrency } from '@/lib/format-currency'
 import { exportToCsv } from '@/shared/utils/export-csv'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
@@ -30,11 +33,41 @@ const METHOD_LABELS: Record<string, string> = {
   receivable: 'Piutang',
 }
 
+type ReceivableRow = {
+  id: string
+  orderNumber: string
+  grandTotal: number
+  paidTotal: number
+  outstanding: number
+  createdAt: string
+  dateFormatted: string
+}
+
+type PaymentMethodRow = {
+  id: string
+  method: string
+  label: string
+  total: number
+  count: number
+}
+
 export function PaymentReportPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const params = useReportDateParams()
   const { data, isLoading } = usePaymentReport(params)
+  const [receivableSearch, setReceivableSearch] = useState('')
+  const receivableRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (searchParams.get('tab') === 'receivables' && receivableRef.current && data) {
+      const timer = setTimeout(() => {
+        receivableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams, data])
 
   const pieData = (data?.byMethod ?? []).map((m) => ({
     name: METHOD_LABELS[m.method] ?? m.method,
@@ -50,6 +83,24 @@ export function PaymentReportPage() {
     }
     return acc
   }, [])
+
+  const methodRows: PaymentMethodRow[] = (data?.byMethod ?? []).map((m) => ({
+    id: m.method,
+    method: m.method,
+    label: METHOD_LABELS[m.method] ?? m.method,
+    total: m.total,
+    count: m.count,
+  }))
+
+  const receivableRows: ReceivableRow[] = (data?.receivables ?? []).map((r) => ({
+    ...r,
+    dateFormatted: new Date(r.createdAt).toLocaleDateString('id-ID'),
+  }))
+
+  const filteredReceivables = receivableRows.filter((r) => {
+    if (!receivableSearch) return true
+    return r.orderNumber.toLowerCase().includes(receivableSearch.toLowerCase())
+  })
 
   function handleExport() {
     if (!data) return
@@ -82,6 +133,16 @@ export function PaymentReportPage() {
       </div>
 
       <ReportDateFilter />
+
+      {/* Cross-report correlation navigation with date sync */}
+      <ReportCorrelationNav
+        links={[
+          { to: '/reports/sales', label: 'Laporan Penjualan', hint: 'Cek omzet & total penjualan' },
+          { to: '/reports/profit-loss', label: 'Laba Rugi', hint: 'Cek pendapatan vs beban' },
+          { to: '/reports/balance-sheet', label: 'Neraca', hint: 'Cek saldo kas & piutang usaha' },
+          { to: '/reports/general-ledger', label: 'Buku Besar', hint: 'Detail jurnal kas' },
+        ]}
+      />
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground py-8 text-center">{t('common.loading')}</p>
@@ -132,63 +193,82 @@ export function PaymentReportPage() {
           </div>
 
           <ReportSection title={t('reports.method_breakdown')}>
-            <div className="overflow-x-auto">
-              <Table className="w-full text-sm">
-                <TableHeader>
-                  <TableRow className="border-b text-left text-muted-foreground">
-                    <TableHead className="pb-2 font-medium">{t('reports.method')}</TableHead>
-                    <TableHead className="pb-2 font-medium text-right">{t('common.total')}</TableHead>
-                    <TableHead className="pb-2 font-medium text-right">{t('reports.payment_transactions')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.byMethod.map((m) => (
-                    <TableRow key={m.method} className="border-b last:border-0">
-                      <TableCell className="py-2">
-                        <Badge variant="outline" className="capitalize">{METHOD_LABELS[m.method] ?? m.method}</Badge>
-                      </TableCell>
-                      <TableCell className="py-2 text-right font-semibold">{formatCurrency(m.total)}</TableCell>
-                      <TableCell className="py-2 text-right">{m.count}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <DataTable<PaymentMethodRow>
+              columns={[
+                {
+                  key: 'label',
+                  header: t('reports.method'),
+                  sortable: true,
+                  render: (row) => (
+                    <Badge variant="outline" className="capitalize">
+                      {row.label}
+                    </Badge>
+                  ),
+                },
+                {
+                  key: 'total',
+                  header: t('common.total'),
+                  sortable: true,
+                  render: (row) => <span className="font-semibold">{formatCurrency(row.total)}</span>,
+                },
+                {
+                  key: 'count',
+                  header: t('reports.payment_transactions'),
+                  sortable: true,
+                },
+              ]}
+              data={methodRows}
+              emptyTitle="Belum ada transaksi pembayaran"
+            />
           </ReportSection>
 
           {data.receivables.length > 0 && (
-            <ReportSection title={t('reports.receivable_section')}>
-              <div className="grid gap-3 mb-3 md:grid-cols-4">
-                <ReportMetricCard label={t('reports.aging_days_0_7')} value={formatCurrency(data.aging.current)} />
-                <ReportMetricCard label={t('reports.aging_days_8_30')} value={formatCurrency(data.aging.days7)} />
-                <ReportMetricCard label={t('reports.aging_days_31_60')} value={formatCurrency(data.aging.days30)} />
-                <ReportMetricCard label={t('reports.aging_over_60')} value={formatCurrency(data.aging.over60)} tone="negative" />
-              </div>
-              <div className="overflow-x-auto">
-                <Table className="w-full text-sm">
-                  <TableHeader>
-                    <TableRow className="border-b text-left text-muted-foreground">
-                      <TableHead className="pb-2 font-medium">{t('reports.order_number')}</TableHead>
-                      <TableHead className="pb-2 font-medium text-right">{t('common.total')}</TableHead>
-                      <TableHead className="pb-2 font-medium text-right">{t('reports.receivable_paid')}</TableHead>
-                      <TableHead className="pb-2 font-medium text-right">{t('reports.receivable_remaining')}</TableHead>
-                      <TableHead className="pb-2 font-medium text-right">{t('common.date')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.receivables.map((r) => (
-                      <TableRow key={r.id} className="border-b last:border-0">
-                        <TableCell className="py-2 font-medium">{r.orderNumber}</TableCell>
-                        <TableCell className="py-2 text-right">{formatCurrency(r.grandTotal)}</TableCell>
-                        <TableCell className="py-2 text-right">{formatCurrency(r.paidTotal)}</TableCell>
-                        <TableCell className="py-2 text-right font-semibold text-red-600">{formatCurrency(r.outstanding)}</TableCell>
-                        <TableCell className="py-2 text-right text-muted-foreground">{new Date(r.createdAt).toLocaleDateString('id-ID')}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </ReportSection>
+            <div ref={receivableRef}>
+              <ReportSection title={t('reports.receivable_section')}>
+                <div className="grid gap-3 mb-3 md:grid-cols-5">
+                  <ReportMetricCard label={t('reports.aging_days_0_7')} value={formatCurrency(data.aging.current)} />
+                  <ReportMetricCard label={t('reports.aging_days_8_30')} value={formatCurrency(data.aging.days7)} />
+                  <ReportMetricCard label={t('reports.aging_days_31_60')} value={formatCurrency(data.aging.days30)} />
+                  <ReportMetricCard label="61-90 Hari" value={formatCurrency(data.aging.days60)} />
+                  <ReportMetricCard label={t('reports.aging_over_60')} value={formatCurrency(data.aging.over60)} tone="negative" />
+                </div>
+                <FilterToolbar
+                  placeholder="Cari nomor order..."
+                  searchQuery={receivableSearch}
+                  onSearchChange={setReceivableSearch}
+                />
+                <DataTable<ReceivableRow>
+                  columns={[
+                    { key: 'orderNumber', header: t('reports.order_number'), sortable: true },
+                    {
+                      key: 'grandTotal',
+                      header: t('common.total'),
+                      sortable: true,
+                      render: (row) => formatCurrency(row.grandTotal),
+                    },
+                    {
+                      key: 'paidTotal',
+                      header: t('reports.receivable_paid'),
+                      sortable: true,
+                      render: (row) => formatCurrency(row.paidTotal),
+                    },
+                    {
+                      key: 'outstanding',
+                      header: t('reports.receivable_remaining'),
+                      sortable: true,
+                      render: (row) => <span className="font-semibold text-red-600">{formatCurrency(row.outstanding)}</span>,
+                    },
+                    {
+                      key: 'dateFormatted',
+                      header: t('common.date'),
+                      sortable: true,
+                    },
+                  ]}
+                  data={filteredReceivables}
+                  emptyTitle="Tidak ada piutang ditemukan"
+                />
+              </ReportSection>
+            </div>
           )}
         </>
       ) : null}

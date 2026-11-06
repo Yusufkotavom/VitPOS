@@ -1,21 +1,42 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ReportDateFilter, useReportDateParams } from '@/features/reports/components/report-date-filter'
 import { ReportSection, ReportMetricCard } from '@/features/reports/components/report-section'
+import { ReportCorrelationNav } from '@/features/reports/components/report-correlation-nav'
 import { useSalesReport } from '@/features/reports/hooks/use-sales-report'
+import { DataTable } from '@/shared/components/data-table/data-table'
+import { FilterToolbar } from '@/shared/components/data-table/filter-toolbar'
 import { formatCurrency } from '@/lib/format-currency'
 import { exportToCsv } from '@/shared/utils/export-csv'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+
+type TopProductRow = {
+  id: string
+  rank: number
+  name: string
+  totalQty: number
+  totalRevenue: number
+}
+
+type DailySalesRow = {
+  id: string
+  date: string
+  penjualan: number
+  service: number
+  total: number
+}
 
 export function SalesReportPage() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const params = useReportDateParams()
   const { data, isLoading } = useSalesReport(params)
+  const [productSearch, setProductSearch] = useState('')
+  const [dailySearch, setDailySearch] = useState('')
 
   const trendData = (data?.dailySales ?? []).map((d) => {
     const svc = data?.dailyService.find((s) => s.date === d.date)
@@ -27,11 +48,35 @@ export function SalesReportPage() {
     }
   })
 
-  const svcOnlyDates = (data?.dailyService ?? []).filter(
-    (s) => !data?.dailySales.find((d) => d.date === s.date)
-  ).map((s) => ({ date: s.date, penjualan: 0, service: s.revenue, total: s.revenue }))
+  const svcOnlyDates = (data?.dailyService ?? [])
+    .filter((s) => !data?.dailySales.find((d) => d.date === s.date))
+    .map((s) => ({ date: s.date, penjualan: 0, service: s.revenue, total: s.revenue }))
 
   const allTrend = [...trendData, ...svcOnlyDates].sort((a, b) => a.date.localeCompare(b.date))
+
+  const topProductRows: TopProductRow[] = (data?.topProducts ?? []).map((p, i) => ({
+    id: p.productId ?? p.name,
+    rank: i + 1,
+    name: p.name,
+    totalQty: p.totalQty,
+    totalRevenue: p.totalRevenue,
+  }))
+
+  const filteredProducts = productSearch
+    ? topProductRows.filter((p) => p.name.toLowerCase().includes(productSearch.toLowerCase()))
+    : topProductRows
+
+  const dailySalesRows: DailySalesRow[] = allTrend.map((d) => ({
+    id: d.date,
+    date: d.date,
+    penjualan: d.penjualan,
+    service: d.service,
+    total: d.total,
+  }))
+
+  const filteredDailySales = dailySearch
+    ? dailySalesRows.filter((d) => d.date.includes(dailySearch))
+    : dailySalesRows
 
   function handleExport() {
     if (!data) return
@@ -60,12 +105,23 @@ export function SalesReportPage() {
           <h1 className="text-xl font-semibold">{t('reports.sales_title')}</h1>
           <p className="text-sm text-muted-foreground">{t('reports.sales_description')}</p>
         </div>
-        <div className="ml-auto">
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={!data}>{t('common.export')} CSV</Button>
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={!data}>
+            {t('common.export')} CSV
+          </Button>
         </div>
       </div>
 
       <ReportDateFilter />
+
+      {/* Cross-report correlation navigation with date sync */}
+      <ReportCorrelationNav
+        links={[
+          { to: '/reports/payments', label: 'Laporan Pembayaran', hint: 'Cek uang masuk & piutang' },
+          { to: '/reports/profit-loss', label: 'Laba Rugi', hint: 'Cek laba kotor & HPP' },
+          { to: '/reports/inventory', label: 'Stok & Inventori', hint: 'Cek persediaan barang' },
+        ]}
+      />
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground py-8 text-center">{t('common.loading')}</p>
@@ -95,30 +151,63 @@ export function SalesReportPage() {
             </ReportSection>
           )}
 
-          {data.topProducts.length > 0 && (
+          {topProductRows.length > 0 && (
             <ReportSection title={t('reports.top_products')}>
-              <div className="overflow-x-auto">
-                <Table className="w-full text-sm">
-                  <TableHeader>
-                    <TableRow className="border-b text-left text-muted-foreground">
-                      <TableHead className="pb-2 font-medium">{t('reports.top_products_rank')}</TableHead>
-                      <TableHead className="pb-2 font-medium">{t('reports.top_products_product')}</TableHead>
-                      <TableHead className="pb-2 font-medium text-right">{t('reports.top_products_qty')}</TableHead>
-                      <TableHead className="pb-2 font-medium text-right">{t('reports.top_products_revenue')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.topProducts.map((p, i) => (
-                      <TableRow key={p.productId ?? i} className="border-b last:border-0">
-                        <TableCell className="py-2 text-muted-foreground">{i + 1}</TableCell>
-                        <TableCell className="py-2 font-medium">{p.name}</TableCell>
-                        <TableCell className="py-2 text-right">{p.totalQty}</TableCell>
-                        <TableCell className="py-2 text-right font-semibold">{formatCurrency(p.totalRevenue)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <FilterToolbar
+                placeholder="Cari nama produk..."
+                searchQuery={productSearch}
+                onSearchChange={setProductSearch}
+              />
+              <DataTable<TopProductRow>
+                columns={[
+                  { key: 'rank', header: '#', sortable: true },
+                  { key: 'name', header: t('reports.top_products_product'), sortable: true },
+                  { key: 'totalQty', header: t('reports.top_products_qty'), sortable: true },
+                  {
+                    key: 'totalRevenue',
+                    header: t('reports.top_products_revenue'),
+                    sortable: true,
+                    render: (row) => <span className="font-semibold">{formatCurrency(row.totalRevenue)}</span>,
+                  },
+                ]}
+                data={filteredProducts}
+                emptyTitle="Tidak ada produk ditemukan"
+              />
+            </ReportSection>
+          )}
+
+          {dailySalesRows.length > 0 && (
+            <ReportSection title="Penjualan Harian">
+              <FilterToolbar
+                placeholder="Cari tanggal (contoh: 2026-11)..."
+                searchQuery={dailySearch}
+                onSearchChange={setDailySearch}
+              />
+              <DataTable<DailySalesRow>
+                columns={[
+                  { key: 'date', header: t('common.date'), sortable: true },
+                  {
+                    key: 'penjualan',
+                    header: t('reports.sales'),
+                    sortable: true,
+                    render: (row) => formatCurrency(row.penjualan),
+                  },
+                  {
+                    key: 'service',
+                    header: 'Service',
+                    sortable: true,
+                    render: (row) => formatCurrency(row.service),
+                  },
+                  {
+                    key: 'total',
+                    header: t('common.total'),
+                    sortable: true,
+                    render: (row) => <span className="font-semibold">{formatCurrency(row.total)}</span>,
+                  },
+                ]}
+                data={filteredDailySales}
+                emptyTitle="Belum ada data penjualan harian"
+              />
             </ReportSection>
           )}
         </>

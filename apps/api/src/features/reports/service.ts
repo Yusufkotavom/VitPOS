@@ -422,7 +422,7 @@ export async function getSalesReport(db: AppDb, input: ReportInput) {
     .where(and(...saleFilters))
     .groupBy(salesOrderItems.productId, salesOrderItems.name)
     .orderBy(desc(sum(salesOrderItems.subtotal)))
-    .limit(20)
+    .limit(100)
 
   const [totals] = await db
     .select({
@@ -525,7 +525,7 @@ export async function getPaymentReport(db: AppDb, input: ReportInput) {
     .from(salesOrders)
     .where(and(...arFilters))
     .orderBy(salesOrders.createdAt)
-    .limit(50)
+    .limit(200)
 
   const now = new Date()
   const aging = { current: 0, days7: 0, days30: 0, days60: 0, over60: 0 }
@@ -535,6 +535,7 @@ export async function getPaymentReport(db: AppDb, input: ReportInput) {
     if (days <= 7) aging.current += amount
     else if (days <= 30) aging.days7 += amount
     else if (days <= 60) aging.days30 += amount
+    else if (days <= 90) aging.days60 += amount
     else aging.over60 += amount
   }
 

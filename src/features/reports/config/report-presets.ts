@@ -47,7 +47,7 @@ const SHARED_OWNER_CARDS: ReportCardPreset[] = [
     description: 'Uang masuk, uang keluar, saldo berjalan',
   },
   {
-    to: '/reports/payments',
+    to: '/reports/payments?tab=receivables',
     title: 'Piutang',
     description: 'Tagihan belum lunas dan histori bayar',
   },

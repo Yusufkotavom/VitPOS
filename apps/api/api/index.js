@@ -1172,7 +1172,7 @@ async function getSalesReport(db2, input) {
     name: salesOrderItems.name,
     totalQty: sum(salesOrderItems.qty),
     totalRevenue: sum(salesOrderItems.subtotal)
-  }).from(salesOrderItems).innerJoin(salesOrders, eq2(salesOrderItems.salesOrderId, salesOrders.id)).where(and2(...saleFilters)).groupBy(salesOrderItems.productId, salesOrderItems.name).orderBy(desc(sum(salesOrderItems.subtotal))).limit(20);
+  }).from(salesOrderItems).innerJoin(salesOrders, eq2(salesOrderItems.salesOrderId, salesOrders.id)).where(and2(...saleFilters)).groupBy(salesOrderItems.productId, salesOrderItems.name).orderBy(desc(sum(salesOrderItems.subtotal))).limit(100);
   const [totals] = await db2.select({
     orderCount: count(salesOrders.id),
     revenue: sum(salesOrders.grandTotal),
@@ -1236,7 +1236,7 @@ async function getPaymentReport(db2, input) {
     paidTotal: salesOrders.paidTotal,
     outstanding: sql`${salesOrders.grandTotal} - ${salesOrders.paidTotal}`,
     createdAt: salesOrders.createdAt
-  }).from(salesOrders).where(and2(...arFilters)).orderBy(salesOrders.createdAt).limit(50);
+  }).from(salesOrders).where(and2(...arFilters)).orderBy(salesOrders.createdAt).limit(200);
   const now = /* @__PURE__ */ new Date();
   const aging = { current: 0, days7: 0, days30: 0, days60: 0, over60: 0 };
   for (const r of receivables) {
@@ -1245,6 +1245,7 @@ async function getPaymentReport(db2, input) {
     if (days <= 7) aging.current += amount;
     else if (days <= 30) aging.days7 += amount;
     else if (days <= 60) aging.days30 += amount;
+    else if (days <= 90) aging.days60 += amount;
     else aging.over60 += amount;
   }
   const totalCollected = byMethod.reduce((s, r) => s + n(r.total), 0);
