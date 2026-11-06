@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 
 import { db } from '../../lib/db.js'
 import {
+  branches,
   customers,
   products,
   salesOrderItems,
@@ -174,5 +175,255 @@ storefrontRoutes.get('/:slug/track', async (c) => {
       phone: customer.phone,
     },
     orders: rows,
+  })
+})
+
+// POST /api/v1/store/:slug/checkout
+storefrontRoutes.post('/:slug/checkout', async (c) => {
+  const slug = c.req.param('slug')
+
+  const tenantId = await resolveTenantId(slug)
+  if (!tenantId) {
+    return c.json({ ok: false, message: 'Toko tidak ditemukan' }, 404)
+  }
+
+  const body = (await c.req.json().catch(() => null)) as {
+    customer?: {
+      name?: string
+      phone?: string
+      address?: string
+      notes?: string
+    }
+    orderType?: 'delivery' | 'pickup'
+    items?: Array<{
+      productId: string
+      qty: number
+      notes?: string
+    }>
+  } | null
+
+  const customerName = body?.customer?.name?.trim()
+  const rawPhone = body?.customer?.phone?.trim() ?? ''
+  const cleanPhone = rawPhone.replace(/\D/g, '')
+
+  if (!customerName) {
+    return c.json({ ok: false, message: 'Nama pemesan wajib diisi' }, 400)
+  }
+  if (!cleanPhone || cleanPhone.length < 8) {
+    return c.json({ ok: false, message: 'Nomor WhatsApp tidak valid (minimal 8 digit)' }, 400)
+  }
+
+  const items = body?.items ?? []
+  if (!Array.isArray(items) || items.length === 0) {
+    return c.json({ ok: false, message: 'Keranjang belanja tidak boleh kosong' }, 400)
+  }
+
+  for (const item of items) {
+    if (!item.productId || typeof item.qty !== 'number' || item.qty <= 0) {
+      return c.json({ ok: false, message: 'Item pesanan tidak valid' }, 400)
+    }
+  }
+
+  // Find active branch
+  const branch = await db.query.branches.findFirst({
+    where: and(
+      eq(branches.tenantId, tenantId),
+      eq(branches.isActive, true),
+    ),
+    orderBy: [desc(branches.isDefault)],
+  })
+
+  if (!branch) {
+    return c.json({ ok: false, message: 'Cabang toko belum tersedia' }, 400)
+  }
+
+  // Fetch products
+  const productIds = items.map((i) => i.productId)
+  const productRows = await db.query.products.findMany({
+    where: and(
+      eq(products.tenantId, tenantId),
+      eq(products.isActive, true),
+      isNull(products.deletedAt),
+      inArray(products.id, productIds),
+    ),
+  })
+
+  const productMap = new Map(productRows.map((p) => [p.id, p]))
+  for (const item of items) {
+    if (!productMap.has(item.productId)) {
+      return c.json({ ok: false, message: 'Salah satu produk tidak ditemukan atau sudah tidak aktif' }, 400)
+    }
+  }
+
+  let grandTotal = 0
+  const orderItemRecords: Array<{
+    id: string
+    tenantId: string
+    productId: string
+    name: string
+    qty: string
+    unitPrice: string
+    discountTotal: string
+    subtotal: string
+  }> = []
+
+  for (const item of items) {
+    const prod = productMap.get(item.productId)!
+    const price = Number(prod.salePrice) || 0
+    const sub = price * item.qty
+    grandTotal += sub
+
+    orderItemRecords.push({
+      id: crypto.randomUUID(),
+      tenantId,
+      productId: prod.id,
+      name: prod.name,
+      qty: item.qty.toString(),
+      unitPrice: price.toFixed(2),
+      discountTotal: '0',
+      subtotal: sub.toFixed(2),
+    })
+  }
+
+  // Find or create customer
+  const phoneVariants = new Set([cleanPhone])
+  if (cleanPhone.startsWith('62')) phoneVariants.add(`0${cleanPhone.slice(2)}`)
+  if (cleanPhone.startsWith('0')) phoneVariants.add(`62${cleanPhone.slice(1)}`)
+
+  const existingCustomer = await db.query.customers.findFirst({
+    where: and(
+      eq(customers.tenantId, tenantId),
+      inArray(
+        sql`regexp_replace(${customers.phone}, '[^0-9]', '', 'g')`,
+        [...phoneVariants],
+      ),
+    ),
+  })
+
+  const now = new Date()
+  let customerId = existingCustomer?.id
+
+  if (!existingCustomer) {
+    customerId = crypto.randomUUID()
+    await db.insert(customers).values({
+      id: customerId,
+      tenantId,
+      branchId: branch.id,
+      name: customerName,
+      phone: cleanPhone,
+      address: body?.customer?.address?.trim() ?? null,
+      isActive: true,
+      version: 1,
+      syncStatus: 'synced',
+      createdAt: now,
+      updatedAt: now,
+    })
+  } else if (body?.customer?.address?.trim()) {
+    await db.update(customers).set({
+      address: body.customer.address.trim(),
+      updatedAt: now,
+    }).where(eq(customers.id, existingCustomer.id))
+  }
+
+  // Create sales order
+  const orderId = crypto.randomUUID()
+  const dateStr = now.toISOString().slice(0, 10).replaceAll('-', '')
+  const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase()
+  const orderNumber = `SO-${dateStr}-${randomSuffix}`
+
+  const orderType = body?.orderType === 'pickup' ? 'pickup' : 'delivery'
+  const orderTypeLabel = orderType === 'pickup' ? 'Ambil di Toko' : 'Kirim ke Alamat'
+  const customerNotes = body?.customer?.notes?.trim()
+  const customerAddress = body?.customer?.address?.trim()
+  const fullNotes = `[Pesanan Online Storefront - ${orderTypeLabel}]${customerNotes ? ` Catatan: ${customerNotes}` : ''}${customerAddress ? ` | Alamat: ${customerAddress}` : ''}`
+
+  await db.transaction(async (tx) => {
+    await tx.insert(salesOrders).values({
+      id: orderId,
+      tenantId,
+      branchId: branch.id,
+      customerId,
+      orderNumber,
+      status: 'unpaid',
+      subtotal: grandTotal.toFixed(2),
+      discountTotal: '0',
+      taxTotal: '0',
+      grandTotal: grandTotal.toFixed(2),
+      paidTotal: '0',
+      date: now.toISOString(),
+      notes: fullNotes,
+      syncStatus: 'synced',
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    for (const itemRec of orderItemRecords) {
+      await tx.insert(salesOrderItems).values({
+        ...itemRec,
+        salesOrderId: orderId,
+        createdAt: now,
+        updatedAt: now,
+      })
+    }
+  })
+
+  // Fetch store settings for WhatsApp message
+  const storeSettings = await db.query.settings.findMany({
+    where: eq(settings.tenantId, tenantId),
+  })
+  const tenant = await db.query.tenants.findFirst({
+    where: eq(tenants.id, tenantId),
+  })
+
+  const storeName = storeSettings.find((s) => s.key === 'company-name')?.value || tenant?.name || 'Toko'
+  const storePhone = storeSettings.find((s) => s.key === 'company-phone')?.value || tenant?.phone || ''
+
+  const formatRupiah = (num: number) => `Rp ${new Intl.NumberFormat('id-ID').format(num)}`
+  const itemsText = orderItemRecords
+    .map((i) => `• ${i.qty}x ${i.name} (${formatRupiah(Number(i.unitPrice))}) = ${formatRupiah(Number(i.subtotal))}`)
+    .join('\n')
+
+  const waMessage = `Halo *${storeName}*, saya ingin konfirmasi pesanan dari web store:
+
+📋 *Nomor Pesanan:* ${orderNumber}
+👤 *Nama Pemesan:* ${customerName}
+📱 *No. WhatsApp:* ${cleanPhone}
+🚚 *Pengambilan:* ${orderTypeLabel}
+${customerAddress ? `📍 *Alamat:* ${customerAddress}\n` : ''}${customerNotes ? `📝 *Catatan:* ${customerNotes}\n` : ''}
+🛒 *Daftar Pesanan:*
+${itemsText}
+
+💰 *Total Pembayaran:* *${formatRupiah(grandTotal)}*
+
+Mohon diproses pesanannya. Terima kasih!`
+
+  const cleanStorePhone = storePhone.replace(/\D/g, '')
+  const waTargetPhone = cleanStorePhone.startsWith('0') ? `62${cleanStorePhone.slice(1)}` : cleanStorePhone
+  const whatsappUrl = waTargetPhone
+    ? `https://wa.me/${waTargetPhone}?text=${encodeURIComponent(waMessage)}`
+    : null
+
+  return c.json({
+    ok: true,
+    order: {
+      id: orderId,
+      orderNumber,
+      grandTotal,
+      status: 'unpaid',
+      orderType,
+      date: now.toISOString(),
+    },
+    customer: {
+      id: customerId,
+      name: customerName,
+      phone: cleanPhone,
+    },
+    store: {
+      name: storeName,
+      phone: storePhone,
+    },
+    whatsappUrl,
+    whatsappMessage: waMessage,
   })
 })

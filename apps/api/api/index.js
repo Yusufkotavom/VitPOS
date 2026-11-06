@@ -4043,6 +4043,198 @@ storefrontRoutes.get("/:slug/track", async (c) => {
     orders: rows
   });
 });
+storefrontRoutes.post("/:slug/checkout", async (c) => {
+  const slug = c.req.param("slug");
+  const tenantId = await resolveTenantId(slug);
+  if (!tenantId) {
+    return c.json({ ok: false, message: "Toko tidak ditemukan" }, 404);
+  }
+  const body = await c.req.json().catch(() => null);
+  const customerName = body?.customer?.name?.trim();
+  const rawPhone = body?.customer?.phone?.trim() ?? "";
+  const cleanPhone = rawPhone.replace(/\D/g, "");
+  if (!customerName) {
+    return c.json({ ok: false, message: "Nama pemesan wajib diisi" }, 400);
+  }
+  if (!cleanPhone || cleanPhone.length < 8) {
+    return c.json({ ok: false, message: "Nomor WhatsApp tidak valid (minimal 8 digit)" }, 400);
+  }
+  const items = body?.items ?? [];
+  if (!Array.isArray(items) || items.length === 0) {
+    return c.json({ ok: false, message: "Keranjang belanja tidak boleh kosong" }, 400);
+  }
+  for (const item of items) {
+    if (!item.productId || typeof item.qty !== "number" || item.qty <= 0) {
+      return c.json({ ok: false, message: "Item pesanan tidak valid" }, 400);
+    }
+  }
+  const branch = await db.query.branches.findFirst({
+    where: and9(
+      eq12(branches.tenantId, tenantId),
+      eq12(branches.isActive, true)
+    ),
+    orderBy: [desc6(branches.isDefault)]
+  });
+  if (!branch) {
+    return c.json({ ok: false, message: "Cabang toko belum tersedia" }, 400);
+  }
+  const productIds = items.map((i) => i.productId);
+  const productRows = await db.query.products.findMany({
+    where: and9(
+      eq12(products.tenantId, tenantId),
+      eq12(products.isActive, true),
+      isNull2(products.deletedAt),
+      inArray2(products.id, productIds)
+    )
+  });
+  const productMap = new Map(productRows.map((p) => [p.id, p]));
+  for (const item of items) {
+    if (!productMap.has(item.productId)) {
+      return c.json({ ok: false, message: "Salah satu produk tidak ditemukan atau sudah tidak aktif" }, 400);
+    }
+  }
+  let grandTotal = 0;
+  const orderItemRecords = [];
+  for (const item of items) {
+    const prod = productMap.get(item.productId);
+    const price = Number(prod.salePrice) || 0;
+    const sub = price * item.qty;
+    grandTotal += sub;
+    orderItemRecords.push({
+      id: crypto.randomUUID(),
+      tenantId,
+      productId: prod.id,
+      name: prod.name,
+      qty: item.qty.toString(),
+      unitPrice: price.toFixed(2),
+      discountTotal: "0",
+      subtotal: sub.toFixed(2)
+    });
+  }
+  const phoneVariants = /* @__PURE__ */ new Set([cleanPhone]);
+  if (cleanPhone.startsWith("62")) phoneVariants.add(`0${cleanPhone.slice(2)}`);
+  if (cleanPhone.startsWith("0")) phoneVariants.add(`62${cleanPhone.slice(1)}`);
+  const existingCustomer = await db.query.customers.findFirst({
+    where: and9(
+      eq12(customers.tenantId, tenantId),
+      inArray2(
+        sql3`regexp_replace(${customers.phone}, '[^0-9]', '', 'g')`,
+        [...phoneVariants]
+      )
+    )
+  });
+  const now = /* @__PURE__ */ new Date();
+  let customerId = existingCustomer?.id;
+  if (!existingCustomer) {
+    customerId = crypto.randomUUID();
+    await db.insert(customers).values({
+      id: customerId,
+      tenantId,
+      branchId: branch.id,
+      name: customerName,
+      phone: cleanPhone,
+      address: body?.customer?.address?.trim() ?? null,
+      isActive: true,
+      version: 1,
+      syncStatus: "synced",
+      createdAt: now,
+      updatedAt: now
+    });
+  } else if (body?.customer?.address?.trim()) {
+    await db.update(customers).set({
+      address: body.customer.address.trim(),
+      updatedAt: now
+    }).where(eq12(customers.id, existingCustomer.id));
+  }
+  const orderId = crypto.randomUUID();
+  const dateStr = now.toISOString().slice(0, 10).replaceAll("-", "");
+  const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const orderNumber = `SO-${dateStr}-${randomSuffix}`;
+  const orderType = body?.orderType === "pickup" ? "pickup" : "delivery";
+  const orderTypeLabel = orderType === "pickup" ? "Ambil di Toko" : "Kirim ke Alamat";
+  const customerNotes = body?.customer?.notes?.trim();
+  const customerAddress = body?.customer?.address?.trim();
+  const fullNotes = `[Pesanan Online Storefront - ${orderTypeLabel}]${customerNotes ? ` Catatan: ${customerNotes}` : ""}${customerAddress ? ` | Alamat: ${customerAddress}` : ""}`;
+  await db.transaction(async (tx) => {
+    await tx.insert(salesOrders).values({
+      id: orderId,
+      tenantId,
+      branchId: branch.id,
+      customerId,
+      orderNumber,
+      status: "unpaid",
+      subtotal: grandTotal.toFixed(2),
+      discountTotal: "0",
+      taxTotal: "0",
+      grandTotal: grandTotal.toFixed(2),
+      paidTotal: "0",
+      date: now.toISOString(),
+      notes: fullNotes,
+      syncStatus: "synced",
+      version: 1,
+      createdAt: now,
+      updatedAt: now
+    });
+    for (const itemRec of orderItemRecords) {
+      await tx.insert(salesOrderItems).values({
+        ...itemRec,
+        salesOrderId: orderId,
+        createdAt: now,
+        updatedAt: now
+      });
+    }
+  });
+  const storeSettings = await db.query.settings.findMany({
+    where: eq12(settings.tenantId, tenantId)
+  });
+  const tenant = await db.query.tenants.findFirst({
+    where: eq12(tenants.id, tenantId)
+  });
+  const storeName = storeSettings.find((s) => s.key === "company-name")?.value || tenant?.name || "Toko";
+  const storePhone = storeSettings.find((s) => s.key === "company-phone")?.value || tenant?.phone || "";
+  const formatRupiah = (num) => `Rp ${new Intl.NumberFormat("id-ID").format(num)}`;
+  const itemsText = orderItemRecords.map((i) => `\u2022 ${i.qty}x ${i.name} (${formatRupiah(Number(i.unitPrice))}) = ${formatRupiah(Number(i.subtotal))}`).join("\n");
+  const waMessage = `Halo *${storeName}*, saya ingin konfirmasi pesanan dari web store:
+
+\u{1F4CB} *Nomor Pesanan:* ${orderNumber}
+\u{1F464} *Nama Pemesan:* ${customerName}
+\u{1F4F1} *No. WhatsApp:* ${cleanPhone}
+\u{1F69A} *Pengambilan:* ${orderTypeLabel}
+${customerAddress ? `\u{1F4CD} *Alamat:* ${customerAddress}
+` : ""}${customerNotes ? `\u{1F4DD} *Catatan:* ${customerNotes}
+` : ""}
+\u{1F6D2} *Daftar Pesanan:*
+${itemsText}
+
+\u{1F4B0} *Total Pembayaran:* *${formatRupiah(grandTotal)}*
+
+Mohon diproses pesanannya. Terima kasih!`;
+  const cleanStorePhone = storePhone.replace(/\D/g, "");
+  const waTargetPhone = cleanStorePhone.startsWith("0") ? `62${cleanStorePhone.slice(1)}` : cleanStorePhone;
+  const whatsappUrl = waTargetPhone ? `https://wa.me/${waTargetPhone}?text=${encodeURIComponent(waMessage)}` : null;
+  return c.json({
+    ok: true,
+    order: {
+      id: orderId,
+      orderNumber,
+      grandTotal,
+      status: "unpaid",
+      orderType,
+      date: now.toISOString()
+    },
+    customer: {
+      id: customerId,
+      name: customerName,
+      phone: cleanPhone
+    },
+    store: {
+      name: storeName,
+      phone: storePhone
+    },
+    whatsappUrl,
+    whatsappMessage: waMessage
+  });
+});
 
 // src/features/updates/routes.ts
 import { Hono as Hono11 } from "hono";

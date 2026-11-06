@@ -1,14 +1,16 @@
 import { Input } from '@/components/ui/input'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Filter, LayoutGrid, List } from 'lucide-react'
+import { Filter, LayoutGrid, List, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { formatDateTime } from '@/lib/date'
 import { formatCurrency } from '@/lib/format-currency'
 import { useSalesOrders } from '@/features/sales-orders/hooks/use-sales-orders'
+import { runSync } from '@/services/sync/sync-engine'
 import { DataTable } from '@/shared/components/data-table/data-table'
 import { ContentCard } from '@/shared/components/display/content-card'
 import { StatusBadge } from '@/shared/components/display/status-badge'
@@ -17,10 +19,20 @@ import { PageShell } from '@/shared/components/layout/page-shell'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 function tone(status: string) {
-  if (status === 'Lunas') return 'success'
-  if (status === 'Sebagian') return 'warning'
-  if (status === 'Belum Bayar') return 'danger'
+  if (status === 'Lunas' || status === 'paid') return 'success'
+  if (status === 'Sebagian' || status === 'partial') return 'warning'
+  if (status === 'Belum Bayar' || status === 'unpaid') return 'danger'
+  if (status === 'confirmed') return 'info'
   return 'neutral'
+}
+
+function statusLabel(status: string) {
+  if (status === 'unpaid') return 'Belum Bayar'
+  if (status === 'paid') return 'Lunas'
+  if (status === 'partial') return 'Sebagian'
+  if (status === 'confirmed') return 'Dikonfirmasi'
+  if (status === 'draft') return 'Draft'
+  return status
 }
 
 function paymentSummary(paidTotal: number | undefined | null, grandTotal: number | undefined | null) {
@@ -62,7 +74,7 @@ function SalesOrderCard({ row }: { row: ReturnType<typeof useSalesOrders>[number
             </h3>
             <p className="text-sm text-muted-foreground">{row.customerName}</p>
           </div>
-          <StatusBadge label={row.status} tone={tone(row.status)} />
+          <StatusBadge label={statusLabel(row.status)} tone={tone(row.status)} />
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-sm">
@@ -149,9 +161,27 @@ export function SalesOrdersPage() {
     setPageSize('20')
   }
 
+  const [syncing, setSyncing] = useState(false)
+
+  async function handleSync() {
+    setSyncing(true)
+    try {
+      await runSync()
+      toast.success('Pesanan berhasil disinkronkan')
+    } catch {
+      toast.error('Gagal menyinkronkan data pesanan')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   return (
     <PageShell title="Pesanan Penjualan" description="Invoice, pembayaran, piutang, print, PDF, dan WhatsApp." actions={
       <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
+          <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+          Sinkron Pesanan
+        </Button>
         <Button variant="outline" asChild>
           <Link to="/returns">Retur</Link>
         </Button>
@@ -252,7 +282,7 @@ export function SalesOrdersPage() {
               { key: 'date', header: 'Tanggal', sortable: true, render: (row) => formatDateTime(row.date) },
               { key: 'grandTotal', header: 'Total', sortable: true, render: (row) => formatCurrency(row.grandTotal) },
               { key: 'paidTotal', header: 'Dibayar', render: (row) => formatCurrency(row.paidTotal) },
-              { key: 'status', header: 'Status', render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
+              { key: 'status', header: 'Status', render: (row) => <StatusBadge label={statusLabel(row.status)} tone={tone(row.status)} /> },
             ]}
           />
         ) : paginated.length === 0 ? (

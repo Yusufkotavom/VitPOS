@@ -28,6 +28,44 @@ export interface TrackedOrder {
   status: string
 }
 
+export interface CheckoutInput {
+  customer: {
+    name: string
+    phone: string
+    address?: string
+    notes?: string
+  }
+  orderType: 'delivery' | 'pickup'
+  items: Array<{
+    productId: string
+    qty: number
+    notes?: string
+  }>
+}
+
+export interface CheckoutResponse {
+  ok: boolean
+  order: {
+    id: string
+    orderNumber: string
+    grandTotal: number
+    status: string
+    orderType: string
+    date: string
+  }
+  customer: {
+    id: string
+    name: string
+    phone: string
+  }
+  store: {
+    name: string
+    phone: string
+  }
+  whatsappUrl: string | null
+  whatsappMessage: string
+}
+
 const getBaseUrl = () =>
   (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3010').replace(/\/+$/, '')
 
@@ -69,4 +107,20 @@ export async function trackOrders(slug: string, phone: string): Promise<TrackedO
     `${baseUrl}/api/v1/store/${encodeURIComponent(slug)}/track?${params.toString()}`,
   )
   return res.orders ?? []
+}
+
+export async function submitStoreCheckout(slug: string, payload: CheckoutInput): Promise<CheckoutResponse> {
+  const baseUrl = getBaseUrl()
+  const res = await fetch(`${baseUrl}/api/v1/store/${encodeURIComponent(slug)}/checkout`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+
+  const data = (await res.json().catch(() => null)) as (CheckoutResponse & { message?: string }) | null
+  if (!res.ok || !data?.ok) {
+    throw new Error(data?.message ?? `Gagal memproses pesanan (${res.status})`)
+  }
+
+  return data
 }
