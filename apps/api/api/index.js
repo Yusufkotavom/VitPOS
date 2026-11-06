@@ -3596,12 +3596,15 @@ subscriptionBillingRoutes.post("/tenants/:tenantId/invoices", async (c) => {
 var submitPaymentSchema = z3.object({
   invoiceId: z3.string().uuid(),
   amount: z3.string().min(1),
-  bankName: z3.string().max(120).optional(),
-  accountName: z3.string().max(160).optional(),
-  referenceNumber: z3.string().max(120).optional(),
-  proofImageUrl: z3.string().url().optional(),
-  proofText: z3.string().min(3).optional()
-}).refine((value) => value.proofImageUrl || value.proofText, { message: "Isi catatan bukti bayar atau unggah bukti transfer." });
+  bankName: z3.string().max(120).optional().nullable(),
+  accountName: z3.string().max(160).optional().nullable(),
+  referenceNumber: z3.string().max(120).optional().nullable(),
+  proofImageUrl: z3.string().max(2e3).optional().nullable(),
+  proofText: z3.string().max(1e3).optional().nullable()
+}).refine(
+  (value) => Boolean(value.proofImageUrl?.trim() || value.proofText?.trim()),
+  { message: "Isi catatan bukti bayar atau unggah bukti transfer." }
+);
 subscriptionBillingRoutes.post("/tenants/:tenantId/payments", async (c) => {
   const tenantId = c.req.param("tenantId");
   const userId = c.get("userId");
@@ -3616,11 +3619,11 @@ subscriptionBillingRoutes.post("/tenants/:tenantId/payments", async (c) => {
     invoiceId: body.invoiceId,
     amount: body.amount,
     method: "manual_transfer",
-    bankName: body.bankName,
-    accountName: body.accountName,
-    referenceNumber: body.referenceNumber,
-    proofImageUrl: body.proofImageUrl,
-    proofText: body.proofText,
+    bankName: body.bankName?.trim() || null,
+    accountName: body.accountName?.trim() || null,
+    referenceNumber: body.referenceNumber?.trim() || null,
+    proofImageUrl: body.proofImageUrl?.trim() || null,
+    proofText: body.proofText?.trim() || null,
     status: "submitted",
     submittedByUserId: userId
   }).returning();
@@ -3648,7 +3651,16 @@ subscriptionBillingRoutes.post("/tenants/:tenantId/change-plan", async (c) => {
   const now = /* @__PURE__ */ new Date();
   let invoiceId = null;
   let status = "pending_payment";
-  if (body.changeType === "downgrade") {
+  const isFreePlan = plan.code === "free" || Number(plan.monthlyPrice) === 0;
+  if (isFreePlan) {
+    status = "applied";
+    await db.update(tenants).set({
+      planCode: plan.code,
+      subscriptionStatus: "active",
+      planValidUntil: null,
+      updatedAt: now
+    }).where(eq9(tenants.id, tenantId));
+  } else if (body.changeType === "downgrade") {
     status = "scheduled";
   } else {
     const amount = body.billingPeriod === "yearly" && plan.yearlyPrice ? plan.yearlyPrice : plan.monthlyPrice;
@@ -3665,6 +3677,7 @@ subscriptionBillingRoutes.post("/tenants/:tenantId/change-plan", async (c) => {
       dueAt: addDays2(now, 7)
     }).returning();
     invoiceId = invoice.id;
+    await db.update(tenants).set({ subscriptionStatus: "pending_payment", updatedAt: now }).where(eq9(tenants.id, tenantId));
   }
   const [request] = await db.insert(planChangeRequests).values({
     tenantId,
@@ -3672,12 +3685,17 @@ subscriptionBillingRoutes.post("/tenants/:tenantId/change-plan", async (c) => {
     toPlanCode: plan.code,
     changeType: body.changeType,
     status,
-    effectiveAt: body.changeType === "downgrade" ? tenant.planValidUntil : null,
+    effectiveAt: isFreePlan ? now : body.changeType === "downgrade" ? tenant.planValidUntil : null,
     invoiceId,
     requestedByUserId: userId
   }).returning();
-  await writeSubscriptionEvent2({ tenantId, actorUserId: userId, eventType: "plan_change.requested", metadata: { requestId: request.id, changeType: body.changeType } });
-  return c.json({ ok: true, item: request }, 201);
+  await writeSubscriptionEvent2({
+    tenantId,
+    actorUserId: userId,
+    eventType: isFreePlan ? "plan_change.applied" : "plan_change.requested",
+    metadata: { requestId: request.id, changeType: body.changeType, toPlanCode: plan.code, status }
+  });
+  return c.json({ ok: true, item: request, invoiceId }, 201);
 });
 
 // src/features/subscription/routes.ts

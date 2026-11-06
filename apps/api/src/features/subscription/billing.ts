@@ -124,15 +124,20 @@ subscriptionBillingRoutes.post('/tenants/:tenantId/invoices', async (c) => {
   return c.json({ ok: true, item: invoice }, 201)
 })
 
-const submitPaymentSchema = z.object({
-  invoiceId: z.string().uuid(),
-  amount: z.string().min(1),
-  bankName: z.string().max(120).optional(),
-  accountName: z.string().max(160).optional(),
-  referenceNumber: z.string().max(120).optional(),
-  proofImageUrl: z.string().url().optional(),
-  proofText: z.string().min(3).optional(),
-}).refine((value) => value.proofImageUrl || value.proofText, { message: 'Isi catatan bukti bayar atau unggah bukti transfer.' })
+const submitPaymentSchema = z
+  .object({
+    invoiceId: z.string().uuid(),
+    amount: z.string().min(1),
+    bankName: z.string().max(120).optional().nullable(),
+    accountName: z.string().max(160).optional().nullable(),
+    referenceNumber: z.string().max(120).optional().nullable(),
+    proofImageUrl: z.string().max(2000).optional().nullable(),
+    proofText: z.string().max(1000).optional().nullable(),
+  })
+  .refine(
+    (value) => Boolean(value.proofImageUrl?.trim() || value.proofText?.trim()),
+    { message: 'Isi catatan bukti bayar atau unggah bukti transfer.' },
+  )
 
 subscriptionBillingRoutes.post('/tenants/:tenantId/payments', async (c) => {
   const tenantId = c.req.param('tenantId')
@@ -151,11 +156,11 @@ subscriptionBillingRoutes.post('/tenants/:tenantId/payments', async (c) => {
     invoiceId: body.invoiceId,
     amount: body.amount,
     method: 'manual_transfer',
-    bankName: body.bankName,
-    accountName: body.accountName,
-    referenceNumber: body.referenceNumber,
-    proofImageUrl: body.proofImageUrl,
-    proofText: body.proofText,
+    bankName: body.bankName?.trim() || null,
+    accountName: body.accountName?.trim() || null,
+    referenceNumber: body.referenceNumber?.trim() || null,
+    proofImageUrl: body.proofImageUrl?.trim() || null,
+    proofText: body.proofText?.trim() || null,
     status: 'submitted',
     submittedByUserId: userId,
   }).returning()
@@ -189,9 +194,19 @@ subscriptionBillingRoutes.post('/tenants/:tenantId/change-plan', async (c) => {
 
   const now = new Date()
   let invoiceId: string | null = null
-  let status: 'pending_payment' | 'scheduled' = 'pending_payment'
+  let status: 'pending_payment' | 'scheduled' | 'applied' = 'pending_payment'
 
-  if (body.changeType === 'downgrade') {
+  const isFreePlan = plan.code === 'free' || Number(plan.monthlyPrice) === 0
+
+  if (isFreePlan) {
+    status = 'applied'
+    await db.update(tenants).set({
+      planCode: plan.code,
+      subscriptionStatus: 'active',
+      planValidUntil: null,
+      updatedAt: now,
+    }).where(eq(tenants.id, tenantId))
+  } else if (body.changeType === 'downgrade') {
     status = 'scheduled'
   } else {
     const amount = body.billingPeriod === 'yearly' && plan.yearlyPrice ? plan.yearlyPrice : plan.monthlyPrice
@@ -208,6 +223,7 @@ subscriptionBillingRoutes.post('/tenants/:tenantId/change-plan', async (c) => {
       dueAt: addDays(now, 7),
     }).returning()
     invoiceId = invoice.id
+    await db.update(tenants).set({ subscriptionStatus: 'pending_payment', updatedAt: now }).where(eq(tenants.id, tenantId))
   }
 
   const [request] = await db.insert(planChangeRequests).values({
@@ -216,11 +232,17 @@ subscriptionBillingRoutes.post('/tenants/:tenantId/change-plan', async (c) => {
     toPlanCode: plan.code,
     changeType: body.changeType,
     status,
-    effectiveAt: body.changeType === 'downgrade' ? tenant.planValidUntil : null,
+    effectiveAt: isFreePlan ? now : (body.changeType === 'downgrade' ? tenant.planValidUntil : null),
     invoiceId,
     requestedByUserId: userId,
   }).returning()
 
-  await writeSubscriptionEvent({ tenantId, actorUserId: userId, eventType: 'plan_change.requested', metadata: { requestId: request.id, changeType: body.changeType } })
-  return c.json({ ok: true, item: request }, 201)
+  await writeSubscriptionEvent({
+    tenantId,
+    actorUserId: userId,
+    eventType: isFreePlan ? 'plan_change.applied' : 'plan_change.requested',
+    metadata: { requestId: request.id, changeType: body.changeType, toPlanCode: plan.code, status },
+  })
+
+  return c.json({ ok: true, item: request, invoiceId }, 201)
 })

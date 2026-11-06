@@ -93,6 +93,30 @@ describe('tenant subscription billing API', () => {
     expect(dbMock.update).toHaveBeenCalled()
   })
 
+  it('submits payment with image proof URL even without proofText', async () => {
+    dbMock.select
+      .mockReturnValueOnce(makeChain([{ role: 'owner' }]))
+      .mockReturnValueOnce(makeChain([{ id: 'invoice-id', tenantId: 'tenant-id', status: 'pending_payment' }]))
+    dbMock.insert.mockReturnValueOnce(makeChain([{ id: 'payment-id', invoiceId: 'invoice-id', proofImageUrl: '/api/v1/upload/file/invoices/proof.png', status: 'submitted' }]))
+
+    const response = await buildApp().request('/api/v1/subscription/tenants/tenant-id/payments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-id': 'user-id' },
+      body: JSON.stringify({
+        invoiceId: '550e8400-e29b-41d4-a716-446655440000',
+        amount: '150000',
+        proofImageUrl: '/api/v1/upload/file/invoices/proof.png',
+        bankName: 'BCA',
+        accountName: 'Budi Santoso',
+      }),
+    })
+    const body = await response.json()
+
+    expect(response.status).toBe(201)
+    expect(body.item.status).toBe('submitted')
+    expect(dbMock.update).toHaveBeenCalled()
+  })
+
   it('creates scheduled downgrade request without payment', async () => {
     dbMock.select
       .mockReturnValueOnce(makeChain([{ role: 'owner' }]))
@@ -109,5 +133,24 @@ describe('tenant subscription billing API', () => {
 
     expect(response.status).toBe(201)
     expect(body.item.status).toBe('scheduled')
+  })
+
+  it('activates free plan immediately without invoice', async () => {
+    dbMock.select
+      .mockReturnValueOnce(makeChain([{ role: 'owner' }]))
+      .mockReturnValueOnce(makeChain([{ id: 'tenant-id', planCode: 'starter', planValidUntil: new Date('2026-07-01') }]))
+      .mockReturnValueOnce(makeChain([{ code: 'free', monthlyPrice: '0', yearlyPrice: null, durationDays: 365, isActive: true }]))
+    dbMock.insert.mockReturnValueOnce(makeChain([{ id: 'request-id', changeType: 'downgrade', status: 'applied' }]))
+
+    const response = await buildApp().request('/api/v1/subscription/tenants/tenant-id/change-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-id': 'user-id' },
+      body: JSON.stringify({ toPlanCode: 'free', changeType: 'downgrade', billingPeriod: 'monthly' }),
+    })
+    const body = await response.json()
+
+    expect(response.status).toBe(201)
+    expect(body.item.status).toBe('applied')
+    expect(dbMock.update).toHaveBeenCalled()
   })
 })
