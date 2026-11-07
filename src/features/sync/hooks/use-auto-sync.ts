@@ -64,6 +64,9 @@ export function useAutoSync() {
 
     setOnline(navigator.onLine)
     checkApiConnection()
+    if (navigator.onLine) {
+      triggerSync()
+    }
 
     intervalRef.current = setInterval(() => {
       if (navigator.onLine) {

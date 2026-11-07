@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Building2, CheckCircle2, ShieldCheck } from 'lucide-react'
+import { Building2, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -229,6 +229,32 @@ export function LoginPage() {
           </CardContent>
           <CardFooter className="flex flex-col items-stretch gap-3">
             <Button type="submit" form="login-form">Masuk</Button>
+            <div className="relative my-0.5">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-[11px] uppercase">
+                <span className="bg-card px-2 text-muted-foreground">atau eksplorasi instan</span>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-primary/30 text-primary hover:bg-primary/5 font-semibold gap-2"
+              onClick={() => {
+                const emailInput = document.getElementById('email') as HTMLInputElement
+                const passInput = document.getElementById('password') as HTMLInputElement
+                if (emailInput && passInput) {
+                  emailInput.value = 'demo@kotacom.id'
+                  passInput.value = 'demo12345'
+                  const form = document.getElementById('login-form') as HTMLFormElement
+                  form?.requestSubmit()
+                }
+              }}
+            >
+              <Sparkles className="size-4 text-primary shrink-0" />
+              <span>Coba Akun Demo (Kotacom Service & Print)</span>
+            </Button>
             <p className="text-center text-xs text-muted-foreground">Login dan reset password tersimpan di cloud.</p>
           </CardFooter>
         </Card>
