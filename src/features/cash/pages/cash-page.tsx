@@ -9,6 +9,7 @@ import {
   ArrowLeftRight,
   ArrowUpRight,
   ArrowDownLeft,
+  CalendarClock,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -26,6 +27,7 @@ import { BankTransferDialog } from '@/features/cash/components/bank-transfer-dia
 import { OpeningBalanceDialog } from '@/features/accounting/components/opening-balance-dialog'
 import { CapitalInjectionDialog } from '@/features/accounting/components/capital-injection-dialog'
 import { DebtPaymentDialog } from '@/features/accounting/components/debt-payment-dialog'
+import { RecurringCashDialog } from '@/features/cash/components/recurring-cash-dialog'
 
 function tone(status: string) {
   if (status === 'Tercatat') return 'success'
@@ -37,7 +39,7 @@ export function CashPage() {
   const cash = useCash()
   const categories = useCashCategories()
   const [view, setView] = useState<'list' | 'card'>('list')
-  const [activeTab, setActiveTab] = useState<'all' | 'cash' | 'bank' | 'transfer'>('all')
+  const [activeTab, setActiveTab] = useState<'all' | 'cash' | 'bank' | 'transfer' | 'recurring'>('all')
   const [search, setSearch] = useState('')
   const [filterAccount, setFilterAccount] = useState('all')
   const [filterCategory, setFilterCategory] = useState('all')
@@ -77,10 +79,12 @@ export function CashPage() {
         row.account.toLowerCase().includes('transfer')
       const isCash = !isBank
       const isTransfer = row.category === 'Transfer Antar Kas/Bank'
+      const isRecurring = row.ref.startsWith('RUT-') || row.category.toLowerCase().includes('rutin')
 
       if (activeTab === 'cash' && !isCash) return false
       if (activeTab === 'bank' && !isBank) return false
       if (activeTab === 'transfer' && !isTransfer) return false
+      if (activeTab === 'recurring' && !isRecurring) return false
 
       if (
         search &&
@@ -118,6 +122,7 @@ export function CashPage() {
           <CapitalInjectionDialog />
           <DebtPaymentDialog />
           <BankTransferDialog />
+          <RecurringCashDialog />
           <CashCrudActions />
         </div>
       }
@@ -219,6 +224,15 @@ export function CashPage() {
           >
             <ArrowLeftRight className="h-3.5 w-3.5" />
             Transfer Antar Kas/Bank
+          </Button>
+          <Button
+            variant={activeTab === 'recurring' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setActiveTab('recurring')}
+            className="h-8 text-xs font-medium gap-1"
+          >
+            <CalendarClock className="h-3.5 w-3.5 text-blue-500" />
+            Transaksi Rutin
           </Button>
         </div>
 
@@ -351,8 +365,13 @@ export function CashPage() {
                 render: (row) => {
                   const isTransfer = row.category === 'Transfer Antar Kas/Bank'
                   const isOpening = row.category === 'Saldo Awal'
+                  const isCapital = row.category === 'Setor Modal' || row.category.toLowerCase().includes('modal')
+                  const isPrive = row.category === 'Prive Pemilik' || row.category.toLowerCase().includes('prive')
+                  const isDebt = row.category.toLowerCase().includes('hutang')
+                  const isRecurring = row.ref.startsWith('RUT-') || row.category.toLowerCase().includes('rutin')
+
                   return (
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       {isTransfer && (
                         <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200">
                           Transfer
@@ -361,6 +380,26 @@ export function CashPage() {
                       {isOpening && (
                         <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200">
                           Saldo Awal
+                        </Badge>
+                      )}
+                      {isCapital && (
+                        <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300">
+                          Setor Modal
+                        </Badge>
+                      )}
+                      {isPrive && (
+                        <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300">
+                          Prive
+                        </Badge>
+                      )}
+                      {isDebt && (
+                        <Badge variant="outline" className="text-[10px] bg-orange-50 text-orange-800 border-orange-300 dark:bg-orange-950 dark:text-orange-300">
+                          Hutang Usaha
+                        </Badge>
+                      )}
+                      {isRecurring && (
+                        <Badge variant="outline" className="text-[10px] bg-sky-50 text-sky-800 border-sky-300 dark:bg-sky-950 dark:text-sky-300">
+                          Rutin
                         </Badge>
                       )}
                       <span className="text-sm">{getCategoryName(row.category)}</span>
