@@ -332,7 +332,7 @@ describe('createApp', () => {
         notes: 'Android release ready',
         publishedAt: '2026-06-10T00:00:00Z',
         releaseUrl: 'https://github.com/Yusufkotavom/VitPOS/releases/tag/v1.2.3',
-        webUrl: 'https://vit-pos-8vle.vercel.app',
+        webUrl: 'https://vitpos.devk.my.id',
         apkUrl: 'https://example.com/app-release.apk',
         checksum: 'apk-checksum',
         preferredChannel: 'apk',

@@ -12,12 +12,15 @@ export function UpdateAnnouncer() {
   const platform = detectRuntimePlatform()
 
   useEffect(() => {
+    // Pengguna web selalu memuat bundle terbaru langsung dari server,
+    // notifikasi pop-up update hanya untuk platform native (APK / Desktop).
+    if (platform === 'web') return
     if (!update.hasUpdate || !update.latest?.preferredUrl) return
     if (announcedVersion.current === update.latest.version) return
 
     announcedVersion.current = update.latest.version
     toast.message(`Update v${update.latest.version} tersedia`, {
-      description: 'Buka update terbaru dari GitHub Release atau pakai versi web terbaru.',
+      description: 'Buka update terbaru dari GitHub Release atau unduh versi terbaru.',
       action: {
         label: 'Update',
         onClick: () => {

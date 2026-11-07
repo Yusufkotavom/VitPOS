@@ -17,7 +17,7 @@ export type AvailableUpdate = {
   preferredChannel: UpdateChannel
 }
 
-const DEFAULT_API_BASE_URL = 'https://vit-pos-8vle.vercel.app'
+const DEFAULT_API_BASE_URL = 'https://vitpos.devk.my.id'
 
 function normalizeVersion(version: string) {
   return version.replace(/^v/i, '').trim()

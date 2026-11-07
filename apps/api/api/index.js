@@ -4464,7 +4464,7 @@ import { Hono as Hono11 } from "hono";
 
 // src/features/updates/service.ts
 var GITHUB_RELEASES_API_URL = process.env.GITHUB_RELEASES_API_URL ?? "https://api.github.com/repos/Yusufkotavom/VitPOS/releases/latest";
-var PUBLIC_WEB_URL = process.env.PUBLIC_WEB_URL ?? "https://vit-pos-8vle.vercel.app";
+var PUBLIC_WEB_URL = process.env.PUBLIC_WEB_URL ?? "https://vitpos.devk.my.id";
 function normalizeVersion(version) {
   return version.replace(/^v/i, "").trim();
 }

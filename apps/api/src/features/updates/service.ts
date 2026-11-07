@@ -37,7 +37,7 @@ export type DesktopUpdateResponse = {
 }
 
 const GITHUB_RELEASES_API_URL = process.env.GITHUB_RELEASES_API_URL ?? 'https://api.github.com/repos/Yusufkotavom/VitPOS/releases/latest'
-const PUBLIC_WEB_URL = process.env.PUBLIC_WEB_URL ?? 'https://vit-pos-8vle.vercel.app'
+const PUBLIC_WEB_URL = process.env.PUBLIC_WEB_URL ?? 'https://vitpos.devk.my.id'
 
 function normalizeVersion(version: string) {
   return version.replace(/^v/i, '').trim()
