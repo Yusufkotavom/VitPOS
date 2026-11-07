@@ -114,6 +114,11 @@ export function TenantSelectorPage() {
     navigate('/')
   }
 
+  const isPlatformAdmin = currentUser?.role === 'platform_admin'
+  const ownedTenants = tenants.filter((t) => t.role === 'owner')
+  const maxAllowedTenants = Math.max(1, ...ownedTenants.map((t) => t.maxBranches ?? 1))
+  const isLimitReached = !isPlatformAdmin && ownedTenants.length >= maxAllowedTenants
+
   return (
     <main className="min-h-screen bg-muted/30 px-4 py-6 sm:py-8">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
@@ -170,11 +175,28 @@ export function TenantSelectorPage() {
           ))}
         </section>
 
-        <div className="flex justify-center">
-          <Button variant="outline" asChild>
-            <Link to="/onboarding">Tambah usaha baru</Link>
-          </Button>
-        </div>
+        {isLimitReached ? (
+          <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed bg-background/50 p-6 text-center">
+            <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10 mb-1">
+              Batas Usaha Tercapai ({ownedTenants.length}/{maxAllowedTenants} Usaha)
+            </Badge>
+            <p className="text-sm font-semibold text-foreground">
+              Paket langganan Anda dibatasi maksimal {maxAllowedTenants} usaha
+            </p>
+            <p className="text-xs text-muted-foreground max-w-md">
+              Tingkatkan paket langganan Anda ke paket Multi-Cabang untuk dapat menambah unit usaha atau cabang baru.
+            </p>
+            <Button variant="outline" size="sm" asChild className="mt-2">
+              <Link to="/settings/billing">Upgrade Paket Langganan</Link>
+            </Button>
+          </div>
+        ) : (
+          <div className="flex justify-center">
+            <Button variant="outline" asChild>
+              <Link to="/onboarding">Tambah usaha baru</Link>
+            </Button>
+          </div>
+        )}
       </div>
     </main>
   )

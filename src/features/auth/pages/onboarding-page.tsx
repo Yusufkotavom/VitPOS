@@ -124,10 +124,28 @@ export function OnboardingPage() {
   const [loading, setLoading] = useState(false)
   const [selectedPayments, setSelectedPayments] = useState<Record<string, boolean>>({})
   const [editable, setEditable] = useState(() => clonePreset(DEFAULT_BUSINESS_MODE))
+  const [limitStatus, setLimitStatus] = useState<{ canCreate: boolean; message?: string } | null>(null)
 
   const [availablePlans, setAvailablePlans] = useState<SubscriptionPlan[]>(DEFAULT_PLANS)
   const [plansLoading, setPlansLoading] = useState(false)
   const [selectedPlanCode, setSelectedPlanCode] = useState('trial-monthly')
+
+  useEffect(() => {
+    if (!currentUser || currentUser.role === 'platform_admin') return
+
+    let mounted = true
+    apiGet<{ ok: boolean; canCreate: boolean; ownedCount: number; maxAllowed: number; message?: string }>('/tenants/check-limit')
+      .then((res) => {
+        if (mounted && res?.ok && !res.canCreate) {
+          setLimitStatus({ canCreate: false, message: res.message })
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      mounted = false
+    }
+  }, [currentUser])
 
   useEffect(() => {
     let mounted = true
@@ -346,6 +364,34 @@ export function OnboardingPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (limitStatus && !limitStatus.canCreate) {
+    return (
+      <main className="min-h-screen bg-muted/30 px-4 py-12 flex items-center justify-center">
+        <Card className="max-w-md w-full text-center p-6 space-y-4">
+          <CardHeader className="space-y-2">
+            <CardTitle className="text-xl">Batas Usaha Tercapai</CardTitle>
+            <CardDescription className="text-sm leading-relaxed">
+              {limitStatus.message || 'Paket langganan Anda saat ini telah mencapai batas maksimum unit usaha.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-2">
+            <p className="text-xs text-muted-foreground">
+              Untuk menambah toko atau cabang baru, silakan tingkatkan paket langganan Anda ke paket Multi-Cabang.
+            </p>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-2 pt-2">
+            <Button asChild className="w-full">
+              <Link to="/tenants">Kembali ke Daftar Usaha</Link>
+            </Button>
+            <Button variant="outline" asChild className="w-full">
+              <Link to="/settings/billing">Upgrade Paket Langganan</Link>
+            </Button>
+          </CardFooter>
+        </Card>
+      </main>
+    )
   }
 
   return (

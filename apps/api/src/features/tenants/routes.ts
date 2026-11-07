@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 
 import { db } from '../../lib/db.js'
-import { branches, subscriptionPlans, tenantMembers, tenants, warehouses } from '../../../../../src/db/schema/index.js'
+import { branches, subscriptionPlans, tenantMembers, tenants, users, warehouses } from '../../../../../src/db/schema/index.js'
 import { authMiddleware, verifyTenantMembership } from '../auth/middleware.js'
 
 type Env = { Variables: { userId: string } }
@@ -31,6 +31,50 @@ tenantRoutes.get('/default-branch', async (c) => {
   return c.json({ ok: true, id: branch.id, name: branch.name })
 })
 
+tenantRoutes.get('/check-limit', async (c) => {
+  const userId = c.get('userId')
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  })
+
+  if (user?.role === 'platform_admin') {
+    return c.json({ ok: true, canCreate: true, ownedCount: 0, maxAllowed: 999 })
+  }
+
+  const ownedMemberships = await db
+    .select({
+      tenantId: tenantMembers.tenantId,
+      maxBranches: tenants.maxBranches,
+      planCode: tenants.planCode,
+    })
+    .from(tenantMembers)
+    .innerJoin(tenants, eq(tenantMembers.tenantId, tenants.id))
+    .where(
+      and(
+        eq(tenantMembers.userId, userId),
+        eq(tenantMembers.role, 'owner'),
+        eq(tenantMembers.isActive, true),
+        eq(tenants.isActive, true),
+      )
+    )
+
+  const maxAllowed = ownedMemberships.length > 0
+    ? Math.max(1, ...ownedMemberships.map((m) => m.maxBranches ?? 1))
+    : 1
+
+  const canCreate = ownedMemberships.length < maxAllowed
+
+  return c.json({
+    ok: true,
+    canCreate,
+    ownedCount: ownedMemberships.length,
+    maxAllowed,
+    message: canCreate
+      ? undefined
+      : `Batas maksimum usaha (${maxAllowed} usaha) untuk paket langganan Anda telah tercapai. Silakan tingkatkan paket langganan Anda ke paket Multi-Cabang untuk menambah usaha baru.`,
+  })
+})
+
 tenantRoutes.post('/', async (c) => {
   const userId = c.get('userId')
   const body = await c.req.json().catch(() => null) as {
@@ -47,6 +91,45 @@ tenantRoutes.post('/', async (c) => {
 
   if (!tenantName) {
     return c.json({ ok: false, message: 'name required' }, 400)
+  }
+
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  })
+
+  // Enforce tenant/business count limits unless platform admin
+  if (user?.role !== 'platform_admin') {
+    const ownedMemberships = await db
+      .select({
+        tenantId: tenantMembers.tenantId,
+        maxBranches: tenants.maxBranches,
+        planCode: tenants.planCode,
+      })
+      .from(tenantMembers)
+      .innerJoin(tenants, eq(tenantMembers.tenantId, tenants.id))
+      .where(
+        and(
+          eq(tenantMembers.userId, userId),
+          eq(tenantMembers.role, 'owner'),
+          eq(tenantMembers.isActive, true),
+          eq(tenants.isActive, true),
+        )
+      )
+
+    if (ownedMemberships.length > 0) {
+      const maxAllowedTenants = Math.max(
+        1,
+        ...ownedMemberships.map((m) => m.maxBranches ?? 1)
+      )
+
+      if (ownedMemberships.length >= maxAllowedTenants) {
+        return c.json({
+          ok: false,
+          code: 'TENANT_LIMIT_REACHED',
+          message: `Batas maksimum usaha (${maxAllowedTenants} usaha) untuk paket langganan Anda telah tercapai. Silakan tingkatkan paket langganan Anda ke paket Multi-Cabang untuk menambah usaha baru.`,
+        }, 403)
+      }
+    }
   }
 
   const branchId = crypto.randomUUID()

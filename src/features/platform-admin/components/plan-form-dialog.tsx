@@ -192,7 +192,7 @@ export function PlanFormDialog({
               <Input id="plan-storage" type="number" min={0} value={form.storageLimitMb} onChange={(e) => setForm({ ...form, storageLimitMb: e.target.value })} />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="plan-max-branches">Max Cabang</Label>
+              <Label htmlFor="plan-max-branches">Max Cabang & Usaha</Label>
               <Input id="plan-max-branches" type="number" min={1} value={form.maxBranches} onChange={(e) => setForm({ ...form, maxBranches: e.target.value })} />
             </div>
             <div className="flex flex-col gap-2">

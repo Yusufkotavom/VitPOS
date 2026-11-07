@@ -178,4 +178,67 @@ describe('Commercial Security & Multi-tenant Gating', () => {
     expect(pushBody.ok).toBe(false)
     expect(pushBody.code).toBe('SUBSCRIPTION_EXPIRED')
   })
+
+  it('enforces tenant/business limits when user already owns max allowed tenants', async () => {
+    const tenantId = crypto.randomUUID()
+    const userId = crypto.randomUUID()
+    const now = new Date()
+
+    await db.insert(users).values({
+      id: userId,
+      email: `tlimit-${userId}@test.id`,
+      name: 'Tenant Limit Test User',
+      passwordHash: 'hash',
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    await db.insert(tenants).values({
+      id: tenantId,
+      name: 'Existing Single Tenant',
+      planCode: 'starter-monthly',
+      maxBranches: 1,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    await db.insert(tenantMembers).values({
+      id: crypto.randomUUID(),
+      tenantId,
+      userId,
+      role: 'owner',
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    const token = await createAccessToken({ id: userId, email: `tlimit-${userId}@test.id` })
+
+    // Check limit endpoint
+    const checkRes = await app.request('/api/v1/tenants/check-limit', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    expect(checkRes.status).toBe(200)
+    const checkBody = await checkRes.json()
+    expect(checkBody.ok).toBe(true)
+    expect(checkBody.canCreate).toBe(false)
+    expect(checkBody.ownedCount).toBe(1)
+    expect(checkBody.maxAllowed).toBe(1)
+
+    // Attempting to create a second tenant must be rejected with 403
+    const createRes = await app.request('/api/v1/tenants', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ name: 'Second Business Attempt' }),
+    })
+
+    expect(createRes.status).toBe(403)
+    const createBody = await createRes.json()
+    expect(createBody.ok).toBe(false)
+    expect(createBody.code).toBe('TENANT_LIMIT_REACHED')
+  })
 })

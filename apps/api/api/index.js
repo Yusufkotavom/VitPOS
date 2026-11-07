@@ -3895,6 +3895,36 @@ tenantRoutes.get("/default-branch", async (c) => {
   }
   return c.json({ ok: true, id: branch.id, name: branch.name });
 });
+tenantRoutes.get("/check-limit", async (c) => {
+  const userId = c.get("userId");
+  const user = await db.query.users.findFirst({
+    where: eq11(users.id, userId)
+  });
+  if (user?.role === "platform_admin") {
+    return c.json({ ok: true, canCreate: true, ownedCount: 0, maxAllowed: 999 });
+  }
+  const ownedMemberships = await db.select({
+    tenantId: tenantMembers.tenantId,
+    maxBranches: tenants.maxBranches,
+    planCode: tenants.planCode
+  }).from(tenantMembers).innerJoin(tenants, eq11(tenantMembers.tenantId, tenants.id)).where(
+    and8(
+      eq11(tenantMembers.userId, userId),
+      eq11(tenantMembers.role, "owner"),
+      eq11(tenantMembers.isActive, true),
+      eq11(tenants.isActive, true)
+    )
+  );
+  const maxAllowed = ownedMemberships.length > 0 ? Math.max(1, ...ownedMemberships.map((m) => m.maxBranches ?? 1)) : 1;
+  const canCreate = ownedMemberships.length < maxAllowed;
+  return c.json({
+    ok: true,
+    canCreate,
+    ownedCount: ownedMemberships.length,
+    maxAllowed,
+    message: canCreate ? void 0 : `Batas maksimum usaha (${maxAllowed} usaha) untuk paket langganan Anda telah tercapai. Silakan tingkatkan paket langganan Anda ke paket Multi-Cabang untuk menambah usaha baru.`
+  });
+});
 tenantRoutes.post("/", async (c) => {
   const userId = c.get("userId");
   const body = await c.req.json().catch(() => null);
@@ -3904,6 +3934,36 @@ tenantRoutes.post("/", async (c) => {
   const billingPeriod = body?.billingPeriod === "yearly" ? "yearly" : "monthly";
   if (!tenantName) {
     return c.json({ ok: false, message: "name required" }, 400);
+  }
+  const user = await db.query.users.findFirst({
+    where: eq11(users.id, userId)
+  });
+  if (user?.role !== "platform_admin") {
+    const ownedMemberships = await db.select({
+      tenantId: tenantMembers.tenantId,
+      maxBranches: tenants.maxBranches,
+      planCode: tenants.planCode
+    }).from(tenantMembers).innerJoin(tenants, eq11(tenantMembers.tenantId, tenants.id)).where(
+      and8(
+        eq11(tenantMembers.userId, userId),
+        eq11(tenantMembers.role, "owner"),
+        eq11(tenantMembers.isActive, true),
+        eq11(tenants.isActive, true)
+      )
+    );
+    if (ownedMemberships.length > 0) {
+      const maxAllowedTenants = Math.max(
+        1,
+        ...ownedMemberships.map((m) => m.maxBranches ?? 1)
+      );
+      if (ownedMemberships.length >= maxAllowedTenants) {
+        return c.json({
+          ok: false,
+          code: "TENANT_LIMIT_REACHED",
+          message: `Batas maksimum usaha (${maxAllowedTenants} usaha) untuk paket langganan Anda telah tercapai. Silakan tingkatkan paket langganan Anda ke paket Multi-Cabang untuk menambah usaha baru.`
+        }, 403);
+      }
+    }
   }
   const branchId = crypto.randomUUID();
   const warehouseId = crypto.randomUUID();

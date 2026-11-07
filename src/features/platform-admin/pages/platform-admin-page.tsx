@@ -234,7 +234,7 @@ function PlansTab({ plans }: { plans: PlatformPlan[] }) {
           { key: 'monthlyPrice', header: 'Harga / bulan', render: (row) => <span>{Number(row.monthlyPrice) === 0 ? 'Gratis' : formatCurrency(Number(row.monthlyPrice))}</span> },
           { key: 'yearlyPrice', header: 'Harga / tahun', render: (row) => <span>{row.yearlyPrice ? formatCurrency(Number(row.yearlyPrice)) : '-'}</span> },
           { key: 'storageLimitMb', header: 'Storage', render: (row) => <span>{Math.round(row.storageLimitMb / 1024 * 10) / 10} GB</span> },
-          { key: 'maxBranches', header: 'Max Cabang' },
+          { key: 'maxBranches', header: 'Max Usaha / Cabang' },
           { key: 'maxUsers', header: 'Max User' },
           {
             key: 'isActive',

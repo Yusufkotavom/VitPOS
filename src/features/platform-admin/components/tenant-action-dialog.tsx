@@ -148,7 +148,7 @@ export function TenantActionDialog({
               <Input type="number" min={0} value={form.storageLimitMb} onChange={(e) => setForm({ ...form, storageLimitMb: e.target.value })} />
             </div>
             <div className="flex flex-col gap-2">
-              <Label>Max cabang</Label>
+              <Label>Max Usaha / Cabang</Label>
               <Input type="number" min={1} value={form.maxBranches} onChange={(e) => setForm({ ...form, maxBranches: e.target.value })} />
             </div>
           </div>
