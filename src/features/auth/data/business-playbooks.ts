@@ -1,5 +1,13 @@
-export type BusinessVerticalId = 'atk_printing' | 'general'
-export type BusinessModeId = 'atk_only' | 'printing_only' | 'atk_printing_combo' | 'general_standard'
+export type BusinessVerticalId = 'atk_printing' | 'service_gadget' | 'service_computer' | 'general'
+export type BusinessModeId =
+  | 'atk_only'
+  | 'printing_only'
+  | 'atk_printing_combo'
+  | 'hp_service_repair'
+  | 'hp_accessories_combo'
+  | 'computer_service_repair'
+  | 'computer_printer_combo'
+  | 'general_standard'
 
 export type PlaybookItemType = 'Produk Fisik' | 'Jasa'
 
@@ -106,6 +114,112 @@ export const BUSINESS_PLAYBOOKS: Record<BusinessVerticalId, BusinessVerticalPlay
         quickActions: ['Transaksi baru', 'Tambah stok', 'Catat pengeluaran', 'Input piutang', 'Lihat barang hampir habis'],
         reportKeys: ['ringkasan', 'penjualan', 'stok', 'kas', 'piutang'],
         dashboardFocus: ['barang', 'layanan', 'stok', 'kas'],
+      },
+    ],
+  },
+  service_gadget: {
+    id: 'service_gadget',
+    label: 'Servis HP & Gadget',
+    description: 'Toko servis handphone, ganti LCD & baterai, sparepart gadget, dan aksesoris.',
+    modes: [
+      {
+        id: 'hp_service_repair',
+        label: 'Servis HP saja',
+        description: 'Fokus pengerjaan tiket servis, diagnosa kerusakan, dan suku cadang.',
+        categories: ['Jasa Servis HP', 'LCD & Layar', 'Baterai Original', 'Sparepart Mesin', 'Biaya Diagnosa'],
+        products: [
+          { name: 'Jasa Ganti LCD Touchscreen', category: 'Jasa Servis HP', price: 150000, cost: 50000, type: 'Jasa', unit: 'unit', stock: 0, minStock: 0, tags: ['servis', 'hp', 'jasa'] },
+          { name: 'Jasa Ganti Baterai HP', category: 'Jasa Servis HP', price: 100000, cost: 35000, type: 'Jasa', unit: 'unit', stock: 0, minStock: 0, tags: ['servis', 'hp', 'jasa'] },
+          { name: 'Flash & Bypass Software', category: 'Jasa Servis HP', price: 75000, cost: 10000, type: 'Jasa', unit: 'unit', stock: 0, minStock: 0, tags: ['servis', 'software', 'jasa'] },
+          { name: 'Baterai iPhone High Capacity', category: 'Baterai Original', price: 220000, cost: 150000, type: 'Produk Fisik', unit: 'pcs', stock: 5, minStock: 2, tags: ['sparepart', 'stok'] },
+          { name: 'Lem LCD B7000 15ml', category: 'Sparepart Mesin', price: 25000, cost: 15000, type: 'Produk Fisik', unit: 'pcs', stock: 8, minStock: 2, tags: ['alat', 'stok'] },
+        ],
+        paymentMethods: [...SHARED_PAYMENT_METHODS],
+        cashCategories: [
+          { name: 'Pendapatan Jasa Servis', type: 'Pemasukan' },
+          { name: 'Penjualan Sparepart', type: 'Pemasukan' },
+          { name: 'Beli Sparepart HP', type: 'Pengeluaran' },
+          { name: 'Alat & Solder Teknisi', type: 'Pengeluaran' },
+        ],
+        quickActions: ['Buat tiket servis', 'Cek status servis', 'Tambah sparepart', 'Catat kas'],
+        reportKeys: ['ringkasan', 'penjualan', 'stok', 'kas', 'piutang'],
+        dashboardFocus: ['servis_aktif', 'sparepart_menipis', 'kas'],
+      },
+      {
+        id: 'hp_accessories_combo',
+        label: 'Servis + Aksesoris HP',
+        description: 'Kombinasi kasir cepat toko aksesoris dan penerimaan unit servis HP.',
+        categories: ['Aksesori & Kabel', 'Pelindung Layar', 'Jasa Servis HP', 'LCD & Baterai'],
+        products: [
+          { name: 'Kabel Data Type-C Fast Charge', category: 'Aksesori & Kabel', price: 35000, cost: 18000, type: 'Produk Fisik', unit: 'pcs', stock: 30, minStock: 5, tags: ['aksesori', 'stok', 'laris'] },
+          { name: 'Tempered Glass Bening 9H', category: 'Pelindung Layar', price: 25000, cost: 8000, type: 'Produk Fisik', unit: 'pcs', stock: 50, minStock: 10, tags: ['aksesori', 'stok', 'laris'] },
+          { name: 'Kepala Charger 20W Quick Charge', category: 'Aksesori & Kabel', price: 75000, cost: 42000, type: 'Produk Fisik', unit: 'pcs', stock: 15, minStock: 3, tags: ['aksesori', 'stok'] },
+          { name: 'Jasa Ganti LCD Touchscreen', category: 'Jasa Servis HP', price: 150000, cost: 50000, type: 'Jasa', unit: 'unit', stock: 0, minStock: 0, tags: ['servis', 'hp', 'jasa'] },
+          { name: 'Jasa Ganti Baterai HP', category: 'Jasa Servis HP', price: 100000, cost: 35000, type: 'Jasa', unit: 'unit', stock: 0, minStock: 0, tags: ['servis', 'hp', 'jasa'] },
+        ],
+        paymentMethods: [...SHARED_PAYMENT_METHODS],
+        cashCategories: [
+          { name: 'Penjualan Aksesoris', type: 'Pemasukan' },
+          { name: 'Pendapatan Jasa Servis', type: 'Pemasukan' },
+          { name: 'Beli Stok Aksesoris & Part', type: 'Pengeluaran' },
+          { name: 'Operasional Toko', type: 'Pengeluaran' },
+        ],
+        quickActions: ['Transaksi kasir baru', 'Buat tiket servis', 'Tambah stok', 'Lacak unit servis'],
+        reportKeys: ['ringkasan', 'penjualan', 'stok', 'kas', 'piutang'],
+        dashboardFocus: ['barang', 'servis', 'stok', 'kas'],
+      },
+    ],
+  },
+  service_computer: {
+    id: 'service_computer',
+    label: 'Servis Komputer, Laptop & Printer',
+    description: 'Reparasi laptop, instalasi PC, servis printer infus/head, dan perlengkapan komputer.',
+    modes: [
+      {
+        id: 'computer_service_repair',
+        label: 'Servis Laptop & PC saja',
+        description: 'Fokus reparasi hardware, install ulang sistem, dan upgrade komponen.',
+        categories: ['Jasa Komputer & Laptop', 'Storage & RAM', 'Thermal Paste & Fan', 'Perangkat Keras'],
+        products: [
+          { name: 'Install Ulang OS + Software Standar', category: 'Jasa Komputer & Laptop', price: 100000, cost: 20000, type: 'Jasa', unit: 'unit', stock: 0, minStock: 0, tags: ['servis', 'pc', 'jasa'] },
+          { name: 'Deep Cleaning & Ganti Thermal Paste', category: 'Jasa Komputer & Laptop', price: 125000, cost: 30000, type: 'Jasa', unit: 'unit', stock: 0, minStock: 0, tags: ['servis', 'laptop', 'jasa'] },
+          { name: 'SSD NVMe 512GB PCIe Gen3', category: 'Storage & RAM', price: 480000, cost: 385000, type: 'Produk Fisik', unit: 'pcs', stock: 6, minStock: 2, tags: ['sparepart', 'stok'] },
+          { name: 'RAM DDR4 8GB PC 3200MHz', category: 'Storage & RAM', price: 290000, cost: 230000, type: 'Produk Fisik', unit: 'pcs', stock: 8, minStock: 2, tags: ['sparepart', 'stok'] },
+          { name: 'Jasa Perbaikan Engsel Laptop', category: 'Jasa Komputer & Laptop', price: 150000, cost: 40000, type: 'Jasa', unit: 'unit', stock: 0, minStock: 0, tags: ['servis', 'laptop', 'jasa'] },
+        ],
+        paymentMethods: [...SHARED_PAYMENT_METHODS],
+        cashCategories: [
+          { name: 'Pendapatan Jasa Servis PC/Laptop', type: 'Pemasukan' },
+          { name: 'Penjualan Komponen & SSD', type: 'Pemasukan' },
+          { name: 'Beli Komponen & Sparepart', type: 'Pengeluaran' },
+          { name: 'Alat & Bahan Kimia Pembersih', type: 'Pengeluaran' },
+        ],
+        quickActions: ['Buat tiket servis', 'Cari pelanggan servis', 'Tambah komponen', 'Catat pengeluaran'],
+        reportKeys: ['ringkasan', 'penjualan', 'stok', 'kas', 'piutang'],
+        dashboardFocus: ['servis_selesai', 'garansi_aktif', 'stok_sparepart', 'kas'],
+      },
+      {
+        id: 'computer_printer_combo',
+        label: 'Servis Komputer + Printer & Tinta',
+        description: 'Kombinasi komprehensif servis komputer dan servis printer head/infus.',
+        categories: ['Jasa Servis Komputer', 'Jasa Servis Printer', 'Tinta & Cartridge', 'Sparepart Komputer'],
+        products: [
+          { name: 'Install Ulang OS + Software', category: 'Jasa Servis Komputer', price: 100000, cost: 20000, type: 'Jasa', unit: 'unit', stock: 0, minStock: 0, tags: ['servis', 'jasa'] },
+          { name: 'Servis Printer Head Buntu / Cleaning', category: 'Jasa Servis Printer', price: 90000, cost: 25000, type: 'Jasa', unit: 'unit', stock: 0, minStock: 0, tags: ['servis', 'printer', 'jasa'] },
+          { name: 'Tinta Botol 003 Black 65ml', category: 'Tinta & Cartridge', price: 85000, cost: 68000, type: 'Produk Fisik', unit: 'botol', stock: 12, minStock: 3, tags: ['tinta', 'stok', 'laris'] },
+          { name: 'Cartridge PG-810 Black Original', category: 'Tinta & Cartridge', price: 260000, cost: 220000, type: 'Produk Fisik', unit: 'pcs', stock: 6, minStock: 2, tags: ['cartridge', 'stok'] },
+          { name: 'SSD SATA 256GB 2.5 Inch', category: 'Sparepart Komputer', price: 260000, cost: 195000, type: 'Produk Fisik', unit: 'pcs', stock: 10, minStock: 3, tags: ['sparepart', 'stok'] },
+        ],
+        paymentMethods: [...SHARED_PAYMENT_METHODS],
+        cashCategories: [
+          { name: 'Jasa Servis PC & Printer', type: 'Pemasukan' },
+          { name: 'Penjualan Tinta & Sparepart', type: 'Pemasukan' },
+          { name: 'Beli Stok Tinta & Part', type: 'Pengeluaran' },
+          { name: 'Operasional Workshop', type: 'Pengeluaran' },
+        ],
+        quickActions: ['Transaksi baru', 'Tiket servis masuk', 'Update pengerjaan', 'Lacak status'],
+        reportKeys: ['ringkasan', 'penjualan', 'stok', 'kas', 'piutang'],
+        dashboardFocus: ['servis', 'tinta_laris', 'stok_kritis', 'kas'],
       },
     ],
   },

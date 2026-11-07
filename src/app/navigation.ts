@@ -2,6 +2,7 @@ import {
   BarChart3,
   Boxes,
   ClipboardList,
+  HelpCircle,
   Home,
   Package,
   ReceiptText,
@@ -61,6 +62,7 @@ export function sidebarNavigation(t: TFunction): SidebarNavigationGroup[] {
       group: t('nav.group_sistem'),
       items: [
         { to: '/settings', label: t('nav.pengaturan'), icon: Settings },
+        { to: '/help', label: 'Bantuan & Panduan', icon: HelpCircle },
       ],
     },
   ]

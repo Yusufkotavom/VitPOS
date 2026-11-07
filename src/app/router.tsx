@@ -1,12 +1,15 @@
 import { lazy, Suspense, type ComponentType } from 'react'
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter, Navigate, useLocation } from 'react-router-dom'
 
 import { AppLayout } from '@/shared/components/layout/app-layout'
 import { AuthGuard } from '@/features/auth/components/auth-guard'
 import { PlatformAdminGuard } from '@/features/auth/components/platform-admin-guard'
+import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { LoadingState } from '@/shared/components/feedback/loading-state'
 import { NotFoundPage } from '@/shared/components/feedback/not-found-page'
 
+const LandingPage = lazy(() => import('@/features/marketing/pages/landing-page').then(pick('LandingPage')))
+const HelpPage = lazy(() => import('@/features/help/pages/help-page').then(pick('HelpPage')))
 const DashboardPage = lazy(() => import('@/features/dashboard/pages/dashboard-page').then(pick('DashboardPage')))
 const PosPage = lazy(() => import('@/features/pos/pages/pos-page').then(pick('PosPage')))
 const ProductsPage = lazy(() => import('@/features/products/pages/products-page').then(pick('ProductsPage')))
@@ -65,7 +68,25 @@ function routeElement(Page: ComponentType) {
   )
 }
 
+function RootAuthWrapper() {
+  const currentUser = useAuthStore((state) => state.currentUser)
+  const location = useLocation()
+
+  // Visitor opening root '/' without active login gets the public landing page
+  if (!currentUser && location.pathname === '/') {
+    return routeElement(LandingPage)
+  }
+
+  return (
+    <AuthGuard>
+      <AppLayout />
+    </AuthGuard>
+  )
+}
+
 export const router = createBrowserRouter([
+  { path: '/landing', element: routeElement(LandingPage) },
+  { path: '/help', element: routeElement(HelpPage) },
   { path: '/store/:slug', element: routeElement(StoreHomePage) },
   { path: '/store/:slug/track', element: routeElement(OrderTrackingPage) },
   { path: '/login', element: routeElement(LoginPage) },
@@ -76,14 +97,11 @@ export const router = createBrowserRouter([
   { path: '/dashboard', element: <Navigate to="/" replace /> },
   {
     path: '/',
-    element: (
-      <AuthGuard>
-        <AppLayout />
-      </AuthGuard>
-    ),
+    element: <RootAuthWrapper />,
     children: [
       { index: true, element: routeElement(DashboardPage) },
       { path: 'dashboard', element: <Navigate to="/" replace /> },
+      { path: 'help', element: routeElement(HelpPage) },
       { path: 'pos', element: routeElement(PosPage) },
       { path: 'products', element: routeElement(ProductsPage) },
       { path: 'products/categories', element: routeElement(CategoriesPage) },
