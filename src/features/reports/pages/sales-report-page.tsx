@@ -68,15 +68,16 @@ export function SalesReportPage() {
   const [txStatusFilter, setTxStatusFilter] = useState('all')
   const [txMethodFilter, setTxMethodFilter] = useState('all')
 
-  // Fallback to local Dexie orders if offline / server transactions empty
+  // Local Dexie orders (merged with server transactions for full offline-first visibility)
   const localOrders = useLiveQuery<LocalSalesOrder[], LocalSalesOrder[]>(
     async () => {
       if (!tenantId) return []
       const list = await dexieDb.salesOrders.where('tenantId').equals(tenantId).toArray()
       return list.filter((o: LocalSalesOrder) => {
         if (o.status === 'Batal') return false
-        if (params.from && o.date < params.from) return false
-        if (params.to && o.date > params.to) return false
+        const d = o.date ? o.date.slice(0, 10) : ''
+        if (params.from && d < params.from) return false
+        if (params.to && d > params.to) return false
         return true
       })
     },
@@ -90,8 +91,9 @@ export function SalesReportPage() {
       const list = await dexieDb.serviceOrders.where('tenantId').equals(tenantId).toArray()
       return list.filter((s: LocalServiceOrder) => {
         if (s.status === 'Batal') return false
-        if (params.from && s.date < params.from) return false
-        if (params.to && s.date > params.to) return false
+        const d = s.date ? s.date.slice(0, 10) : ''
+        if (params.from && d < params.from) return false
+        if (params.to && d > params.to) return false
         return true
       })
     },
@@ -99,86 +101,93 @@ export function SalesReportPage() {
     [],
   )
 
+  // Merge server transactions with any local Dexie transactions not yet present in server response
   const transactions: SalesReportTransaction[] = useMemo(() => {
-    if (data?.transactions && data.transactions.length > 0) {
-      return data.transactions
-    }
-    // Fallback mapping from local Dexie sales orders & service orders
+    const serverTx = data?.transactions ?? []
+    const serverIds = new Set(serverTx.map((t) => t.id))
+    const serverOrderNumbers = new Set(serverTx.map((t) => t.orderNumber))
+
+    // Local Dexie sales orders not yet on server
     const ordersList: LocalSalesOrder[] = Array.isArray(localOrders) ? localOrders : []
-    const posList: SalesReportTransaction[] = ordersList.map((o: LocalSalesOrder) => {
-      const grandTotal = Number(o.grandTotal ?? 0)
-      const paidTotal = Number(o.paidTotal ?? 0)
-      const balanceDue = Math.max(0, grandTotal - paidTotal)
-      let paymentStatus: 'paid' | 'partial' | 'unpaid' = 'unpaid'
-      if (paidTotal >= grandTotal && grandTotal > 0) {
-        paymentStatus = 'paid'
-      } else if (paidTotal > 0) {
-        paymentStatus = 'partial'
-      }
+    const posList: SalesReportTransaction[] = ordersList
+      .filter((o) => !serverIds.has(o.id) && !serverOrderNumbers.has(o.code || o.id))
+      .map((o: LocalSalesOrder) => {
+        const grandTotal = Number(o.grandTotal ?? 0)
+        const paidTotal = Number(o.paidTotal ?? 0)
+        const balanceDue = Math.max(0, grandTotal - paidTotal)
+        let paymentStatus: 'paid' | 'partial' | 'unpaid' = 'unpaid'
+        if (paidTotal >= grandTotal && grandTotal > 0) {
+          paymentStatus = 'paid'
+        } else if (paidTotal > 0) {
+          paymentStatus = 'partial'
+        }
 
-      const itemsSummary = (o.items ?? []).map((it: LocalSalesOrderItem) => `${it.name} (x${it.qty})`).join(', ')
-      const itemCount = (o.items ?? []).reduce((s: number, it: LocalSalesOrderItem) => s + (Number(it.qty) || 0), 0)
+        const itemsSummary = (o.items ?? []).map((it: LocalSalesOrderItem) => `${it.name} (x${it.qty})`).join(', ')
+        const itemCount = (o.items ?? []).reduce((s: number, it: LocalSalesOrderItem) => s + (Number(it.qty) || 0), 0)
 
-      return {
-        id: o.id,
-        orderNumber: o.code || o.id,
-        type: 'pos' as const,
-        createdAt: o.date || new Date().toISOString(),
-        customerName: o.customerName || 'Pelanggan Umum',
-        status: o.status,
-        paymentStatus,
-        paymentMethod: 'tunai',
-        itemCount,
-        itemsSummary: itemsSummary || '-',
-        subtotal: Number(o.subtotal ?? 0),
-        discountTotal: Number(o.discountTotal ?? 0),
-        taxTotal: Number(o.taxTotal ?? 0),
-        grandTotal,
-        paidTotal,
-        balanceDue,
-      }
-    })
+        return {
+          id: o.id,
+          orderNumber: o.code || o.id,
+          type: 'pos' as const,
+          createdAt: o.date || new Date().toISOString(),
+          customerName: o.customerName || 'Pelanggan Umum',
+          status: o.status,
+          paymentStatus,
+          paymentMethod: 'tunai',
+          itemCount,
+          itemsSummary: itemsSummary || '-',
+          subtotal: Number(o.subtotal ?? 0),
+          discountTotal: Number(o.discountTotal ?? 0),
+          taxTotal: Number(o.taxTotal ?? 0),
+          grandTotal,
+          paidTotal,
+          balanceDue,
+        }
+      })
 
+    // Local Dexie service orders not yet on server
     const svcList: LocalServiceOrder[] = Array.isArray(localServiceOrders) ? localServiceOrders : []
-    const serviceList: SalesReportTransaction[] = svcList.map((s: LocalServiceOrder) => {
-      const grandTotal = Number(s.cost ?? 0)
-      const paidTotal = Number(s.paidTotal ?? 0)
-      const balanceDue = Math.max(0, grandTotal - paidTotal)
-      let paymentStatus: 'paid' | 'partial' | 'unpaid' = 'unpaid'
-      if (paidTotal >= grandTotal && grandTotal > 0) {
-        paymentStatus = 'paid'
-      } else if (paidTotal > 0) {
-        paymentStatus = 'partial'
-      }
+    const serviceList: SalesReportTransaction[] = svcList
+      .filter((s) => !serverIds.has(s.id) && !serverOrderNumbers.has(s.code || s.id))
+      .map((s: LocalServiceOrder) => {
+        const grandTotal = Number(s.cost ?? 0)
+        const paidTotal = Number(s.paidTotal ?? 0)
+        const balanceDue = Math.max(0, grandTotal - paidTotal)
+        let paymentStatus: 'paid' | 'partial' | 'unpaid' = 'unpaid'
+        if (paidTotal >= grandTotal && grandTotal > 0) {
+          paymentStatus = 'paid'
+        } else if (paidTotal > 0) {
+          paymentStatus = 'partial'
+        }
 
-      const itemsSummary = (s.items && s.items.length > 0)
-        ? s.items.map((it) => `${it.name} (x${it.qty})`).join(', ')
-        : (s.description || 'Jasa Service')
-      const itemCount = (s.items && s.items.length > 0)
-        ? s.items.reduce((acc, it) => acc + (Number(it.qty) || 1), 0)
-        : 1
+        const itemsSummary = (s.items && s.items.length > 0)
+          ? s.items.map((it) => `${it.name} (x${it.qty})`).join(', ')
+          : (s.description || 'Jasa Service')
+        const itemCount = (s.items && s.items.length > 0)
+          ? s.items.reduce((acc, it) => acc + (Number(it.qty) || 1), 0)
+          : 1
 
-      return {
-        id: s.id,
-        orderNumber: s.code || s.id,
-        type: 'service' as const,
-        createdAt: s.date || new Date().toISOString(),
-        customerName: s.customerName || 'Pelanggan Umum',
-        status: s.status,
-        paymentStatus,
-        paymentMethod: 'tunai',
-        itemCount,
-        itemsSummary,
-        subtotal: grandTotal,
-        discountTotal: 0,
-        taxTotal: 0,
-        grandTotal,
-        paidTotal,
-        balanceDue,
-      }
-    })
+        return {
+          id: s.id,
+          orderNumber: s.code || s.id,
+          type: 'service' as const,
+          createdAt: s.date || new Date().toISOString(),
+          customerName: s.customerName || 'Pelanggan Umum',
+          status: s.status,
+          paymentStatus,
+          paymentMethod: 'tunai',
+          itemCount,
+          itemsSummary,
+          subtotal: grandTotal,
+          discountTotal: 0,
+          taxTotal: 0,
+          grandTotal,
+          paidTotal,
+          balanceDue,
+        }
+      })
 
-    return [...posList, ...serviceList].sort(
+    return [...serverTx, ...posList, ...serviceList].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     )
   }, [data?.transactions, localOrders, localServiceOrders])
@@ -350,11 +359,29 @@ export function SalesReportPage() {
         <p className="text-sm text-muted-foreground py-8 text-center">{t('common.loading')}</p>
       ) : data ? (
         <>
-          <div className="grid gap-3 md:grid-cols-4">
-            <ReportMetricCard label={t('reports.total_omzet')} value={formatCurrency(data.summary.totalRevenue)} tone="positive" />
-            <ReportMetricCard label={t('reports.total_orders')} value={String(data.summary.totalOrders)} />
-            <ReportMetricCard label={t('reports.avg_order_value')} value={formatCurrency(data.summary.avgOrderValue)} />
-            <ReportMetricCard label={t('reports.total_paid')} value={formatCurrency(data.summary.totalPaid)} />
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <ReportMetricCard
+              label="Total Omzet (POS + Service)"
+              value={formatCurrency(txSummary.allTotal)}
+              description={`${txSummary.allCount} Total Transaksi (${txSummary.posCount} POS • ${txSummary.svcCount} Service)`}
+              tone="positive"
+            />
+            <ReportMetricCard
+              label="Pendapatan Jasa & Service"
+              value={formatCurrency(txSummary.svcTotal)}
+              description={`${txSummary.svcCount} Service Order`}
+              tone={txSummary.svcTotal > 0 ? 'positive' : 'neutral'}
+            />
+            <ReportMetricCard
+              label="Penjualan Produk (POS)"
+              value={formatCurrency(txSummary.posTotal)}
+              description={`${txSummary.posCount} Pesanan POS`}
+            />
+            <ReportMetricCard
+              label="Total Terbayar"
+              value={formatCurrency(txSummary.allPaid)}
+              description={`Sisa Piutang: ${formatCurrency(txSummary.allDue)}`}
+            />
           </div>
 
           {/* 1. Detail Transaksi Penjualan Section */}
@@ -597,16 +624,16 @@ export function SalesReportPage() {
           )}
 
           {topProductRows.length > 0 && (
-            <ReportSection title={t('reports.top_products')}>
+            <ReportSection title="Top Produk & Jasa Terlaris">
               <FilterToolbar
-                placeholder="Cari nama produk..."
+                placeholder="Cari nama produk atau jasa..."
                 searchQuery={productSearch}
                 onSearchChange={setProductSearch}
               />
               <DataTable<TopProductRow>
                 columns={[
                   { key: 'rank', header: '#', sortable: true },
-                  { key: 'name', header: t('reports.top_products_product'), sortable: true },
+                  { key: 'name', header: 'Produk / Jasa', sortable: true },
                   { key: 'totalQty', header: t('reports.top_products_qty'), sortable: true },
                   {
                     key: 'totalRevenue',
@@ -616,7 +643,7 @@ export function SalesReportPage() {
                   },
                 ]}
                 data={filteredProducts}
-                emptyTitle="Tidak ada produk ditemukan"
+                emptyTitle="Tidak ada produk atau jasa ditemukan"
               />
             </ReportSection>
           )}

@@ -9,12 +9,25 @@ export function ReportSection({ title, children }: { title: string; children: Re
   )
 }
 
-export function ReportMetricCard({ label, value, tone }: { label: string; value: string; tone?: 'positive' | 'negative' | 'neutral' }) {
+export function ReportMetricCard({
+  label,
+  value,
+  tone,
+  description,
+}: {
+  label: string
+  value: string
+  tone?: 'positive' | 'negative' | 'neutral'
+  description?: string
+}) {
   const color = tone === 'positive' ? 'text-green-600' : tone === 'negative' ? 'text-red-600' : ''
   return (
-    <article className="rounded-xl border bg-background p-4">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`mt-1 text-xl font-bold ${color}`}>{value}</p>
+    <article className="rounded-xl border bg-background p-4 flex flex-col justify-between">
+      <div>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className={`mt-1 text-xl font-bold ${color}`}>{value}</p>
+      </div>
+      {description && <p className="mt-1.5 text-xs text-muted-foreground">{description}</p>}
     </article>
   )
 }

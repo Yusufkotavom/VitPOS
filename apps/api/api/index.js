@@ -1058,11 +1058,21 @@ import { and as and3, count, desc, eq as eq3, gte, inArray, lte, ne, sql, sum } 
 function n(val) {
   return Number(val ?? 0);
 }
+function parseFromDate(val) {
+  if (!val) return void 0;
+  return new Date(val.length <= 10 ? `${val}T00:00:00.000Z` : val);
+}
+function parseToDate(val) {
+  if (!val) return void 0;
+  return new Date(val.length <= 10 ? `${val}T23:59:59.999Z` : val);
+}
 async function getSalesSummary(db2, input) {
+  const fromDate = parseFromDate(input.from);
+  const toDate = parseToDate(input.to);
   const filters = [eq3(salesOrders.tenantId, input.tenantId)];
   if (input.branchId) filters.push(eq3(salesOrders.branchId, input.branchId));
-  if (input.from) filters.push(gte(salesOrders.createdAt, new Date(input.from)));
-  if (input.to) filters.push(lte(salesOrders.createdAt, new Date(input.to)));
+  if (fromDate) filters.push(gte(salesOrders.createdAt, fromDate));
+  if (toDate) filters.push(lte(salesOrders.createdAt, toDate));
   const [summary] = await db2.select({
     orderCount: count(salesOrders.id),
     grossSales: sum(salesOrders.grandTotal),
@@ -1075,10 +1085,12 @@ async function getSalesSummary(db2, input) {
   };
 }
 async function getPaymentSummary(db2, input) {
+  const fromDate = parseFromDate(input.from);
+  const toDate = parseToDate(input.to);
   const filters = [eq3(payments.tenantId, input.tenantId)];
   if (input.branchId) filters.push(eq3(payments.branchId, input.branchId));
-  if (input.from) filters.push(gte(payments.createdAt, new Date(input.from)));
-  if (input.to) filters.push(lte(payments.createdAt, new Date(input.to)));
+  if (fromDate) filters.push(gte(payments.createdAt, fromDate));
+  if (toDate) filters.push(lte(payments.createdAt, toDate));
   const rows = await db2.select({
     method: payments.method,
     total: sum(payments.amount),
@@ -1091,10 +1103,12 @@ async function getPaymentSummary(db2, input) {
   }));
 }
 async function getInventoryMovementSummary(db2, input) {
+  const fromDate = parseFromDate(input.from);
+  const toDate = parseToDate(input.to);
   const filters = [eq3(stockMovements.tenantId, input.tenantId)];
   if (input.branchId) filters.push(eq3(stockMovements.branchId, input.branchId));
-  if (input.from) filters.push(gte(stockMovements.createdAt, new Date(input.from)));
-  if (input.to) filters.push(lte(stockMovements.createdAt, new Date(input.to)));
+  if (fromDate) filters.push(gte(stockMovements.createdAt, fromDate));
+  if (toDate) filters.push(lte(stockMovements.createdAt, toDate));
   const rows = await db2.select({
     type: stockMovements.type,
     totalQty: sum(stockMovements.qty),
@@ -1108,25 +1122,27 @@ async function getInventoryMovementSummary(db2, input) {
 }
 async function getProfitLoss(db2, input) {
   const tenantId = input.tenantId;
+  const fromDate = parseFromDate(input.from);
+  const toDate = parseToDate(input.to);
   const saleFilters = [eq3(salesOrders.tenantId, tenantId), inArray(salesOrders.status, ["paid", "partial"])];
   if (input.branchId) saleFilters.push(eq3(salesOrders.branchId, input.branchId));
-  if (input.from) saleFilters.push(gte(salesOrders.createdAt, new Date(input.from)));
-  if (input.to) saleFilters.push(lte(salesOrders.createdAt, new Date(input.to)));
+  if (fromDate) saleFilters.push(gte(salesOrders.createdAt, fromDate));
+  if (toDate) saleFilters.push(lte(salesOrders.createdAt, toDate));
   const [salesRev] = await db2.select({ revenue: sum(salesOrders.grandTotal), orderCount: count(salesOrders.id) }).from(salesOrders).where(and3(...saleFilters));
   const svcFilters = [eq3(serviceOrders.tenantId, tenantId), inArray(serviceOrders.status, ["completed", "picked_up"])];
   if (input.branchId) svcFilters.push(eq3(serviceOrders.branchId, input.branchId));
-  if (input.from) svcFilters.push(gte(serviceOrders.date, new Date(input.from)));
-  if (input.to) svcFilters.push(lte(serviceOrders.date, new Date(input.to)));
+  if (fromDate) svcFilters.push(gte(serviceOrders.date, fromDate));
+  if (toDate) svcFilters.push(lte(serviceOrders.date, toDate));
   const [svcRev] = await db2.select({ revenue: sum(serviceOrders.cost), orderCount: count(serviceOrders.id) }).from(serviceOrders).where(and3(...svcFilters));
   const cogsFilters = [eq3(salesOrders.tenantId, tenantId)];
   if (input.branchId) cogsFilters.push(eq3(salesOrders.branchId, input.branchId));
-  if (input.from) cogsFilters.push(gte(salesOrders.createdAt, new Date(input.from)));
-  if (input.to) cogsFilters.push(lte(salesOrders.createdAt, new Date(input.to)));
+  if (fromDate) cogsFilters.push(gte(salesOrders.createdAt, fromDate));
+  if (toDate) cogsFilters.push(lte(salesOrders.createdAt, toDate));
   const [cogsRow] = await db2.select({ cogs: sum(sql`${salesOrderItems.qty} * COALESCE(${products.costPrice}, 0)`) }).from(salesOrderItems).innerJoin(salesOrders, eq3(salesOrderItems.salesOrderId, salesOrders.id)).leftJoin(products, eq3(salesOrderItems.productId, products.id)).where(and3(...cogsFilters));
   const cashFilters = [eq3(cash.tenantId, tenantId)];
   if (input.branchId) cashFilters.push(eq3(cash.branchId, input.branchId));
-  if (input.from) cashFilters.push(gte(cash.date, new Date(input.from)));
-  if (input.to) cashFilters.push(lte(cash.date, new Date(input.to)));
+  if (fromDate) cashFilters.push(gte(cash.date, fromDate));
+  if (toDate) cashFilters.push(lte(cash.date, toDate));
   const expenseRows = await db2.select({
     category: cashCategories.name,
     total: sum(cash.expense)
@@ -1268,10 +1284,12 @@ async function getBalanceSheet(db2, input) {
 }
 async function getSalesReport(db2, input) {
   const tenantId = input.tenantId;
+  const fromDate = parseFromDate(input.from);
+  const toDate = parseToDate(input.to);
   const saleFilters = [eq3(salesOrders.tenantId, tenantId), ne(salesOrders.status, "cancelled")];
   if (input.branchId) saleFilters.push(eq3(salesOrders.branchId, input.branchId));
-  if (input.from) saleFilters.push(gte(salesOrders.createdAt, new Date(input.from)));
-  if (input.to) saleFilters.push(lte(salesOrders.createdAt, new Date(input.to)));
+  if (fromDate) saleFilters.push(gte(salesOrders.createdAt, fromDate));
+  if (toDate) saleFilters.push(lte(salesOrders.createdAt, toDate));
   const dailySales = await db2.select({
     date: sql`DATE(${salesOrders.createdAt})`.as("date"),
     orderCount: count(salesOrders.id),
@@ -1280,8 +1298,8 @@ async function getSalesReport(db2, input) {
   }).from(salesOrders).where(and3(...saleFilters)).groupBy(sql`DATE(${salesOrders.createdAt})`).orderBy(sql`DATE(${salesOrders.createdAt})`);
   const svcFilters = [eq3(serviceOrders.tenantId, tenantId), ne(serviceOrders.status, "cancelled")];
   if (input.branchId) svcFilters.push(eq3(serviceOrders.branchId, input.branchId));
-  if (input.from) svcFilters.push(gte(serviceOrders.date, new Date(input.from)));
-  if (input.to) svcFilters.push(lte(serviceOrders.date, new Date(input.to)));
+  if (fromDate) svcFilters.push(gte(serviceOrders.date, fromDate));
+  if (toDate) svcFilters.push(lte(serviceOrders.date, toDate));
   const dailyService = await db2.select({
     date: sql`DATE(${serviceOrders.date})`.as("date"),
     orderCount: count(serviceOrders.id),
@@ -1293,6 +1311,60 @@ async function getSalesReport(db2, input) {
     totalQty: sum(salesOrderItems.qty),
     totalRevenue: sum(salesOrderItems.subtotal)
   }).from(salesOrderItems).innerJoin(salesOrders, eq3(salesOrderItems.salesOrderId, salesOrders.id)).where(and3(...saleFilters)).groupBy(salesOrderItems.productId, salesOrderItems.name).orderBy(desc(sum(salesOrderItems.subtotal))).limit(100);
+  const svcItemRows = await db2.select({
+    items: serviceOrders.items,
+    description: serviceOrders.description,
+    cost: serviceOrders.cost
+  }).from(serviceOrders).where(and3(...svcFilters));
+  const topItemsMap = /* @__PURE__ */ new Map();
+  for (const r of topProductRows) {
+    topItemsMap.set(r.name.toLowerCase(), {
+      productId: r.productId,
+      name: r.name,
+      totalQty: n(r.totalQty),
+      totalRevenue: n(r.totalRevenue)
+    });
+  }
+  for (const s of svcItemRows) {
+    const rawItems = Array.isArray(s.items) ? s.items : [];
+    if (rawItems.length > 0) {
+      for (const it of rawItems) {
+        const name = it.name?.trim() || "Jasa Service";
+        const key = name.toLowerCase();
+        const qty = Number(it.qty || 1);
+        const subtotal = Number(it.subtotal || (it.price || 0) * qty);
+        const existing = topItemsMap.get(key);
+        if (existing) {
+          existing.totalQty += qty;
+          existing.totalRevenue += subtotal;
+        } else {
+          topItemsMap.set(key, {
+            productId: it.productId || null,
+            name,
+            totalQty: qty,
+            totalRevenue: subtotal
+          });
+        }
+      }
+    } else {
+      const name = s.description?.trim() || "Jasa Service";
+      const key = name.toLowerCase();
+      const revenue = n(s.cost);
+      const existing = topItemsMap.get(key);
+      if (existing) {
+        existing.totalQty += 1;
+        existing.totalRevenue += revenue;
+      } else {
+        topItemsMap.set(key, {
+          productId: null,
+          name,
+          totalQty: 1,
+          totalRevenue: revenue
+        });
+      }
+    }
+  }
+  const combinedTopProducts = Array.from(topItemsMap.values()).sort((a, b) => b.totalRevenue - a.totalRevenue).slice(0, 100);
   const [totals] = await db2.select({
     orderCount: count(salesOrders.id),
     revenue: sum(salesOrders.grandTotal),
@@ -1460,21 +1532,18 @@ async function getSalesReport(db2, input) {
       orderCount: Number(r.orderCount ?? 0),
       revenue: n(r.revenue)
     })),
-    topProducts: topProductRows.map((r) => ({
-      productId: r.productId,
-      name: r.name,
-      totalQty: n(r.totalQty),
-      totalRevenue: n(r.totalRevenue)
-    })),
+    topProducts: combinedTopProducts,
     transactions
   };
 }
 async function getPaymentReport(db2, input) {
   const tenantId = input.tenantId;
+  const fromDate = parseFromDate(input.from);
+  const toDate = parseToDate(input.to);
   const payFilters = [eq3(payments.tenantId, tenantId), eq3(payments.status, "success")];
   if (input.branchId) payFilters.push(eq3(payments.branchId, input.branchId));
-  if (input.from) payFilters.push(gte(payments.createdAt, new Date(input.from)));
-  if (input.to) payFilters.push(lte(payments.createdAt, new Date(input.to)));
+  if (fromDate) payFilters.push(gte(payments.createdAt, fromDate));
+  if (toDate) payFilters.push(lte(payments.createdAt, toDate));
   const byMethod = await db2.select({ method: payments.method, total: sum(payments.amount), count: count(payments.id) }).from(payments).where(and3(...payFilters)).groupBy(payments.method).orderBy(payments.method);
   const bySource = await db2.select({ source: payments.source, total: sum(payments.amount), count: count(payments.id) }).from(payments).where(and3(...payFilters)).groupBy(payments.source).orderBy(payments.source);
   const dailyFlow = await db2.select({
@@ -1492,11 +1561,45 @@ async function getPaymentReport(db2, input) {
     outstanding: sql`${salesOrders.grandTotal} - ${salesOrders.paidTotal}`,
     createdAt: salesOrders.createdAt
   }).from(salesOrders).where(and3(...arFilters)).orderBy(salesOrders.createdAt).limit(200);
+  const svcArFilters = [
+    eq3(serviceOrders.tenantId, tenantId),
+    ne(serviceOrders.status, "cancelled"),
+    sql`${serviceOrders.cost} > ${serviceOrders.paidTotal}`
+  ];
+  if (input.branchId) svcArFilters.push(eq3(serviceOrders.branchId, input.branchId));
+  const svcReceivables = await db2.select({
+    id: serviceOrders.id,
+    orderNumber: serviceOrders.code,
+    grandTotal: serviceOrders.cost,
+    paidTotal: serviceOrders.paidTotal,
+    outstanding: sql`${serviceOrders.cost} - ${serviceOrders.paidTotal}`,
+    createdAt: serviceOrders.date
+  }).from(serviceOrders).where(and3(...svcArFilters)).orderBy(serviceOrders.date).limit(100);
+  const combinedReceivables = [
+    ...receivables.map((r) => ({
+      id: r.id,
+      orderNumber: r.orderNumber,
+      grandTotal: n(r.grandTotal),
+      paidTotal: n(r.paidTotal),
+      outstanding: n(r.outstanding),
+      createdAt: r.createdAt.toISOString(),
+      type: "pos"
+    })),
+    ...svcReceivables.map((s) => ({
+      id: s.id,
+      orderNumber: s.orderNumber,
+      grandTotal: n(s.grandTotal),
+      paidTotal: n(s.paidTotal),
+      outstanding: n(s.outstanding),
+      createdAt: s.createdAt.toISOString(),
+      type: "service"
+    }))
+  ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   const now = /* @__PURE__ */ new Date();
   const aging = { current: 0, days7: 0, days30: 0, days60: 0, over60: 0 };
-  for (const r of receivables) {
+  for (const r of combinedReceivables) {
     const days = Math.floor((now.getTime() - new Date(r.createdAt).getTime()) / 864e5);
-    const amount = n(r.outstanding);
+    const amount = r.outstanding;
     if (days <= 7) aging.current += amount;
     else if (days <= 30) aging.days7 += amount;
     else if (days <= 60) aging.days30 += amount;
@@ -1504,7 +1607,7 @@ async function getPaymentReport(db2, input) {
     else aging.over60 += amount;
   }
   const totalCollected = byMethod.reduce((s, r) => s + n(r.total), 0);
-  const totalReceivable = receivables.reduce((s, r) => s + n(r.outstanding), 0);
+  const totalReceivable = combinedReceivables.reduce((s, r) => s + r.outstanding, 0);
   return {
     summary: {
       totalCollected,
@@ -1515,18 +1618,13 @@ async function getPaymentReport(db2, input) {
     bySource: bySource.map((r) => ({ source: r.source ?? "Unknown", total: n(r.total), count: Number(r.count ?? 0) })),
     dailyFlow: dailyFlow.map((r) => ({ date: r.date, method: r.method, total: n(r.total) })),
     aging,
-    receivables: receivables.map((r) => ({
-      id: r.id,
-      orderNumber: r.orderNumber,
-      grandTotal: n(r.grandTotal),
-      paidTotal: n(r.paidTotal),
-      outstanding: n(r.outstanding),
-      createdAt: r.createdAt.toISOString()
-    }))
+    receivables: combinedReceivables
   };
 }
 async function getInventoryReport(db2, input) {
   const tenantId = input.tenantId;
+  const fromDate = parseFromDate(input.from);
+  const toDate = parseToDate(input.to);
   const prodRows = await db2.select({
     id: products.id,
     name: products.name,
@@ -1560,8 +1658,8 @@ async function getInventoryReport(db2, input) {
   });
   const movFilters = [eq3(stockMovements.tenantId, tenantId)];
   if (input.branchId) movFilters.push(eq3(stockMovements.branchId, input.branchId));
-  if (input.from) movFilters.push(gte(stockMovements.createdAt, new Date(input.from)));
-  if (input.to) movFilters.push(lte(stockMovements.createdAt, new Date(input.to)));
+  if (fromDate) movFilters.push(gte(stockMovements.createdAt, fromDate));
+  if (toDate) movFilters.push(lte(stockMovements.createdAt, toDate));
   const movementSummary = await db2.select({
     type: stockMovements.type,
     totalQty: sum(sql`ABS(${stockMovements.qty})`),

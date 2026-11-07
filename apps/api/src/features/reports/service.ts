@@ -20,13 +20,25 @@ function n(val: string | null | undefined): number {
   return Number(val ?? 0)
 }
 
+function parseFromDate(val: string | undefined): Date | undefined {
+  if (!val) return undefined
+  return new Date(val.length <= 10 ? `${val}T00:00:00.000Z` : val)
+}
+
+function parseToDate(val: string | undefined): Date | undefined {
+  if (!val) return undefined
+  return new Date(val.length <= 10 ? `${val}T23:59:59.999Z` : val)
+}
+
 // ── Existing ────────────────────────────────────────────────────────────────
 
 export async function getSalesSummary(db: AppDb, input: ReportInput) {
+  const fromDate = parseFromDate(input.from)
+  const toDate = parseToDate(input.to)
   const filters = [eq(salesOrders.tenantId, input.tenantId)]
   if (input.branchId) filters.push(eq(salesOrders.branchId, input.branchId))
-  if (input.from) filters.push(gte(salesOrders.createdAt, new Date(input.from)))
-  if (input.to) filters.push(lte(salesOrders.createdAt, new Date(input.to)))
+  if (fromDate) filters.push(gte(salesOrders.createdAt, fromDate))
+  if (toDate) filters.push(lte(salesOrders.createdAt, toDate))
 
   const [summary] = await db
     .select({
@@ -45,10 +57,12 @@ export async function getSalesSummary(db: AppDb, input: ReportInput) {
 }
 
 export async function getPaymentSummary(db: AppDb, input: ReportInput) {
+  const fromDate = parseFromDate(input.from)
+  const toDate = parseToDate(input.to)
   const filters = [eq(payments.tenantId, input.tenantId)]
   if (input.branchId) filters.push(eq(payments.branchId, input.branchId))
-  if (input.from) filters.push(gte(payments.createdAt, new Date(input.from)))
-  if (input.to) filters.push(lte(payments.createdAt, new Date(input.to)))
+  if (fromDate) filters.push(gte(payments.createdAt, fromDate))
+  if (toDate) filters.push(lte(payments.createdAt, toDate))
 
   const rows = await db
     .select({
@@ -69,10 +83,12 @@ export async function getPaymentSummary(db: AppDb, input: ReportInput) {
 }
 
 export async function getInventoryMovementSummary(db: AppDb, input: ReportInput) {
+  const fromDate = parseFromDate(input.from)
+  const toDate = parseToDate(input.to)
   const filters = [eq(stockMovements.tenantId, input.tenantId)]
   if (input.branchId) filters.push(eq(stockMovements.branchId, input.branchId))
-  if (input.from) filters.push(gte(stockMovements.createdAt, new Date(input.from)))
-  if (input.to) filters.push(lte(stockMovements.createdAt, new Date(input.to)))
+  if (fromDate) filters.push(gte(stockMovements.createdAt, fromDate))
+  if (toDate) filters.push(lte(stockMovements.createdAt, toDate))
 
   const rows = await db
     .select({
@@ -96,11 +112,13 @@ export async function getInventoryMovementSummary(db: AppDb, input: ReportInput)
 
 export async function getProfitLoss(db: AppDb, input: ReportInput) {
   const tenantId = input.tenantId
+  const fromDate = parseFromDate(input.from)
+  const toDate = parseToDate(input.to)
 
   const saleFilters = [eq(salesOrders.tenantId, tenantId), inArray(salesOrders.status, ['paid', 'partial'])]
   if (input.branchId) saleFilters.push(eq(salesOrders.branchId, input.branchId))
-  if (input.from) saleFilters.push(gte(salesOrders.createdAt, new Date(input.from)))
-  if (input.to) saleFilters.push(lte(salesOrders.createdAt, new Date(input.to)))
+  if (fromDate) saleFilters.push(gte(salesOrders.createdAt, fromDate))
+  if (toDate) saleFilters.push(lte(salesOrders.createdAt, toDate))
 
   const [salesRev] = await db
     .select({ revenue: sum(salesOrders.grandTotal), orderCount: count(salesOrders.id) })
@@ -109,8 +127,8 @@ export async function getProfitLoss(db: AppDb, input: ReportInput) {
 
   const svcFilters = [eq(serviceOrders.tenantId, tenantId), inArray(serviceOrders.status, ['completed', 'picked_up'])]
   if (input.branchId) svcFilters.push(eq(serviceOrders.branchId, input.branchId))
-  if (input.from) svcFilters.push(gte(serviceOrders.date, new Date(input.from)))
-  if (input.to) svcFilters.push(lte(serviceOrders.date, new Date(input.to)))
+  if (fromDate) svcFilters.push(gte(serviceOrders.date, fromDate))
+  if (toDate) svcFilters.push(lte(serviceOrders.date, toDate))
 
   const [svcRev] = await db
     .select({ revenue: sum(serviceOrders.cost), orderCount: count(serviceOrders.id) })
@@ -119,8 +137,8 @@ export async function getProfitLoss(db: AppDb, input: ReportInput) {
 
   const cogsFilters = [eq(salesOrders.tenantId, tenantId)]
   if (input.branchId) cogsFilters.push(eq(salesOrders.branchId, input.branchId))
-  if (input.from) cogsFilters.push(gte(salesOrders.createdAt, new Date(input.from)))
-  if (input.to) cogsFilters.push(lte(salesOrders.createdAt, new Date(input.to)))
+  if (fromDate) cogsFilters.push(gte(salesOrders.createdAt, fromDate))
+  if (toDate) cogsFilters.push(lte(salesOrders.createdAt, toDate))
 
   const [cogsRow] = await db
     .select({ cogs: sum(sql`${salesOrderItems.qty} * COALESCE(${products.costPrice}, 0)`) })
@@ -131,8 +149,8 @@ export async function getProfitLoss(db: AppDb, input: ReportInput) {
 
   const cashFilters = [eq(cash.tenantId, tenantId)]
   if (input.branchId) cashFilters.push(eq(cash.branchId, input.branchId))
-  if (input.from) cashFilters.push(gte(cash.date, new Date(input.from)))
-  if (input.to) cashFilters.push(lte(cash.date, new Date(input.to)))
+  if (fromDate) cashFilters.push(gte(cash.date, fromDate))
+  if (toDate) cashFilters.push(lte(cash.date, toDate))
 
   const expenseRows = await db
     .select({
@@ -377,11 +395,13 @@ export async function getBalanceSheet(db: AppDb, input: ReportInput) {
 
 export async function getSalesReport(db: AppDb, input: ReportInput) {
   const tenantId = input.tenantId
+  const fromDate = parseFromDate(input.from)
+  const toDate = parseToDate(input.to)
 
   const saleFilters = [eq(salesOrders.tenantId, tenantId), ne(salesOrders.status, 'cancelled')]
   if (input.branchId) saleFilters.push(eq(salesOrders.branchId, input.branchId))
-  if (input.from) saleFilters.push(gte(salesOrders.createdAt, new Date(input.from)))
-  if (input.to) saleFilters.push(lte(salesOrders.createdAt, new Date(input.to)))
+  if (fromDate) saleFilters.push(gte(salesOrders.createdAt, fromDate))
+  if (toDate) saleFilters.push(lte(salesOrders.createdAt, toDate))
 
   const dailySales = await db
     .select({
@@ -397,8 +417,8 @@ export async function getSalesReport(db: AppDb, input: ReportInput) {
 
   const svcFilters = [eq(serviceOrders.tenantId, tenantId), ne(serviceOrders.status, 'cancelled')]
   if (input.branchId) svcFilters.push(eq(serviceOrders.branchId, input.branchId))
-  if (input.from) svcFilters.push(gte(serviceOrders.date, new Date(input.from)))
-  if (input.to) svcFilters.push(lte(serviceOrders.date, new Date(input.to)))
+  if (fromDate) svcFilters.push(gte(serviceOrders.date, fromDate))
+  if (toDate) svcFilters.push(lte(serviceOrders.date, toDate))
 
   const dailyService = await db
     .select({
@@ -424,6 +444,71 @@ export async function getSalesReport(db: AppDb, input: ReportInput) {
     .groupBy(salesOrderItems.productId, salesOrderItems.name)
     .orderBy(desc(sum(salesOrderItems.subtotal)))
     .limit(100)
+
+  // Aggregate services from service_orders to include in topProducts ranking
+  const svcItemRows = await db
+    .select({
+      items: serviceOrders.items,
+      description: serviceOrders.description,
+      cost: serviceOrders.cost,
+    })
+    .from(serviceOrders)
+    .where(and(...svcFilters))
+
+  const topItemsMap = new Map<string, { productId: string | null; name: string; totalQty: number; totalRevenue: number }>()
+
+  for (const r of topProductRows) {
+    topItemsMap.set(r.name.toLowerCase(), {
+      productId: r.productId,
+      name: r.name,
+      totalQty: n(r.totalQty),
+      totalRevenue: n(r.totalRevenue),
+    })
+  }
+
+  for (const s of svcItemRows) {
+    const rawItems = Array.isArray(s.items) ? (s.items as Array<{ productId?: string; name?: string; qty?: number; price?: number; subtotal?: number }>) : []
+    if (rawItems.length > 0) {
+      for (const it of rawItems) {
+        const name = it.name?.trim() || 'Jasa Service'
+        const key = name.toLowerCase()
+        const qty = Number(it.qty || 1)
+        const subtotal = Number(it.subtotal || ((it.price || 0) * qty))
+        const existing = topItemsMap.get(key)
+        if (existing) {
+          existing.totalQty += qty
+          existing.totalRevenue += subtotal
+        } else {
+          topItemsMap.set(key, {
+            productId: it.productId || null,
+            name,
+            totalQty: qty,
+            totalRevenue: subtotal,
+          })
+        }
+      }
+    } else {
+      const name = s.description?.trim() || 'Jasa Service'
+      const key = name.toLowerCase()
+      const revenue = n(s.cost)
+      const existing = topItemsMap.get(key)
+      if (existing) {
+        existing.totalQty += 1
+        existing.totalRevenue += revenue
+      } else {
+        topItemsMap.set(key, {
+          productId: null,
+          name,
+          totalQty: 1,
+          totalRevenue: revenue,
+        })
+      }
+    }
+  }
+
+  const combinedTopProducts = Array.from(topItemsMap.values())
+    .sort((a, b) => b.totalRevenue - a.totalRevenue)
+    .slice(0, 100)
 
   const [totals] = await db
     .select({
@@ -641,12 +726,7 @@ export async function getSalesReport(db: AppDb, input: ReportInput) {
       orderCount: Number(r.orderCount ?? 0),
       revenue: n(r.revenue),
     })),
-    topProducts: topProductRows.map((r) => ({
-      productId: r.productId,
-      name: r.name,
-      totalQty: n(r.totalQty),
-      totalRevenue: n(r.totalRevenue),
-    })),
+    topProducts: combinedTopProducts,
     transactions,
   }
 }
@@ -655,11 +735,13 @@ export async function getSalesReport(db: AppDb, input: ReportInput) {
 
 export async function getPaymentReport(db: AppDb, input: ReportInput) {
   const tenantId = input.tenantId
+  const fromDate = parseFromDate(input.from)
+  const toDate = parseToDate(input.to)
 
   const payFilters = [eq(payments.tenantId, tenantId), eq(payments.status, 'success')]
   if (input.branchId) payFilters.push(eq(payments.branchId, input.branchId))
-  if (input.from) payFilters.push(gte(payments.createdAt, new Date(input.from)))
-  if (input.to) payFilters.push(lte(payments.createdAt, new Date(input.to)))
+  if (fromDate) payFilters.push(gte(payments.createdAt, fromDate))
+  if (toDate) payFilters.push(lte(payments.createdAt, toDate))
 
   const byMethod = await db
     .select({ method: payments.method, total: sum(payments.amount), count: count(payments.id) })
@@ -703,11 +785,54 @@ export async function getPaymentReport(db: AppDb, input: ReportInput) {
     .orderBy(salesOrders.createdAt)
     .limit(200)
 
+  // Also include outstanding service orders in receivables
+  const svcArFilters = [
+    eq(serviceOrders.tenantId, tenantId),
+    ne(serviceOrders.status, 'cancelled'),
+    sql`${serviceOrders.cost} > ${serviceOrders.paidTotal}`,
+  ]
+  if (input.branchId) svcArFilters.push(eq(serviceOrders.branchId, input.branchId))
+
+  const svcReceivables = await db
+    .select({
+      id: serviceOrders.id,
+      orderNumber: serviceOrders.code,
+      grandTotal: serviceOrders.cost,
+      paidTotal: serviceOrders.paidTotal,
+      outstanding: sql<string>`${serviceOrders.cost} - ${serviceOrders.paidTotal}`,
+      createdAt: serviceOrders.date,
+    })
+    .from(serviceOrders)
+    .where(and(...svcArFilters))
+    .orderBy(serviceOrders.date)
+    .limit(100)
+
+  const combinedReceivables = [
+    ...receivables.map((r) => ({
+      id: r.id,
+      orderNumber: r.orderNumber,
+      grandTotal: n(r.grandTotal),
+      paidTotal: n(r.paidTotal),
+      outstanding: n(r.outstanding),
+      createdAt: r.createdAt.toISOString(),
+      type: 'pos' as const,
+    })),
+    ...svcReceivables.map((s) => ({
+      id: s.id,
+      orderNumber: s.orderNumber,
+      grandTotal: n(s.grandTotal),
+      paidTotal: n(s.paidTotal),
+      outstanding: n(s.outstanding),
+      createdAt: s.createdAt.toISOString(),
+      type: 'service' as const,
+    })),
+  ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+
   const now = new Date()
   const aging = { current: 0, days7: 0, days30: 0, days60: 0, over60: 0 }
-  for (const r of receivables) {
+  for (const r of combinedReceivables) {
     const days = Math.floor((now.getTime() - new Date(r.createdAt).getTime()) / 86400000)
-    const amount = n(r.outstanding)
+    const amount = r.outstanding
     if (days <= 7) aging.current += amount
     else if (days <= 30) aging.days7 += amount
     else if (days <= 60) aging.days30 += amount
@@ -716,7 +841,7 @@ export async function getPaymentReport(db: AppDb, input: ReportInput) {
   }
 
   const totalCollected = byMethod.reduce((s, r) => s + n(r.total), 0)
-  const totalReceivable = receivables.reduce((s, r) => s + n(r.outstanding), 0)
+  const totalReceivable = combinedReceivables.reduce((s, r) => s + r.outstanding, 0)
 
   return {
     summary: {
@@ -728,14 +853,7 @@ export async function getPaymentReport(db: AppDb, input: ReportInput) {
     bySource: bySource.map((r) => ({ source: r.source ?? 'Unknown', total: n(r.total), count: Number(r.count ?? 0) })),
     dailyFlow: dailyFlow.map((r) => ({ date: r.date, method: r.method, total: n(r.total) })),
     aging,
-    receivables: receivables.map((r) => ({
-      id: r.id,
-      orderNumber: r.orderNumber,
-      grandTotal: n(r.grandTotal),
-      paidTotal: n(r.paidTotal),
-      outstanding: n(r.outstanding),
-      createdAt: r.createdAt.toISOString(),
-    })),
+    receivables: combinedReceivables,
   }
 }
 
@@ -743,6 +861,8 @@ export async function getPaymentReport(db: AppDb, input: ReportInput) {
 
 export async function getInventoryReport(db: AppDb, input: ReportInput) {
   const tenantId = input.tenantId
+  const fromDate = parseFromDate(input.from)
+  const toDate = parseToDate(input.to)
 
   const prodRows = await db
     .select({
@@ -788,8 +908,8 @@ export async function getInventoryReport(db: AppDb, input: ReportInput) {
 
   const movFilters = [eq(stockMovements.tenantId, tenantId)]
   if (input.branchId) movFilters.push(eq(stockMovements.branchId, input.branchId))
-  if (input.from) movFilters.push(gte(stockMovements.createdAt, new Date(input.from)))
-  if (input.to) movFilters.push(lte(stockMovements.createdAt, new Date(input.to)))
+  if (fromDate) movFilters.push(gte(stockMovements.createdAt, fromDate))
+  if (toDate) movFilters.push(lte(stockMovements.createdAt, toDate))
 
   const movementSummary = await db
     .select({
