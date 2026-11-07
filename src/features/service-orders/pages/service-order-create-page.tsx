@@ -89,7 +89,7 @@ export function ServiceOrderCreatePage() {
       return
     }
     if (!store.customerName || store.customerName.trim() === '') {
-      toast.error('Silakan pilih pelanggan terlebih dahulu')
+      toast.error(t('service_orders.customer_required'))
       setTimeout(() => {
         const input = document.getElementById('soc-customer-select')
         if (input) {
@@ -225,7 +225,7 @@ export function ServiceOrderCreatePage() {
               onClick={() => store.addCustomItem()}
             >
               <PlusCircle className="h-3.5 w-3.5" />
-              Item Custom
+              {t('service_orders.add_manual_item')}
             </Button>
             <Dialog open={isProductModalOpen} onOpenChange={setIsProductModalOpen}>
               <DialogTrigger asChild>
@@ -258,7 +258,7 @@ export function ServiceOrderCreatePage() {
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          store.addItem({ productId: p.id, name: p.name, price: p.price, wholesaleTiers: p.wholesaleTiers })
+                          store.addItem({ productId: p.id, name: p.name, price: p.price, costPrice: p.costPrice, wholesaleTiers: p.wholesaleTiers })
                           toast.success(t('service_orders.item_added', { name: p.name }))
                         }}
                       >
@@ -286,7 +286,7 @@ export function ServiceOrderCreatePage() {
                 <div className="flex items-center gap-2">
                   <Input
                     className="h-8 text-sm font-medium flex-1 min-w-0"
-                    placeholder="Nama item / jasa"
+                    placeholder={t('service_orders.item_name_placeholder')}
                     value={item.name}
                     onChange={e => store.updateItem(item.productId, { name: e.target.value })}
                   />
@@ -299,38 +299,62 @@ export function ServiceOrderCreatePage() {
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
-                    <span>Rp</span>
-                    <Input
-                      className="h-7 w-28 text-xs"
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={item.price === 0 ? '' : String(item.price)}
-                      onChange={e => {
-                        const val = e.target.value.replace(/\D/g, '')
-                        store.updateItem(item.productId, { price: val ? Number(val) : 0 })
-                      }}
-                    />
+                <div className="flex flex-wrap items-center gap-3 pt-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground font-medium">{t('common.price')}:</span>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <span>Rp</span>
+                      <Input
+                        className="h-7 w-24 text-xs font-medium"
+                        inputMode="numeric"
+                        placeholder="0"
+                        value={item.price === 0 ? '' : String(item.price)}
+                        onChange={e => {
+                          const val = e.target.value.replace(/\D/g, '')
+                          store.updateItem(item.productId, { price: val ? Number(val) : 0 })
+                        }}
+                      />
+                    </div>
                   </div>
-                  <span className="text-xs text-muted-foreground">×</span>
-                  <div className="flex items-center rounded-md border bg-background">
-                    <Button
-                      variant="ghost"
-                      className="h-7 w-7 p-0 text-muted-foreground"
-                      onClick={() => item.qty > 1 ? store.updateItemQty(item.productId, item.qty - 1) : store.removeItem(item.productId)}
-                    >
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                    <span className="w-7 text-center text-xs font-medium">{item.qty}</span>
-                    <Button
-                      variant="ghost"
-                      className="h-7 w-7 p-0 text-muted-foreground"
-                      onClick={() => store.updateItemQty(item.productId, item.qty + 1)}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
+
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground font-medium">{t('common.cost_price') || 'Modal'}:</span>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <span>Rp</span>
+                      <Input
+                        className="h-7 w-24 text-xs"
+                        inputMode="numeric"
+                        placeholder="0"
+                        value={!item.costPrice ? '' : String(item.costPrice)}
+                        onChange={e => {
+                          const val = e.target.value.replace(/\D/g, '')
+                          store.updateItem(item.productId, { costPrice: val ? Number(val) : 0 })
+                        }}
+                      />
+                    </div>
                   </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground font-medium">{t('common.qty')}:</span>
+                    <div className="flex items-center rounded-md border bg-background">
+                      <Button
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-muted-foreground"
+                        onClick={() => item.qty > 1 ? store.updateItemQty(item.productId, item.qty - 1) : store.removeItem(item.productId)}
+                      >
+                        <Minus className="h-3 w-3" />
+                      </Button>
+                      <span className="w-7 text-center text-xs font-medium">{item.qty}</span>
+                      <Button
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-muted-foreground"
+                        onClick={() => store.updateItemQty(item.productId, item.qty + 1)}
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+
                   <span className="ml-auto text-sm font-semibold">{formatCurrency(item.subtotal)}</span>
                 </div>
               </div>

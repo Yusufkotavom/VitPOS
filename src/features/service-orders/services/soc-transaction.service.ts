@@ -21,6 +21,7 @@ export type SocItem = {
   name: string
   qty: number
   price: number
+  costPrice?: number
   subtotal: number
 }
 
@@ -90,6 +91,7 @@ export const socTransactionService = {
         date: todayISO(),
       estimatedCompletion: serviceData.estimatedCompletion,
       cost: totals.total,
+      costPrice: items.reduce((acc, it) => acc + ((Number(it.costPrice) || 0) * (Number(it.qty) || 1)), 0),
       paidTotal: retainedAmount,
       status: 'Diterima',
       items: items.map(c => ({ ...c })),

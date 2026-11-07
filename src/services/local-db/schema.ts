@@ -325,11 +325,12 @@ export type LocalServiceOrder = {
   date: string
   estimatedCompletion?: string
   cost: number
+  costPrice?: number
   paidTotal: number
   status: ServiceOrderStatus
   
   // New fields for POS-like behavior
-  items?: { productId: string, name: string, qty: number, price: number, subtotal: number }[]
+  items?: { productId: string, name: string, qty: number, price: number, costPrice?: number, subtotal: number }[]
   notes?: string
   timeline?: ServiceOrderTimelineItem[]
   hasWarranty?: boolean

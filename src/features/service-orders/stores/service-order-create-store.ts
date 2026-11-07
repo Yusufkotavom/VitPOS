@@ -8,6 +8,7 @@ export interface ServiceItem {
   name: string
   qty: number
   price: number
+  costPrice?: number
   subtotal: number
   wholesaleTiers?: WholesaleTier[]
 }
@@ -32,10 +33,10 @@ interface ServiceOrderCreateState {
   setHasWarranty: (value: boolean) => void
   setWarrantyValue: (value: string) => void
   setWarrantyUnit: (value: 'hari' | 'bulan' | 'tahun') => void
-  addItem: (item: { productId: string; name: string; price: number; wholesaleTiers?: WholesaleTier[] }) => void
+  addItem: (item: { productId: string; name: string; price: number; costPrice?: number; wholesaleTiers?: WholesaleTier[] }) => void
   addCustomItem: () => void
   updateItemQty: (productId: string, qty: number) => void
-  updateItem: (productId: string, changes: Partial<Pick<ServiceItem, 'name' | 'price'>>) => void
+  updateItem: (productId: string, changes: Partial<Pick<ServiceItem, 'name' | 'price' | 'costPrice'>>) => void
   removeItem: (productId: string) => void
   clear: () => void
 }
@@ -74,7 +75,7 @@ export const useServiceOrderCreateStore = create<ServiceOrderCreateState>((set) 
         }
       }
       return {
-        items: [...state.items, { ...product, qty: 1, subtotal: product.price }],
+        items: [...state.items, { ...product, costPrice: product.costPrice ?? 0, qty: 1, subtotal: product.price }],
       }
     })
   },
@@ -86,6 +87,7 @@ export const useServiceOrderCreateStore = create<ServiceOrderCreateState>((set) 
         name: '',
         qty: 1,
         price: 0,
+        costPrice: 0,
         subtotal: 0,
       }],
     }))

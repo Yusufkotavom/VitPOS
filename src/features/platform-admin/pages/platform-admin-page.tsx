@@ -246,7 +246,7 @@ function PlansTab({ plans }: { plans: PlatformPlan[] }) {
             header: 'Aksi',
             render: (row) => (
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => { setEditingPlan(row); setDialogOpen(true) }}>Edit</Button>
+                <Button size="sm" variant="outline" onClick={() => { setEditingPlan(row); setDialogOpen(true) }}>Ubah</Button>
                 {row.isActive && (
                   <Button size="sm" variant="destructive" onClick={() => deleteMutation.mutate(row.id)}>Non-aktifkan</Button>
                 )}
@@ -265,7 +265,7 @@ function PlansTab({ plans }: { plans: PlatformPlan[] }) {
             <p className="text-sm">{Number(row.monthlyPrice) === 0 ? 'Gratis' : formatCurrency(Number(row.monthlyPrice))} / bulan{row.yearlyPrice ? ` · ${formatCurrency(Number(row.yearlyPrice))} / tahun` : ''}</p>
             <p className="text-sm">Storage {Math.round(row.storageLimitMb / 1024 * 10) / 10} GB · {row.maxBranches} cabang · {row.maxUsers} user</p>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => { setEditingPlan(row); setDialogOpen(true) }}>Edit</Button>
+              <Button size="sm" variant="outline" onClick={() => { setEditingPlan(row); setDialogOpen(true) }}>Ubah</Button>
               {row.isActive && (
                 <Button size="sm" variant="destructive" onClick={() => deleteMutation.mutate(row.id)}>Non-aktifkan</Button>
               )}

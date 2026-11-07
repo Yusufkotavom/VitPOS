@@ -61,6 +61,7 @@ function dateKey(value: string) {
 }
 
 function SalesOrderCard({ row }: { row: ReturnType<typeof useSalesOrders>[number] }) {
+  const { t } = useTranslation()
   if (!row) return null
 
   return (
@@ -79,26 +80,26 @@ function SalesOrderCard({ row }: { row: ReturnType<typeof useSalesOrders>[number
 
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div className="rounded-xl bg-muted/40 p-3">
-            <p className="text-xs text-muted-foreground">Tanggal</p>
+            <p className="text-xs text-muted-foreground">{t('common.date')}</p>
             <p className="mt-1 font-medium">{formatDateTime(row.date)}</p>
           </div>
           <div className="rounded-xl bg-muted/40 p-3">
-            <p className="text-xs text-muted-foreground">Pembayaran</p>
+            <p className="text-xs text-muted-foreground">{t('common.payment')}</p>
             <p className="mt-1 font-medium">{paymentSummary(row.paidTotal, row.grandTotal)}</p>
           </div>
           <div className="rounded-xl bg-muted/40 p-3">
-            <p className="text-xs text-muted-foreground">Total</p>
+            <p className="text-xs text-muted-foreground">{t('common.total')}</p>
             <p className="mt-1 font-medium">{formatCurrency(row.grandTotal)}</p>
           </div>
           <div className="rounded-xl bg-muted/40 p-3">
-            <p className="text-xs text-muted-foreground">Dibayar</p>
+            <p className="text-xs text-muted-foreground">{t('sales_orders.paid_label')}</p>
             <p className="mt-1 font-medium">{formatCurrency(row.paidTotal)}</p>
           </div>
         </div>
       </div>
 
       <div className="mt-4 border-t pt-4">
-        <Link to={`/sales-orders/${row.id}`} className="text-sm font-medium text-primary hover:underline">Lihat Detail</Link>
+        <Link to={`/sales-orders/${row.id}`} className="text-sm font-medium text-primary hover:underline">{t('common.view_detail')}</Link>
       </div>
     </article>
   )

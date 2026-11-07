@@ -4,6 +4,7 @@ import { apiGet, buildTenantQuery } from '@/services/api/client'
 export type SalesReportTransaction = {
   id: string
   orderNumber: string
+  type?: 'pos' | 'service'
   createdAt: string
   customerName: string
   status: string

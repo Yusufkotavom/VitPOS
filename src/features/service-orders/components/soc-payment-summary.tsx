@@ -8,6 +8,7 @@ import { socTransactionService } from '@/features/service-orders/services/soc-tr
 import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
 import { toast } from 'sonner'
 import { useState, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { PosSuccessDialog } from '@/features/pos/components/pos-success-dialog'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { localDb } from '@/services/local-db/client'
@@ -24,6 +25,7 @@ const defaultMethods = [
 ]
 
 export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
+  const { t } = useTranslation()
   const store = useServiceOrderCreateStore()
   const dbMethods = usePaymentMethods()
   const activeMethods = dbMethods && dbMethods.length > 0 ? dbMethods.filter((m) => m.status === 'Aktif') : defaultMethods
@@ -65,7 +67,7 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
 
     if (!paymentMethod) {
       setHasAttemptedCheckout(true)
-      toast.error('Silakan pilih metode pembayaran terlebih dahulu.')
+      toast.error(t('pos.payment_method_required'))
       const methodsSection = document.getElementById('soc-payment-methods')
       if (methodsSection) {
         methodsSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -94,7 +96,7 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
       )
 
       if (!result) {
-        throw new Error('Transaksi gagal')
+        throw new Error(t('common.error_generic'))
       }
 
       setSuccessOrder({
@@ -115,7 +117,7 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
       })
       store.clear()
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Gagal mencatat order'
+      const message = error instanceof Error ? error.message : t('common.error_generic')
       toast.error(message)
     } finally {
       setProcessing(false)
@@ -136,7 +138,7 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
       phone = customer?.phone ?? ''
     }
     if (!phone) {
-      toast.error('Nomor WhatsApp pelanggan tidak ditemukan')
+      toast.error(t('service_orders.whatsapp_not_found'))
       return
     }
 
@@ -194,10 +196,10 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
       </div>
 
       <div className="space-y-3">
-        <h3 className="font-medium text-sm text-muted-foreground">Detail Pekerjaan</h3>
+        <h3 className="font-medium text-sm text-muted-foreground">{t('service_orders.job_detail')}</h3>
         <p className="text-sm border p-2 rounded bg-muted/20">{store.description}</p>
 
-        <h3 className="font-medium text-sm text-muted-foreground mt-3">Item Biaya</h3>
+        <h3 className="font-medium text-sm text-muted-foreground mt-3">{t('service_orders.cost_items')}</h3>
         <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
           {store.items.map(item => (
             <div key={item.productId} className="flex justify-between text-sm">
@@ -209,7 +211,7 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
             </div>
           ))}
           {store.items.length === 0 && (
-            <p className="text-xs text-muted-foreground">Tidak ada item biaya khusus (hanya service)</p>
+            <p className="text-xs text-muted-foreground">{t('service_orders.no_special_cost_items')}</p>
           )}
         </div>
       </div>
@@ -218,13 +220,13 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
 
       <div className="space-y-2 text-sm">
         <div className="flex justify-between text-xl font-bold pt-2">
-          <span>Total Estimasi Biaya</span>
+          <span>{t('service_orders.total_estimated_cost')}</span>
           <span className="text-primary">{formatCurrency(totals.total)}</span>
         </div>
       </div>
 
       <div id="soc-payment-methods" className={`space-y-3 pt-2 p-2 rounded-xl transition-colors ${hasAttemptedCheckout && !paymentMethod ? 'bg-destructive/10 border border-destructive/50' : ''}`}>
-        <label className={`text-sm font-medium ${hasAttemptedCheckout && !paymentMethod ? 'text-destructive' : ''}`}>Metode Pembayaran</label>
+        <label className={`text-sm font-medium ${hasAttemptedCheckout && !paymentMethod ? 'text-destructive' : ''}`}>{t('pos.payment_method_select')}</label>
         <div className="grid grid-cols-3 gap-2">
           {activeMethods.map((method: { id: string; name: string }) => (
             <Button
@@ -240,10 +242,10 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
       </div>
 
       <div className="space-y-3 p-4 border rounded-2xl bg-muted/10">
-        <label className="text-sm font-medium">DP / Uang Dibayar</label>
+        <label className="text-sm font-medium">{t('service_orders.down_payment_or_paid')}</label>
         <Input
           inputMode="numeric"
-          placeholder="Isi 0 jika tidak ada DP"
+          placeholder={t('service_orders.dp_placeholder')}
           value={paidAmount || ''}
           onChange={(event) => setPaidAmount(Number(event.target.value) || 0)}
           className="text-lg font-semibold h-12"
@@ -251,12 +253,12 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
         <div className="flex justify-between items-center text-sm pt-2">
           {paidAmount > 0 && paidAmount < totals.total ? (
             <>
-              <span className="text-destructive font-medium">Sisa Tagihan</span>
+              <span className="text-destructive font-medium">{t('service_orders.remaining_bill')}</span>
               <span className="text-destructive font-bold">{formatCurrency(totals.total - paidAmount)}</span>
             </>
           ) : (
             <>
-              <span className="text-muted-foreground">Kembalian</span>
+              <span className="text-muted-foreground">{t('pos.change')}</span>
               <span className="text-lg font-bold text-success">{formatCurrency(Math.max((paidAmount || totals.total) - totals.total, 0))}</span>
             </>
           )}
@@ -264,7 +266,7 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
       </div>
 
       <Button size="lg" className="h-14 text-lg font-semibold w-full mt-2" disabled={isProcessing} onClick={handleCheckout}>
-        {isProcessing ? 'Memproses...' : 'Proses Service Order'}
+        {isProcessing ? t('common.processing') : t('service_orders.process_service_order')}
       </Button>
     </div>
   )

@@ -1300,7 +1300,8 @@ async function getSalesReport(db2, input) {
   }).from(salesOrders).where(and3(...saleFilters));
   const [svcTotals] = await db2.select({
     orderCount: count(serviceOrders.id),
-    revenue: sum(serviceOrders.cost)
+    revenue: sum(serviceOrders.cost),
+    paid: sum(serviceOrders.paidTotal)
   }).from(serviceOrders).where(and3(...svcFilters));
   const totalRevenue = n(totals?.revenue) + n(svcTotals?.revenue);
   const totalOrders = Number(totals?.orderCount ?? 0) + Number(svcTotals?.orderCount ?? 0);
@@ -1343,7 +1344,34 @@ async function getSalesReport(db2, input) {
       }
     }
   }
-  const transactions = transactionRows.map((t) => {
+  const svcTransactionRows = await db2.select({
+    id: serviceOrders.id,
+    orderNumber: serviceOrders.code,
+    createdAt: serviceOrders.date,
+    customerId: serviceOrders.customerId,
+    customerName: serviceOrders.customerName,
+    status: serviceOrders.status,
+    cost: serviceOrders.cost,
+    paidTotal: serviceOrders.paidTotal,
+    items: serviceOrders.items,
+    description: serviceOrders.description
+  }).from(serviceOrders).where(and3(...svcFilters)).orderBy(desc(serviceOrders.date)).limit(100);
+  const svcOrderIds = svcTransactionRows.map((s) => s.id);
+  const svcPaymentsByOrder = /* @__PURE__ */ new Map();
+  if (svcOrderIds.length > 0) {
+    const svcPayRows = await db2.select({
+      serviceOrderId: payments.serviceOrderId,
+      method: payments.method
+    }).from(payments).where(and3(eq3(payments.tenantId, tenantId), inArray(payments.serviceOrderId, svcOrderIds)));
+    for (const p of svcPayRows) {
+      if (p.serviceOrderId) {
+        const arr = svcPaymentsByOrder.get(p.serviceOrderId) ?? [];
+        if (!arr.includes(p.method)) arr.push(p.method);
+        svcPaymentsByOrder.set(p.serviceOrderId, arr);
+      }
+    }
+  }
+  const posTransactions = transactionRows.map((t) => {
     const items = itemsByOrder.get(t.id) ?? [];
     const methods = paymentsByOrder.get(t.id) ?? [];
     const grandTotal = n(t.grandTotal);
@@ -1358,6 +1386,7 @@ async function getSalesReport(db2, input) {
     return {
       id: t.id,
       orderNumber: t.orderNumber,
+      type: "pos",
       createdAt: t.createdAt ? new Date(t.createdAt).toISOString() : (/* @__PURE__ */ new Date()).toISOString(),
       customerName: t.customerName || "Pelanggan Umum",
       status: t.status,
@@ -1373,6 +1402,42 @@ async function getSalesReport(db2, input) {
       balanceDue
     };
   });
+  const svcTransactions = svcTransactionRows.map((s) => {
+    const rawItems = Array.isArray(s.items) ? s.items : [];
+    const methods = svcPaymentsByOrder.get(s.id) ?? [];
+    const grandTotal = n(s.cost);
+    const paidTotal = n(s.paidTotal);
+    const balanceDue = Math.max(0, grandTotal - paidTotal);
+    let paymentStatus = "unpaid";
+    if (paidTotal >= grandTotal && grandTotal > 0) {
+      paymentStatus = "paid";
+    } else if (paidTotal > 0) {
+      paymentStatus = "partial";
+    }
+    const itemsSummary = rawItems.length > 0 ? rawItems.map((i) => `${i.name || "Jasa"} (x${i.qty || 1})`).join(", ") : s.description || "Jasa Service";
+    const itemCount = rawItems.length > 0 ? rawItems.reduce((acc, it) => acc + (Number(it.qty) || 1), 0) : 1;
+    return {
+      id: s.id,
+      orderNumber: s.orderNumber,
+      type: "service",
+      createdAt: s.createdAt ? new Date(s.createdAt).toISOString() : (/* @__PURE__ */ new Date()).toISOString(),
+      customerName: s.customerName || "Pelanggan Umum",
+      status: s.status,
+      paymentStatus,
+      paymentMethod: methods.length > 0 ? methods.join(", ") : "tunai",
+      itemCount,
+      itemsSummary,
+      subtotal: grandTotal,
+      discountTotal: 0,
+      taxTotal: 0,
+      grandTotal,
+      paidTotal,
+      balanceDue
+    };
+  });
+  const transactions = [...posTransactions, ...svcTransactions].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
   return {
     summary: {
       totalRevenue,
@@ -1381,7 +1446,7 @@ async function getSalesReport(db2, input) {
       totalOrders,
       salesOrders: Number(totals?.orderCount ?? 0),
       serviceOrders: Number(svcTotals?.orderCount ?? 0),
-      totalPaid: n(totals?.paid),
+      totalPaid: n(totals?.paid) + n(svcTotals?.paid),
       avgOrderValue: totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0
     },
     dailySales: dailySales.map((r) => ({

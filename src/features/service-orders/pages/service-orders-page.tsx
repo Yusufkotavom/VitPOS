@@ -150,13 +150,13 @@ export function ServiceOrdersPage() {
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm" className="relative gap-2">
                     <Filter className="h-4 w-4" />
-                    Filter
+                    {t('common.filter')}
                     {hasActiveFilter ? <span className="absolute right-2 top-2 size-2 rounded-full bg-primary" /> : null}
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-lg">
                   <DialogHeader>
-                    <DialogTitle>Filter Service Order</DialogTitle>
+                    <DialogTitle>{t('service_orders.filter_dialog_title')}</DialogTitle>
                   </DialogHeader>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -183,34 +183,34 @@ export function ServiceOrdersPage() {
                     <Select value={customer} onValueChange={setCustomer}>
                       <SelectTrigger><SelectValue placeholder={t('common.customer')} /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Semua Pelanggan</SelectItem>
+                        <SelectItem value="all">{t('common.all_customers')}</SelectItem>
                         {customers.filter(name => name !== "").map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     <Select value={sortBy} onValueChange={setSortBy}>
-                      <SelectTrigger><SelectValue placeholder="Urutkan" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t('common.sort_by')} /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="newest">Terbaru</SelectItem>
-                        <SelectItem value="oldest">Terlama</SelectItem>
-                        <SelectItem value="cost_desc">Biaya Tertinggi</SelectItem>
-                        <SelectItem value="cost_asc">Biaya Terendah</SelectItem>
-                        <SelectItem value="code_asc">Kode A-Z</SelectItem>
+                        <SelectItem value="newest">{t('common.sort_newest')}</SelectItem>
+                        <SelectItem value="oldest">{t('common.sort_oldest')}</SelectItem>
+                        <SelectItem value="cost_desc">{t('service_orders.sort_cost_desc')}</SelectItem>
+                        <SelectItem value="cost_asc">{t('service_orders.sort_cost_asc')}</SelectItem>
+                        <SelectItem value="code_asc">{t('service_orders.sort_code_asc')}</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} aria-label="Tanggal awal" />
-                    <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} aria-label="Tanggal akhir" />
+                    <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} aria-label={t('common.start_date')} />
+                    <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} aria-label={t('common.end_date')} />
                     <Select value={pageSize} onValueChange={setPageSize}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="20">20 / page</SelectItem>
-                        <SelectItem value="50">50 / page</SelectItem>
-                        <SelectItem value="100">100 / page</SelectItem>
+                        <SelectItem value="20">{t('common.page_size', { count: 20 })}</SelectItem>
+                        <SelectItem value="50">{t('common.page_size', { count: 50 })}</SelectItem>
+                        <SelectItem value="100">{t('common.page_size', { count: 100 })}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={resetFilters}>Reset</Button>
-                    <Button onClick={() => setFilterOpen(false)}>Tutup</Button>
+                    <Button variant="outline" onClick={resetFilters}>{t('common.reset')}</Button>
+                    <Button onClick={() => setFilterOpen(false)}>{t('common.close')}</Button>
                   </div>
                 </DialogContent>
               </Dialog>
@@ -224,7 +224,7 @@ export function ServiceOrdersPage() {
               </div>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">Menampilkan {paginated.length} dari {filtered.length} service order</p>
+          <p className="text-xs text-muted-foreground">{t('service_orders.showing_count', { count: paginated.length, total: filtered.length })}</p>
         </div>
 
         {view === 'list' ? (

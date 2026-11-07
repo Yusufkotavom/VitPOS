@@ -1,6 +1,7 @@
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Printer, MessageSquare, Download, CreditCard, PlusIcon, Trash2Icon, PencilIcon, XIcon, CheckIcon, Search, FileText } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useLiveQuery } from '@/shared/hooks/use-live-query'
 import { usePdf } from '@/shared/components/pdf/use-pdf'
 import type { PdfData } from '@/shared/components/pdf/types'
@@ -43,6 +44,7 @@ type EditableItem = { id: string; name: string; qty: string; unitPrice: string }
 type EditablePayment = { id: string; date: string; amount: string; method: string; notes: string }
 
 export function SalesOrderDetailPage() {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const tenantId = requireActiveTenantId()
   const { data: order, isLoading, refetch } = useSalesOrder(id)
@@ -483,10 +485,10 @@ export function SalesOrderDetailPage() {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/40">
-                        <TableHead>Nama</TableHead>
-                        <TableHead className="text-right w-20">Qty</TableHead>
-                        <TableHead className="text-right w-28">Harga</TableHead>
-                        <TableHead className="text-right w-28">Subtotal</TableHead>
+                        <TableHead>{t('common.name')}</TableHead>
+                        <TableHead className="text-right w-20">{t('common.qty')}</TableHead>
+                        <TableHead className="text-right w-28">{t('common.price')}</TableHead>
+                        <TableHead className="text-right w-28">{t('common.subtotal')}</TableHead>
                         <TableHead className="w-10"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -531,16 +533,16 @@ export function SalesOrderDetailPage() {
                         <Input value={item.name} onChange={e => updateItem(idx, 'name', e.target.value)} placeholder="Nama produk" className="h-8 text-sm" />
                         <div className="grid grid-cols-2 gap-2">
                           <div className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">Qty</span>
+                            <span className="text-xs text-muted-foreground">{t('common.qty')}</span>
                             <Input value={item.qty} onChange={e => updateItem(idx, 'qty', e.target.value)} inputMode="numeric" className="h-8 text-sm" />
                           </div>
                           <div className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">Harga</span>
+                            <span className="text-xs text-muted-foreground">{t('common.price')}</span>
                             <Input value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)} inputMode="numeric" className="h-8 text-sm" />
                           </div>
                         </div>
                         <div className="flex justify-between items-center pt-1">
-                          <span className="text-xs text-muted-foreground">Subtotal</span>
+                          <span className="text-xs text-muted-foreground">{t('common.subtotal')}</span>
                           <span className="text-sm font-medium">{itemSubtotal > 0 ? formatCurrency(itemSubtotal) : '-'}</span>
                         </div>
                       </div>
@@ -610,10 +612,10 @@ export function SalesOrderDetailPage() {
                   <Table className="min-w-[640px]">
                     <TableHeader>
                       <TableRow className="bg-muted/40">
-                        <TableHead>Item</TableHead>
-                        <TableHead className="w-28 text-right">Harga</TableHead>
-                        <TableHead className="w-20 text-right">Qty</TableHead>
-                        <TableHead className="w-32 text-right">Subtotal</TableHead>
+                        <TableHead>{t('common.item')}</TableHead>
+                        <TableHead className="w-28 text-right">{t('common.price')}</TableHead>
+                        <TableHead className="w-20 text-right">{t('common.qty')}</TableHead>
+                        <TableHead className="w-32 text-right">{t('common.subtotal')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -746,41 +748,41 @@ export function SalesOrderDetailPage() {
         <div className="space-y-4">
           <div className="rounded-lg border p-4 space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Status</span>
+              <span className="text-sm text-muted-foreground">{t('common.status')}</span>
               {editing ? (
-                <StatusBadge label={isPaid ? 'Lunas' : editPaid > 0 ? 'Sebagian' : 'Belum Bayar'} tone={isPaid ? 'success' : editPaid > 0 ? 'warning' : 'danger'} />
+                <StatusBadge label={isPaid ? t('common.paid') : editPaid > 0 ? t('common.partial') : t('common.unpaid')} tone={isPaid ? 'success' : editPaid > 0 ? 'warning' : 'danger'} />
               ) : (
                 <StatusBadge label={order.status} tone={tone(order.status)} />
               )}
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Subtotal</span>
+              <span className="text-sm text-muted-foreground">{t('common.subtotal')}</span>
               <span className="font-medium">{formatCurrency(editing ? editSubtotal : order.subtotal)}</span>
             </div>
             {order.discountTotal > 0 && (
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Diskon</span>
+                <span className="text-sm text-muted-foreground">{t('common.discount')}</span>
                 <span className="font-medium text-red-600">-{formatCurrency(order.discountTotal)}</span>
               </div>
             )}
             {order.taxTotal > 0 && (
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Pajak</span>
+                <span className="text-sm text-muted-foreground">{t('common.tax')}</span>
                 <span className="font-medium">+{formatCurrency(order.taxTotal)}</span>
               </div>
             )}
             <div className="flex justify-between items-center pt-2 border-t">
-              <span className="font-medium">Total</span>
+              <span className="font-medium">{t('common.total')}</span>
               <span className="font-semibold text-lg">{formatCurrency(editing ? editSubtotal - order.discountTotal + order.taxTotal : order.grandTotal)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Dibayar</span>
+              <span className="text-sm text-muted-foreground">{t('sales_orders.paid_label')}</span>
               <span className="font-semibold text-green-600">{formatCurrency(editPaid)}</span>
             </div>
             <div className="flex justify-between items-center pt-2 border-t">
-              <span className="font-medium">{isPaid ? 'Status' : 'Sisa Tagihan'}</span>
+              <span className="font-medium">{isPaid ? t('common.status') : t('service_orders.remaining_bill')}</span>
               {isPaid ? (
-                <StatusBadge label="Lunas" tone="success" />
+                <StatusBadge label={t('common.paid')} tone="success" />
               ) : (
                 <span className="font-bold text-red-600 text-lg">{formatCurrency(shortage)}</span>
               )}

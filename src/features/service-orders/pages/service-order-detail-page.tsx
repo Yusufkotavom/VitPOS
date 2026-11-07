@@ -35,7 +35,7 @@ function tone(status: string) {
   return 'warning'
 }
 
-type EditableItem = { id: string; name: string; qty: string; unitPrice: string; productId?: string }
+type EditableItem = { id: string; name: string; qty: string; unitPrice: string; costPrice: string; productId?: string }
 
 export function ServiceOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -148,6 +148,7 @@ export function ServiceOrderDetailPage() {
         name: i.name,
         qty: String(i.qty),
         unitPrice: String(i.price),
+        costPrice: String(i.costPrice ?? ''),
       })) || []
     )
     setEditing(true)
@@ -226,10 +227,12 @@ export function ServiceOrderDetailPage() {
         name: i.name,
         qty: Number(i.qty) || 1,
         price: Number(i.unitPrice) || 0,
+        costPrice: Number(i.costPrice) || 0,
         subtotal: (Number(i.qty) || 1) * (Number(i.unitPrice) || 0)
       }))
       const itemsCost = finalItems.reduce((acc, i) => acc + i.subtotal, 0)
       const finalCost = finalItems.length > 0 ? itemsCost : (Number(editCost) || 0)
+      const totalCostPrice = finalItems.reduce((acc, i) => acc + (i.costPrice * i.qty), 0)
 
       await serviceOrderRepository.upsert({
         ...order,
@@ -237,6 +240,7 @@ export function ServiceOrderDetailPage() {
         customerName: customerName,
         description: editDesc.trim(),
         cost: finalCost,
+        costPrice: totalCostPrice,
         items: finalItems.length > 0 ? finalItems : undefined,
         status: editStatus as typeof order.status,
         hasWarranty: editHasWarranty,
@@ -432,8 +436,9 @@ export function ServiceOrderDetailPage() {
                       <TableHeader>
                         <TableRow className="bg-muted/40">
                           <TableHead>{t('common.name')}</TableHead>
-                          <TableHead className="text-right w-20">{t('common.qty')}</TableHead>
+                          <TableHead className="text-right w-24">{t('common.cost_price') || 'Modal'}</TableHead>
                           <TableHead className="text-right w-28">{t('common.price')}</TableHead>
+                          <TableHead className="text-right w-20">{t('common.qty')}</TableHead>
                           <TableHead className="text-right w-28">{t('common.subtotal')}</TableHead>
                           <TableHead className="w-10"></TableHead>
                         </TableRow>
@@ -445,10 +450,13 @@ export function ServiceOrderDetailPage() {
                               <Input value={item.name} onChange={e => { const newItems = [...editItems]; newItems[idx].name = e.target.value; setEditItems(newItems) }} placeholder={t('service_orders.item_name_placeholder')} className="h-8 text-sm" />
                             </TableCell>
                             <TableCell className="py-1.5 px-2">
-                              <Input value={item.qty} onChange={e => { const newItems = [...editItems]; newItems[idx].qty = e.target.value; setEditItems(newItems) }} inputMode="numeric" className="h-8 text-sm text-right" />
+                              <Input value={item.costPrice} onChange={e => { const newItems = [...editItems]; newItems[idx].costPrice = e.target.value; setEditItems(newItems) }} inputMode="numeric" placeholder="0" className="h-8 text-sm text-right" />
                             </TableCell>
                             <TableCell className="py-1.5 px-2">
                               <Input value={item.unitPrice} onChange={e => { const newItems = [...editItems]; newItems[idx].unitPrice = e.target.value; setEditItems(newItems) }} inputMode="numeric" className="h-8 text-sm text-right" />
+                            </TableCell>
+                            <TableCell className="py-1.5 px-2">
+                              <Input value={item.qty} onChange={e => { const newItems = [...editItems]; newItems[idx].qty = e.target.value; setEditItems(newItems) }} inputMode="numeric" className="h-8 text-sm text-right" />
                             </TableCell>
                             <TableCell className="py-1.5 px-3 text-right font-medium">{(Number(item.qty) || 0) * (Number(item.unitPrice) || 0) > 0 ? formatCurrency((Number(item.qty) || 0) * (Number(item.unitPrice) || 0)) : '-'}</TableCell>
                             <TableCell className="py-1.5 px-2">
@@ -473,14 +481,18 @@ export function ServiceOrderDetailPage() {
                             </Button>
                           </div>
                           <Input value={item.name} onChange={e => { const newItems = [...editItems]; newItems[idx].name = e.target.value; setEditItems(newItems) }} placeholder={t('service_orders.item_name_placeholder')} className="h-8 text-sm" />
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-3 gap-2">
                             <div className="flex flex-col gap-1">
-                              <span className="text-xs text-muted-foreground">{t('common.qty')}</span>
-                              <Input value={item.qty} onChange={e => { const newItems = [...editItems]; newItems[idx].qty = e.target.value; setEditItems(newItems) }} inputMode="numeric" className="h-8 text-sm" />
+                              <span className="text-xs text-muted-foreground">{t('common.cost_price') || 'Modal'}</span>
+                              <Input value={item.costPrice} onChange={e => { const newItems = [...editItems]; newItems[idx].costPrice = e.target.value; setEditItems(newItems) }} inputMode="numeric" placeholder="0" className="h-8 text-sm" />
                             </div>
                             <div className="flex flex-col gap-1">
                               <span className="text-xs text-muted-foreground">{t('common.price')}</span>
                               <Input value={item.unitPrice} onChange={e => { const newItems = [...editItems]; newItems[idx].unitPrice = e.target.value; setEditItems(newItems) }} inputMode="numeric" className="h-8 text-sm" />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <span className="text-xs text-muted-foreground">{t('common.qty')}</span>
+                              <Input value={item.qty} onChange={e => { const newItems = [...editItems]; newItems[idx].qty = e.target.value; setEditItems(newItems) }} inputMode="numeric" className="h-8 text-sm" />
                             </div>
                           </div>
                           <div className="flex justify-between items-center pt-1">
@@ -521,7 +533,7 @@ export function ServiceOrderDetailPage() {
                               size="sm"
                               variant="outline"
                               onClick={() => {
-                                setEditItems(prev => [...prev, { id: crypto.randomUUID(), name: p.name, qty: '1', unitPrice: String(p.price) }])
+                                setEditItems(prev => [...prev, { id: crypto.randomUUID(), name: p.name, qty: '1', unitPrice: String(p.price), costPrice: String(p.costPrice ?? '') }])
                                 toast.success(t('service_orders.item_added', { name: p.name }))
                                 setIsProductModalOpen(false)
                               }}
@@ -536,7 +548,7 @@ export function ServiceOrderDetailPage() {
                       </div>
                       <DialogFooter>
                         <Button variant="secondary" className="w-full" onClick={() => {
-                          setEditItems(prev => [...prev, { id: crypto.randomUUID(), name: '', qty: '1', unitPrice: '' }])
+                          setEditItems(prev => [...prev, { id: crypto.randomUUID(), name: '', qty: '1', unitPrice: '', costPrice: '' }])
                           setIsProductModalOpen(false)
                         }}>
                           {t('service_orders.add_manual_item')}
@@ -554,7 +566,10 @@ export function ServiceOrderDetailPage() {
                       <div key={item.productId || crypto.randomUUID()} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0">
                         <div>
                           <p className="font-medium text-sm">{item.name}</p>
-                          <p className="text-xs text-muted-foreground">{formatCurrency(item.price)} x {item.qty}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatCurrency(item.price)} x {item.qty}
+                            {item.costPrice ? ` · Modal: ${formatCurrency(item.costPrice)}` : ''}
+                          </p>
                         </div>
                         <p className="font-semibold text-sm">{formatCurrency(item.subtotal)}</p>
                       </div>

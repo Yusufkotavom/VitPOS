@@ -45,8 +45,8 @@ function statusTone(status: string) {
   return 'neutral'
 }
 
-function displayStock(product: { type: string; stock: number; manageStock?: boolean }) {
-  if (product.type === 'Jasa' || product.manageStock === false) return 'Unlimited'
+function displayStock(product: { type: string; stock: number; manageStock?: boolean }, t: (key: string) => string) {
+  if (product.type === 'Jasa' || product.manageStock === false) return t('products.unlimited') || 'Unlimited'
   return `${product.stock} pcs`
 }
 
@@ -203,7 +203,7 @@ export function ProductsPage() {
                 }
                 return row.wholesalePrice ? `${formatCurrency(row.price)} / Grosir ${formatCurrency(row.wholesalePrice)}` : formatCurrency(row.price)
               }},
-              { key: 'stock', header: 'Stok', render: (row) => displayStock(row) },
+              { key: 'stock', header: t('common.stock'), render: (row) => displayStock(row, t) },
               { key: 'status', header: t('common.status'), render: (row) => <StatusBadge label={row.status} tone={statusTone(row.status)} /> },
               { key: 'actions', header: t('common.actions'), render: (row) => <ProductCrudActions product={row} /> },
             ]}
@@ -238,7 +238,7 @@ export function ProductsPage() {
                       </div>
                       <div className="flex flex-col bg-muted/30 p-2 rounded-lg col-span-2">
                         <span className="text-muted-foreground text-xs mb-0.5">{t('inventory.stock_per_warehouse') || 'Sisa Stok'}</span>
-                        <span className="font-medium">{displayStock(row)}</span>
+                        <span className="font-medium">{displayStock(row, t)}</span>
                       </div>
                     </div>
                     <div className="pt-2 border-t flex justify-end">

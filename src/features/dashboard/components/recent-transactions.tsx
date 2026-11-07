@@ -1,25 +1,27 @@
+import { useTranslation } from 'react-i18next'
 import { useDashboardStats } from '@/features/dashboard/hooks/use-dashboard-stats'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 
 export function RecentTransactions() {
+  const { t } = useTranslation()
   const { dashboardTransactions } = useDashboardStats()
 
   return (
     <Card className="shadow-sm">
       <CardHeader>
-        <CardTitle className="text-lg">Transaksi Terbaru</CardTitle>
+        <CardTitle className="text-lg">{t('dashboard.recent_transactions')}</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30">
-                <TableHead className="w-[120px]">ID Pesanan</TableHead>
-                <TableHead>Pelanggan</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right w-[100px]">Status</TableHead>
+                <TableHead className="w-[120px]">{t('dashboard.order_id')}</TableHead>
+                <TableHead>{t('common.customer')}</TableHead>
+                <TableHead className="text-right">{t('common.total')}</TableHead>
+                <TableHead className="text-right w-[100px]">{t('common.status')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -38,7 +40,7 @@ export function RecentTransactions() {
               {dashboardTransactions.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                    Belum ada transaksi hari ini
+                    {t('dashboard.no_transactions_today')}
                   </TableCell>
                 </TableRow>
               )}
