@@ -14,11 +14,12 @@ import {
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { apiGet } from '@/services/api/client'
 import { localDb } from '@/services/local-db/client'
 
 export function RegisterPage() {
   const navigate = useNavigate()
-  const { setAuth } = useAuthStore()
+  const { setAuth, logout } = useAuthStore()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -41,10 +42,26 @@ export function RegisterPage() {
     try {
       const existingUser = await localDb.users.where('email').equals(email).first()
       if (existingUser) {
-        setError('Email sudah digunakan')
+        setError('Email sudah digunakan di perangkat ini. Silakan login.')
         setLoading(false)
         return
       }
+
+      try {
+        const cloudCheck = await apiGet<{ ok: boolean; exists: boolean }>(
+          `/auth/check-email?email=${encodeURIComponent(email)}`
+        )
+        if (cloudCheck?.exists) {
+          setError('Email sudah terdaftar di sistem cloud. Silakan login.')
+          setLoading(false)
+          return
+        }
+      } catch {
+        // Mode offline atau pengecekan cloud gagal, lanjutkan pendaftaran lokal
+      }
+
+      // Pastikan session lama (seperti akun demo atau user sebelumnya) dibersihkan tuntas
+      logout()
 
       const userId = crypto.randomUUID()
       const newUser = {
@@ -57,7 +74,7 @@ export function RegisterPage() {
       }
 
       await localDb.users.add(newUser)
-      setAuth(newUser)
+      setAuth(newUser, null)
 
       navigate('/onboarding')
     } catch (err) {

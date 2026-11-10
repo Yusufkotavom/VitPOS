@@ -94,6 +94,15 @@ function userResponse(user: AuthUser) {
   }
 }
 
+authRoutes.get('/check-email', async (c) => {
+  const email = c.req.query('email')?.trim().toLowerCase()
+  if (!email) {
+    return c.json({ ok: false, message: 'email required' }, 400)
+  }
+  const existingUser = await findUserByEmail(db, email)
+  return c.json({ ok: true, exists: !!existingUser })
+})
+
 authRoutes.post('/register', async (c) => {
   const body = await c.req.json().catch(() => null) as {
     name?: string

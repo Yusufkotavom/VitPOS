@@ -25,10 +25,14 @@ export const useAuthStore = create<AuthState>()(
       activeTenant: null,
       token: null,
       setAuth: (user, token) =>
-        set((state) => ({
-          currentUser: user,
-          token: token !== undefined ? token : state.token,
-        })),
+        set((state) => {
+          const isSameUser = state.currentUser?.id === user.id
+          return {
+            currentUser: user,
+            token: token !== undefined ? token : (isSameUser ? state.token : null),
+            activeTenant: isSameUser ? state.activeTenant : null,
+          }
+        }),
       setToken: (token) => set({ token }),
       setActiveTenant: (tenant, role) => set({ activeTenant: { ...tenant, role } }),
       isAuthenticated: () => get().currentUser !== null,

@@ -241,4 +241,30 @@ describe('Commercial Security & Multi-tenant Gating', () => {
     expect(createBody.ok).toBe(false)
     expect(createBody.code).toBe('TENANT_LIMIT_REACHED')
   })
+
+  it('checks email availability via GET /api/v1/auth/check-email', async () => {
+    const checkEmail = `check-${crypto.randomUUID()}@test.id`
+    const now = new Date()
+    await db.insert(users).values({
+      id: crypto.randomUUID(),
+      email: checkEmail,
+      name: 'Check Email Test',
+      passwordHash: 'dummy',
+      role: 'user',
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    const existingRes = await app.request(`/api/v1/auth/check-email?email=${checkEmail}`)
+    expect(existingRes.status).toBe(200)
+    const existingBody = await existingRes.json()
+    expect(existingBody.ok).toBe(true)
+    expect(existingBody.exists).toBe(true)
+
+    const nonExistingRes = await app.request('/api/v1/auth/check-email?email=notfound999@domain.id')
+    expect(nonExistingRes.status).toBe(200)
+    const nonExistingBody = await nonExistingRes.json()
+    expect(nonExistingBody.ok).toBe(true)
+    expect(nonExistingBody.exists).toBe(false)
+  })
 })

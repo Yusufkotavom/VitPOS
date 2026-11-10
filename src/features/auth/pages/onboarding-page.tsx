@@ -134,13 +134,31 @@ export function OnboardingPage() {
     if (!currentUser || currentUser.role === 'platform_admin') return
 
     let mounted = true
-    apiGet<{ ok: boolean; canCreate: boolean; ownedCount: number; maxAllowed: number; message?: string }>('/tenants/check-limit')
-      .then((res) => {
+    async function checkTenantLimit() {
+      // Pengecekan limit unit usaha HANYA berlaku jika user sudah memiliki usaha sebelumnya (ingin menambah usaha ke-2, dst).
+      // Pendaftar baru (sign up / onboarding pertama) belum memiliki usaha sehingga tidak boleh diblokir oleh limit usaha.
+      const localMembershipCount = currentUser
+        ? await localDb.tenantMembers.where('userId').equals(currentUser.id).count()
+        : 0
+
+      if (localMembershipCount === 0) {
+        return
+      }
+
+      const token = useAuthStore.getState().token
+      if (!token) return
+
+      try {
+        const res = await apiGet<{ ok: boolean; canCreate: boolean; ownedCount: number; maxAllowed: number; message?: string }>('/tenants/check-limit')
         if (mounted && res?.ok && !res.canCreate) {
           setLimitStatus({ canCreate: false, message: res.message })
         }
-      })
-      .catch(() => {})
+      } catch {
+        // Mode offline atau jaringan tidak tersedia diabaikan
+      }
+    }
+
+    checkTenantLimit()
 
     return () => {
       mounted = false
