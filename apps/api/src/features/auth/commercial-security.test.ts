@@ -179,6 +179,71 @@ describe('Commercial Security & Multi-tenant Gating', () => {
     expect(pushBody.code).toBe('SUBSCRIPTION_EXPIRED')
   })
 
+  it('allows sync push for cancelled tenant whose planValidUntil is still in the future', async () => {
+    const tenantId = crypto.randomUUID()
+    const userId = crypto.randomUUID()
+    const now = new Date()
+    const futureDate = new Date(now.getTime() + 14 * 86400000)
+
+    await db.insert(users).values({
+      id: userId,
+      email: `cancelled-active-${userId}@test.id`,
+      name: 'Cancelled Active User',
+      passwordHash: 'hash',
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    await db.insert(tenants).values({
+      id: tenantId,
+      name: 'Cancelled Active Tenant',
+      planCode: 'Go',
+      subscriptionStatus: 'cancelled',
+      planValidUntil: futureDate,
+      maxBranches: 1,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    await db.insert(tenantMembers).values({
+      id: crypto.randomUUID(),
+      tenantId,
+      userId,
+      role: 'owner',
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    const token = await createAccessToken({ id: userId, email: `cancelled-active-${userId}@test.id` })
+
+    const pushRes = await app.request('/api/v1/sync/push', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        tenantId,
+        deviceId: 'dev-1',
+        mutations: [
+          {
+            clientMutationId: crypto.randomUUID(),
+            entityType: 'customer',
+            entityId: crypto.randomUUID(),
+            mutationType: 'create',
+            payload: { name: 'Budi Test' },
+          },
+        ],
+      }),
+    })
+
+    expect(pushRes.status).toBe(200)
+    const pushBody = await pushRes.json()
+    expect(pushBody.ok).toBe(true)
+  })
+
   it('enforces tenant/business limits when user already owns max allowed tenants', async () => {
     const tenantId = crypto.randomUUID()
     const userId = crypto.randomUUID()

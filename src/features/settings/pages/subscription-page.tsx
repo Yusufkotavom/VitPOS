@@ -40,7 +40,7 @@ function formatPeriod(period: 'monthly' | 'yearly') {
   return period === 'yearly' ? 'Tahunan' : 'Bulanan'
 }
 
-function statusLabel(status: string) {
+function statusLabel(status: string, daysLeft?: number | null) {
   switch (status) {
     case 'trial': return 'Masa Percobaan'
     case 'active': return 'Aktif'
@@ -49,13 +49,16 @@ function statusLabel(status: string) {
     case 'expired': return 'Kedaluwarsa'
     case 'past_due': return 'Tertunggak'
     case 'suspended': return 'Ditangguhkan'
-    case 'cancelled': return 'Dibatalkan'
+    case 'cancelled':
+      return daysLeft !== null && daysLeft !== undefined && daysLeft >= 0
+        ? 'Dibatalkan (Akses Masih Aktif)'
+        : 'Dibatalkan'
     case 'free': return 'Free Aktif'
     default: return status
   }
 }
 
-function statusTone(status: string) {
+function statusTone(status: string, daysLeft?: number | null) {
   switch (status) {
     case 'active':
     case 'free':
@@ -70,8 +73,11 @@ function statusTone(status: string) {
     case 'expired':
       return 'bg-orange-100 text-orange-800 border-orange-300'
     case 'suspended':
-    case 'cancelled':
       return 'bg-rose-100 text-rose-800 border-rose-300'
+    case 'cancelled':
+      return daysLeft !== null && daysLeft !== undefined && daysLeft >= 0
+        ? 'bg-amber-100 text-amber-800 border-amber-300'
+        : 'bg-rose-100 text-rose-800 border-rose-300'
     default:
       return 'bg-muted text-muted-foreground'
   }
@@ -323,8 +329,8 @@ export function SubscriptionPage() {
                   <CardTitle className="text-lg">Status Paket Aktif</CardTitle>
                   <CardDescription>Detail paket langganan dan kapasitas yang sedang digunakan.</CardDescription>
                 </div>
-                <Badge variant="outline" className={`w-fit py-1 px-3 text-xs font-semibold ${statusTone(subscription.status)}`}>
-                  {statusLabel(subscription.status)}
+                <Badge variant="outline" className={`w-fit py-1 px-3 text-xs font-semibold ${statusTone(subscription.status, subscription.daysLeft)}`}>
+                  {statusLabel(subscription.status, subscription.daysLeft)}
                 </Badge>
               </div>
             </CardHeader>
@@ -377,6 +383,28 @@ export function SubscriptionPage() {
                   <p className="text-xs text-muted-foreground">Penyimpanan katalog & gambar</p>
                 </div>
               </div>
+
+              {subscription.status === 'cancelled' && subscription.daysLeft !== null && subscription.daysLeft >= 0 && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-900 flex items-start gap-3">
+                  <AlertCircle className="size-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-sm text-foreground">Langganan Telah Dibatalkan</p>
+                    <p className="text-muted-foreground leading-relaxed">
+                      Perpanjangan otomatis telah dinonaktifkan. Seluruh akses transaksi kasir POS, laporan, dan operasional Anda <strong className="text-foreground">tetap aktif sepenuhnya</strong> sampai{' '}
+                      <strong className="text-foreground">
+                        {subscription.planValidUntil
+                          ? new Date(subscription.planValidUntil).toLocaleDateString('id-ID', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric',
+                            })
+                          : 'akhir periode'}
+                      </strong>{' '}
+                      ({subscription.daysLeft} hari tersisa). Anda dapat memperpanjang kembali kapan saja.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-2 pt-2 border-t">

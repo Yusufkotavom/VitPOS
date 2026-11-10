@@ -599,12 +599,16 @@ syncRoutes.post('/push', async (c) => {
 
   const now = new Date()
 
-  // Subscription hard gating: block sync writes if subscription is suspended or cancelled
-  if (authResult.subscriptionStatus === 'suspended' || authResult.subscriptionStatus === 'cancelled') {
+  // Subscription hard gating: block sync writes if subscription is suspended, or cancelled and past valid until
+  const isCancelledAndExpired =
+    authResult.subscriptionStatus === 'cancelled' &&
+    (!authResult.planValidUntil || new Date(authResult.planValidUntil).getTime() < now.getTime())
+
+  if (authResult.subscriptionStatus === 'suspended' || isCancelledAndExpired) {
     return c.json({
       ok: false,
       code: 'SUBSCRIPTION_EXPIRED',
-      message: 'Langganan unit usaha Anda ditangguhkan atau dibatalkan. Silakan perpanjang paket langganan untuk menyinkronkan data.',
+      message: 'Langganan unit usaha Anda ditangguhkan atau telah berakhir. Silakan perpanjang paket langganan untuk menyinkronkan data.',
     }, 402)
   }
 

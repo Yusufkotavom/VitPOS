@@ -54,8 +54,11 @@ export function useSubscription(): SubscriptionState {
     const warningKind: 'expiring' | 'expired' | null = daysLeft !== null && daysLeft < 0 ? 'expired' : isExpiringSoon ? 'expiring' : null
 
     let isEnforced = false
-    if (effectiveStatus === 'suspended' || effectiveStatus === 'cancelled') {
+    if (effectiveStatus === 'suspended') {
       isEnforced = true
+    } else if (effectiveStatus === 'cancelled') {
+      // Dibatalkan hanya memblokir jika masa aktif (planValidUntil) sudah lewat
+      isEnforced = !validUntilDate || isExpired
     }
 
     return {

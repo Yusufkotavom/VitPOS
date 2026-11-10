@@ -3301,11 +3301,12 @@ syncRoutes.post("/push", async (c) => {
     return c.json({ ok: false, message: authResult.message, code: authResult.code }, authResult.status);
   }
   const now = /* @__PURE__ */ new Date();
-  if (authResult.subscriptionStatus === "suspended" || authResult.subscriptionStatus === "cancelled") {
+  const isCancelledAndExpired = authResult.subscriptionStatus === "cancelled" && (!authResult.planValidUntil || new Date(authResult.planValidUntil).getTime() < now.getTime());
+  if (authResult.subscriptionStatus === "suspended" || isCancelledAndExpired) {
     return c.json({
       ok: false,
       code: "SUBSCRIPTION_EXPIRED",
-      message: "Langganan unit usaha Anda ditangguhkan atau dibatalkan. Silakan perpanjang paket langganan untuk menyinkronkan data."
+      message: "Langganan unit usaha Anda ditangguhkan atau telah berakhir. Silakan perpanjang paket langganan untuk menyinkronkan data."
     }, 402);
   }
   if (authResult.planValidUntil && new Date(authResult.planValidUntil).getTime() < now.getTime() && authResult.subscriptionStatus !== "active" && !authResult.planCode?.startsWith("free")) {

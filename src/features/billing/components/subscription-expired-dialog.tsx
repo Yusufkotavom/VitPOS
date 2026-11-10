@@ -45,7 +45,8 @@ function buildWhatsappUrl(value?: string | null) {
 
 export function SubscriptionExpiredDialog({ open, status, planName, planValidUntil, warningKind = 'expired', tenantId }: Props) {
   const navigate = useNavigate()
-  const isHardGated = warningKind === 'expired' || status === 'suspended' || status === 'cancelled'
+  const isPastValidUntil = !planValidUntil || new Date(planValidUntil).getTime() < Date.now()
+  const isHardGated = warningKind === 'expired' || status === 'suspended' || (status === 'cancelled' && isPastValidUntil)
   const [dismissed, setDismissed] = useState(() => {
     try {
       return typeof window !== 'undefined' && window.localStorage.getItem(dismissalKey(tenantId)) === '1'
@@ -86,11 +87,17 @@ export function SubscriptionExpiredDialog({ open, status, planName, planValidUnt
             <AlertTriangle className="size-6" />
           </div>
           <DialogTitle className="text-center">
-            {warningKind === 'expiring' ? 'Paket Anda akan segera berakhir' : 'Paket Anda sudah berakhir'}
+            {warningKind === 'expiring'
+              ? status === 'cancelled'
+                ? 'Langganan Telah Dibatalkan'
+                : 'Paket Anda akan segera berakhir'
+              : 'Paket Anda sudah berakhir'}
           </DialogTitle>
           <DialogDescription className="text-center">
             {warningKind === 'expiring'
-              ? 'Silakan perpanjang paket agar layanan tetap aman dipakai tanpa gangguan.'
+              ? status === 'cancelled'
+                ? `Akses transaksi dan operasional usaha Anda tetap aktif sampai ${formatDate(planValidUntil)}.`
+                : 'Silakan perpanjang paket agar layanan tetap aman dipakai tanpa gangguan.'
               : 'Silakan perpanjang paket Anda. Data tetap aman dan Anda masih bisa membuka aplikasi.'}
           </DialogDescription>
         </DialogHeader>

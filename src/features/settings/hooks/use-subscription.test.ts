@@ -99,7 +99,7 @@ describe('useSubscription', () => {
     expect(result.current.daysLeft).toBeGreaterThanOrEqual(0)
   })
 
-  it('enforces suspended and cancelled regardless of planValidUntil', () => {
+  it('enforces suspended immediately regardless of planValidUntil', () => {
     useAuthStore.getState().setAuth({ id: 'u1', email: 'a@b.id', name: 'A', passwordHash: '', createdAt: '', updatedAt: '' })
     useAuthStore.getState().setActiveTenant(
       {
@@ -120,5 +120,53 @@ describe('useSubscription', () => {
 
     const { result } = renderHook(() => useSubscription())
     expect(result.current.isEnforced).toBe(true)
+  })
+
+  it('keeps cancelled subscription active and not enforced until planValidUntil expires', () => {
+    useAuthStore.getState().setAuth({ id: 'u1', email: 'a@b.id', name: 'A', passwordHash: '', createdAt: '', updatedAt: '' })
+    useAuthStore.getState().setActiveTenant(
+      {
+        id: 't1',
+        name: 'T',
+        type: '',
+        phone: '',
+        planCode: 'starter-monthly',
+        subscriptionStatus: 'cancelled',
+        planValidUntil: tomorrowIso(),
+        billingPeriod: 'monthly',
+        isActive: true,
+        createdAt: '',
+        updatedAt: '',
+      },
+      'owner',
+    )
+
+    const { result } = renderHook(() => useSubscription())
+    expect(result.current.isEnforced).toBe(false)
+    expect(result.current.isExpired).toBe(false)
+  })
+
+  it('enforces cancelled subscription once planValidUntil has expired', () => {
+    useAuthStore.getState().setAuth({ id: 'u1', email: 'a@b.id', name: 'A', passwordHash: '', createdAt: '', updatedAt: '' })
+    useAuthStore.getState().setActiveTenant(
+      {
+        id: 't1',
+        name: 'T',
+        type: '',
+        phone: '',
+        planCode: 'starter-monthly',
+        subscriptionStatus: 'cancelled',
+        planValidUntil: yesterdayIso(),
+        billingPeriod: 'monthly',
+        isActive: true,
+        createdAt: '',
+        updatedAt: '',
+      },
+      'owner',
+    )
+
+    const { result } = renderHook(() => useSubscription())
+    expect(result.current.isEnforced).toBe(true)
+    expect(result.current.isExpired).toBe(true)
   })
 })
