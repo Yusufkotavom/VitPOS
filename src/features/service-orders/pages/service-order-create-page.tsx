@@ -1,66 +1,73 @@
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useState } from 'react'
-import { Plus, Minus, Trash2, Search, PlusCircle } from 'lucide-react'
-import { toast } from 'sonner'
-import { useLiveQuery } from '@/shared/hooks/use-live-query'
+import { format } from 'date-fns'
+import { id as localeId } from 'date-fns/locale'
+import { ArrowLeft, CalendarIcon, Check, Plus, Sparkles, UserPlus } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
-import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from '@/components/ui/combobox'
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Field, FieldGroup } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Card } from '@/components/ui/card'
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
+import { Field, FieldGroup } from '@/components/ui/field'
+import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from '@/components/ui/combobox'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { formatCurrency } from '@/lib/format-currency'
-import { format } from 'date-fns'
-import { id as localeId } from 'date-fns/locale'
-import { CalendarIcon } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { StatusBadge } from '@/shared/components/display/status-badge'
+import { cn } from '@/lib/utils'
+import { formatCurrency } from '@/lib/format-currency'
+import { useMediaQuery } from '@/hooks/use-media-query'
+import { useLiveQuery } from '@/shared/hooks/use-live-query'
 import { localDb } from '@/services/local-db/client'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
-import { useServiceOrderCreateStore } from '@/features/service-orders/stores/service-order-create-store'
-import { SocPaymentSummary } from '@/features/service-orders/components/soc-payment-summary'
-import { customerFormSchema, customerInitialValues, customerStatusOptions, type CustomerFormValues, mapCustomerFormToRecord } from '@/features/customers/schemas/customer-form-schema'
-import { createCustomerId } from '@/features/catalog/lib/entity-id'
 import { customerRepository } from '@/services/local-db/repository'
+import { createCustomerId } from '@/features/catalog/lib/entity-id'
+import { customerFormSchema, customerInitialValues, customerStatusOptions, mapCustomerFormToRecord, type CustomerFormValues } from '@/features/customers/schemas/customer-form-schema'
+import { useServiceOrderCreateStore } from '@/features/service-orders/stores/service-order-create-store'
+import { useServiceVertical } from '@/features/service-orders/hooks/use-service-vertical'
+import { JobLineEditor } from '@/features/service-orders/components/job-line-editor'
+import { JobCatalogPicker } from '@/features/service-orders/components/job-catalog-picker'
+import { SocPaymentSummary } from '@/features/service-orders/components/soc-payment-summary'
+import { ServiceSuccessFlow, type ServiceSuccessMeta } from '@/features/service-orders/components/service-success-flow'
+import { sumJobLines } from '@/features/service-orders/lib/job-lines'
+import { saveJobLineAsCatalogService } from '@/features/service-orders/lib/save-line-as-service'
+import { isJobOverdue } from '@/features/service-orders/lib/warranty'
+import type { JobPriority } from '@/services/local-db/schema'
+import type { PosOrderSummary } from '@/features/pos/types/pos-order.types'
 
 export function ServiceOrderCreatePage() {
   const { t } = useTranslation()
   const store = useServiceOrderCreateStore()
+  const vertical = useServiceVertical()
   const tenantId = requireActiveTenantId()
+  const isDesktop = useMediaQuery('(min-width: 768px)')
 
-  const [search, setSearch] = useState('')
-  const [isProductModalOpen, setIsProductModalOpen] = useState(false)
+  const [isCatalogOpen, setIsCatalogOpen] = useState(false)
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false)
+  const [successOrder, setSuccessOrder] = useState<PosOrderSummary | null>(null)
+  const [successMeta, setSuccessMeta] = useState<ServiceSuccessMeta | null>(null)
 
   const customers = useLiveQuery(() => localDb.customers.where('tenantId').equals(tenantId).toArray(), [tenantId], [])
-  const products = useLiveQuery(() => localDb.products.where('tenantId').equals(tenantId).toArray(), [tenantId], [])
-
-  const activeCustomers = (customers ?? []).filter(c => c.status === 'Aktif')
+  const activeCustomers = useMemo(() => (customers ?? []).filter((customer) => customer.status === 'Aktif'), [customers])
 
   const addCustomerForm = useForm<CustomerFormValues>({
     resolver: zodResolver(customerFormSchema),
     defaultValues: { ...customerInitialValues, receivable: '0', orders: '0' },
   })
 
-  const filteredProducts = products.filter(p => {
-    if (p.status !== 'Aktif') return false
-    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false
-    return true
-  })
-
-  const totals = {
-    subtotal: store.items.reduce((sum, item) => sum + item.subtotal, 0),
-  }
+  const subtotal = sumJobLines(store.lines)
+  const total = Math.max(subtotal - store.discount, 0)
 
   function handleCustomerInputChange(name: string) {
-    const match = activeCustomers.find(c => c.name.toLowerCase() === name.toLowerCase())
+    const match = activeCustomers.find((customer) => customer.name.toLowerCase() === name.toLowerCase())
     if (match) {
       store.setCustomer(match.name, match.id)
     } else if (name === '') {
@@ -83,32 +90,132 @@ export function ServiceOrderCreatePage() {
     }
   }
 
+  function handleQuickService(service: { label: string; complaint: string }) {
+    store.setComplaint(service.complaint)
+    if (!store.description.trim()) store.setDescription(service.complaint)
+    store.addCustomLine({ name: service.label })
+  }
+
+  function handlePickProduct(product: Parameters<typeof store.addProduct>[0]) {
+    store.addProduct(product)
+    toast.success(t('service_orders.item_added', { name: product.name }))
+  }
+
   function handleOpenPayment() {
-    if (!store.description.trim()) {
+    if (!store.complaint.trim() && !store.description.trim()) {
       toast.error(t('service_orders.description_required'))
+      return
+    }
+    if (store.lines.length === 0) {
+      toast.error(t('service_orders.lines_required'))
+      return
+    }
+    if (store.lines.some((line) => !line.name.trim())) {
+      toast.error(t('service_orders.line_name_required'))
+      return
+    }
+    if (store.lines.some((line) => !Number.isFinite(line.qty) || line.qty <= 0)) {
+      toast.error(t('service_orders.line_qty_required'))
       return
     }
     if (!store.customerName || store.customerName.trim() === '') {
       toast.error(t('service_orders.customer_required'))
-      setTimeout(() => {
-        const input = document.getElementById('soc-customer-select')
-        if (input) {
-          input.focus()
-          input.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        }
-      }, 100)
       return
     }
     setIsPaymentOpen(true)
   }
 
   const addCustomerErrors = addCustomerForm.formState.errors
+  const isOverdue = useMemo(
+    () => isJobOverdue(store.estimatedCompletion),
+    [store.estimatedCompletion],
+  )
+
+  const summaryPanel = (
+    <div className="space-y-4">
+      <div className="space-y-2 text-sm">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">{t('common.customer')}</span>
+          <span className="font-medium">{store.customerName || 'Umum'}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">{vertical.jobCategoryLabel}</span>
+          <span className="font-medium">{store.jobCategory || '-'}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">{t('service_orders.device')}</span>
+          <span className="max-w-[60%] truncate text-right font-medium">
+            {[store.deviceBrand, store.deviceModel].filter(Boolean).join(' ') || '-'}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">{t('service_orders.estimated_completion')}</span>
+          <span className={cn('font-medium', isOverdue && 'text-destructive')}>
+            {store.estimatedCompletion ? format(new Date(store.estimatedCompletion), 'd MMM yyyy', { locale: localeId }) : '-'}
+          </span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground">{t('common.status')}</span>
+          <StatusBadge label={vertical.statusFlow[0] ?? 'Diterima'} tone="warning" />
+        </div>
+      </div>
+
+      <div className="space-y-2 border-t pt-3 text-sm">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">{t('common.subtotal')}</span>
+          <span>{formatCurrency(subtotal)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-muted-foreground">{t('common.discount')}</span>
+          <Input
+            inputMode="numeric"
+            value={store.discount || ''}
+            onChange={(event) => store.setDiscount(Number(event.target.value.replace(/\D/g, '')) || 0)}
+            className="h-8 w-28 text-right"
+            placeholder="0"
+            aria-label={t('common.discount')}
+          />
+        </div>
+        <div className="flex items-end justify-between pt-1">
+          <span className="font-medium">{t('common.total')}</span>
+          <span className="text-2xl font-bold text-primary">{formatCurrency(total)}</span>
+        </div>
+      </div>
+
+      <Button size="lg" className="h-12 w-full" onClick={handleOpenPayment}>
+        <Check data-icon="inline-start" />
+        {t('service_orders.create_order')}
+      </Button>
+      <p className="text-center text-[11px] text-muted-foreground">{t('service_orders.save_local_description')}</p>
+    </div>
+  )
 
   return (
-    <div className="flex min-h-[100dvh] flex-col bg-muted/20 relative pb-20">
-      <div className="mx-auto max-w-3xl w-full px-4 pt-4">
-          <div className="flex flex-wrap items-end gap-4 px-4 py-3">
-            <div className="flex-1 min-w-[200px] space-y-1">
+    <div className="min-h-[100dvh] bg-muted/20 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8">
+      <header className="border-b bg-background">
+        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+          <Button variant="ghost" size="icon" asChild className="h-8 w-8">
+            <Link to="/service-orders" aria-label={t('common.back')}>
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-base font-semibold">{t('service_orders.create_order')}</h1>
+            <p className="truncate text-xs text-muted-foreground">{vertical.label}</p>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto grid max-w-6xl gap-4 p-4 lg:grid-cols-[1fr_320px]">
+        <div className="space-y-4">
+          {/* 1. Pelanggan & Perangkat */}
+          <Card className="gap-4 p-4">
+            <div className="flex items-center gap-2">
+              <span className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">1</span>
+              <h2 className="text-sm font-semibold">{t('service_orders.section_customer_device')}</h2>
+            </div>
+
+            <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">{t('common.customer')}</Label>
               <div className="flex items-center gap-2">
                 <div className="flex-1">
@@ -133,247 +240,319 @@ export function ServiceOrderCreatePage() {
                     </ComboboxContent>
                   </Combobox>
                 </div>
-                <Button variant="outline" className="h-9 w-9 shrink-0" onClick={() => setIsAddCustomerOpen(true)}>
-                  <Plus className="size-4" />
+                <Button variant="outline" size="icon" className="size-11 shrink-0" onClick={() => setIsAddCustomerOpen(true)} aria-label={t('customers.add_new')}>
+                  <UserPlus className="size-4" />
                 </Button>
               </div>
             </div>
 
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">{t('service_orders.estimated_completion')}</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={cn(
-                      "gap-1.5 font-normal w-[140px] justify-start",
-                      !store.estimatedCompletion && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="h-3.5 w-3.5" />
-                    {store.estimatedCompletion
-                      ? format(new Date(store.estimatedCompletion), "d MMM yyyy", { locale: localeId })
-                      : t('common.select_date')}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={store.estimatedCompletion ? new Date(store.estimatedCompletion) : undefined}
-                    onSelect={(date) => store.setEstimatedCompletion(date ? date.toISOString() : undefined)}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="soc-warranty"
-                  className="h-4 w-4 rounded border-gray-300"
-                  checked={store.hasWarranty}
-                  onChange={(e) => store.setHasWarranty(e.target.checked)}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="soc-job-category" className="text-xs text-muted-foreground">{vertical.jobCategoryLabel}</Label>
+                <Input
+                  id="soc-job-category"
+                  value={store.jobCategory}
+                  onChange={(event) => store.setJobCategory(event.target.value)}
+                  placeholder={vertical.jobCategoryPlaceholder}
+                  className="h-10"
                 />
-                <Label htmlFor="soc-warranty" className="text-xs text-muted-foreground cursor-pointer">{t('service_orders.service_warranty')}</Label>
               </div>
-              {store.hasWarranty && (
-                <div className="flex items-center gap-1.5">
-                  <Input
-                    type="number"
-                    min="1"
-                    placeholder={t('service_orders.duration')}
-                    className="h-8 w-20 text-sm"
-                    value={store.warrantyValue}
-                    onChange={(e) => store.setWarrantyValue(e.target.value)}
-                  />
-                  <select
-                    value={store.warrantyUnit}
-                    onChange={(e) => store.setWarrantyUnit(e.target.value as 'hari' | 'bulan' | 'tahun')}
-                    className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring"
+              <div className="space-y-1">
+                <Label htmlFor="soc-priority" className="text-xs text-muted-foreground">{t('service_orders.priority')}</Label>
+                <Select value={store.priority} onValueChange={(value) => store.setPriority(value as JobPriority)}>
+                  <SelectTrigger id="soc-priority" className="h-10 w-full">
+                    <SelectValue placeholder={t('common.select_placeholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(['Normal', 'Tinggi', 'Mendesak'] as JobPriority[]).map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {t(`service_orders.priority_${option.toLowerCase()}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {vertical.intakeFields.map((field) => {
+                const deviceFieldKeys = ['deviceBrand', 'deviceModel', 'deviceSerial', 'accessories'] as const
+                const isDeviceField = (deviceFieldKeys as readonly string[]).includes(field.key)
+                const value = isDeviceField
+                  ? (store[field.key as typeof deviceFieldKeys[number]] ?? '')
+                  : (store.details[field.key] ?? '')
+
+                return (
+                  <div key={field.key} className="space-y-1">
+                    <Label htmlFor={`soc-${field.key}`} className="text-xs text-muted-foreground">{field.label}</Label>
+                    <Input
+                      id={`soc-${field.key}`}
+                      value={value}
+                      onChange={(event) => {
+                        if (isDeviceField) {
+                          store.setDeviceField(field.key as typeof deviceFieldKeys[number], event.target.value)
+                        } else {
+                          store.setDetail(field.key, event.target.value)
+                        }
+                      }}
+                      placeholder={field.placeholder}
+                      className="h-10"
+                    />
+                  </div>
+                )
+              })}
+              <div className="space-y-1">
+                <Label htmlFor="soc-technician" className="text-xs text-muted-foreground">{t('service_orders.technician')}</Label>
+                <Input
+                  id="soc-technician"
+                  value={store.technicianName}
+                  onChange={(event) => store.setTechnicianName(event.target.value)}
+                  placeholder={t('service_orders.technician_placeholder')}
+                  className="h-10"
+                />
+              </div>
+            </div>
+          </Card>
+
+          {/* 2. Keluhan & Pekerjaan */}
+          <Card className="gap-4 p-4">
+            <div className="flex items-center gap-2">
+              <span className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">2</span>
+              <h2 className="text-sm font-semibold">{t('service_orders.section_job')}</h2>
+            </div>
+
+            {vertical.quickServices.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {vertical.quickServices.map((service) => (
+                  <Button
+                    key={service.label}
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    className="gap-1"
+                    onClick={() => handleQuickService(service)}
                   >
-                    <option value="hari">{t('common.days')}</option>
-                    <option value="bulan">{t('common.months')}</option>
-                    <option value="tahun">{t('common.years')}</option>
-                  </select>
-                </div>
-              )}
-            </div>
-            </div>
-          </div>
+                    <Sparkles className="size-3.5" />
+                    {service.label}
+                  </Button>
+                ))}
+              </div>
+            )}
 
-      <main className="flex-1 mx-auto max-w-3xl w-full p-4 space-y-4">
-        <div className="space-y-3">
-          <Label htmlFor="soc-description">{t('service_orders.job_description')}</Label>
-          <Textarea
-            id="soc-description"
-            className="min-h-[80px] resize-none"
-            placeholder={t('service_orders.job_description_placeholder')}
-            value={store.description}
-            onChange={e => store.setDescription(e.target.value)}
-          />
-        </div>
+            <div className="space-y-1">
+              <Label htmlFor="soc-complaint" className="text-xs text-muted-foreground">{vertical.complaintLabel}</Label>
+              <Textarea
+                id="soc-complaint"
+                className="min-h-[76px] resize-none"
+                placeholder={vertical.complaintPlaceholder}
+                value={store.complaint}
+                onChange={(event) => store.setComplaint(event.target.value)}
+              />
+            </div>
 
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-muted-foreground">{t('service_orders.items_and_cost')}</span>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="gap-1.5 text-muted-foreground"
-              onClick={() => store.addCustomItem()}
-            >
-              <PlusCircle className="h-3.5 w-3.5" />
-              {t('service_orders.add_manual_item')}
-            </Button>
-            <Dialog open={isProductModalOpen} onOpenChange={setIsProductModalOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" variant="outline" className="gap-1.5">
-                  <PlusCircle className="h-3.5 w-3.5" />
-                  {t('common.add')}
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col">
-                <DialogHeader>
-                  <DialogTitle>{t('service_orders.select_product_service')}</DialogTitle>
-                </DialogHeader>
-                <div className="relative mt-2">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder={t('service_orders.search_product_service')}
-                    className="pl-8"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+            <div className="space-y-1">
+              <Label htmlFor="soc-diagnosis" className="text-xs text-muted-foreground">{vertical.diagnosisLabel}</Label>
+              <Textarea
+                id="soc-diagnosis"
+                className="min-h-[64px] resize-none"
+                placeholder={t('service_orders.diagnosis_placeholder')}
+                value={store.diagnosis}
+                onChange={(event) => store.setDiagnosis(event.target.value)}
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">{t('service_orders.estimated_completion')}</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn('h-10 w-full justify-start gap-2 font-normal', !store.estimatedCompletion && 'text-muted-foreground')}>
+                      <CalendarIcon className="h-4 w-4" />
+                      {store.estimatedCompletion
+                        ? format(new Date(store.estimatedCompletion), 'd MMM yyyy', { locale: localeId })
+                        : t('common.select_date')}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={store.estimatedCompletion ? new Date(store.estimatedCompletion) : undefined}
+                      onSelect={(date) => store.setEstimatedCompletion(date ? date.toISOString() : undefined)}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">{t('service_orders.service_warranty')}</Label>
+                <div className="flex h-10 items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="soc-warranty"
+                    className="h-4 w-4 rounded border-gray-300"
+                    checked={store.hasWarranty}
+                    onChange={(event) => store.setHasWarranty(event.target.checked)}
                   />
-                </div>
-                <div className="flex-1 overflow-y-auto space-y-1 mt-4">
-                  {filteredProducts.map(p => (
-                    <div key={p.id} className="flex items-center justify-between p-2.5 rounded-lg hover:bg-muted/50">
-                      <div>
-                        <p className="font-medium text-sm">{p.name}</p>
-                        <p className="text-xs text-muted-foreground">{formatCurrency(p.price)}</p>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          store.addItem({ productId: p.id, name: p.name, price: p.price, costPrice: p.costPrice, wholesaleTiers: p.wholesaleTiers })
-                          toast.success(t('service_orders.item_added', { name: p.name }))
-                        }}
-                      >
-                        {t('common.add')}
-                      </Button>
-                    </div>
-                  ))}
-                  {filteredProducts.length === 0 && (
-                    <p className="text-center text-sm text-muted-foreground py-8">{t('service_orders.no_products')}</p>
+                  {store.hasWarranty ? (
+                    <>
+                      <Input
+                        inputMode="numeric"
+                        className="h-10 w-16"
+                        value={store.warrantyValue}
+                        onChange={(event) => store.setWarrantyValue(event.target.value.replace(/\D/g, ''))}
+                        placeholder="30"
+                        aria-label={t('service_orders.warranty_value')}
+                      />
+                      <Select value={store.warrantyUnit} onValueChange={(value) => store.setWarrantyUnit(value as 'hari' | 'bulan' | 'tahun')}>
+                        <SelectTrigger className="h-10 flex-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="hari">{t('common.days')}</SelectItem>
+                          <SelectItem value="bulan">{t('common.months')}</SelectItem>
+                          <SelectItem value="tahun">{t('common.years')}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">{t('common.none')}</span>
                   )}
                 </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          {store.items.length === 0 ? (
-            <div className="py-10 text-center border border-dashed rounded-lg">
-              <p className="text-sm text-muted-foreground">{t('service_orders.no_items')}</p>
+              </div>
             </div>
-          ) : (
-            store.items.map(item => (
-              <div key={item.productId} className="rounded-lg border bg-background p-2.5 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Input
-                    className="h-8 text-sm font-medium flex-1 min-w-0"
-                    placeholder={t('service_orders.item_name_placeholder')}
-                    value={item.name}
-                    onChange={e => store.updateItem(item.productId, { name: e.target.value })}
+
+            <div className="space-y-1">
+              <Label htmlFor="soc-notes" className="text-xs text-muted-foreground">{t('service_orders.additional_notes')}</Label>
+              <Textarea
+                id="soc-notes"
+                className="min-h-[56px] resize-none"
+                placeholder={t('service_orders.internal_notes')}
+                value={store.notes}
+                onChange={(event) => store.setNotes(event.target.value)}
+              />
+            </div>
+          </Card>
+
+          {/* 3. Item & Biaya */}
+          <Card className="gap-4 p-4">
+            <div className="flex items-center gap-2">
+              <span className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">3</span>
+              <h2 className="text-sm font-semibold">{t('service_orders.section_items')}</h2>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" onClick={() => setIsCatalogOpen(true)}>
+                <Plus data-icon="inline-start" />
+                {t('service_orders.from_catalog')}
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => store.addCustomLine()}>
+                <Plus data-icon="inline-start" />
+                {t('service_orders.custom_line')}
+              </Button>
+            </div>
+
+            {store.lines.length === 0 ? (
+              <div className="rounded-xl border border-dashed p-6 text-center">
+                <p className="text-sm text-muted-foreground">{t('service_orders.no_lines')}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('service_orders.no_lines_desc')}</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {store.lines.map((line) => (
+                  <JobLineEditor
+                    key={line.id}
+                    line={line}
+                    onChange={(changes) => store.updateLine(line.id, changes)}
+                    onRemove={() => store.removeLine(line.id)}
+                    onSaveAsCatalog={() => {
+                      saveJobLineAsCatalogService(line, store.jobCategory || 'Jasa Servis')
+                        .then(() => toast.success(t('service_orders.saved_as_service')))
+                        .catch((error) => toast.error(error instanceof Error ? error.message : t('common.error_generic')))
+                    }}
                   />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => store.removeItem(item.productId)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                ))}
+              </div>
+            )}
+
+            {store.lines.length > 0 && (
+              <div className="space-y-2 rounded-xl bg-muted/30 p-3 text-sm lg:hidden">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{t('common.subtotal')}</span>
+                  <span>{formatCurrency(subtotal)}</span>
                 </div>
-                <div className="flex flex-wrap items-center gap-3 pt-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-muted-foreground font-medium">{t('common.price')}:</span>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <span>Rp</span>
-                      <Input
-                        className="h-7 w-24 text-xs font-medium"
-                        inputMode="numeric"
-                        placeholder="0"
-                        value={item.price === 0 ? '' : String(item.price)}
-                        onChange={e => {
-                          const val = e.target.value.replace(/\D/g, '')
-                          store.updateItem(item.productId, { price: val ? Number(val) : 0 })
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-muted-foreground font-medium">{t('common.cost_price') || 'Modal'}:</span>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <span>Rp</span>
-                      <Input
-                        className="h-7 w-24 text-xs"
-                        inputMode="numeric"
-                        placeholder="0"
-                        value={!item.costPrice ? '' : String(item.costPrice)}
-                        onChange={e => {
-                          const val = e.target.value.replace(/\D/g, '')
-                          store.updateItem(item.productId, { costPrice: val ? Number(val) : 0 })
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-muted-foreground font-medium">{t('common.qty')}:</span>
-                    <div className="flex items-center rounded-md border bg-background">
-                      <Button
-                        variant="ghost"
-                        className="h-7 w-7 p-0 text-muted-foreground"
-                        onClick={() => item.qty > 1 ? store.updateItemQty(item.productId, item.qty - 1) : store.removeItem(item.productId)}
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <span className="w-7 text-center text-xs font-medium">{item.qty}</span>
-                      <Button
-                        variant="ghost"
-                        className="h-7 w-7 p-0 text-muted-foreground"
-                        onClick={() => store.updateItemQty(item.productId, item.qty + 1)}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <span className="ml-auto text-sm font-semibold">{formatCurrency(item.subtotal)}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">{t('common.discount')}</span>
+                  <Input
+                    inputMode="numeric"
+                    value={store.discount || ''}
+                    onChange={(event) => store.setDiscount(Number(event.target.value.replace(/\D/g, '')) || 0)}
+                    className="h-8 w-28 text-right"
+                    placeholder="0"
+                    aria-label={t('common.discount')}
+                  />
+                </div>
+                <div className="flex items-end justify-between border-t pt-2">
+                  <span className="font-medium">{t('common.total')}</span>
+                  <span className="text-xl font-bold text-primary">{formatCurrency(total)}</span>
                 </div>
               </div>
-            ))
-          )}
+            )}
+          </Card>
         </div>
+
+        {/* Ringkasan */}
+        <aside className="hidden lg:block">
+          <div className="sticky top-4">
+            <Card className="gap-3 p-4">
+              <h2 className="text-sm font-semibold">{t('service_orders.summary')}</h2>
+              {summaryPanel}
+            </Card>
+          </div>
+        </aside>
       </main>
 
-      <div className="sticky bottom-0 left-0 right-0 border-t bg-background px-4 py-3 z-20">
-        <div className="mx-auto max-w-3xl flex items-center gap-3">
-          <div className="flex-1">
-            <p className="text-xs text-muted-foreground">{t('pos.item_count', { count: store.items.length })}</p>
-            <p className="text-lg font-bold">{formatCurrency(totals.subtotal)}</p>
+      {/* Footer mobile */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] lg:hidden">
+        <div className="mx-auto flex max-w-6xl items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-muted-foreground">{t('pos.item_count', { count: store.lines.length })}</p>
+            <p className="truncate text-lg font-bold">{formatCurrency(total)}</p>
           </div>
-          <Button size="lg" className="min-w-32" onClick={handleOpenPayment}>
+          <Button size="lg" className="h-11 min-w-32" onClick={handleOpenPayment}>
             {t('service_orders.create_order')}
           </Button>
         </div>
       </div>
+
+      {isDesktop ? (
+        <Dialog open={isCatalogOpen} onOpenChange={setIsCatalogOpen}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{t('service_orders.select_product_service')}</DialogTitle>
+            </DialogHeader>
+            <JobCatalogPicker onPick={handlePickProduct} />
+            <DialogFooter>
+              <span className="mr-auto text-xs text-muted-foreground">
+                {t('pos.item_count', { count: store.lines.length })}
+              </span>
+              <Button type="button" onClick={() => setIsCatalogOpen(false)}>{t('common.finish')}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : (
+        <Drawer open={isCatalogOpen} onOpenChange={setIsCatalogOpen}>
+          <DrawerContent className="h-[85vh]">
+            <DrawerHeader className="border-b text-left">
+              <DrawerTitle>{t('service_orders.select_product_service')}</DrawerTitle>
+            </DrawerHeader>
+            <div className="flex-1 overflow-y-auto p-4">
+              <JobCatalogPicker onPick={handlePickProduct} />
+            </div>
+            <div className="border-t p-3">
+              <Button className="w-full" onClick={() => setIsCatalogOpen(false)}>
+                {t('common.finish')} ({store.lines.length})
+              </Button>
+            </div>
+          </DrawerContent>
+        </Drawer>
+      )}
 
       <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
@@ -381,10 +560,26 @@ export function ServiceOrderCreatePage() {
             <DialogTitle>{t('service_orders.process_service_order')}</DialogTitle>
           </DialogHeader>
           <div className="py-2">
-            <SocPaymentSummary onComplete={() => setIsPaymentOpen(false)} />
+            <SocPaymentSummary
+              onComplete={() => setIsPaymentOpen(false)}
+              onSuccess={(order, meta) => {
+                setIsPaymentOpen(false)
+                setSuccessOrder(order)
+                setSuccessMeta(meta)
+              }}
+            />
           </div>
         </DialogContent>
       </Dialog>
+
+      <ServiceSuccessFlow
+        order={successOrder}
+        meta={successMeta}
+        onClose={() => {
+          setSuccessOrder(null)
+          setSuccessMeta(null)
+        }}
+      />
 
       <Dialog open={isAddCustomerOpen} onOpenChange={setIsAddCustomerOpen}>
         <DialogContent className="sm:max-w-sm">
@@ -403,8 +598,8 @@ export function ServiceOrderCreatePage() {
                 <Input id="soc-cust-phone" {...addCustomerForm.register('phone')} aria-invalid={!!addCustomerErrors.phone} />
               </Field>
               <Field data-invalid={!!addCustomerErrors.city}>
-                <Label htmlFor="soc-cust-city">{t('common.address')}</Label>
-                <Textarea id="soc-cust-city" {...addCustomerForm.register('city')} aria-invalid={!!addCustomerErrors.city} className="min-h-[3.5rem]" />
+                <Label htmlFor="soc-cust-city">{t('common.city')}</Label>
+                <Input id="soc-cust-city" {...addCustomerForm.register('city')} aria-invalid={!!addCustomerErrors.city} />
               </Field>
               <Field>
                 <Label htmlFor="soc-cust-status">{t('common.status')}</Label>
@@ -418,7 +613,7 @@ export function ServiceOrderCreatePage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          {customerStatusOptions.map(opt => (
+                          {customerStatusOptions.map((opt) => (
                             <SelectItem key={opt} value={opt}>{opt}</SelectItem>
                           ))}
                         </SelectGroup>

@@ -36,3 +36,9 @@ export function isWarrantyExpired(endDateIso?: string, now: Date = new Date()) {
 
   return isBefore(new Date(endDateIso), now)
 }
+
+export function isJobOverdue(estimatedCompletion?: string, status?: string, now: Date = new Date()) {
+  if (!estimatedCompletion) return false
+  if (status === 'Selesai' || status === 'Diambil' || status === 'Batal') return false
+  return isBefore(new Date(estimatedCompletion), now)
+}

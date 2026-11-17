@@ -64,7 +64,7 @@ export function ProductGrid() {
     return <EmptyState title={t('pos.product_empty_title')} description={t('pos.product_empty_desc')} />
   }
 
-  function handleAddItem(product: { id: string; sku?: string; barcode?: string; name: string; category: string; price: number; stock: number; type: string; wholesaleTiers?: { minQty: number; price: number }[] }) {
+  function handleAddItem(product: { id: string; sku?: string; barcode?: string; name: string; category: string; price: number; stock: number; type: string; unit?: string; wholesaleTiers?: { minQty: number; price: number }[] }) {
     addItem({
       id: product.id,
       sku: product.sku ?? product.id.slice(0, 8),
@@ -73,7 +73,7 @@ export function ProductGrid() {
       category: product.category,
       price: product.price,
       stock: product.stock,
-      unit: product.type === 'Jasa' ? 'unit' : 'pcs',
+      unit: product.unit ?? (product.type === 'Jasa' ? 'unit' : 'pcs'),
       isFavorite: false,
       wholesaleTiers: product.wholesaleTiers,
     })

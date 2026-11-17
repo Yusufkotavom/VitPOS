@@ -1,95 +1,117 @@
-import { useTranslation } from 'react-i18next'
-import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Printer, MessageSquare, Download, PencilIcon, XIcon, CheckIcon, Trash2Icon, CreditCard, ShieldCheck, ShieldX, PlusIcon, Search } from 'lucide-react'
 import { useState } from 'react'
-import { useLiveQuery } from '@/shared/hooks/use-live-query'
-import { usePdf } from '@/shared/components/pdf/use-pdf'
-import type { PdfData } from '@/shared/components/pdf/types'
+import { useTranslation } from 'react-i18next'
+import { Link, useParams } from 'react-router-dom'
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  CreditCard,
+  Download,
+  MessageSquare,
+  Pencil,
+  Plus,
+  Printer,
+  ShieldCheck,
+  ShieldX,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Card } from '@/components/ui/card'
+import { StatusBadge } from '@/shared/components/display/status-badge'
+import { PageShell } from '@/shared/components/layout/page-shell'
+import { CurrencyInput } from '@/shared/components/forms/currency-input'
 import { formatCurrency } from '@/lib/format-currency'
 import { formatDateTime } from '@/lib/date'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
-import { useServiceOrder } from '@/features/service-orders/hooks/use-service-order'
-import { serviceOrderRepository } from '@/services/local-db/repository'
+import { cn } from '@/lib/utils'
+import { useLiveQuery } from '@/shared/hooks/use-live-query'
+import { usePdf } from '@/shared/components/pdf/use-pdf'
 import { localDb } from '@/services/local-db/client'
+import { serviceOrderRepository } from '@/services/local-db/repository'
 import { messageTemplateService } from '@/services/message-template.service'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
-import { serviceOrderStatusOptions } from '@/features/service-orders/schemas/service-order-form-schema'
+import { useServiceOrder } from '@/features/service-orders/hooks/use-service-order'
+import { useServiceVertical } from '@/features/service-orders/hooks/use-service-vertical'
 import { recordServiceOrderPayment } from '@/features/service-orders/services/service-order-finance.service'
-import { PageShell } from '@/shared/components/layout/page-shell'
-import { StatusBadge } from '@/shared/components/display/status-badge'
 import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
-import { addWarrantyDuration, buildWarrantyTimelineNote, isWarrantyExpired } from '@/features/service-orders/lib/warranty'
+import { getPaymentMethodDisplay, buildQuickCashOptions } from '@/features/pos/lib/payment-method-display'
+import { JobLineEditor } from '@/features/service-orders/components/job-line-editor'
+import { JobCatalogPicker } from '@/features/service-orders/components/job-catalog-picker'
+import { addWarrantyDuration, buildWarrantyTimelineNote, isJobOverdue, isWarrantyExpired } from '@/features/service-orders/lib/warranty'
+import { normalizeJobLines, sumJobLines, validateJobLines } from '@/features/service-orders/lib/job-lines'
+import { saveJobLineAsCatalogService } from '@/features/service-orders/lib/save-line-as-service'
+import type { LocalJobLine, LocalServiceOrder, ServiceOrderStatus } from '@/services/local-db/schema'
+import type { PdfData } from '@/shared/components/pdf/types'
 
 function tone(status: string) {
-  if (status === 'Selesai' || status === 'Diambil') return 'success'
-  if (status === 'Dikerjakan') return 'info'
-  if (status === 'Batal') return 'danger'
-  return 'warning'
+  if (status === 'Selesai' || status === 'Diambil') return 'success' as const
+  if (status === 'Dikerjakan') return 'info' as const
+  if (status === 'Batal') return 'danger' as const
+  if (status === 'Diagnosa' || status === 'Menunggu Persetujuan') return 'info' as const
+  return 'warning' as const
 }
-
-type EditableItem = { id: string; name: string; qty: string; unitPrice: string; costPrice: string; productId?: string }
 
 export function ServiceOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { data: order, isLoading, refetch } = useServiceOrder(id)
   const { t } = useTranslation()
+  const vertical = useServiceVertical()
   const tenantId = requireActiveTenantId()
-  
-  // Data Pembayaran
-  const payments = useLiveQuery(() => 
-    id ? localDb.payments.where('serviceOrderId').equals(id).toArray() : []
-  , [id])
+  const { printPdf, downloadPdf } = usePdf()
 
-  const customer = useLiveQuery(() =>
-    order?.customerId ? localDb.customers.get(order.customerId) : undefined
-  , [order?.customerId])
-  
+  const payments = useLiveQuery(
+    () => (id ? localDb.payments.where('serviceOrderId').equals(id).toArray() : []),
+    [id],
+  )
+
+  const customer = useLiveQuery(
+    () => (order?.customerId ? localDb.customers.get(order.customerId) : undefined),
+    [order?.customerId],
+  )
+
   const paymentMethods = usePaymentMethods()
-  const activeMethods = paymentMethods && paymentMethods.length > 0 ? paymentMethods.filter(m => m.status === 'Aktif') : [
-    { id: 'tunai', name: t('payment.method_cash') },
-    { id: 'qris', name: t('payment.method_qris') },
-    { id: 'transfer', name: t('payment.method_transfer') },
-  ]
+  const activeMethods = paymentMethods && paymentMethods.length > 0
+    ? paymentMethods.filter((method) => method.status === 'Aktif')
+    : [
+        { id: 'tunai', name: t('payment.method_cash') },
+        { id: 'qris', name: t('payment.method_qris') },
+        { id: 'transfer', name: t('payment.method_transfer') },
+      ]
 
-  const totalPaid = payments?.reduce((acc, p) => acc + p.amount, 0) || 0
-  const remaining = order ? Math.max(0, order.cost - totalPaid) : 0
+  const lines = order ? normalizeJobLines(order) : []
+  const totalPaid = payments?.reduce((acc, payment) => acc + payment.amount, 0) || 0
+  const cost = order ? order.cost : 0
+  const remaining = Math.max(0, cost - totalPaid)
 
   const [editing, setEditing] = useState(false)
   const [editCustomer, setEditCustomer] = useState('')
-  const [editDesc, setEditDesc] = useState('')
-  const [editCost, setEditCost] = useState('')
-  const [editStatus, setEditStatus] = useState('')
+  const [editComplaint, setEditComplaint] = useState('')
+  const [editDiagnosis, setEditDiagnosis] = useState('')
+  const [editNotes, setEditNotes] = useState('')
+  const [editJobCategory, setEditJobCategory] = useState('')
+  const [editStatus, setEditStatus] = useState<ServiceOrderStatus>('Diterima')
+  const [editTechnician, setEditTechnician] = useState('')
+  const [editEstimated, setEditEstimated] = useState('')
+  const [editDetails, setEditDetails] = useState<Record<string, string>>({})
+  const [editDiscount, setEditDiscount] = useState(0)
+  const [editLines, setEditLines] = useState<LocalJobLine[]>([])
   const [editHasWarranty, setEditHasWarranty] = useState(false)
   const [editWarrantyValue, setEditWarrantyValue] = useState('')
   const [editWarrantyUnit, setEditWarrantyUnit] = useState<'hari' | 'bulan' | 'tahun'>('hari')
-  const [editItems, setEditItems] = useState<EditableItem[]>([])
 
-  // Product dialog states
-  const [isProductModalOpen, setIsProductModalOpen] = useState(false)
-  const [productSearch, setProductSearch] = useState('')
-  const products = useLiveQuery(() => localDb.products.where('tenantId').equals(tenantId).toArray(), [tenantId], [])
-  const filteredProducts = (products || []).filter(p => {
-    if (p.status !== 'Aktif') return false
-    if (productSearch && !p.name.toLowerCase().includes(productSearch.toLowerCase())) return false
-    return true
-  })
-
+  const [isCatalogOpen, setIsCatalogOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
-
-  // Pelunasan State
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [payAmount, setPayAmount] = useState(0)
   const [payMethod, setPayMethod] = useState('tunai')
-
-  const { downloadPdf, printPdf } = usePdf()
 
   const serviceData: PdfData | null = order ? {
     type: 'service',
@@ -100,24 +122,28 @@ export function ServiceOrderDetailPage() {
       phone: customer?.phone,
       address: customer?.address || customer?.city,
     },
-    device: order.description.split('\n')[0] || order.description,
-    problem: order.description,
+    device: [order.deviceBrand, order.deviceModel].filter(Boolean).join(' ') || order.jobCategory || order.description,
+    problem: order.complaint || order.description,
     cost: order.cost,
     summary: {
       subtotal: order.cost,
-      discount: 0,
+      discount: order.discountTotal ?? 0,
       grandTotal: order.cost,
       paidTotal: totalPaid,
       status: remaining <= 0 ? 'Lunas' : 'Sebagian',
     },
-    items: order.items?.map(i => ({ name: i.name, qty: i.qty, price: i.price, subtotal: i.subtotal })),
+    items: lines.map((line) => ({ name: line.name, qty: line.qty, price: line.unitPrice, subtotal: line.subtotal })),
     warranty: order.hasWarranty && order.warrantyEndDate ? {
       value: order.warrantyValue ?? 0,
       unit: order.warrantyUnit ?? 'hari',
       isExpired: isWarrantyExpired(order.warrantyEndDate),
       endDate: order.warrantyEndDate,
     } : undefined,
-    payments: payments?.map(p => ({ method: p.method, amount: p.amount, date: formatDateTime(p.date) })),
+    payments: payments?.map((payment) => ({
+      method: payment.method,
+      amount: payment.amount,
+      date: formatDateTime(payment.date),
+    })),
   } : null
 
   if (isLoading) {
@@ -135,49 +161,50 @@ export function ServiceOrderDetailPage() {
   function startEditing() {
     if (!order) return
     setEditCustomer(order.customerName)
-    setEditDesc(order.description)
-    setEditCost(String(order.cost))
+    setEditComplaint(order.complaint ?? order.description)
+    setEditDiagnosis(order.diagnosis ?? '')
+    setEditNotes(order.notes ?? '')
+    setEditJobCategory(order.jobCategory ?? '')
     setEditStatus(order.status)
+    setEditTechnician(order.technicianName ?? '')
+    setEditEstimated(order.estimatedCompletion ? order.estimatedCompletion.slice(0, 10) : '')
+    setEditDetails(order.details ?? {})
+    setEditDiscount(order.discountTotal ?? 0)
+    setEditLines(normalizeJobLines(order))
     setEditHasWarranty(order.hasWarranty ?? false)
     setEditWarrantyValue(String(order.warrantyValue ?? ''))
     setEditWarrantyUnit(order.warrantyUnit ?? 'hari')
-    setEditItems(
-      order.items?.map((i: NonNullable<typeof order.items>[number]) => ({
-        id: crypto.randomUUID(),
-        productId: i.productId,
-        name: i.name,
-        qty: String(i.qty),
-        unitPrice: String(i.price),
-        costPrice: String(i.costPrice ?? ''),
-      })) || []
-    )
     setEditing(true)
-  }
-
-  function cancelEditing() {
-    setEditing(false)
   }
 
   async function saveEditing() {
     if (!order) return
+
+    const validationError = validateJobLines(editLines)
+    if (validationError) {
+      toast.error(validationError)
+      return
+    }
+
     try {
       const customerName = editCustomer.trim()
-      const customer = customerName
-        ? await localDb.customers.where('[tenantId+name]').equals([tenantId, customerName]).first()
+      const matchedCustomer = customerName
+        ? await localDb.customers.where('tenantId').equals(tenantId).filter((row) => row.name === customerName).first()
         : undefined
 
-      let updatedTimeline = order.timeline || []
+      let timeline = order.timeline ?? []
       const nowIso = new Date().toISOString()
 
       if (editStatus !== order.status) {
-        updatedTimeline = [
-          ...updatedTimeline,
+        timeline = [
+          ...timeline,
           {
             id: crypto.randomUUID(),
             status: editStatus,
             date: nowIso,
             note: `Status diubah menjadi ${editStatus}`,
-          }
+            actor: editTechnician || undefined,
+          },
         ]
       }
 
@@ -185,75 +212,111 @@ export function ServiceOrderDetailPage() {
       let warrantyEndDate = order.warrantyEndDate
 
       if (editStatus === 'Selesai' && editHasWarranty) {
-        if (!order.warrantyStartDate) {
-          warrantyStartDate = nowIso
-        }
-        const prevHasWarranty = order.hasWarranty
-        const prevVal = order.warrantyValue
-        const prevUnit = order.warrantyUnit
-        
-        const val = Number(editWarrantyValue) || 0
-        if (!prevHasWarranty || val !== prevVal || editWarrantyUnit !== prevUnit || !order.warrantyEndDate) {
-          warrantyEndDate = addWarrantyDuration(warrantyStartDate ?? nowIso, val, editWarrantyUnit)
-          const mode = !prevHasWarranty ? 'created' : 'updated'
-          updatedTimeline = [
-            ...updatedTimeline,
+        if (!warrantyStartDate) warrantyStartDate = nowIso
+        const value = Number(editWarrantyValue) || 0
+        if (!order.hasWarranty || value !== order.warrantyValue || editWarrantyUnit !== order.warrantyUnit || !warrantyEndDate) {
+          warrantyEndDate = addWarrantyDuration(warrantyStartDate ?? nowIso, value, editWarrantyUnit)
+          timeline = [
+            ...timeline,
             {
               id: crypto.randomUUID(),
               status: editStatus,
               date: nowIso,
-              note: buildWarrantyTimelineNote({ value: val, unit: editWarrantyUnit, mode, endDate: warrantyEndDate }),
+              note: buildWarrantyTimelineNote({
+                value,
+                unit: editWarrantyUnit,
+                mode: order.hasWarranty ? 'updated' : 'created',
+                endDate: warrantyEndDate,
+              }),
               type: 'warranty',
-            }
+              actor: editTechnician || undefined,
+            },
           ]
         }
       } else if (!editHasWarranty && order.hasWarranty) {
         warrantyStartDate = undefined
         warrantyEndDate = undefined
-        updatedTimeline = [
-          ...updatedTimeline,
+        timeline = [
+          ...timeline,
           {
             id: crypto.randomUUID(),
             status: editStatus,
             date: nowIso,
             note: buildWarrantyTimelineNote({ value: 0, unit: 'hari', mode: 'removed' }),
             type: 'warranty',
-          }
+            actor: editTechnician || undefined,
+          },
         ]
       }
 
-      const finalItems = editItems.map(i => ({
-        productId: i.productId ?? '',
-        name: i.name,
-        qty: Number(i.qty) || 1,
-        price: Number(i.unitPrice) || 0,
-        costPrice: Number(i.costPrice) || 0,
-        subtotal: (Number(i.qty) || 1) * (Number(i.unitPrice) || 0)
-      }))
-      const itemsCost = finalItems.reduce((acc, i) => acc + i.subtotal, 0)
-      const finalCost = finalItems.length > 0 ? itemsCost : (Number(editCost) || 0)
-      const totalCostPrice = finalItems.reduce((acc, i) => acc + (i.costPrice * i.qty), 0)
+      const subtotal = sumJobLines(editLines)
+      const finalCost = Math.max(subtotal - editDiscount, 0)
 
       await serviceOrderRepository.upsert({
         ...order,
-        customerId: customer?.id,
-        customerName: customerName,
-        description: editDesc.trim(),
+        customerId: matchedCustomer?.id,
+        customerName,
+        description: editComplaint.trim(),
+        complaint: editComplaint.trim(),
+        diagnosis: editDiagnosis.trim() || undefined,
+        notes: editNotes.trim() || undefined,
+        jobCategory: editJobCategory.trim() || undefined,
         cost: finalCost,
-        costPrice: totalCostPrice,
-        items: finalItems.length > 0 ? finalItems : undefined,
-        status: editStatus as typeof order.status,
+        discountTotal: editDiscount > 0 ? editDiscount : undefined,
+        costPrice: editLines.reduce((sum, line) => sum + (line.costPrice ?? 0) * line.qty, 0),
+        lines: editLines,
+        items: editLines.map((line) => ({
+          productId: line.productId ?? line.id,
+          name: line.name,
+          qty: line.qty,
+          price: line.unitPrice,
+          costPrice: line.costPrice,
+          subtotal: line.subtotal,
+        })),
+        status: editStatus,
+        technicianName: editTechnician.trim() || undefined,
+        details: editDetails,
+        estimatedCompletion: editEstimated ? new Date(editEstimated).toISOString() : undefined,
         hasWarranty: editHasWarranty,
         warrantyValue: editHasWarranty ? Number(editWarrantyValue) || undefined : undefined,
         warrantyUnit: editHasWarranty ? editWarrantyUnit : undefined,
         warrantyStartDate,
         warrantyEndDate,
-        timeline: updatedTimeline,
+        timeline,
         version: order.version + 1,
         updatedAt: nowIso,
       })
+
       toast.success(t('service_orders.updated'))
       setEditing(false)
+      refetch()
+    } catch (error) {
+      toast.error(t('common.save_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
+    }
+  }
+
+  async function advanceStatus(nextStatus: ServiceOrderStatus) {
+    if (!order) return
+    try {
+      const nowIso = new Date().toISOString()
+      const next: LocalServiceOrder = {
+        ...order,
+        status: nextStatus,
+        timeline: [
+          ...(order.timeline ?? []),
+          {
+            id: crypto.randomUUID(),
+            status: nextStatus,
+            date: nowIso,
+            note: `Status diubah menjadi ${nextStatus}`,
+            actor: order.technicianName || undefined,
+          },
+        ],
+        version: order.version + 1,
+        updatedAt: nowIso,
+      }
+      await serviceOrderRepository.upsert(next)
+      toast.success(t('service_orders.updated'))
       refetch()
     } catch (error) {
       toast.error(t('common.save_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
@@ -277,6 +340,7 @@ export function ServiceOrderDetailPage() {
       await recordServiceOrderPayment(order.id, payAmount, payMethod, 'Service Order', tenantId)
       toast.success(t('service_orders.payment_added'))
       setPaymentOpen(false)
+      refetch()
     } catch (error) {
       toast.error(t('common.save_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
@@ -284,32 +348,34 @@ export function ServiceOrderDetailPage() {
 
   async function handleWhatsApp() {
     if (!order) return
-    const customer = order.customerId
+    const found = order.customerId
       ? await localDb.customers.get(order.customerId)
-      : (await localDb.customers.where('[tenantId+name]').equals([tenantId, order.customerName]).toArray())[0]
-    const phone = customer?.tenantId === tenantId ? customer.phone : ''
+      : (await localDb.customers.where('tenantId').equals(tenantId).filter((row) => row.name === order.customerName).toArray())[0]
+    const phone = found?.tenantId === tenantId ? found.phone : ''
     if (!phone) {
       toast.error(t('service_orders.whatsapp_not_found'))
       return
     }
 
-    const templateType = order.status === 'Selesai' || order.status === 'Diambil' 
-      ? 'service_order_selesai' 
+    const templateType = order.status === 'Selesai' || order.status === 'Diambil'
+      ? 'service_order_selesai'
       : 'service_order_masuk'
 
     const text = await messageTemplateService.render(templateType, {
       code: order.code,
       customer_name: order.customerName,
-      device: order.description.split('\n')[0] || order.description,
-      problem: order.description,
+      device: [order.deviceBrand, order.deviceModel].filter(Boolean).join(' ') || order.jobCategory || order.description,
+      problem: order.complaint || order.description,
       status: order.status,
       cost: formatCurrency(order.cost),
-      estimated_completion: order.estimatedCompletion ? new Date(order.estimatedCompletion).toLocaleDateString('id-ID', { dateStyle: 'long' }) : '-',
+      estimated_completion: order.estimatedCompletion
+        ? new Date(order.estimatedCompletion).toLocaleDateString('id-ID', { dateStyle: 'long' })
+        : '-',
       date: formatDateTime(order.date),
       total: formatCurrency(order.cost),
       paid: formatCurrency(totalPaid),
       remaining: formatCurrency(remaining),
-      items: order.items?.map(i => `- ${i.name} (${i.qty})`).join('\n') || '',
+      items: lines.map((line) => `- ${line.name} (${line.qty} ${line.unit})`).join('\n'),
       change: '',
       payment_method: '',
       store_name: '',
@@ -331,6 +397,16 @@ export function ServiceOrderDetailPage() {
     )
   }
 
+  const statusFlow = vertical.statusFlow
+  const currentIndex = statusFlow.indexOf(order.status)
+  const isFinal = order.status === 'Diambil' || order.status === 'Batal'
+  const nextStatus = currentIndex >= 0 && currentIndex < statusFlow.length - 1 ? statusFlow[currentIndex + 1] : null
+  const isOverdue = isJobOverdue(order.estimatedCompletion, order.status)
+
+  const editSubtotal = sumJobLines(editLines)
+  const editTotal = Math.max(editSubtotal - editDiscount, 0)
+  const quickCashOptions = buildQuickCashOptions(remaining)
+
   return (
     <PageShell
       title={order.code}
@@ -341,7 +417,7 @@ export function ServiceOrderDetailPage() {
             <Printer className="mr-2 h-4 w-4" />
             {t('common.print')}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => serviceData && downloadPdf(serviceData, `Service-${order?.code || 'download'}`)}>
+          <Button variant="outline" size="sm" onClick={() => serviceData && downloadPdf(serviceData, `Service-${order.code}`)}>
             <Download className="mr-2 h-4 w-4" />
             {t('common.pdf')}
           </Button>
@@ -351,23 +427,23 @@ export function ServiceOrderDetailPage() {
           </Button>
           {editing ? (
             <>
-              <Button variant="outline" size="sm" onClick={cancelEditing}>
-                <XIcon className="mr-2 h-4 w-4" />
+              <Button variant="outline" size="sm" onClick={() => setEditing(false)}>
+                <X className="mr-2 h-4 w-4" />
                 {t('common.cancel')}
               </Button>
               <Button size="sm" onClick={saveEditing}>
-                <CheckIcon className="mr-2 h-4 w-4" />
+                <Check className="mr-2 h-4 w-4" />
                 {t('common.save')}
               </Button>
             </>
           ) : (
             <>
               <Button variant="outline" size="sm" onClick={startEditing}>
-                <PencilIcon className="mr-2 h-4 w-4" />
+                <Pencil className="mr-2 h-4 w-4" />
                 {t('common.edit')}
               </Button>
               <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
-                <Trash2Icon className="mr-2 h-4 w-4" />
+                <Trash2 className="mr-2 h-4 w-4" />
                 {t('common.delete')}
               </Button>
             </>
@@ -375,379 +451,491 @@ export function ServiceOrderDetailPage() {
         </>
       }
     >
-      <div className="grid gap-6 md:grid-cols-3">
-        <div className="space-y-6 md:col-span-2">
-          
-          {/* Detail Pekerjaan */}
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-              {t('service_orders.job_detail')}
-            </h3>
-            <div className="rounded-2xl border p-5 shadow-sm bg-card space-y-4">
-              <div className="grid grid-cols-2 gap-4 border-b pb-4">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">{t('common.customer')}</p>
-                  {editing ? (
-                    <Input value={editCustomer} onChange={e => setEditCustomer(e.target.value)} className="h-8 text-sm" />
-                  ) : (
-                    <p className="font-medium text-base">{order.customerName}</p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">{t('common.date')}</p>
-                  <p className="font-medium text-base">{order.date}</p>
-                </div>
-                {order.estimatedCompletion && (
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">{t('service_orders.estimated_completion')}</p>
-                    <p className="font-medium text-base">{new Date(order.estimatedCompletion).toLocaleDateString('id-ID', { dateStyle: 'long' })}</p>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2">
+          {/* Stepper + aksi status */}
+          <Card className="gap-4 p-4">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {statusFlow.map((status, index) => {
+                const reached = currentIndex >= index && currentIndex !== -1
+                return (
+                  <div key={status} className="flex items-center gap-1.5">
+                    {index > 0 && <span className="h-px w-4 bg-border" />}
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={cn(
+                          'flex size-5 items-center justify-center rounded-full text-[10px] font-semibold',
+                          reached ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+                        )}
+                      >
+                        {index + 1}
+                      </span>
+                      <span className={cn('text-xs', reached ? 'font-medium' : 'text-muted-foreground')}>{status}</span>
+                    </div>
                   </div>
-                )}
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">{t('service_orders.issue_or_job')}</p>
-                {editing ? (
-                  <textarea
-                    value={editDesc}
-                    onChange={e => setEditDesc(e.target.value)}
-                    className="min-h-[80px] w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring"
-                  />
-                ) : (
-                  <p className="text-sm font-medium whitespace-pre-wrap">{order.description}</p>
-                )}
-              </div>
-              {order.notes && (
-                <div className="pt-2">
-                  <p className="text-xs text-muted-foreground mb-1">{t('service_orders.additional_notes')}</p>
-                  <p className="text-sm text-muted-foreground">{order.notes}</p>
-                </div>
-              )}
+                )
+              })}
             </div>
-          </div>
 
-          {/* Daftar Produk / Item Biaya */}
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">{t('service_orders.items_used')}</h3>
-            <div className="rounded-2xl border p-5 shadow-sm bg-card">
-              {editing ? (
-                <div className="flex flex-col gap-3">
-                  <div className="hidden sm:block rounded-lg border overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/40">
-                          <TableHead>{t('common.name')}</TableHead>
-                          <TableHead className="text-right w-24">{t('common.cost_price') || 'Modal'}</TableHead>
-                          <TableHead className="text-right w-28">{t('common.price')}</TableHead>
-                          <TableHead className="text-right w-20">{t('common.qty')}</TableHead>
-                          <TableHead className="text-right w-28">{t('common.subtotal')}</TableHead>
-                          <TableHead className="w-10"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {editItems.map((item, idx) => (
-                          <TableRow key={item.id}>
-                            <TableCell className="py-1.5 px-2">
-                              <Input value={item.name} onChange={e => { const newItems = [...editItems]; newItems[idx].name = e.target.value; setEditItems(newItems) }} placeholder={t('service_orders.item_name_placeholder')} className="h-8 text-sm" />
-                            </TableCell>
-                            <TableCell className="py-1.5 px-2">
-                              <Input value={item.costPrice} onChange={e => { const newItems = [...editItems]; newItems[idx].costPrice = e.target.value; setEditItems(newItems) }} inputMode="numeric" placeholder="0" className="h-8 text-sm text-right" />
-                            </TableCell>
-                            <TableCell className="py-1.5 px-2">
-                              <Input value={item.unitPrice} onChange={e => { const newItems = [...editItems]; newItems[idx].unitPrice = e.target.value; setEditItems(newItems) }} inputMode="numeric" className="h-8 text-sm text-right" />
-                            </TableCell>
-                            <TableCell className="py-1.5 px-2">
-                              <Input value={item.qty} onChange={e => { const newItems = [...editItems]; newItems[idx].qty = e.target.value; setEditItems(newItems) }} inputMode="numeric" className="h-8 text-sm text-right" />
-                            </TableCell>
-                            <TableCell className="py-1.5 px-3 text-right font-medium">{(Number(item.qty) || 0) * (Number(item.unitPrice) || 0) > 0 ? formatCurrency((Number(item.qty) || 0) * (Number(item.unitPrice) || 0)) : '-'}</TableCell>
-                            <TableCell className="py-1.5 px-2">
-                              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditItems(editItems.filter((_, i) => i !== idx))}>
-                                <Trash2Icon className="h-3.5 w-3.5 text-destructive" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+            {isOverdue && (
+              <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+                {t('service_orders.overdue_hint')}
+              </p>
+            )}
+
+            {!isFinal && !editing && (
+              <div className="flex flex-wrap gap-2">
+                {nextStatus && (
+                  <Button size="sm" onClick={() => advanceStatus(nextStatus)}>
+                    <ArrowRight data-icon="inline-start" />
+                    {t('service_orders.advance_to', { status: nextStatus })}
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={() => advanceStatus('Selesai')} disabled={order.status === 'Selesai'}>
+                  {t('service_orders.mark_complete')}
+                </Button>
+                {remaining > 0 && (
+                  <Button variant="secondary" size="sm" onClick={() => { setPayAmount(remaining); setPaymentOpen(true) }}>
+                    <CreditCard data-icon="inline-start" />
+                    {t('service_orders.accept_payment')}
+                  </Button>
+                )}
+              </div>
+            )}
+          </Card>
+
+          {/* Info pekerjaan */}
+          <Card className="gap-4 p-4">
+            <h3 className="text-sm font-semibold">{t('service_orders.job_detail')}</h3>
+
+            {editing ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex flex-col gap-1 text-xs font-medium">
+                  {t('common.customer')}
+                  <Input value={editCustomer} onChange={(event) => setEditCustomer(event.target.value)} className="h-10" />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium">
+                  {vertical.jobCategoryLabel}
+                  <Input value={editJobCategory} onChange={(event) => setEditJobCategory(event.target.value)} className="h-10" />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium sm:col-span-2">
+                  {vertical.complaintLabel}
+                  <Textarea value={editComplaint} onChange={(event) => setEditComplaint(event.target.value)} className="min-h-[72px]" />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium sm:col-span-2">
+                  {vertical.diagnosisLabel}
+                  <Textarea value={editDiagnosis} onChange={(event) => setEditDiagnosis(event.target.value)} className="min-h-[64px]" />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium">
+                  {t('service_orders.technician')}
+                  <Input value={editTechnician} onChange={(event) => setEditTechnician(event.target.value)} className="h-10" />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium">
+                  {t('service_orders.estimated_completion')}
+                  <Input type="date" value={editEstimated} onChange={(event) => setEditEstimated(event.target.value)} className="h-10" />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium sm:col-span-2">
+                  {t('service_orders.additional_notes')}
+                  <Textarea value={editNotes} onChange={(event) => setEditNotes(event.target.value)} className="min-h-[56px]" />
+                </label>
+                {vertical.intakeFields
+                  .filter((field) => !['deviceBrand', 'deviceModel', 'deviceSerial', 'accessories'].includes(field.key))
+                  .map((field) => (
+                    <label key={field.key} className="flex flex-col gap-1 text-xs font-medium">
+                      {field.label}
+                      <Input
+                        value={editDetails[field.key] ?? ''}
+                        onChange={(event) => setEditDetails((prev) => ({ ...prev, [field.key]: event.target.value }))}
+                        placeholder={field.placeholder}
+                        className="h-10"
+                      />
+                    </label>
+                  ))}
+              </div>
+            ) : (
+              <div className="space-y-3 text-sm">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">{t('common.customer')}</p>
+                    <p className="font-medium">{order.customerName}</p>
                   </div>
-                  <div className="flex flex-col gap-3 sm:hidden">
-                    {editItems.map((item, idx) => {
-                      const itemSubtotal = (Number(item.qty) || 0) * (Number(item.unitPrice) || 0)
+                  <div>
+                    <p className="text-xs text-muted-foreground">{vertical.jobCategoryLabel}</p>
+                    <p className="font-medium">{order.jobCategory || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">{t('service_orders.device')}</p>
+                    <p className="font-medium">
+                      {[order.deviceBrand, order.deviceModel].filter(Boolean).join(' ') || '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">{t('service_orders.technician')}</p>
+                    <p className="font-medium">{order.technicianName || '-'}</p>
+                  </div>
+                  {order.deviceSerial && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">{t('service_orders.device_serial')}</p>
+                      <p className="font-medium">{order.deviceSerial}</p>
+                    </div>
+                  )}
+                  {order.accessories && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">{t('service_orders.accessories')}</p>
+                      <p className="font-medium">{order.accessories}</p>
+                    </div>
+                  )}
+                  {vertical.intakeFields
+                    .filter((field) => !['deviceBrand', 'deviceModel', 'deviceSerial', 'accessories'].includes(field.key))
+                    .map((field) => {
+                      const value = order.details?.[field.key]
+                      if (!value) return null
                       return (
-                        <div key={item.id} className="rounded-xl border bg-muted/20 p-3 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-muted-foreground">Item {idx + 1}</span>
-                            <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditItems(editItems.filter((_, i) => i !== idx))}>
-                              <Trash2Icon className="h-3.5 w-3.5 text-destructive" />
-                            </Button>
-                          </div>
-                          <Input value={item.name} onChange={e => { const newItems = [...editItems]; newItems[idx].name = e.target.value; setEditItems(newItems) }} placeholder={t('service_orders.item_name_placeholder')} className="h-8 text-sm" />
-                          <div className="grid grid-cols-3 gap-2">
-                            <div className="flex flex-col gap-1">
-                              <span className="text-xs text-muted-foreground">{t('common.cost_price') || 'Modal'}</span>
-                              <Input value={item.costPrice} onChange={e => { const newItems = [...editItems]; newItems[idx].costPrice = e.target.value; setEditItems(newItems) }} inputMode="numeric" placeholder="0" className="h-8 text-sm" />
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <span className="text-xs text-muted-foreground">{t('common.price')}</span>
-                              <Input value={item.unitPrice} onChange={e => { const newItems = [...editItems]; newItems[idx].unitPrice = e.target.value; setEditItems(newItems) }} inputMode="numeric" className="h-8 text-sm" />
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <span className="text-xs text-muted-foreground">{t('common.qty')}</span>
-                              <Input value={item.qty} onChange={e => { const newItems = [...editItems]; newItems[idx].qty = e.target.value; setEditItems(newItems) }} inputMode="numeric" className="h-8 text-sm" />
-                            </div>
-                          </div>
-                          <div className="flex justify-between items-center pt-1">
-                            <span className="text-xs text-muted-foreground">{t('common.subtotal')}</span>
-                            <span className="text-sm font-medium">{itemSubtotal > 0 ? formatCurrency(itemSubtotal) : '-'}</span>
-                          </div>
+                        <div key={field.key}>
+                          <p className="text-xs text-muted-foreground">{field.label}</p>
+                          <p className="font-medium">{value}</p>
                         </div>
                       )
                     })}
-                  </div>
-                  <Dialog open={isProductModalOpen} onOpenChange={setIsProductModalOpen}>
-                    <DialogTrigger asChild>
-                      <Button type="button" variant="ghost" size="sm" className="self-start">
-                        <PlusIcon className="mr-1 h-3.5 w-3.5" />{t('service_orders.add_product_service')}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col">
-                      <DialogHeader>
-                        <DialogTitle>{t('service_orders.select_product_service')}</DialogTitle>
-                      </DialogHeader>
-                      <div className="relative mt-2">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder={t('service_orders.search_product_service')}
-                          className="pl-8"
-                          value={productSearch}
-                          onChange={(e) => setProductSearch(e.target.value)}
-                        />
-                      </div>
-                      <div className="flex-1 overflow-y-auto space-y-1 mt-4">
-                        {filteredProducts.map(p => (
-                          <div key={p.id} className="flex items-center justify-between p-2.5 rounded-lg hover:bg-muted/50">
-                            <div>
-                              <p className="font-medium text-sm">{p.name}</p>
-                              <p className="text-xs text-muted-foreground">{formatCurrency(p.price)}</p>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setEditItems(prev => [...prev, { id: crypto.randomUUID(), name: p.name, qty: '1', unitPrice: String(p.price), costPrice: String(p.costPrice ?? '') }])
-                                toast.success(t('service_orders.item_added', { name: p.name }))
-                                setIsProductModalOpen(false)
-                              }}
-                            >
-                              {t('common.add')}
-                            </Button>
-                          </div>
-                        ))}
-                        {filteredProducts.length === 0 && (
-                          <p className="text-center text-sm text-muted-foreground py-8">{t('service_orders.no_items_found')}</p>
-                        )}
-                      </div>
-                      <DialogFooter>
-                        <Button variant="secondary" className="w-full" onClick={() => {
-                          setEditItems(prev => [...prev, { id: crypto.randomUUID(), name: '', qty: '1', unitPrice: '', costPrice: '' }])
-                          setIsProductModalOpen(false)
-                        }}>
-                          {t('service_orders.add_manual_item')}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
                 </div>
-              ) : (
-                (!order.items || order.items.length === 0) ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">{t('service_orders.no_item_details')}</p>
-                ) : (
-                  <div className="space-y-3">
-                    {order.items.map(item => (
-                      <div key={item.productId || crypto.randomUUID()} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0">
-                        <div>
-                          <p className="font-medium text-sm">{item.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatCurrency(item.price)} x {item.qty}
-                            {item.costPrice ? ` · Modal: ${formatCurrency(item.costPrice)}` : ''}
-                          </p>
-                        </div>
-                        <p className="font-semibold text-sm">{formatCurrency(item.subtotal)}</p>
-                      </div>
-                    ))}
-                  </div>
-                )
-              )}
-            </div>
-          </div>
 
-          {/* Timeline Status */}
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">{t('service_orders.status_history')}</h3>
-            <div className="rounded-2xl border p-5 shadow-sm bg-card">
-              {(!order.timeline || order.timeline.length === 0) ? (
-                <p className="text-sm text-muted-foreground text-center py-4">{t('service_orders.no_timeline_history')}</p>
-              ) : (
-                <div className="space-y-4 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-border before:to-transparent">
-                  {order.timeline.map((item: { id: string; status: string; date: string; note: string; type?: string }) => (
-                    <div key={item.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                      <div className={`flex items-center justify-center w-5 h-5 rounded-full border-2 shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 shadow-sm ${item.type === 'warranty' ? 'border-amber-500 bg-amber-50 text-amber-600' : 'border-primary bg-background text-primary'}`}>
-                        {item.type === 'warranty' ? <ShieldCheck className="h-3 w-3" /> : null}
-                      </div>
-                      <div className={`w-[calc(100%-2.5rem)] md:w-[calc(50%-1.25rem)] border bg-background p-3 rounded-xl shadow-sm ${item.type === 'warranty' ? 'border-amber-200' : ''}`}>
-                        <div className="flex items-center justify-between space-x-2 mb-1">
-                          <StatusBadge label={item.type === 'warranty' ? t('service_orders.warranty') : item.status} tone={item.type === 'warranty' ? 'warning' : tone(item.status)} />
-                          <time className="text-xs text-muted-foreground">{new Date(item.date).toLocaleDateString('id-ID')}</time>
-                        </div>
-                        <p className="text-sm mt-2 text-muted-foreground">{item.note}</p>
-                      </div>
-                    </div>
-                  ))}
+                <div>
+                  <p className="text-xs text-muted-foreground">{vertical.complaintLabel}</p>
+                  <p className="whitespace-pre-wrap font-medium">{order.complaint || order.description}</p>
                 </div>
+
+                {order.diagnosis && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">{vertical.diagnosisLabel}</p>
+                    <p className="whitespace-pre-wrap">{order.diagnosis}</p>
+                  </div>
+                )}
+
+                {order.notes && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">{t('service_orders.additional_notes')}</p>
+                    <p className="text-muted-foreground">{order.notes}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+
+          {/* Item pekerjaan */}
+          <Card className="gap-4 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold">{t('service_orders.items_used')}</h3>
+              {editing && (
+                <Button type="button" size="sm" variant="outline" onClick={() => setIsCatalogOpen(true)}>
+                  <Plus data-icon="inline-start" />
+                  {t('service_orders.from_catalog')}
+                </Button>
               )}
             </div>
-          </div>
+
+            {editing ? (
+              <div className="space-y-2">
+                {editLines.map((line) => (
+                  <JobLineEditor
+                    key={line.id}
+                    line={line}
+                    onChange={(changes) =>
+                      setEditLines((prev) => prev.map((item) => {
+                        if (item.id !== line.id) return item
+                        const next = { ...item, ...changes }
+                        const subtotal = next.priceMode === 'area'
+                          ? Math.round(next.qty * (next.width ?? 0) * (next.height ?? 0) * next.unitPrice)
+                          : Math.round(next.qty * next.unitPrice)
+                        return { ...next, subtotal }
+                      }))
+                    }
+                    onRemove={() => setEditLines((prev) => prev.filter((item) => item.id !== line.id))}
+                    onSaveAsCatalog={() => {
+                      saveJobLineAsCatalogService(line, order.jobCategory || 'Jasa Servis')
+                        .then(() => toast.success(t('service_orders.saved_as_service')))
+                        .catch((error) => toast.error(error instanceof Error ? error.message : t('common.error_generic')))
+                    }}
+                  />
+                ))}
+                <Button type="button" variant="ghost" size="sm" onClick={() => setEditLines((prev) => [...prev, {
+                  id: `line-${crypto.randomUUID()}`,
+                  source: 'custom',
+                  kind: 'service',
+                  name: '',
+                  unit: 'pcs',
+                  qty: 1,
+                  priceMode: 'unit',
+                  unitPrice: 0,
+                  costPrice: 0,
+                  trackStock: false,
+                  subtotal: 0,
+                }])}>
+                  <Plus data-icon="inline-start" />
+                  {t('service_orders.custom_line')}
+                </Button>
+              </div>
+            ) : lines.length === 0 ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">{t('service_orders.no_item_details')}</p>
+            ) : (
+              <div className="space-y-2">
+                {lines.map((line) => (
+                  <div key={line.id} className="flex items-start justify-between gap-3 border-b pb-2 last:border-0 last:pb-0">
+                    <div className="min-w-0">
+                      <p className="font-medium">{line.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {line.qty} {line.unit} × {formatCurrency(line.unitPrice)}
+                        {line.priceMode === 'area' && line.width && line.height ? ` · ${line.width}x${line.height}` : ''}
+                        {line.note ? ` · ${line.note}` : ''}
+                      </p>
+                    </div>
+                    <p className="shrink-0 font-semibold">{formatCurrency(line.subtotal)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* Timeline */}
+          <Card className="gap-4 p-4">
+            <h3 className="text-sm font-semibold">{t('service_orders.status_history')}</h3>
+            {(!order.timeline || order.timeline.length === 0) ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">{t('service_orders.no_timeline_history')}</p>
+            ) : (
+              <ol className="space-y-3">
+                {order.timeline.map((item) => (
+                  <li key={item.id} className="flex gap-3">
+                    <div className={cn(
+                      'mt-1 flex size-5 shrink-0 items-center justify-center rounded-full border-2',
+                      item.type === 'warranty' ? 'border-amber-500 bg-amber-50 text-amber-600' : 'border-primary bg-background text-primary',
+                    )}>
+                      {item.type === 'warranty' ? <ShieldCheck className="size-3" /> : null}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusBadge
+                          label={item.type === 'warranty' ? t('service_orders.warranty') : item.status}
+                          tone={item.type === 'warranty' ? 'warning' : tone(item.status)}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(item.date).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
+                        </span>
+                        {item.actor && <span className="text-xs text-muted-foreground">· {item.actor}</span>}
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">{item.note}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </Card>
         </div>
 
-        {/* Kolom Kanan: Status & Pembayaran */}
+        {/* Kolom kanan */}
         <div className="space-y-4">
-          <div className="rounded-2xl border p-5 shadow-sm bg-card space-y-4">
-            <h3 className="font-semibold border-b pb-2">{t('service_orders.status_and_cost')}</h3>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">{t('service_orders.job_status')}</span>
-              {editing ? (
-                <Select value={editStatus} onValueChange={setEditStatus}>
-                  <SelectTrigger className="h-8 w-44">
-                    <SelectValue placeholder={t('common.select_placeholder')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {serviceOrderStatusOptions.map(opt => (
-                      <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <StatusBadge label={order.status} tone={tone(order.status)} />
-              )}
-            </div>
-            
-            <div className="flex justify-between items-center pt-2">
-              <span className="text-sm text-muted-foreground">{t('service_orders.service_cost')}</span>
-              <span className="font-bold">
-                {formatCurrency(
-                  editing 
-                    ? (editItems.length > 0 ? editItems.reduce((acc, i) => acc + (Number(i.qty) || 0) * (Number(i.unitPrice) || 0), 0) : Number(editCost) || 0) 
-                    : order.cost
-                )}
-              </span>
-            </div>
+          <Card className="gap-4 p-4">
+            <h3 className="text-sm font-semibold">{t('service_orders.status_and_cost')}</h3>
 
-            <div className="flex justify-between items-center text-primary pt-2 border-t border-dashed">
-              <span className="font-medium">{t('service_orders.paid_amount')}</span>
-              <span className="font-bold">{formatCurrency(totalPaid)}</span>
-            </div>
-            
-            {remaining > 0 ? (
-              <div className="flex justify-between items-center text-destructive pt-2">
-                <span className="font-medium">{t('service_orders.remaining_balance')}</span>
-                <span className="font-bold text-lg">{formatCurrency(remaining)}</span>
-              </div>
-            ) : (
-              <div className="flex justify-between items-center text-success pt-2">
-                <span className="font-medium">{t('service_orders.payment_status')}</span>
-                <span className="font-bold text-lg">{t('common.paid')}</span>
-              </div>
-            )}
-            
-            {remaining > 0 && !editing && (
-              <Button className="w-full mt-4" onClick={() => {
-                setPayAmount(remaining)
-                setPaymentOpen(true)
-              }}>
-                <CreditCard className="mr-2 h-4 w-4" />
-                {t('service_orders.accept_payment')}
-              </Button>
-            )}
+            {editing ? (
+              <div className="space-y-3">
+                <label className="flex flex-col gap-1 text-xs font-medium">
+                  {t('service_orders.job_status')}
+                  <Select value={editStatus} onValueChange={(value) => setEditStatus(value as ServiceOrderStatus)}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder={t('common.select_placeholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vertical.statusFlow.map((status) => (
+                        <SelectItem key={status} value={status}>{status}</SelectItem>
+                      ))}
+                      <SelectItem value="Batal">Batal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </label>
 
-            {/* Garansi */}
-            <div className="border-t border-dashed pt-3 mt-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">{t('service_orders.service_warranty')}</span>
-                {editing ? (
-                  <div className="flex items-center gap-1.5">
+                <label className="flex flex-col gap-1 text-xs font-medium">
+                  {t('common.discount')}
+                  <CurrencyInput prefix="Rp" value={editDiscount} onValueChange={setEditDiscount} className="h-10" />
+                </label>
+
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{t('common.subtotal')}</span>
+                  <span>{formatCurrency(editSubtotal)}</span>
+                </div>
+                <div className="flex items-center justify-between border-t pt-2">
+                  <span className="font-medium">{t('common.total')}</span>
+                  <span className="text-lg font-bold">{formatCurrency(editTotal)}</span>
+                </div>
+
+                <div className="space-y-2 border-t pt-3">
+                  <div className="flex items-center gap-2">
                     <input
                       type="checkbox"
                       id="edit-warranty"
                       className="h-4 w-4 rounded border-gray-300"
                       checked={editHasWarranty}
-                      onChange={(e) => setEditHasWarranty(e.target.checked)}
+                      onChange={(event) => setEditHasWarranty(event.target.checked)}
                     />
-                    {editHasWarranty && (
-                      <div className="flex items-center gap-1">
-                        <Input
-                          type="number"
-                          min="1"
-                          className="h-7 w-14 text-sm"
-                          value={editWarrantyValue}
-                          onChange={(e) => setEditWarrantyValue(e.target.value)}
-                        />
-                        <Select value={editWarrantyUnit} onValueChange={(v) => setEditWarrantyUnit(v as 'hari' | 'bulan' | 'tahun')}>
-                          <SelectTrigger className="h-7 w-20 text-xs">
-                            <SelectValue placeholder={t('common.select_placeholder')} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="hari">{t('common.days')}</SelectItem>
-                            <SelectItem value="bulan">{t('common.months')}</SelectItem>
-                            <SelectItem value="tahun">{t('common.years')}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+                    <label htmlFor="edit-warranty" className="text-xs font-medium">{t('service_orders.service_warranty')}</label>
                   </div>
-                ) : order.hasWarranty ? (
-                  <div className="flex items-center gap-1.5">
-                    {order.warrantyEndDate && isWarrantyExpired(order.warrantyEndDate) ? (
-                      <>
-                        <ShieldX className="h-4 w-4 text-destructive" />
-                        <span className="text-xs text-destructive font-medium">{t('service_orders.warranty_expired')}</span>
-                      </>
-                    ) : (
-                      <>
-                        <ShieldCheck className="h-4 w-4 text-amber-500" />
-                        <span className="text-xs text-amber-600 font-medium">
-                          {order.warrantyValue} {order.warrantyUnit}
-                        </span>
-                      </>
-                    )}
+                  {editHasWarranty && (
+                    <div className="flex gap-2">
+                      <Input
+                        inputMode="numeric"
+                        className="h-9 w-20"
+                        value={editWarrantyValue}
+                        onChange={(event) => setEditWarrantyValue(event.target.value.replace(/\D/g, ''))}
+                        aria-label={t('service_orders.warranty_value')}
+                      />
+                      <Select value={editWarrantyUnit} onValueChange={(value) => setEditWarrantyUnit(value as 'hari' | 'bulan' | 'tahun')}>
+                        <SelectTrigger className="h-9 flex-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="hari">{t('common.days')}</SelectItem>
+                          <SelectItem value="bulan">{t('common.months')}</SelectItem>
+                          <SelectItem value="tahun">{t('common.years')}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{t('service_orders.job_status')}</span>
+                  <StatusBadge label={order.status} tone={tone(order.status)} />
+                </div>
+                {order.discountTotal ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">{t('common.discount')}</span>
+                    <span className="text-destructive">-{formatCurrency(order.discountTotal)}</span>
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{t('service_orders.service_cost')}</span>
+                  <span className="font-bold">{formatCurrency(order.cost)}</span>
+                </div>
+                <div className="flex items-center justify-between border-t border-dashed pt-2 text-primary">
+                  <span className="font-medium">{t('service_orders.paid_amount')}</span>
+                  <span className="font-bold">{formatCurrency(totalPaid)}</span>
+                </div>
+                {remaining > 0 ? (
+                  <div className="flex items-center justify-between text-destructive">
+                    <span className="font-medium">{t('service_orders.remaining_balance')}</span>
+                    <span className="text-lg font-bold">{formatCurrency(remaining)}</span>
                   </div>
                 ) : (
-                  <span className="text-xs text-muted-foreground">{t('common.none')}</span>
-                )}
-              </div>
-              {order.hasWarranty && order.warrantyEndDate && !editing && (
-                <div className="text-xs text-muted-foreground">
-                  {t('service_orders.valid_until', { date: new Date(order.warrantyEndDate).toLocaleDateString('id-ID', { dateStyle: 'long' }) })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Riwayat Pembayaran */}
-          {payments && payments.length > 0 && (
-            <div className="rounded-2xl border p-5 shadow-sm bg-card space-y-3">
-              <h3 className="font-semibold border-b pb-2">{t('service_orders.payment_history')}</h3>
-              {payments.map(p => (
-                <div key={p.id} className="flex justify-between text-sm py-2 border-b last:border-0 last:pb-0">
-                  <div>
-                    <p className="font-medium capitalize">{p.method}</p>
-                    <p className="text-xs text-muted-foreground">{p.date}</p>
+                  <div className="flex items-center justify-between text-success">
+                    <span className="font-medium">{t('service_orders.payment_status')}</span>
+                    <span className="text-lg font-bold">{t('common.paid')}</span>
                   </div>
-                  <p className="font-bold">{formatCurrency(p.amount)}</p>
+                )}
+
+                {remaining > 0 && (
+                  <Button className="w-full" onClick={() => { setPayAmount(remaining); setPaymentOpen(true) }}>
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    {t('service_orders.accept_payment')}
+                  </Button>
+                )}
+
+                <div className="space-y-1 border-t border-dashed pt-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">{t('service_orders.service_warranty')}</span>
+                    {order.hasWarranty ? (
+                      order.warrantyEndDate && isWarrantyExpired(order.warrantyEndDate) ? (
+                        <span className="flex items-center gap-1 text-xs font-medium text-destructive">
+                          <ShieldX className="h-4 w-4" />
+                          {t('service_orders.warranty_expired')}
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-xs font-medium text-amber-600">
+                          <ShieldCheck className="h-4 w-4" />
+                          {order.warrantyValue} {order.warrantyUnit}
+                        </span>
+                      )
+                    ) : (
+                      <span className="text-xs text-muted-foreground">{t('common.none')}</span>
+                    )}
+                  </div>
+                  {order.hasWarranty && order.warrantyEndDate && (
+                    <p className="text-xs text-muted-foreground">
+                      {t('service_orders.valid_until', {
+                        date: new Date(order.warrantyEndDate).toLocaleDateString('id-ID', { dateStyle: 'long' }),
+                      })}
+                    </p>
+                  )}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
+          </Card>
+
+          {payments && payments.length > 0 && (
+            <Card className="gap-3 p-4">
+              <h3 className="text-sm font-semibold">{t('service_orders.payment_history')}</h3>
+              <div className="space-y-2">
+                {payments.map((payment) => (
+                  <div key={payment.id} className="flex items-center justify-between border-b pb-2 text-sm last:border-0 last:pb-0">
+                    <div>
+                      <p className="font-medium capitalize">{payment.method}</p>
+                      <p className="text-xs text-muted-foreground">{payment.date}</p>
+                    </div>
+                    <p className="font-bold">{formatCurrency(payment.amount)}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
           )}
         </div>
       </div>
+
+      <Dialog open={isCatalogOpen} onOpenChange={setIsCatalogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{t('service_orders.select_product_service')}</DialogTitle>
+          </DialogHeader>
+          <JobCatalogPicker
+            onPick={(product) => {
+              const isService = product.type === 'Jasa'
+              setEditLines((prev) => {
+                const existing = !isService
+                  ? prev.find((line) => line.source === 'catalog' && line.productId === product.id)
+                  : undefined
+
+                if (existing) {
+                  return prev.map((line) =>
+                    line.id === existing.id
+                      ? { ...line, qty: line.qty + 1, subtotal: (line.qty + 1) * line.unitPrice }
+                      : line,
+                  )
+                }
+
+                return [
+                  ...prev,
+                  {
+                    id: `line-${crypto.randomUUID()}`,
+                    source: 'catalog',
+                    kind: isService ? 'service' : 'product',
+                    productId: product.id,
+                    name: product.name,
+                    unit: product.unit ?? (isService ? 'unit' : 'pcs'),
+                    qty: 1,
+                    priceMode: 'unit',
+                    unitPrice: product.price,
+                    costPrice: product.costPrice,
+                    trackStock: !isService && product.manageStock !== false,
+                    subtotal: product.price,
+                  },
+                ]
+              })
+              toast.success(t('service_orders.item_added', { name: product.name }))
+            }}
+          />
+          <DialogFooter>
+            <Button type="button" onClick={() => setIsCatalogOpen(false)}>{t('common.finish')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
@@ -773,29 +961,49 @@ export function ServiceOrderDetailPage() {
               <span>{t('service_orders.remaining_bill')}</span>
               <span className="font-bold text-destructive">{formatCurrency(remaining)}</span>
             </div>
+
             <div className="space-y-2">
               <label className="text-sm font-medium">{t('common.method')}</label>
-              <div className="grid grid-cols-3 gap-2">
-                {activeMethods.map((method) => (
-                  <Button
-                    key={method.id}
-                    variant={payMethod === method.name.toLowerCase() ? 'default' : 'outline'}
-                    onClick={() => setPayMethod(method.name.toLowerCase())}
-                    size="sm"
-                  >
-                    {method.name}
-                  </Button>
-                ))}
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {activeMethods.map((method: { id: string; name: string }) => {
+                  const display = getPaymentMethodDisplay(method.id, method.name)
+                  const MethodIcon = display.icon
+                  const isActive = payMethod === method.name.toLowerCase()
+                  return (
+                    <Button
+                      key={method.id}
+                      variant={isActive ? 'default' : 'outline'}
+                      onClick={() => setPayMethod(method.name.toLowerCase())}
+                      size="sm"
+                      className="justify-start gap-2"
+                      aria-pressed={isActive}
+                    >
+                      <MethodIcon className={`size-4 ${isActive ? '' : display.tone}`} aria-hidden="true" />
+                      {method.name}
+                    </Button>
+                  )
+                })}
               </div>
             </div>
+
             <div className="space-y-2">
-              <label className="text-sm font-medium">{t('common.amount')}</label>
-              <Input 
-                type="number"
-                value={payAmount || ''}
-                onChange={e => setPayAmount(Number(e.target.value) || 0)}
-                className="text-lg font-bold"
+              <label className="text-sm font-medium" htmlFor="soc-detail-pay">{t('common.amount')}</label>
+              <CurrencyInput
+                id="soc-detail-pay"
+                prefix="Rp"
+                value={payAmount}
+                onValueChange={setPayAmount}
+                className="h-11 text-lg font-bold"
               />
+              {quickCashOptions.length > 0 && (
+                <div className="grid grid-cols-2 gap-2">
+                  {quickCashOptions.slice(0, 4).map((amount, index) => (
+                    <Button key={amount} type="button" variant="secondary" size="sm" onClick={() => setPayAmount(amount)}>
+                      {index === 0 ? t('pos.quick_cash_exact') : formatCurrency(amount)}
+                    </Button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -804,7 +1012,6 @@ export function ServiceOrderDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
     </PageShell>
   )
 }

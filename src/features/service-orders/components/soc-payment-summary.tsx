@@ -1,22 +1,19 @@
+import { useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
+import { User, Wallet } from 'lucide-react'
+
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { formatCurrency } from '@/lib/format-currency'
-import { formatDateTime } from '@/lib/date'
 import { useServiceOrderCreateStore } from '@/features/service-orders/stores/service-order-create-store'
 import { socTransactionService } from '@/features/service-orders/services/soc-transaction.service'
 import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
-import { toast } from 'sonner'
-import { useState, useRef } from 'react'
-import { useTranslation } from 'react-i18next'
-import { PosSuccessDialog } from '@/features/pos/components/pos-success-dialog'
-import { buildWhatsAppLink } from '@/lib/whatsapp'
-import { localDb } from '@/services/local-db/client'
-import { messageTemplateService } from '@/services/message-template.service'
-import { type PosOrderSummary } from '@/features/pos/types/pos-order.types'
-import { usePdf } from '@/shared/components/pdf/use-pdf'
-import type { PdfData } from '@/shared/components/pdf/types'
-import { User } from 'lucide-react'
+import { CurrencyInput } from '@/shared/components/forms/currency-input'
+import { getPaymentMethodDisplay, buildQuickCashOptions } from '@/features/pos/lib/payment-method-display'
+import { sumJobLines } from '@/features/service-orders/lib/job-lines'
+import { ServiceSuccessFlow, type ServiceSuccessMeta } from '@/features/service-orders/components/service-success-flow'
+import type { PosOrderSummary } from '@/features/pos/types/pos-order.types'
 
 const defaultMethods = [
   { id: 'tunai', name: 'Tunai' },
@@ -24,98 +21,121 @@ const defaultMethods = [
   { id: 'transfer', name: 'Transfer' },
 ]
 
-export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
+export function SocPaymentSummary({
+  onComplete,
+  onSuccess,
+}: {
+  onComplete?: () => void
+  onSuccess?: (order: PosOrderSummary, meta: ServiceSuccessMeta) => void
+}) {
   const { t } = useTranslation()
   const store = useServiceOrderCreateStore()
   const dbMethods = usePaymentMethods()
-  const activeMethods = dbMethods && dbMethods.length > 0 ? dbMethods.filter((m) => m.status === 'Aktif') : defaultMethods
-  
+  const activeMethods = dbMethods && dbMethods.length > 0
+    ? dbMethods.filter((method) => method.status === 'Aktif')
+    : defaultMethods
+
   const [successOrder, setSuccessOrder] = useState<PosOrderSummary | null>(null)
+  const [successMeta, setSuccessMeta] = useState<ServiceSuccessMeta | null>(null)
   const [isProcessing, setIsProcessingState] = useState(false)
+  const [allowPartial, setAllowPartial] = useState(false)
   const isProcessingRef = useRef(false)
-  const setProcessing = (v: boolean) => { isProcessingRef.current = v; setIsProcessingState(v) }
-  const { downloadPdf } = usePdf()
+  const setProcessing = (value: boolean) => { isProcessingRef.current = value; setIsProcessingState(value) }
 
-  const totals = {
-    subtotal: store.items.reduce((sum, item) => sum + item.subtotal, 0),
-    total: store.items.reduce((sum, item) => sum + item.subtotal, 0)
-  }
+  const subtotal = sumJobLines(store.lines)
+  const total = Math.max(subtotal - store.discount, 0)
 
-  const receiptData: PdfData | null = successOrder ? {
-    type: 'receipt',
-    code: successOrder.code,
-    date: formatDateTime(successOrder.date),
-    cashierName: successOrder.cashierName || 'Kasir',
-    customer: { name: successOrder.customerName ?? 'Umum' },
-    items: successOrder.items.map(i => ({ name: i.name, qty: i.qty, price: i.price, subtotal: i.subtotal })),
-    summary: {
-      subtotal: successOrder.subtotal,
-      discount: successOrder.discount,
-      grandTotal: successOrder.total,
-      paidTotal: successOrder.amountPaid,
-      status: successOrder.amountPaid >= successOrder.total ? 'Lunas' : 'Sebagian',
-    },
-    paymentMethod: successOrder.paymentMethod,
-  } : null
-
-  const [paidAmount, setPaidAmount] = useState(totals.total)
+  const [paidAmount, setPaidAmount] = useState(total)
   const [paymentMethod, setPaymentMethod] = useState('')
-  const [hasAttemptedCheckout, setHasAttemptedCheckout] = useState(false)
+
+  const shortfall = Math.max(total - paidAmount, 0)
+  const isFullyPaid = shortfall <= 0
+  const canSubmit = store.lines.length > 0 && Boolean(paymentMethod) && !isProcessing && (isFullyPaid || allowPartial)
 
   async function handleCheckout() {
     if (isProcessingRef.current) return
 
     if (!paymentMethod) {
-      setHasAttemptedCheckout(true)
       toast.error(t('pos.payment_method_required'))
-      const methodsSection = document.getElementById('soc-payment-methods')
-      if (methodsSection) {
-        methodsSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }
       return
     }
 
-    setHasAttemptedCheckout(false)
+    if (!isFullyPaid && !allowPartial) {
+      toast.error(t('pos.split_invalid'))
+      return
+    }
+
     setProcessing(true)
     try {
+      const meta: ServiceSuccessMeta = {
+        device: [store.deviceBrand, store.deviceModel].filter(Boolean).join(' ') || store.jobCategory || '-',
+        complaint: store.complaint,
+        estimatedCompletion: store.estimatedCompletion,
+      }
+
       const result = await socTransactionService.checkout(
-        store.items,
-        totals,
+        store.lines,
+        { total, subtotal },
         paymentMethod,
         paidAmount,
         store.customerName,
         store.customerId,
         {
-          description: store.description,
+          description: store.complaint.trim() || store.description,
           notes: store.notes,
           estimatedCompletion: store.estimatedCompletion,
           hasWarranty: store.hasWarranty,
           warrantyValue: store.warrantyValue ? Number(store.warrantyValue) : undefined,
           warrantyUnit: store.warrantyUnit,
-        }
+          complaint: store.complaint,
+          diagnosis: store.diagnosis,
+          jobCategory: store.jobCategory,
+          deviceType: store.deviceType,
+          deviceBrand: store.deviceBrand,
+          deviceModel: store.deviceModel,
+          deviceSerial: store.deviceSerial,
+          accessories: store.accessories,
+          priority: store.priority,
+          technicianName: store.technicianName,
+          details: store.details,
+          discountTotal: store.discount,
+        },
       )
 
-      if (!result) {
-        throw new Error(t('common.error_generic'))
-      }
+      if (!result) throw new Error(t('common.error_generic'))
 
-      setSuccessOrder({
+      const order: PosOrderSummary = {
         id: result.serviceOrderId,
         code: result.code,
         date: new Date(),
-        subtotal: totals.subtotal,
+        subtotal,
         tax: 0,
-        discount: 0,
-        total: totals.total,
-        paymentMethod: paymentMethod,
+        discount: store.discount,
+        total,
+        paymentMethod,
         amountPaid: paidAmount,
-        change: Math.max(paidAmount - totals.total, 0),
-        items: store.items,
+        change: Math.max(paidAmount - total, 0),
+        items: store.lines.map((line) => ({
+          productId: line.productId ?? line.id,
+          name: line.name,
+          price: line.unitPrice,
+          qty: line.qty,
+          subtotal: line.subtotal,
+        })),
         customerId: store.customerId,
         customerName: store.customerName ?? 'Umum',
         cashierName: 'Kasir',
-      })
+      }
+
       store.clear()
+      setAllowPartial(false)
+
+      if (onSuccess) {
+        onSuccess(order, meta)
+      } else {
+        setSuccessMeta(meta)
+        setSuccessOrder(order)
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : t('common.error_generic')
       toast.error(message)
@@ -124,150 +144,167 @@ export function SocPaymentSummary({ onComplete }: { onComplete?: () => void }) {
     }
   }
 
-  async function handlePrint() {
-    if (!successOrder || !receiptData) return
-    await downloadPdf(receiptData, `struk-srv-${successOrder.code}`)
-  }
-
-  async function handleWhatsApp() {
-    if (!successOrder) return
-    const customerId = successOrder.customerId
-    let phone = ''
-    if (customerId) {
-      const customer = await localDb.customers.get(customerId)
-      phone = customer?.phone ?? ''
-    }
-    if (!phone) {
-      toast.error(t('service_orders.whatsapp_not_found'))
-      return
-    }
-
-    const paid = formatCurrency(successOrder.amountPaid)
-    const total = formatCurrency(successOrder.total)
-    const change = formatCurrency(successOrder.change)
-    const items = successOrder.items
-      .map((item) => `${item.name} x${item.qty} = ${formatCurrency(item.subtotal)}`)
-      .join('\n')
-
-    const text = await messageTemplateService.render('service_order_masuk', {
-      code: successOrder.code,
-      date: successOrder.date.toLocaleDateString('id-ID'),
-      customer_name: successOrder.customerName ?? 'Umum',
-      device: store.description.split('\n')[0] || store.description,
-      problem: store.description,
-      status: 'Diterima',
-      cost: formatCurrency(successOrder.total),
-      estimated_completion: store.estimatedCompletion ? new Date(store.estimatedCompletion).toLocaleDateString('id-ID', { dateStyle: 'long' }) : '-',
-      items,
-      total,
-      paid,
-      remaining: formatCurrency(Math.max(successOrder.total - successOrder.amountPaid, 0)),
-      change,
-      payment_method: successOrder.paymentMethod,
-      store_name: '',
-    })
-
-    window.open(buildWhatsAppLink(phone, text), '_blank')
-  }
+  const quickCashOptions = buildQuickCashOptions(total)
 
   return (
     <div className="flex flex-col gap-4">
-      <PosSuccessDialog 
-        open={successOrder !== null} 
-        onOpenChange={(open) => {
-          if (!open) {
+      {!onSuccess && (
+        <ServiceSuccessFlow
+          order={successOrder}
+          meta={successMeta}
+          onClose={() => {
             setSuccessOrder(null)
             onComplete?.()
-          }
-        }}
-        order={successOrder}
-        detailRoute="/service-orders"
-        onPrint={handlePrint}
-        onWhatsApp={handleWhatsApp}
-        onNewSale={() => {
-          setSuccessOrder(null)
-          onComplete?.()
-        }}
-      />
+          }}
+        />
+      )}
 
-      <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
+      <div className="flex items-center gap-2 rounded-lg bg-muted/30 p-3">
         <User className="size-4 text-muted-foreground" />
         <span className="font-medium">{store.customerName || 'Umum'}</span>
       </div>
 
       <div className="space-y-3">
-        <h3 className="font-medium text-sm text-muted-foreground">{t('service_orders.job_detail')}</h3>
-        <p className="text-sm border p-2 rounded bg-muted/20">{store.description}</p>
+        <h3 className="text-sm font-medium text-muted-foreground">{t('service_orders.job_detail')}</h3>
+        <p className="rounded-lg border bg-muted/20 p-2 text-sm">{store.complaint || store.description || '-'}</p>
 
-        <h3 className="font-medium text-sm text-muted-foreground mt-3">{t('service_orders.cost_items')}</h3>
-        <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
-          {store.items.map(item => (
-            <div key={item.productId} className="flex justify-between text-sm">
-              <div className="flex-1 pr-2">
-                <span className="font-medium">{item.name}</span>
-                <span className="text-muted-foreground ml-2">x{item.qty}</span>
+        <div className="max-h-44 space-y-2 overflow-y-auto pr-2">
+          {store.lines.map((line) => (
+            <div key={line.id} className="flex justify-between gap-2 text-sm">
+              <div className="min-w-0 flex-1">
+                <span className="font-medium">{line.name}</span>
+                <span className="ml-2 text-muted-foreground">
+                  {line.qty} {line.unit}
+                  {line.priceMode === 'area' && line.width && line.height ? ` · ${line.width}x${line.height}` : ''}
+                </span>
               </div>
-              <span className="font-medium">{formatCurrency(item.subtotal)}</span>
+              <span className="shrink-0 font-medium">{formatCurrency(line.subtotal)}</span>
             </div>
           ))}
-          {store.items.length === 0 && (
-            <p className="text-xs text-muted-foreground">{t('service_orders.no_special_cost_items')}</p>
+          {store.lines.length === 0 && (
+            <p className="text-xs text-muted-foreground">{t('service_orders.no_lines')}</p>
           )}
         </div>
       </div>
-      
+
       <Separator />
 
       <div className="space-y-2 text-sm">
-        <div className="flex justify-between text-xl font-bold pt-2">
-          <span>{t('service_orders.total_estimated_cost')}</span>
-          <span className="text-primary">{formatCurrency(totals.total)}</span>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">{t('common.subtotal')}</span>
+          <span>{formatCurrency(subtotal)}</span>
+        </div>
+        {store.discount > 0 && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">{t('common.discount')}</span>
+            <span className="text-destructive">-{formatCurrency(store.discount)}</span>
+          </div>
+        )}
+        <div className="flex items-end justify-between pt-1">
+          <span className="font-medium">{t('common.total')}</span>
+          <span className="text-2xl font-bold text-primary">{formatCurrency(total)}</span>
         </div>
       </div>
 
-      <div id="soc-payment-methods" className={`space-y-3 pt-2 p-2 rounded-xl transition-colors ${hasAttemptedCheckout && !paymentMethod ? 'bg-destructive/10 border border-destructive/50' : ''}`}>
-        <label className={`text-sm font-medium ${hasAttemptedCheckout && !paymentMethod ? 'text-destructive' : ''}`}>{t('pos.payment_method_select')}</label>
-        <div className="grid grid-cols-3 gap-2">
-          {activeMethods.map((method: { id: string; name: string }) => (
-            <Button
-              key={method.id}
-              variant={paymentMethod === method.name.toLowerCase() ? 'default' : 'outline'}
-              onClick={() => setPaymentMethod(method.name.toLowerCase())}
-              size="sm"
-            >
-              {method.name}
-            </Button>
-          ))}
+      <div className="space-y-3 rounded-xl border border-transparent p-2">
+        <label className="text-sm font-medium">{t('pos.payment_method_select')}</label>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {activeMethods.map((method: { id: string; name: string }) => {
+            const display = getPaymentMethodDisplay(method.id, method.name)
+            const MethodIcon = display.icon
+            const isActive = paymentMethod === method.name.toLowerCase()
+            return (
+              <Button
+                key={method.id}
+                type="button"
+                variant={isActive ? 'default' : 'outline'}
+                onClick={() => setPaymentMethod(method.name.toLowerCase())}
+                size="sm"
+                className="justify-start gap-2"
+                aria-pressed={isActive}
+              >
+                <MethodIcon className={`size-4 ${isActive ? '' : display.tone}`} aria-hidden="true" />
+                {method.name}
+              </Button>
+            )
+          })}
         </div>
+        {!paymentMethod && (
+          <p className="text-xs font-medium text-destructive">{t('pos.payment_method_required')}</p>
+        )}
       </div>
 
-      <div className="space-y-3 p-4 border rounded-2xl bg-muted/10">
-        <label className="text-sm font-medium">{t('service_orders.down_payment_or_paid')}</label>
-        <Input
-          inputMode="numeric"
-          placeholder={t('service_orders.dp_placeholder')}
-          value={paidAmount || ''}
-          onChange={(event) => setPaidAmount(Number(event.target.value) || 0)}
-          className="text-lg font-semibold h-12"
+      <div className="space-y-3 rounded-2xl border bg-muted/10 p-4">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium" htmlFor="soc-paid-amount">
+            {t('service_orders.down_payment_or_paid')}
+          </label>
+          <span className="text-xs text-muted-foreground">{t('pos.minimum_amount', { amount: formatCurrency(total) })}</span>
+        </div>
+        <CurrencyInput
+          id="soc-paid-amount"
+          prefix="Rp"
+          value={paidAmount}
+          onValueChange={setPaidAmount}
+          className="h-12 text-lg font-semibold"
+          placeholder="0"
         />
-        <div className="flex justify-between items-center text-sm pt-2">
-          {paidAmount > 0 && paidAmount < totals.total ? (
+
+        {quickCashOptions.length > 0 && (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {quickCashOptions.map((amount, index) => (
+              <Button key={amount} type="button" variant="secondary" size="sm" onClick={() => setPaidAmount(amount)}>
+                {index === 0 ? t('pos.quick_cash_exact') : formatCurrency(amount)}
+              </Button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between text-sm">
+          {paidAmount > 0 && paidAmount < total ? (
             <>
-              <span className="text-destructive font-medium">{t('service_orders.remaining_bill')}</span>
-              <span className="text-destructive font-bold">{formatCurrency(totals.total - paidAmount)}</span>
+              <span className="font-medium text-destructive">{t('service_orders.remaining_bill')}</span>
+              <span className="font-bold text-destructive">{formatCurrency(shortfall)}</span>
             </>
           ) : (
             <>
               <span className="text-muted-foreground">{t('pos.change')}</span>
-              <span className="text-lg font-bold text-success">{formatCurrency(Math.max((paidAmount || totals.total) - totals.total, 0))}</span>
+              <span className="text-lg font-bold text-success">{formatCurrency(Math.max(paidAmount - total, 0))}</span>
             </>
           )}
         </div>
+
+        {!isFullyPaid && (
+          <Button
+            type="button"
+            variant={allowPartial ? 'default' : 'outline'}
+            size="sm"
+            className="w-full"
+            onClick={() => setAllowPartial((value) => !value)}
+            aria-pressed={allowPartial}
+          >
+            <Wallet data-icon="inline-start" />
+            {allowPartial ? t('pos.partial_payment_enabled') : t('pos.partial_payment')}
+          </Button>
+        )}
       </div>
 
-      <Button size="lg" className="h-14 text-lg font-semibold w-full mt-2" disabled={isProcessing} onClick={handleCheckout}>
-        {isProcessing ? t('common.processing') : t('service_orders.process_service_order')}
+      <Button
+        size="lg"
+        className="h-14 w-full text-lg font-semibold"
+        disabled={!canSubmit}
+        onClick={handleCheckout}
+      >
+        {isProcessing
+          ? t('common.processing')
+          : isFullyPaid
+            ? t('service_orders.process_service_order')
+            : t('pos.complete_partial_payment')}
       </Button>
+
+      {!isFullyPaid && allowPartial && (
+        <p className="text-center text-xs text-muted-foreground">{t('pos.partial_payment_hint')}</p>
+      )}
     </div>
   )
 }

@@ -3,26 +3,43 @@ import { productRepository } from '@/services/local-db/repository'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { todayISO } from '@/lib/date'
 import { addWarrantyDuration, buildWarrantyTimelineNote } from '@/features/service-orders/lib/warranty'
+import { isStockTrackedLine, jobLineToLegacyItem, sumJobLineCost } from '@/features/service-orders/lib/job-lines'
 import { syncCustomerSalesMetrics } from '@/features/sales-orders/services/sales-order-finance.service'
 import { recordServiceOrderJournal } from '@/services/accounting/accounting-integration'
-import type { 
-  LocalServiceOrder, 
-  LocalPayment, 
+import type {
+  LocalServiceOrder,
+  LocalPayment,
   LocalProduct,
-  LocalStockMovement, 
-  LocalInventory, 
+  LocalStockMovement,
+  LocalInventory,
   OutboxItem,
   PosPaymentMethodCode,
   WarrantyUnit,
+  LocalJobLine,
+  JobPriority,
 } from '@/services/local-db/schema'
 
-export type SocItem = {
-  productId: string
-  name: string
-  qty: number
-  price: number
-  costPrice?: number
-  subtotal: number
+export type SocItem = LocalJobLine
+
+export type SocServiceData = {
+  description: string
+  notes: string
+  estimatedCompletion?: string
+  hasWarranty?: boolean
+  warrantyValue?: number
+  warrantyUnit?: WarrantyUnit
+  complaint?: string
+  diagnosis?: string
+  jobCategory?: string
+  deviceType?: string
+  deviceBrand?: string
+  deviceModel?: string
+  deviceSerial?: string
+  accessories?: string
+  priority?: JobPriority
+  technicianName?: string
+  details?: Record<string, string>
+  discountTotal?: number
 }
 
 function newId(prefix: string) {
@@ -40,24 +57,30 @@ async function serviceOrderCode(): Promise<string> {
 
 export const socTransactionService = {
   async checkout(
-    items: SocItem[], 
-    totals: { total: number }, 
-    paymentMethod: string, 
-    paidAmount: number, 
-    customerName: string, 
+    lines: SocItem[],
+    totals: { total: number; subtotal?: number },
+    paymentMethod: string,
+    paidAmount: number,
+    customerName: string,
     customerId: string | null,
-    serviceData: { description: string; notes: string; estimatedCompletion?: string; hasWarranty?: boolean; warrantyValue?: number; warrantyUnit?: WarrantyUnit }
+    serviceData: SocServiceData,
   ) {
     if (!serviceData.description.trim()) throw new Error('Deskripsi pekerjaan wajib diisi')
+    if (lines.length === 0) throw new Error('Tambahkan minimal satu item pekerjaan')
+    if (lines.some((line) => !line.name.trim())) throw new Error('Nama item tidak boleh kosong')
+    if (lines.some((line) => !Number.isFinite(line.qty) || line.qty <= 0)) throw new Error('Jumlah item harus lebih dari 0')
 
     const tenantId = requireActiveTenantId()
     const nowIso = new Date().toISOString()
     const serviceOrderId = crypto.randomUUID()
     const paymentId = newId('pay')
 
+    const discountTotal = Math.max(serviceData.discountTotal ?? 0, 0)
+    const grandTotal = Math.max(totals.total, 0)
+
     const rawPaid = Math.max(paidAmount, 0)
-    const retainedAmount = Math.min(rawPaid, totals.total)
-    
+    const retainedAmount = Math.min(rawPaid, grandTotal)
+
     const paymentStatus = paymentMethod === 'piutang' ? 'Pending' : 'Berhasil'
 
     const warrantyEndDate = serviceData.hasWarranty && serviceData.warrantyValue && serviceData.warrantyUnit
@@ -69,6 +92,7 @@ export const socTransactionService = {
       status: 'Diterima',
       date: nowIso,
       note: 'Service order dibuat',
+      actor: serviceData.technicianName || undefined,
     }]
 
     if (serviceData.hasWarranty && serviceData.warrantyValue && serviceData.warrantyUnit) {
@@ -78,7 +102,24 @@ export const socTransactionService = {
         date: nowIso,
         note: buildWarrantyTimelineNote({ value: serviceData.warrantyValue, unit: serviceData.warrantyUnit, mode: 'created', endDate: warrantyEndDate }),
         type: 'warranty',
+        actor: serviceData.technicianName || undefined,
       })
+    }
+
+    // Only catalog products that manage stock move inventory.
+    const stockTrackedLines = lines.filter(isStockTrackedLine)
+
+    const productIds = [...new Set(stockTrackedLines.map((line) => line.productId).filter(Boolean))] as string[]
+    const existingProducts = productIds.length > 0 ? await localDb.products.bulkGet(productIds) : []
+    const productMap = new Map(existingProducts.filter(Boolean).map((p) => [p!.id, p!]))
+
+    for (const line of stockTrackedLines) {
+      if (!line.productId) continue
+      const product = productMap.get(line.productId)
+      if (!product) continue
+      if (product.stock < line.qty) {
+        throw new Error(`Stok ${product.name} tidak mencukupi. Tersedia: ${product.stock}, diminta: ${line.qty}`)
+      }
     }
 
     const serviceOrder: LocalServiceOrder = {
@@ -88,14 +129,27 @@ export const socTransactionService = {
       customerId: customerId ?? undefined,
       customerName: customerName || 'Umum',
       description: serviceData.description,
-        date: todayISO(),
+      date: todayISO(),
       estimatedCompletion: serviceData.estimatedCompletion,
-      cost: totals.total,
-      costPrice: items.reduce((acc, it) => acc + ((Number(it.costPrice) || 0) * (Number(it.qty) || 1)), 0),
+      cost: grandTotal,
+      costPrice: sumJobLineCost(lines),
+      discountTotal: discountTotal > 0 ? discountTotal : undefined,
       paidTotal: retainedAmount,
       status: 'Diterima',
-      items: items.map(c => ({ ...c })),
-      notes: serviceData.notes,
+      lines,
+      items: lines.map(jobLineToLegacyItem),
+      notes: serviceData.notes?.trim() || undefined,
+      complaint: serviceData.complaint,
+      diagnosis: serviceData.diagnosis,
+      jobCategory: serviceData.jobCategory,
+      deviceType: serviceData.deviceType,
+      deviceBrand: serviceData.deviceBrand,
+      deviceModel: serviceData.deviceModel,
+      deviceSerial: serviceData.deviceSerial,
+      accessories: serviceData.accessories,
+      priority: serviceData.priority ?? 'Normal',
+      technicianName: serviceData.technicianName || undefined,
+      details: serviceData.details,
       hasWarranty: serviceData.hasWarranty,
       warrantyValue: serviceData.warrantyValue,
       warrantyUnit: serviceData.warrantyUnit,
@@ -119,7 +173,7 @@ export const socTransactionService = {
         attempts: 0,
         createdAt: nowIso,
         updatedAt: nowIso,
-      }
+      },
     ]
 
     let payment: LocalPayment | null = null
@@ -132,7 +186,7 @@ export const socTransactionService = {
         source: 'SERVICE',
         method: paymentMethod as PosPaymentMethodCode,
         amount: retainedAmount,
-      date: todayISO(),
+        date: todayISO(),
         status: paymentStatus,
         syncStatus: 'pending',
         version: 1,
@@ -152,52 +206,46 @@ export const socTransactionService = {
       })
     }
 
-    const stockMovements: LocalStockMovement[] = items
-      .filter(item => item.qty > 0)
-      .map(item => ({
-        id: newId('sm'),
-        tenantId,
-        productId: item.productId,
-        productName: item.name,
-        warehouseName: 'Gudang Toko',
-        type: 'sale',
-        qty: -item.qty,
-        referenceType: 'sale',
-        referenceId: serviceOrderId,
-        syncStatus: 'pending',
-        updatedAt: nowIso,
-      }))
-      
-    if (stockMovements.length > 0) {
-      stockMovements.forEach(m => {
-        outboxPayload.push({
-          id: newId('outbox'),
-          tenantId,
-          entityType: 'stock_movement',
-          entityId: m.id,
-          mutationType: 'create',
-          payload: m,
-          status: 'queued',
-          attempts: 0,
-          createdAt: nowIso,
-          updatedAt: nowIso,
-        })
-      })
-    }
-
     const warehouseName = 'Gudang Toko'
-    const productIds = [...new Set(items.map((i) => i.productId))]
-    const existingProducts = await localDb.products.bulkGet(productIds)
-    const productMap = new Map(existingProducts.filter(Boolean).map((p) => [p!.id, p!]))
+
+    const stockMovements: LocalStockMovement[] = stockTrackedLines.map((line) => ({
+      id: newId('sm'),
+      tenantId,
+      productId: line.productId!,
+      productName: line.name,
+      warehouseName,
+      type: 'sale',
+      qty: -line.qty,
+      referenceType: 'service',
+      referenceId: serviceOrderId,
+      syncStatus: 'pending',
+      updatedAt: nowIso,
+    }))
+
+    stockMovements.forEach((movement) => {
+      outboxPayload.push({
+        id: newId('outbox'),
+        tenantId,
+        entityType: 'stock_movement',
+        entityId: movement.id,
+        mutationType: 'create',
+        payload: movement,
+        status: 'queued',
+        attempts: 0,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      })
+    })
 
     const inventoryRows: LocalInventory[] = []
     const productUpdates: LocalProduct[] = []
 
-    for (const item of items) {
-      const existing = productMap.get(item.productId)
-      if (!existing || existing.tenantId !== tenantId || existing.type !== 'Produk Fisik') continue
+    for (const movement of stockMovements) {
+      const existing = productMap.get(movement.productId)
+      if (!existing || existing.tenantId !== tenantId) continue
+      if (existing.type !== 'Produk Fisik' || existing.manageStock === false) continue
 
-      const nextStock = Math.max(0, existing.stock - item.qty)
+      const nextStock = Math.max(0, existing.stock + movement.qty)
       productUpdates.push({ ...existing, stock: nextStock, updatedAt: nowIso, version: existing.version + 1, syncStatus: 'pending' })
 
       let status = 'Aman'
@@ -205,13 +253,13 @@ export const socTransactionService = {
       else if (nextStock <= 5) status = 'Stok Rendah'
 
       inventoryRows.push({
-        id: `${tenantId}_${item.productId}_${warehouseName}`,
+        id: `${tenantId}_${movement.productId}_${warehouseName}`,
         tenantId,
         product: existing.name,
         warehouse: warehouseName,
         stockSystem: nextStock,
         stockSafe: 5,
-        movement: `-${item.qty} (service)`,
+        movement: `${movement.qty} (service)`,
         status,
       })
     }
@@ -240,12 +288,11 @@ export const socTransactionService = {
       }
     }
 
-    // Accounting journal entry (non-blocking)
     try {
       await recordServiceOrderJournal(
         tenantId,
         serviceOrderId,
-        totals.total,
+        grandTotal,
         paymentMethod,
         todayISO(),
       )

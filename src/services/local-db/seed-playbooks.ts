@@ -77,6 +77,7 @@ export function buildAtkPrintingSeed(input: BuildAtkPrintingSeedInput): Playbook
       costPrice: item.cost,
       stock: item.stock,
       manageStock: item.type === 'Produk Fisik',
+      unit: item.unit,
       status: 'Aktif',
       syncStatus: 'synced',
       version: 1,

@@ -242,6 +242,17 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
         />
       </div>
 
+      <div className="space-y-2">
+        <label className="text-sm font-medium" htmlFor="product-unit">{t('products.unit_label')}</label>
+        <Input
+          id="product-unit"
+          {...form.register('unit')}
+          placeholder={t('products.unit_placeholder')}
+          aria-invalid={Boolean(errors.unit)}
+        />
+        <p className="text-xs text-muted-foreground">{t('products.unit_hint')}</p>
+      </div>
+
       <div className="border rounded-lg">
         <button
           type="button"

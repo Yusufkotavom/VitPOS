@@ -1,123 +1,190 @@
 import { create } from 'zustand'
 
-import { getWholesalePrice } from '@/features/products/lib/wholesale'
-import type { WholesaleTier } from '@/services/local-db/schema'
+import {
+  computeJobLineSubtotal,
+  createJobLine,
+  jobLineFromProduct,
+  sumJobLines,
+} from '@/features/service-orders/lib/job-lines'
+import type { JobPriority, LocalJobLine, LocalProduct } from '@/services/local-db/schema'
+import type { JobLinePriceMode } from '@/services/local-db/schema'
 
-export interface ServiceItem {
-  productId: string
-  name: string
-  qty: number
-  price: number
-  costPrice?: number
-  subtotal: number
-  wholesaleTiers?: WholesaleTier[]
-}
+export type { LocalJobLine as ServiceItem }
 
-interface ServiceOrderCreateState {
+export type ServiceIntakeState = {
   customerName: string
   customerId: string | null
   description: string
   notes: string
+  complaint: string
+  diagnosis: string
+  jobCategory: string
+  deviceType: string
+  deviceBrand: string
+  deviceModel: string
+  deviceSerial: string
+  accessories: string
+  priority: JobPriority
+  technicianName: string
+  details: Record<string, string>
   status: string
   estimatedCompletion?: string
+  discount: number
   hasWarranty: boolean
   warrantyValue: string
   warrantyUnit: 'hari' | 'bulan' | 'tahun'
-  items: ServiceItem[]
+  lines: LocalJobLine[]
 
   setCustomer: (name: string, id: string | null) => void
   setDescription: (desc: string) => void
   setNotes: (notes: string) => void
+  setComplaint: (value: string) => void
+  setDiagnosis: (value: string) => void
+  setJobCategory: (value: string) => void
+  setDeviceField: (field: 'deviceType' | 'deviceBrand' | 'deviceModel' | 'deviceSerial' | 'accessories', value: string) => void
+  setPriority: (value: JobPriority) => void
+  setTechnicianName: (value: string) => void
+  setDetail: (key: string, value: string) => void
   setStatus: (status: string) => void
   setEstimatedCompletion: (date?: string) => void
+  setDiscount: (value: number) => void
   setHasWarranty: (value: boolean) => void
   setWarrantyValue: (value: string) => void
   setWarrantyUnit: (value: 'hari' | 'bulan' | 'tahun') => void
-  addItem: (item: { productId: string; name: string; price: number; costPrice?: number; wholesaleTiers?: WholesaleTier[] }) => void
-  addCustomItem: () => void
-  updateItemQty: (productId: string, qty: number) => void
-  updateItem: (productId: string, changes: Partial<Pick<ServiceItem, 'name' | 'price' | 'costPrice'>>) => void
-  removeItem: (productId: string) => void
+
+  addProduct: (product: LocalProduct) => void
+  addCustomLine: (draft?: Partial<LocalJobLine>) => void
+  updateLine: (lineId: string, changes: Partial<LocalJobLine>) => void
+  updateLineQty: (lineId: string, qty: number) => void
+  removeLine: (lineId: string) => void
+
   clear: () => void
+  subtotal: () => number
+  total: () => number
 }
 
-export const useServiceOrderCreateStore = create<ServiceOrderCreateState>((set) => ({
+const initialState = {
   customerName: 'Umum',
-  customerId: null,
+  customerId: null as string | null,
   description: '',
   notes: '',
-  status: 'Baru',
-  estimatedCompletion: undefined,
+  complaint: '',
+  diagnosis: '',
+  jobCategory: '',
+  deviceType: '',
+  deviceBrand: '',
+  deviceModel: '',
+  deviceSerial: '',
+  accessories: '',
+  priority: 'Normal' as JobPriority,
+  technicianName: '',
+  details: {} as Record<string, string>,
+  status: 'Diterima',
+  estimatedCompletion: undefined as string | undefined,
+  discount: 0,
   hasWarranty: false,
   warrantyValue: '',
-  warrantyUnit: 'hari',
-  items: [],
+  warrantyUnit: 'hari' as const,
+  lines: [] as LocalJobLine[],
+}
+
+function recalcLine(line: LocalJobLine, changes: Partial<LocalJobLine>): LocalJobLine {
+  const next = { ...line, ...changes }
+  return {
+    ...next,
+    subtotal: computeJobLineSubtotal({
+      priceMode: next.priceMode,
+      qty: next.qty,
+      unitPrice: next.unitPrice,
+      width: next.width,
+      height: next.height,
+    }),
+  }
+}
+
+export const useServiceOrderCreateStore = create<ServiceIntakeState>((set, get) => ({
+  ...initialState,
 
   setCustomer: (name, id) => set({ customerName: name, customerId: id }),
-  setDescription: (desc) => set({ description: desc }),
+  setDescription: (description) => set({ description }),
   setNotes: (notes) => set({ notes }),
+  setComplaint: (complaint) => set({ complaint, description: complaint }),
+  setDiagnosis: (diagnosis) => set({ diagnosis }),
+  setJobCategory: (jobCategory) => set({ jobCategory }),
+  setDeviceField: (field, value) => set({ [field]: value } as Partial<ServiceIntakeState>),
+  setPriority: (priority) => set({ priority }),
+  setTechnicianName: (technicianName) => set({ technicianName }),
+  setDetail: (key, value) =>
+    set((state) => ({ details: { ...state.details, [key]: value } })),
   setStatus: (status) => set({ status }),
-  setEstimatedCompletion: (date) => set({ estimatedCompletion: date }),
-  setHasWarranty: (value) => set({ hasWarranty: value }),
-  setWarrantyValue: (value) => set({ warrantyValue: value }),
-  setWarrantyUnit: (value) => set({ warrantyUnit: value }),
+  setEstimatedCompletion: (estimatedCompletion) => set({ estimatedCompletion }),
+  setDiscount: (discount) => set({ discount: Math.max(0, discount) }),
+  setHasWarranty: (hasWarranty) => set({ hasWarranty }),
+  setWarrantyValue: (warrantyValue) => set({ warrantyValue }),
+  setWarrantyUnit: (warrantyUnit) => set({ warrantyUnit }),
 
-  addItem: (product) => {
+  addProduct: (product) =>
     set((state) => {
-      const existing = state.items.find((i) => i.productId === product.productId)
+      const isService = product.type === 'Jasa'
+      const existing = !isService
+        ? state.lines.find((line) => line.source === 'catalog' && line.productId === product.id)
+        : undefined
+
       if (existing) {
-        const newQty = existing.qty + 1
-        const newPrice = getWholesalePrice(existing.price, existing.wholesaleTiers, newQty)
         return {
-          items: state.items.map((i) =>
-            i.productId === product.productId ? { ...i, qty: newQty, price: newPrice, subtotal: newQty * newPrice } : i,
+          lines: state.lines.map((line) =>
+            line.id === existing.id ? recalcLine(line, { qty: line.qty + 1 }) : line,
           ),
         }
       }
-      return {
-        items: [...state.items, { ...product, costPrice: product.costPrice ?? 0, qty: 1, subtotal: product.price }],
-      }
-    })
-  },
 
-  addCustomItem: () => {
+      return { lines: [...state.lines, jobLineFromProduct(product)] }
+    }),
+
+  addCustomLine: (draft) =>
     set((state) => ({
-      items: [...state.items, {
-        productId: `custom-${Date.now()}`,
-        name: '',
-        qty: 1,
-        price: 0,
-        costPrice: 0,
-        subtotal: 0,
-      }],
-    }))
-  },
+      lines: [
+        ...state.lines,
+        createJobLine({
+          source: 'custom',
+          kind: draft?.kind ?? 'service',
+          name: draft?.name ?? '',
+          unit: draft?.unit ?? 'pcs',
+          qty: draft?.qty ?? 1,
+          priceMode: (draft?.priceMode as JobLinePriceMode) ?? 'unit',
+          unitPrice: draft?.unitPrice ?? 0,
+          costPrice: draft?.costPrice ?? 0,
+          width: draft?.width,
+          height: draft?.height,
+          trackStock: false,
+        }),
+      ],
+    })),
 
-  updateItemQty: (productId, qty) => {
+  updateLine: (lineId, changes) =>
     set((state) => ({
-      items: state.items.map((i) =>
-        i.productId === productId
-          ? { ...i, qty, price: getWholesalePrice(i.price, i.wholesaleTiers, qty), subtotal: qty * getWholesalePrice(i.price, i.wholesaleTiers, qty) }
-          : i,
-      ),
-    }))
-  },
+      lines: state.lines.map((line) => (line.id === lineId ? recalcLine(line, changes) : line)),
+    })),
 
-  updateItem: (productId, changes) => {
+  updateLineQty: (lineId, qty) =>
     set((state) => ({
-      items: state.items.map((i) => {
-        if (i.productId !== productId) return i
-        const newPrice = changes.price !== undefined ? changes.price : i.price
-        return { ...i, ...changes, subtotal: i.qty * newPrice }
-      }),
-    }))
-  },
+      lines: state.lines
+        .map((line) => (line.id === lineId ? recalcLine(line, { qty }) : line))
+        .filter((line) => line.qty > 0),
+    })),
 
-  removeItem: (productId) => {
-    set((state) => ({
-      items: state.items.filter((i) => i.productId !== productId),
-    }))
-  },
+  removeLine: (lineId) =>
+    set((state) => ({ lines: state.lines.filter((line) => line.id !== lineId) })),
 
-  clear: () => set({ customerName: 'Umum', customerId: null, description: '', notes: '', status: 'Baru', estimatedCompletion: undefined, hasWarranty: false, warrantyValue: '', warrantyUnit: 'hari', items: [] }),
+  clear: () => set({ ...initialState, lines: [] }),
+
+  subtotal: () => sumJobLines(get().lines),
+
+  total: () => {
+    const subtotal = sumJobLines(get().lines)
+    return Math.max(subtotal - get().discount, 0)
+  },
 }))
+
+export { jobLineFromProduct, createJobLine, computeJobLineSubtotal }
+export type { LocalJobLine as JobLine }

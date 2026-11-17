@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Clock, Filter, LayoutGrid, List, ShieldCheck, ShieldX } from 'lucide-react'
+import { AlertTriangle, Clock, Filter, LayoutGrid, List, ShieldCheck, ShieldX } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -8,24 +8,33 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/format-currency'
+import { cn } from '@/lib/utils'
 import { ServiceOrderCrudActions } from '@/features/service-orders/components/service-order-crud-actions'
 import { useServiceOrders } from '@/features/service-orders/hooks/use-service-orders'
+import { useServiceVertical } from '@/features/service-orders/hooks/use-service-vertical'
 import { DataTable } from '@/shared/components/data-table/data-table'
 import { ContentCard } from '@/shared/components/display/content-card'
 import { StatusBadge } from '@/shared/components/display/status-badge'
+import { EmptyState } from '@/shared/components/feedback/empty-state'
 import { isWarrantyExpired } from '@/features/service-orders/lib/warranty'
 import { PageShell } from '@/shared/components/layout/page-shell'
 
-function tone(status: string) {
+type Tone = 'success' | 'warning' | 'danger' | 'info' | 'neutral'
+
+function tone(status: string): Tone {
   if (status === 'Selesai' || status === 'Diambil') return 'success'
   if (status === 'Dikerjakan') return 'info'
   if (status === 'Batal') return 'danger'
+  if (status === 'Diagnosa' || status === 'Menunggu Persetujuan') return 'info'
   return 'warning'
 }
 
-function warrantyBadge(row: { hasWarranty?: boolean; status: string; warrantyStartDate?: string; warrantyEndDate?: string }, t: (key: string) => string) {
+function warrantyBadge(
+  row: { hasWarranty?: boolean; status: string; warrantyStartDate?: string; warrantyEndDate?: string },
+  t: (key: string) => string,
+) {
   if (!row.hasWarranty) return { label: t('service_orders.no_warranty'), tone: 'neutral' as const, icon: ShieldX, filterValue: 'tanpa' }
-  if (row.status !== 'Selesai' || !row.warrantyStartDate) return { label: t('service_orders.warranty_pending'), tone: 'warning' as const, icon: Clock, filterValue: 'menunggu' }
+  if (row.status !== 'Selesai' && row.status !== 'Diambil') return { label: t('service_orders.warranty_pending'), tone: 'warning' as const, icon: Clock, filterValue: 'menunggu' }
   return isWarrantyExpired(row.warrantyEndDate)
     ? { label: t('service_orders.warranty_expired'), tone: 'danger' as const, icon: ShieldX, filterValue: 'berakhir' }
     : { label: t('common.active'), tone: 'success' as const, icon: ShieldCheck, filterValue: 'aktif' }
@@ -37,58 +46,23 @@ function dateKey(value: string) {
   return date.toISOString().slice(0, 10)
 }
 
-function ServiceOrderCard({ row, t }: { row: ReturnType<typeof useServiceOrders>[number]; t: (key: string) => string }) {
-  if (!row) return null
+function isOverdue(row: { status: string; estimatedCompletion?: string }) {
+  if (!row.estimatedCompletion) return false
+  if (row.status === 'Selesai' || row.status === 'Diambil' || row.status === 'Batal') return false
+  return new Date(row.estimatedCompletion).getTime() < Date.now()
+}
 
-  return (
-    <article className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border bg-background p-5 shadow-sm transition-all hover:border-primary/20 hover:shadow-md">
-      <div className="space-y-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{t('service_orders.label')}</p>
-            <h3 className="text-lg font-semibold leading-none text-primary hover:underline">
-              <Link to={`/service-orders/${row.id}`}>{row.code}</Link>
-            </h3>
-            <p className="text-sm text-muted-foreground">{row.customerName}</p>
-          </div>
-          <StatusBadge label={row.status} tone={tone(row.status)} />
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="rounded-xl bg-muted/40 p-3">
-            <p className="text-xs text-muted-foreground">{t('common.date')}</p>
-            <p className="mt-1 font-medium">{row.date}</p>
-          </div>
-          <div className="rounded-xl bg-muted/40 p-3">
-            <p className="text-xs text-muted-foreground">{t('service_orders.job')}</p>
-            <p className="mt-1 font-medium line-clamp-1">{row.description}</p>
-          </div>
-          <div className="rounded-xl bg-muted/40 p-3">
-            <p className="text-xs text-muted-foreground">{t('service_orders.cost')}</p>
-            <p className="mt-1 font-medium">{formatCurrency(row.cost)}</p>
-          </div>
-          <div className="rounded-xl bg-muted/40 p-3">
-            <p className="text-xs text-muted-foreground">{t('common.status')}</p>
-            <p className="mt-1"><StatusBadge label={row.status} tone={tone(row.status)} /></p>
-          </div>
-          <div className="rounded-xl bg-muted/40 p-3">
-            <p className="text-xs text-muted-foreground">{t('service_orders.warranty')}</p>
-            <p className="mt-1"><StatusBadge label={warrantyBadge(row, t).label} tone={warrantyBadge(row, t).tone} /></p>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 border-t pt-4">
-        <Link to={`/service-orders/${row.id}`} className="text-sm font-medium text-primary hover:underline">{t('common.view_detail')}</Link>
-      </div>
-    </article>
-  )
+function deviceLabel(row: { deviceBrand?: string; deviceModel?: string; jobCategory?: string; description: string }) {
+  const device = [row.deviceBrand, row.deviceModel].filter(Boolean).join(' ')
+  return device || row.jobCategory || row.description
 }
 
 export function ServiceOrdersPage() {
   const { t } = useTranslation()
   const serviceRows = useServiceOrders()
-  const [view, setView] = useState<'list' | 'card'>('list')
+  const vertical = useServiceVertical()
+
+  const [view, setView] = useState<'board' | 'list'>('board')
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterWarranty, setFilterWarranty] = useState('all')
@@ -105,14 +79,16 @@ export function ServiceOrdersPage() {
   )
 
   const filtered = serviceRows
-    .filter(row => {
+    .filter((row) => {
       const query = search.toLowerCase()
       const rowDate = dateKey(row.date)
-      const matchSearch = !query || [row.code, row.customerName, row.description, row.date, row.status]
-        .some(f => f.toLowerCase().includes(query))
-      const matchStatus = filterStatus === 'all' || row.status === filterStatus
-      const w = warrantyBadge({ hasWarranty: row.hasWarranty, status: row.status, warrantyStartDate: row.warrantyStartDate, warrantyEndDate: row.warrantyEndDate }, t)
-      const matchWarranty = filterWarranty === 'all' || w.filterValue === filterWarranty
+      const matchSearch = !query || [row.code, row.customerName, row.description, row.deviceModel, row.deviceBrand, row.date, row.status]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query))
+      const matchStatus = filterStatus === 'all'
+        || (filterStatus === 'overdue' ? isOverdue(row) : row.status === filterStatus)
+      const warranty = warrantyBadge(row, t)
+      const matchWarranty = filterWarranty === 'all' || warranty.filterValue === filterWarranty
       const matchCustomer = customer === 'all' || row.customerName === customer
       const matchFrom = !fromDate || rowDate >= fromDate
       const matchTo = !toDate || rowDate <= toDate
@@ -127,6 +103,24 @@ export function ServiceOrdersPage() {
     })
 
   const paginated = filtered.slice(0, Number(pageSize))
+
+  const boardColumns = useMemo(() => {
+    const flow = vertical.statusFlow
+    const extraStatuses = Array.from(
+      new Set(
+        filtered
+          .map((row) => row.status)
+          .filter((status) => !flow.includes(status)),
+      ),
+    )
+
+    return [...flow, ...extraStatuses].map((status) => ({
+      status,
+      rows: filtered.filter((row) => row.status === status),
+    }))
+  }, [filtered, vertical.statusFlow])
+
+  const overdueCount = filtered.filter(isOverdue).length
   const hasActiveFilter = filterStatus !== 'all' || filterWarranty !== 'all' || customer !== 'all' || fromDate !== '' || toDate !== '' || sortBy !== 'newest' || pageSize !== '20'
 
   function resetFilters() {
@@ -144,7 +138,13 @@ export function ServiceOrdersPage() {
       <ContentCard title={t('service_orders.list_title')} description={t('service_orders.list_description')}>
         <div className="mb-4 space-y-3 border-b pb-4">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
-            <Input type="text" placeholder={t('service_orders.search_placeholder')} value={search} onChange={e => setSearch(e.target.value)} className="w-full lg:w-64" />
+            <Input
+              type="text"
+              placeholder={t('service_orders.search_placeholder')}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="w-full lg:w-64"
+            />
             <div className="flex items-center gap-2 lg:ml-auto">
               <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
                 <DialogTrigger asChild>
@@ -163,11 +163,11 @@ export function ServiceOrdersPage() {
                       <SelectTrigger><SelectValue placeholder={t('common.status')} /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">{t('common.all_statuses')}</SelectItem>
-                        <SelectItem value="Diterima">{t('service_orders.status_received')}</SelectItem>
-                        <SelectItem value="Dikerjakan">{t('service_orders.status_in_progress')}</SelectItem>
-                        <SelectItem value="Selesai">{t('service_orders.status_completed')}</SelectItem>
-                        <SelectItem value="Diambil">{t('service_orders.status_picked_up')}</SelectItem>
-                        <SelectItem value="Batal">{t('service_orders.status_cancelled')}</SelectItem>
+                        <SelectItem value="overdue">{t('service_orders.filter_overdue')}</SelectItem>
+                        {vertical.statusFlow.map((status) => (
+                          <SelectItem key={status} value={status}>{status}</SelectItem>
+                        ))}
+                        <SelectItem value="Batal">Batal</SelectItem>
                       </SelectContent>
                     </Select>
                     <Select value={filterWarranty} onValueChange={setFilterWarranty}>
@@ -184,7 +184,7 @@ export function ServiceOrdersPage() {
                       <SelectTrigger><SelectValue placeholder={t('common.customer')} /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">{t('common.all_customers')}</SelectItem>
-                        {customers.filter(name => name !== "").map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}
+                        {customers.filter((name) => name !== '').map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     <Select value={sortBy} onValueChange={setSortBy}>
@@ -197,8 +197,8 @@ export function ServiceOrdersPage() {
                         <SelectItem value="code_asc">{t('service_orders.sort_code_asc')}</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} aria-label={t('common.start_date')} />
-                    <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} aria-label={t('common.end_date')} />
+                    <Input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} aria-label={t('common.start_date')} />
+                    <Input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} aria-label={t('common.end_date')} />
                     <Select value={pageSize} onValueChange={setPageSize}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -214,17 +214,68 @@ export function ServiceOrdersPage() {
                   </div>
                 </DialogContent>
               </Dialog>
-              <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-1 shrink-0">
-                <Button variant={view === 'list' ? 'secondary' : 'ghost'} size="icon" onClick={() => setView('list')} className="h-7 w-7" title={t('common.list_view')} aria-label={t('common.list_view')} aria-pressed={view === 'list'}>
-                  <List className="h-4 w-4" />
-                </Button>
-                <Button variant={view === 'card' ? 'secondary' : 'ghost'} size="icon" onClick={() => setView('card')} className="h-7 w-7" title={t('common.card_view')} aria-label={t('common.card_view')} aria-pressed={view === 'card'}>
+
+              <div className="flex shrink-0 items-center gap-1 rounded-lg border bg-muted/50 p-1">
+                <Button
+                  variant={view === 'board' ? 'secondary' : 'ghost'}
+                  size="icon"
+                  onClick={() => setView('board')}
+                  className="h-7 w-7"
+                  title={t('service_orders.board_view')}
+                  aria-label={t('service_orders.board_view')}
+                  aria-pressed={view === 'board'}
+                >
                   <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={view === 'list' ? 'secondary' : 'ghost'}
+                  size="icon"
+                  onClick={() => setView('list')}
+                  className="h-7 w-7"
+                  title={t('common.list_view')}
+                  aria-label={t('common.list_view')}
+                  aria-pressed={view === 'list'}
+                >
+                  <List className="h-4 w-4" />
                 </Button>
               </div>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">{t('service_orders.showing_count', { count: paginated.length, total: filtered.length })}</p>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant={filterStatus === 'all' ? 'default' : 'outline'}
+              onClick={() => setFilterStatus('all')}
+            >
+              {t('common.all')} ({filtered.length})
+            </Button>
+            {vertical.statusFlow.map((status) => {
+              const count = filtered.filter((row) => row.status === status).length
+              if (count === 0) return null
+              return (
+                <Button
+                  key={status}
+                  size="sm"
+                  variant={filterStatus === status ? 'default' : 'outline'}
+                  onClick={() => setFilterStatus(status)}
+                >
+                  {status} ({count})
+                </Button>
+              )
+            })}
+            {overdueCount > 0 && (
+              <Button
+                size="sm"
+                variant={filterStatus === 'overdue' ? 'destructive' : 'outline'}
+                className="gap-1 text-destructive"
+                onClick={() => setFilterStatus('overdue')}
+              >
+                <AlertTriangle className="size-3.5" />
+                {t('service_orders.filter_overdue')} ({overdueCount})
+              </Button>
+            )}
+          </div>
         </div>
 
         {view === 'list' ? (
@@ -233,25 +284,74 @@ export function ServiceOrdersPage() {
             columns={[
               { key: 'code', header: t('common.code'), sortable: true, render: (row) => <Link to={`/service-orders/${row.id}`} className="font-medium text-primary hover:underline">{row.code}</Link> },
               { key: 'customerName', header: t('common.customer'), sortable: true },
-              { key: 'description', header: t('service_orders.job') },
+              { key: 'description', header: t('service_orders.job'), render: (row) => deviceLabel(row) },
               { key: 'date', header: t('common.date'), sortable: true },
               { key: 'cost', header: t('service_orders.cost'), sortable: true, render: (row) => formatCurrency(row.cost) },
               { key: 'status', header: t('common.status'), render: (row) => <StatusBadge label={row.status} tone={tone(row.status)} /> },
-              { key: 'warranty', header: t('service_orders.warranty'), render: (row) => { const w = warrantyBadge(row, t); return <StatusBadge label={w.label} tone={w.tone} /> } },
+              { key: 'warranty', header: t('service_orders.warranty'), render: (row) => { const badge = warrantyBadge(row, t); return <StatusBadge label={badge.label} tone={badge.tone} /> } },
               { key: 'actions', header: t('common.actions'), render: (row) => <ServiceOrderCrudActions order={row} /> },
             ]}
           />
         ) : paginated.length === 0 ? (
-          <div className="col-span-full">
-            <p className="text-center text-muted-foreground py-12">{t('service_orders.empty')}</p>
-          </div>
+          <EmptyState title={t('service_orders.empty')} description={t('service_orders.empty_description')} />
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {paginated.map((row) => (
-              <ServiceOrderCard key={row.id} row={row} t={t} />
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {boardColumns.map((column) => (
+              <div key={column.status} className="flex flex-col gap-2">
+                <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{column.status}</span>
+                  <span className="rounded-full bg-background px-2 py-0.5 text-xs font-medium">{column.rows.length}</span>
+                </div>
+
+                {column.rows.length === 0 ? (
+                  <p className="rounded-xl border border-dashed p-4 text-center text-xs text-muted-foreground">
+                    {t('service_orders.board_empty')}
+                  </p>
+                ) : (
+                  column.rows.map((row) => {
+                    const overdue = isOverdue(row)
+                    return (
+                      <Link
+                        key={row.id}
+                        to={`/service-orders/${row.id}`}
+                        className={cn(
+                          'flex flex-col gap-2 rounded-xl border bg-background p-3 shadow-sm transition hover:border-primary/40 hover:shadow-md',
+                          overdue && 'border-destructive/40',
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="font-mono text-xs font-medium text-primary">{row.code}</span>
+                          {overdue ? (
+                            <span className="flex items-center gap-1 text-[11px] font-medium text-destructive">
+                              <AlertTriangle className="size-3" />
+                              {t('service_orders.overdue')}
+                            </span>
+                          ) : row.priority === 'Mendesak' ? (
+                            <span className="text-[11px] font-medium text-amber-600">{t('service_orders.priority_mendesak')}</span>
+                          ) : null}
+                        </div>
+                        <p className="line-clamp-2 text-sm font-medium leading-tight">{deviceLabel(row)}</p>
+                        <p className="truncate text-xs text-muted-foreground">{row.customerName}</p>
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-sm font-semibold">{formatCurrency(row.cost)}</span>
+                          {row.estimatedCompletion && (
+                            <span className={cn('text-[11px]', overdue ? 'text-destructive' : 'text-muted-foreground')}>
+                              {new Date(row.estimatedCompletion).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                            </span>
+                          )}
+                        </div>
+                      </Link>
+                    )
+                  })
+                )}
+              </div>
             ))}
           </div>
         )}
+
+        <p className="mt-3 text-xs text-muted-foreground">
+          {t('service_orders.showing_count', { count: paginated.length, total: filtered.length })}
+        </p>
       </ContentCard>
     </PageShell>
   )

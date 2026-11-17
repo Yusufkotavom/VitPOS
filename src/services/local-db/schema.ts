@@ -64,10 +64,13 @@ export type LocalProduct = {
   wholesaleTiers?: WholesaleTier[]
   stock: number
   manageStock?: boolean
+  unit?: string
   sku?: string
   barcode?: string
   imageUrl?: string
   icon?: string
+  estimatedMinutes?: number
+  defaultWarrantyDays?: number
   status: ProductStatus
   syncStatus: SyncStatus
   version: number
@@ -303,7 +306,30 @@ export type WholesaleTier = {
   price: number
 }
 
-export type ServiceOrderStatus = 'Diterima' | 'Dikerjakan' | 'Selesai' | 'Diambil' | 'Batal'
+export type ServiceOrderStatus = 'Diterima' | 'Diagnosa' | 'Menunggu Persetujuan' | 'Dikerjakan' | 'Selesai' | 'Diambil' | 'Batal'
+
+export type JobLineSource = 'catalog' | 'custom'
+export type JobLineKind = 'product' | 'service'
+export type JobLinePriceMode = 'unit' | 'area'
+export type JobPriority = 'Normal' | 'Tinggi' | 'Mendesak'
+
+export type LocalJobLine = {
+  id: string
+  source: JobLineSource
+  kind: JobLineKind
+  productId?: string
+  name: string
+  unit: string
+  qty: number
+  priceMode: JobLinePriceMode
+  unitPrice: number
+  width?: number
+  height?: number
+  costPrice?: number
+  note?: string
+  trackStock: boolean
+  subtotal: number
+}
 
 export type WarrantyUnit = 'hari' | 'bulan' | 'tahun'
 
@@ -313,6 +339,7 @@ export type ServiceOrderTimelineItem = {
   date: string
   note: string
   type?: 'status' | 'warranty'
+  actor?: string
 }
 
 export type LocalServiceOrder = {
@@ -326,13 +353,30 @@ export type LocalServiceOrder = {
   estimatedCompletion?: string
   cost: number
   costPrice?: number
+  discountTotal?: number
   paidTotal: number
   status: ServiceOrderStatus
-  
-  // New fields for POS-like behavior
+
+  // Job lines: catalog products, catalog services, or free-form custom lines
+  lines?: LocalJobLine[]
+  // Legacy shape kept in sync for older data and sync payloads
   items?: { productId: string, name: string, qty: number, price: number, costPrice?: number, subtotal: number }[]
   notes?: string
   timeline?: ServiceOrderTimelineItem[]
+
+  // Device intake (universal: computer, printer, gadget, printing jobs)
+  deviceType?: string
+  deviceBrand?: string
+  deviceModel?: string
+  deviceSerial?: string
+  accessories?: string
+  complaint?: string
+  diagnosis?: string
+  jobCategory?: string
+  priority?: JobPriority
+  technicianName?: string
+  details?: Record<string, string>
+
   hasWarranty?: boolean
   warrantyValue?: number
   warrantyUnit?: WarrantyUnit
