@@ -24,3 +24,8 @@ export type PosCartItem = {
 }
 
 export type PosPaymentMethod = string
+
+export type PosPaymentSplit = {
+  method: PosPaymentMethod
+  amount: number
+}

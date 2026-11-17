@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
-import { type PosCartItem, type PosPaymentMethod, type PosProduct } from '@/features/pos/types/pos.types'
+import { DEFAULT_CUSTOMER_ID, DEFAULT_CUSTOMER_NAME } from '@/features/pos/lib/default-customer'
+import { type PosCartItem, type PosPaymentMethod, type PosPaymentSplit, type PosProduct } from '@/features/pos/types/pos.types'
 import { getWholesalePrice } from '@/features/products/lib/wholesale'
 
 type PosStore = {
@@ -8,6 +9,8 @@ type PosStore = {
   selectedCategory: string
   cartItems: PosCartItem[]
   paymentMethod: PosPaymentMethod
+  isSplitPayment: boolean
+  paymentSplits: PosPaymentSplit[]
   discount: number
   paidAmount: number
   customerId: string | null
@@ -23,6 +26,11 @@ type PosStore = {
   removeItem: (productId: string) => void
   clearCart: () => void
   setPaymentMethod: (value: PosPaymentMethod) => void
+  setSplitPayment: (value: boolean) => void
+  setPaymentSplits: (value: PosPaymentSplit[]) => void
+  addPaymentSplit: (method: PosPaymentMethod) => void
+  updatePaymentSplit: (index: number, updates: Partial<PosPaymentSplit>) => void
+  removePaymentSplit: (index: number) => void
   setPaidAmount: (value: number) => void
   setDiscount: (value: number) => void
   setOrderNote: (value: string) => void
@@ -36,10 +44,12 @@ export const usePosStore = create<PosStore>((set) => ({
   selectedCategory: 'Semua',
   cartItems: [],
   paymentMethod: '',
+  isSplitPayment: false,
+  paymentSplits: [],
   discount: 0,
   paidAmount: 0,
-  customerId: null,
-  customerName: null,
+  customerId: DEFAULT_CUSTOMER_ID,
+  customerName: DEFAULT_CUSTOMER_NAME,
   viewMode: 'grid',
   orderNote: '',
   setSearchQuery: (searchQuery) => set({ searchQuery }),
@@ -105,8 +115,29 @@ export const usePosStore = create<PosStore>((set) => ({
         .filter((item) => item.qty > 0),
     })),
   removeItem: (productId) => set((state) => ({ cartItems: state.cartItems.filter((item) => item.productId !== productId) })),
-  clearCart: () => set({ cartItems: [], discount: 0, paidAmount: 0, paymentMethod: '', customerId: null, customerName: null, orderNote: '' }),
+  clearCart: () =>
+    set({
+      cartItems: [],
+      discount: 0,
+      paidAmount: 0,
+      paymentMethod: '',
+      isSplitPayment: false,
+      paymentSplits: [],
+      customerId: DEFAULT_CUSTOMER_ID,
+      customerName: DEFAULT_CUSTOMER_NAME,
+      orderNote: '',
+    }),
   setPaymentMethod: (paymentMethod) => set({ paymentMethod }),
+  setSplitPayment: (value) => set({ isSplitPayment: value }),
+  setPaymentSplits: (value) => set({ paymentSplits: value }),
+  addPaymentSplit: (method) =>
+    set((state) => ({ paymentSplits: [...state.paymentSplits, { method, amount: 0 }] })),
+  updatePaymentSplit: (index, updates) =>
+    set((state) => ({
+      paymentSplits: state.paymentSplits.map((split, i) => (i === index ? { ...split, ...updates } : split)),
+    })),
+  removePaymentSplit: (index) =>
+    set((state) => ({ paymentSplits: state.paymentSplits.filter((_, i) => i !== index) })),
   setPaidAmount: (paidAmount) => set({ paidAmount }),
   setDiscount: (discount) => set({ discount }),
   setOrderNote: (orderNote) => set({ orderNote }),

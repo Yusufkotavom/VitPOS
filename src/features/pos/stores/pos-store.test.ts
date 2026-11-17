@@ -67,4 +67,37 @@ describe('usePosStore', () => {
       itemCount: 2,
     })
   })
+
+  it('initializes and resets customer to seed default (Pelanggan Umum)', () => {
+    expect(usePosStore.getState().customerName).toBe('Pelanggan Umum')
+    expect(usePosStore.getState().customerId).toBe('default-customer-umum')
+
+    usePosStore.getState().setCustomer('custom-id', 'Budi Santoso')
+    expect(usePosStore.getState().customerName).toBe('Budi Santoso')
+
+    usePosStore.getState().clearCart()
+    expect(usePosStore.getState().customerName).toBe('Pelanggan Umum')
+    expect(usePosStore.getState().customerId).toBe('default-customer-umum')
+  })
+
+  it('tracks split payment methods and resets them on clearCart', () => {
+    const { addPaymentSplit, updatePaymentSplit, removePaymentSplit, setSplitPayment } = usePosStore.getState()
+
+    setSplitPayment(true)
+    addPaymentSplit('tunai')
+    addPaymentSplit('qris')
+    updatePaymentSplit(0, { amount: 20000 })
+
+    expect(usePosStore.getState().paymentSplits).toEqual([
+      { method: 'tunai', amount: 20000 },
+      { method: 'qris', amount: 0 },
+    ])
+
+    removePaymentSplit(1)
+    expect(usePosStore.getState().paymentSplits).toEqual([{ method: 'tunai', amount: 20000 }])
+
+    usePosStore.getState().clearCart()
+    expect(usePosStore.getState().isSplitPayment).toBe(false)
+    expect(usePosStore.getState().paymentSplits).toEqual([])
+  })
 })

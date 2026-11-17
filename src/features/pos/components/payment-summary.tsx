@@ -1,26 +1,22 @@
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
+import { useEffect, useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
+import { Plus, SplitSquareHorizontal, Trash2, User, Wallet } from 'lucide-react'
+
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/format-currency'
-import { formatDateTime } from '@/lib/date'
 import { selectPosTotals, usePosStore } from '@/features/pos/stores/pos-store'
 import { posTransactionService } from '@/features/pos/services/pos-transaction.service'
 import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods'
-import { toast } from 'sonner'
-import { useEffect, useState, useRef } from 'react'
-import { PosSuccessDialog } from '@/features/pos/components/pos-success-dialog'
-import { buildWhatsAppLink } from '@/lib/whatsapp'
-import { localDb } from '@/services/local-db/client'
-import { messageTemplateService } from '@/services/message-template.service'
-import { type PosOrderSummary } from '@/features/pos/types/pos-order.types'
-import type { LocalPaymentMethod } from '@/services/local-db/schema'
-import { usePdf } from '@/shared/components/pdf/use-pdf'
-import type { PdfData } from '@/shared/components/pdf/types'
-import { User } from 'lucide-react'
-import { ReceiptPrintLayout } from './receipt-print-layout'
-import { printPage } from '@/lib/print'
+import { useCustomers } from '@/features/customers/hooks/use-customers'
+import { getDefaultCustomer, DEFAULT_CUSTOMER_NAME } from '@/features/pos/lib/default-customer'
+import { getPaymentMethodDisplay, buildQuickCashOptions } from '@/features/pos/lib/payment-method-display'
+import { CurrencyInput } from '@/shared/components/forms/currency-input'
 import { useSubscription } from '@/features/settings/hooks/use-subscription'
+import type { PosOrderSummary } from '@/features/pos/types/pos-order.types'
+import type { LocalPaymentMethod } from '@/services/local-db/schema'
 
 const defaultMethods = [
   { id: 'tunai', name: 'Tunai' },
@@ -28,28 +24,62 @@ const defaultMethods = [
   { id: 'transfer', name: 'Transfer' },
 ]
 
-export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
+export function PaymentSummary({
+  onSuccess,
+}: {
+  onSuccess?: (order: PosOrderSummary) => void
+}) {
   const { t } = useTranslation()
   const store = usePosStore()
   const totals = selectPosTotals(store)
   const subscription = useSubscription()
+  const localCustomers = useCustomers()
   const dbMethods = usePaymentMethods()
   const activeMethods = dbMethods && dbMethods.length > 0 ? dbMethods.filter((m) => m.status === 'Aktif') : defaultMethods
 
-  const selectedMethodObj = activeMethods.find(m => m.name.toLowerCase() === store.paymentMethod) as LocalPaymentMethod | undefined
-  
-  const [successOrder, setSuccessOrder] = useState<PosOrderSummary | null>(null)
+  const selectedMethodObj = activeMethods.find((m) => m.name.toLowerCase() === store.paymentMethod) as LocalPaymentMethod | undefined
+
   const [isProcessing, setIsProcessingState] = useState(false)
+  const [allowPartial, setAllowPartial] = useState(false)
   const isProcessingRef = useRef(false)
   const setProcessing = (v: boolean) => { isProcessingRef.current = v; setIsProcessingState(v) }
-  const { printPdf } = usePdf()
 
-  const setPaidAmount = usePosStore(s => s.setPaidAmount)
+  const setPaidAmount = usePosStore((s) => s.setPaidAmount)
   useEffect(() => {
     setPaidAmount(totals.total)
   }, [setPaidAmount, totals.total])
 
-  const [hasAttemptedCheckout, setHasAttemptedCheckout] = useState(false)
+  const splitAllocated = store.paymentSplits.reduce((sum, split) => sum + (split.amount || 0), 0)
+  const splitRemaining = Math.max(totals.total - splitAllocated, 0)
+
+  const shortfall = store.isSplitPayment
+    ? splitRemaining
+    : Math.max(totals.total - store.paidAmount, 0)
+
+  const hasPaymentMethod = store.isSplitPayment
+    ? store.paymentSplits.some((split) => split.method && split.amount > 0)
+    : Boolean(store.paymentMethod)
+
+  const isFullyPaid = shortfall <= 0
+  const canSubmit = store.cartItems.length > 0
+    && !isProcessing
+    && !subscription.isEnforced
+    && hasPaymentMethod
+    && (isFullyPaid || allowPartial)
+
+  function handleSelectMethod(methodName: string) {
+    store.setPaymentMethod(methodName.toLowerCase())
+  }
+
+  function handleToggleSplit() {
+    const next = !store.isSplitPayment
+    store.setSplitPayment(next)
+    store.setPaymentSplits([])
+    setAllowPartial(false)
+    if (next) {
+      store.setPaymentMethod('')
+    }
+  }
 
   async function handleCheckout() {
     if (store.cartItems.length === 0 || isProcessingRef.current) return
@@ -59,24 +89,44 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
       return
     }
 
-    if (!store.paymentMethod) {
-      setHasAttemptedCheckout(true)
-      toast.error(t('pos.payment_method_required', 'Silakan pilih metode pembayaran terlebih dahulu.'))
-      const paymentSection = document.getElementById('pos-payment-methods')
-      if (paymentSection) {
-        paymentSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }
+    if (!hasPaymentMethod) {
+      toast.error(t('pos.payment_method_required'))
       return
     }
 
-    setHasAttemptedCheckout(false)
+    if (!isFullyPaid && !allowPartial) {
+      toast.error(t('pos.split_invalid'))
+      return
+    }
+
     setProcessing(true)
     try {
-      const result = await posTransactionService.checkout(store.cartItems, totals, store.paymentMethod, store.paidAmount, store.discount, store.customerName, store.customerId, store.orderNote)
+      const fallback = getDefaultCustomer(localCustomers)
+      const finalCustomerName = store.customerName?.trim() || fallback.name
+      const finalCustomerId = store.customerName?.trim() ? store.customerId : fallback.id
+
+      const splits = store.isSplitPayment
+        ? store.paymentSplits.filter((split) => split.method && split.amount > 0)
+        : undefined
+
+      const paidAmount = store.isSplitPayment ? splitAllocated : store.paidAmount
+
+      const result = await posTransactionService.checkout(
+        store.cartItems,
+        totals,
+        store.paymentMethod,
+        paidAmount,
+        store.discount,
+        finalCustomerName,
+        finalCustomerId,
+        store.orderNote,
+        splits,
+      )
       if (!result) {
         throw new Error('Transaksi tidak menghasilkan data order')
       }
-      setSuccessOrder({
+
+      const order: PosOrderSummary = {
         id: result.salesOrderId,
         code: result.code,
         date: new Date(),
@@ -84,15 +134,21 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
         tax: 0,
         discount: store.discount,
         total: totals.total,
-        paymentMethod: store.paymentMethod,
-        amountPaid: store.paidAmount,
-        change: Math.max(store.paidAmount - totals.total, 0),
+        paymentMethod: store.isSplitPayment
+          ? store.paymentSplits.map((split) => `${split.method} ${formatCurrency(split.amount)}`).join(' + ')
+          : store.paymentMethod,
+        amountPaid: paidAmount,
+        change: Math.max(paidAmount - totals.total, 0),
         items: store.cartItems,
-        customerId: store.customerId,
-        customerName: store.customerName ?? 'Umum',
+        customerId: finalCustomerId,
+        customerName: finalCustomerName,
         cashierName: 'Kasir',
-      })
+      }
+
       store.clearCart()
+      store.setCustomer(fallback.id, fallback.name)
+      setAllowPartial(false)
+      onSuccess?.(order)
     } catch (error) {
       const message = error instanceof Error ? error.message : t('common.error_generic')
       toast.error(message)
@@ -101,97 +157,19 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
     }
   }
 
-  async function handlePrint() {
-    if (!successOrder) return
-    printPage()
-  }
-
-  async function handlePrintSalesOrder() {
-    if (!successOrder) return
-    const customer = successOrder.customerId ? await localDb.customers.get(successOrder.customerId) : undefined
-    const invoiceData: PdfData = {
-      type: 'invoice',
-      code: successOrder.code,
-      date: formatDateTime(successOrder.date),
-      customer: { name: successOrder.customerName ?? 'Umum', phone: customer?.phone, address: customer?.address },
-      items: successOrder.items.map(i => ({ name: i.name, qty: i.qty, price: i.price, subtotal: i.subtotal })),
-      summary: {
-        subtotal: successOrder.subtotal,
-        discount: successOrder.discount,
-        grandTotal: successOrder.total,
-        paidTotal: successOrder.amountPaid,
-        change: successOrder.change,
-        status: successOrder.amountPaid >= successOrder.total ? 'Lunas' : 'Sebagian',
-      },
-      notes: store.orderNote.trim(),
-    }
-    printPdf(invoiceData)
-  }
-
-  async function handleWhatsApp() {
-    if (!successOrder) return
-    const customerId = successOrder.customerId
-    let phone = ''
-    if (customerId) {
-      const customer = await localDb.customers.get(customerId)
-      phone = customer?.phone ?? ''
-    }
-    if (!phone) {
-      toast.error('Nomor WhatsApp pelanggan tidak ditemukan')
-      return
-    }
-
-    const paid = formatCurrency(successOrder.amountPaid)
-    const total = formatCurrency(successOrder.total)
-    const change = formatCurrency(successOrder.change)
-    const items = successOrder.items
-      .map((item) => `${item.name} x${item.qty} = ${formatCurrency(item.subtotal)}`)
-      .join('\n')
-
-    const text = await messageTemplateService.render('invoice', {
-      code: successOrder.code,
-      date: successOrder.date.toLocaleDateString('id-ID'),
-      customer_name: successOrder.customerName ?? 'Umum',
-      items,
-      total,
-      paid,
-      change,
-      payment_method: successOrder.paymentMethod,
-      store_name: '',
-    })
-
-    window.open(buildWhatsAppLink(phone, text), '_blank')
-  }
+  const quickCashOptions = buildQuickCashOptions(totals.total)
 
   return (
     <div className="flex flex-col gap-4">
-      <PosSuccessDialog 
-        open={successOrder !== null} 
-        onOpenChange={(open) => {
-          if (!open) {
-            setSuccessOrder(null)
-            onComplete?.()
-          }
-        }}
-        order={successOrder}
-        onPrint={handlePrint}
-        onPrintSalesOrder={handlePrintSalesOrder}
-        onWhatsApp={handleWhatsApp}
-        onNewSale={() => {
-          setSuccessOrder(null)
-          onComplete?.()
-        }}
-      />
-
       <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
         <User className="size-4 text-muted-foreground" />
-        <span className="font-medium">{store.customerName || 'Umum'}</span>
+        <span className="font-medium">{store.customerName?.trim() || DEFAULT_CUSTOMER_NAME}</span>
       </div>
 
       <div className="space-y-3">
         <h3 className="font-medium text-sm text-muted-foreground">{t('pos.order_detail')}</h3>
         <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
-          {store.cartItems.map(item => (
+          {store.cartItems.map((item) => (
             <div key={item.productId} className="flex justify-between text-sm">
               <div className="flex-1 pr-2">
                 <span className="font-medium">{item.name}</span>
@@ -203,7 +181,7 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
           ))}
         </div>
       </div>
-      
+
       <Separator />
 
       <div className="space-y-2 text-sm">
@@ -211,104 +189,261 @@ export function PaymentSummary({ onComplete }: { onComplete?: () => void }) {
           <span className="text-muted-foreground">{t('pos.subtotal')}</span>
           <span>{formatCurrency(totals.subtotal)}</span>
         </div>
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center gap-2">
           <span className="text-muted-foreground">{t('pos.additional_discount')}</span>
-          <Input 
-            type="number"
-            inputMode="numeric"
-            className="w-28 h-8 text-right bg-muted/30"
-            value={store.discount || ''}
-            onChange={(e) => store.setDiscount(Number(e.target.value) || 0)}
+          <CurrencyInput
+            prefix="Rp"
+            className="h-8 w-32 text-right bg-muted/30"
+            value={store.discount}
+            onValueChange={store.setDiscount}
             placeholder="0"
           />
         </div>
-        <div className="flex justify-between text-xl font-bold pt-2">
-          <span>{t('common.total')}</span>
-          <span className="text-primary">{formatCurrency(totals.total)}</span>
+        <div className="flex items-end justify-between pt-2">
+          <span className="font-medium">{t('common.total')}</span>
+          <span className="text-2xl font-bold text-primary">{formatCurrency(totals.total)}</span>
         </div>
       </div>
 
-      <div id="pos-payment-methods" className={`space-y-3 pt-2 p-2 rounded-xl transition-colors ${hasAttemptedCheckout && !store.paymentMethod ? 'bg-destructive/10 border border-destructive/50' : ''}`}>
-        <label className={`text-sm font-medium ${hasAttemptedCheckout && !store.paymentMethod ? 'text-destructive' : ''}`}>{t('pos.payment_method_select')}</label>
-        <div className="grid grid-cols-3 gap-2">
-          {activeMethods.map((method: { id: string; name: string }) => (
+      <div
+        id="pos-payment-methods"
+        className={`space-y-3 rounded-xl border p-2 transition-colors ${!hasPaymentMethod ? 'border-destructive/50 bg-destructive/10' : 'border-transparent'}`}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <label className="text-sm font-medium">{t('pos.payment_method_select')}</label>
+          <Button
+            type="button"
+            variant={store.isSplitPayment ? 'default' : 'outline'}
+            size="sm"
+            onClick={handleToggleSplit}
+            aria-pressed={store.isSplitPayment}
+          >
+            <SplitSquareHorizontal data-icon="inline-start" />
+            {t('pos.split_payment')}
+          </Button>
+        </div>
+
+        {store.isSplitPayment ? (
+          <div className="space-y-3">
+            {store.paymentSplits.map((split, index) => {
+              return (
+                <div key={index} className="flex items-center gap-2">
+                  <Select
+                    value={split.method}
+                    onValueChange={(value) => store.updatePaymentSplit(index, { method: value })}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder={t('pos.select_payment_method')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeMethods.map((method: { id: string; name: string }) => {
+                        const methodDisplay = getPaymentMethodDisplay(method.id, method.name)
+                        const MethodIcon = methodDisplay.icon
+                        return (
+                          <SelectItem key={method.id} value={method.name.toLowerCase()}>
+                            <span className="flex items-center gap-2">
+                              <MethodIcon className={`size-4 ${methodDisplay.tone}`} aria-hidden="true" />
+                              {method.name}
+                            </span>
+                          </SelectItem>
+                        )
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <CurrencyInput
+                    prefix="Rp"
+                    className="w-32 text-right"
+                    value={split.amount}
+                    onValueChange={(amount) => store.updatePaymentSplit(index, { amount })}
+                    placeholder="0"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t('pos.remove_split')}
+                    onClick={() => store.removePaymentSplit(index)}
+                  >
+                    <Trash2 className="size-4 text-destructive" aria-hidden="true" />
+                  </Button>
+                </div>
+              )
+            })}
+
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{t('pos.split_remaining')}</span>
+              <span className={`font-semibold ${splitRemaining > 0 ? 'text-destructive' : 'text-success'}`}>
+                {formatCurrency(splitRemaining)}
+              </span>
+            </div>
+
             <Button
-              key={method.id}
-              variant={store.paymentMethod === method.name.toLowerCase() ? 'default' : 'outline'}
-              onClick={() => store.setPaymentMethod(method.name.toLowerCase())}
+              type="button"
+              variant="outline"
               size="sm"
+              className="w-full"
+              onClick={() => store.addPaymentSplit(activeMethods[0]?.name.toLowerCase() ?? 'tunai')}
             >
-              {method.name}
+              <Plus data-icon="inline-start" />
+              {t('pos.add_split')}
             </Button>
-          ))}
-        </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {activeMethods.map((method: { id: string; name: string }) => {
+              const display = getPaymentMethodDisplay(method.id, method.name)
+              const MethodIcon = display.icon
+              const isActive = store.paymentMethod === method.name.toLowerCase()
+              return (
+                <Button
+                  key={method.id}
+                  type="button"
+                  variant={isActive ? 'default' : 'outline'}
+                  onClick={() => handleSelectMethod(method.name)}
+                  size="sm"
+                  className="justify-start gap-2"
+                  aria-pressed={isActive}
+                >
+                  <MethodIcon className={`size-4 ${isActive ? '' : display.tone}`} aria-hidden="true" />
+                  {method.name}
+                </Button>
+              )
+            })}
+          </div>
+        )}
+
+        {!hasPaymentMethod && (
+          <p className="text-xs font-medium text-destructive">{t('pos.payment_method_required')}</p>
+        )}
       </div>
 
-      {selectedMethodObj && (selectedMethodObj.qrImageUrl || selectedMethodObj.instructions) && (
-        <div className="bg-primary/5 rounded-xl p-4 flex flex-col items-center justify-center gap-3 border border-primary/20">
+      {selectedMethodObj && (selectedMethodObj.qrImageUrl || selectedMethodObj.instructions) && !store.isSplitPayment && (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
           <h4 className="font-semibold text-primary">{selectedMethodObj.name}</h4>
           {selectedMethodObj.qrImageUrl && (
-            <div className="bg-white p-2 rounded-xl shadow-sm">
-              <img 
-                src={selectedMethodObj.qrImageUrl} 
-                alt={`QRIS ${selectedMethodObj.name}`} 
-                className="w-48 h-48 object-contain"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  e.currentTarget.parentElement!.innerHTML = `<div class="w-48 h-48 flex items-center justify-center bg-muted/30 text-muted-foreground text-xs text-center rounded">${t('pos.image_load_failed')}</div>`;
+            <div className="rounded-xl bg-white p-2 shadow-sm">
+              <img
+                src={selectedMethodObj.qrImageUrl}
+                alt={`QRIS ${selectedMethodObj.name}`}
+                className="h-48 w-48 object-contain"
+                onError={(event) => {
+                  event.currentTarget.parentElement?.replaceChildren(
+                    Object.assign(document.createElement('div'), {
+                      className: 'flex h-48 w-48 items-center justify-center rounded bg-muted/30 text-center text-xs text-muted-foreground',
+                      textContent: t('pos.image_load_failed'),
+                    }),
+                  )
                 }}
               />
             </div>
           )}
           {selectedMethodObj.instructions && (
-            <div className="text-sm text-center text-muted-foreground whitespace-pre-wrap mt-2">
+            <div className="mt-2 whitespace-pre-wrap text-center text-sm text-muted-foreground">
               {selectedMethodObj.instructions}
             </div>
           )}
         </div>
       )}
 
-      <div className="space-y-3 p-4 border rounded-2xl bg-muted/10">
-        <label className="text-sm font-medium">{t('pos.paid_amount_label')}</label>
-        <Input
-          inputMode="numeric"
-          placeholder={`Minimal ${formatCurrency(totals.total)}`}
-          value={store.paidAmount || ''}
-          onChange={(event) => store.setPaidAmount(Number(event.target.value) || 0)}
-          className="text-lg font-semibold h-12"
-        />
-        <div className="flex justify-between items-center text-sm pt-2">
-          {store.paidAmount > 0 && store.paidAmount < totals.total ? (
-            <>
-              <span className="text-destructive font-medium">{t('pos.shortfall')}</span>
-              <span className="text-destructive font-bold">{formatCurrency(totals.total - store.paidAmount)}</span>
-            </>
-          ) : (
-            <>
-              <span className="text-muted-foreground">{t('pos.change_due')}</span>
-              <span className="text-lg font-bold text-success">{formatCurrency(Math.max((store.paidAmount || totals.total) - totals.total, 0))}</span>
-            </>
+      {store.discount > totals.subtotal && (
+        <p className="text-xs font-medium text-destructive">{t('pos.discount_exceeds_subtotal')}</p>
+      )}
+
+      {!store.isSplitPayment && (
+        <div className="space-y-3 rounded-2xl border bg-muted/10 p-4">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium" htmlFor="pos-paid-amount">{t('pos.paid_amount_label')}</label>
+            <span className="text-xs text-muted-foreground">{t('pos.minimum_amount', { amount: formatCurrency(totals.total) })}</span>
+          </div>
+          <CurrencyInput
+            id="pos-paid-amount"
+            prefix="Rp"
+            value={store.paidAmount}
+            onValueChange={store.setPaidAmount}
+            className="h-12 text-lg font-semibold"
+            placeholder="0"
+          />
+
+          {quickCashOptions.length > 0 && (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {quickCashOptions.map((amount, index) => (
+                <Button
+                  key={amount}
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => store.setPaidAmount(amount)}
+                >
+                  {index === 0 ? t('pos.quick_cash_exact') : formatCurrency(amount)}
+                </Button>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between text-sm">
+            {store.paidAmount > 0 && store.paidAmount < totals.total ? (
+              <>
+                <span className="font-medium text-destructive">{t('pos.shortfall')}</span>
+                <span className="font-bold text-destructive">{formatCurrency(totals.total - store.paidAmount)}</span>
+              </>
+            ) : (
+              <>
+                <span className="text-muted-foreground">{t('pos.change_due')}</span>
+                <span className="text-lg font-bold text-success">
+                  {formatCurrency(Math.max((store.paidAmount || totals.total) - totals.total, 0))}
+                </span>
+              </>
+            )}
+          </div>
+
+          {!isFullyPaid && (
+            <Button
+              type="button"
+              variant={allowPartial ? 'default' : 'outline'}
+              size="sm"
+              className="w-full"
+              onClick={() => setAllowPartial((value) => !value)}
+              aria-pressed={allowPartial}
+            >
+              <Wallet data-icon="inline-start" />
+              {allowPartial ? t('pos.partial_payment_enabled') : t('pos.partial_payment')}
+            </Button>
           )}
         </div>
-      </div>
+      )}
+
+      {store.isSplitPayment && !isFullyPaid && (
+        <Button
+          type="button"
+          variant={allowPartial ? 'default' : 'outline'}
+          size="sm"
+          className="w-full"
+          onClick={() => setAllowPartial((value) => !value)}
+          aria-pressed={allowPartial}
+        >
+          <Wallet data-icon="inline-start" />
+          {allowPartial ? t('pos.partial_payment_enabled') : t('pos.partial_payment')}
+        </Button>
+      )}
 
       <Button
         size="lg"
-        className="h-14 text-lg font-semibold w-full mt-2"
-        disabled={store.cartItems.length === 0 || isProcessing || subscription.isEnforced}
+        className="h-14 w-full text-lg font-semibold"
+        disabled={!canSubmit}
         onClick={handleCheckout}
       >
         {subscription.isEnforced
-          ? 'Langganan Berakhir / Ditangguhkan'
+          ? t('pos.subscription_ended')
           : isProcessing
             ? t('pos.processing')
-            : selectedMethodObj?.qrImageUrl
-              ? t('pos.verify_complete')
-              : t('pos.complete_payment')}
+            : isFullyPaid
+              ? t('pos.complete_payment')
+              : t('pos.complete_partial_payment')}
       </Button>
 
-      {successOrder && <ReceiptPrintLayout order={successOrder} />}
+      {!isFullyPaid && allowPartial && (
+        <p className="text-center text-xs text-muted-foreground">{t('pos.partial_payment_hint')}</p>
+      )}
     </div>
   )
 }
-

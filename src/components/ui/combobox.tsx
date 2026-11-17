@@ -27,11 +27,17 @@ export function Combobox<T>({
   children,
   className,
 }: ComboboxProps<T>) {
-  const [search, setSearch] = React.useState("")
+  const [search, setSearch] = React.useState(value || "")
   const [open, setOpen] = React.useState(false)
   const [internalValue, setInternalValue] = React.useState(value || "")
   
   const selectedValue = value !== undefined ? value : internalValue
+
+  React.useEffect(() => {
+    if (value !== undefined) {
+      setSearch(value)
+    }
+  }, [value])
 
   const handleSelect = React.useCallback((val: string) => {
     if (value === undefined) setInternalValue(val)
@@ -55,6 +61,7 @@ export function ComboboxInput({
   className,
   value,
   onChange,
+  onFocus,
   ...rest
 }: {
   id?: string
@@ -62,6 +69,7 @@ export function ComboboxInput({
   className?: string
   value?: string
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onFocus?: (e: React.FocusEvent<HTMLInputElement>) => void
 } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "id" | "placeholder" | "className" | "value" | "onChange" | "type" | "onFocus">) {
   const context = React.useContext(ComboboxContext)
   if (!context) throw new Error("ComboboxInput must be used within Combobox")
@@ -79,7 +87,10 @@ export function ComboboxInput({
           context.setOpen(true)
           onChange?.(e)
         }}
-        onFocus={() => context.setOpen(true)}
+        onFocus={(e) => {
+          context.setOpen(true)
+          onFocus?.(e)
+        }}
         className={cn(
           "h-11 w-full rounded-xl border border-input bg-background pl-10 pr-4 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20",
           className

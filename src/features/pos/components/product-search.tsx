@@ -1,4 +1,5 @@
 import { Search, LayoutGrid, List } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -6,6 +7,7 @@ import { usePosStore } from '@/features/pos/stores/pos-store'
 import { useProducts } from '@/features/products/hooks/use-products'
 
 export function ProductSearch() {
+  const { t } = useTranslation()
   const searchQuery = usePosStore((state) => state.searchQuery)
   const setSearchQuery = usePosStore((state) => state.setSearchQuery)
   const viewMode = usePosStore((state) => state.viewMode)
@@ -42,10 +44,12 @@ export function ProductSearch() {
       <div className="relative flex-1">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
+          id="pos-product-search"
           value={searchQuery}
           onChange={(event) => handleInputChange(event.target.value)}
-          placeholder="Cari produk / scan barcode"
-          className="pl-10"
+          placeholder={t('pos.search_placeholder')}
+          className="h-11 pl-10"
+          autoComplete="off"
         />
       </div>
       <div className="flex h-9 shrink-0 items-center gap-1 rounded-lg border bg-muted/50 p-1">
@@ -54,7 +58,8 @@ export function ProductSearch() {
           size="icon"
           onClick={() => setViewMode('list')}
           className="size-7"
-          title="List View"
+          title={t('common.list_view')}
+          aria-label={t('common.list_view')}
         >
           <List className="h-4 w-4" />
         </Button>
@@ -63,7 +68,8 @@ export function ProductSearch() {
           size="icon"
           onClick={() => setViewMode('grid')}
           className="size-7"
-          title="Grid View"
+          title={t('common.card_view')}
+          aria-label={t('common.card_view')}
         >
           <LayoutGrid className="h-4 w-4" />
         </Button>

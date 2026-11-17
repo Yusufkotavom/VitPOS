@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { Clock } from 'lucide-react'
 import type { PosCartItem } from '@/features/pos/types/pos.types'
 import { EmptyState } from '@/shared/components/feedback/empty-state'
+import { DEFAULT_CUSTOMER_NAME } from '@/features/pos/lib/default-customer'
 
 interface PosDraftDialogProps {
   open: boolean
@@ -86,7 +87,7 @@ export function PosDraftDialog({ open, onOpenChange }: PosDraftDialogProps) {
                   <div>
                     <h3 className="font-semibold text-lg">{draft.code}</h3>
                     <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                      <span className="font-medium text-foreground">{draft.customerName || 'Umum'}</span>
+                      <span className="font-medium text-foreground">{draft.customerName || DEFAULT_CUSTOMER_NAME}</span>
                       <span>&bull;</span>
                       <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(draft.date).toLocaleString('id-ID')}</span>
                     </div>

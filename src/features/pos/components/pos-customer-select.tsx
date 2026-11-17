@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus } from 'lucide-react'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -19,15 +19,58 @@ import { customerFormSchema, customerInitialValues, customerStatusOptions, type 
 import { mapCustomerFormToRecord } from '@/features/customers/schemas/customer-form-schema'
 import { createCustomerId } from '@/features/catalog/lib/entity-id'
 import { customerRepository } from '@/services/local-db/repository'
+import { DEFAULT_CUSTOMER_NAME, DEFAULT_CUSTOMER_ID, getDefaultCustomer, ensureDefaultCustomer } from '@/features/pos/lib/default-customer'
 
 export function PosCustomerSelect() {
   const { t } = useTranslation()
+  const customerId = usePosStore(state => state.customerId)
   const customerName = usePosStore(state => state.customerName)
   const setCustomer = usePosStore(state => state.setCustomer)
   const localCustomers = useCustomers()
   const [isAddOpen, setIsAddOpen] = useState(false)
+  const [isFocused, setIsFocused] = useState(false)
 
   const activeCustomers = localCustomers.filter(c => c.status === 'Aktif')
+
+  useEffect(() => {
+    void ensureDefaultCustomer()
+  }, [])
+
+  const defaultCustomer = getDefaultCustomer(activeCustomers)
+  const hasPelangganUmum = activeCustomers.some(
+    c => c.name.trim().toLowerCase() === DEFAULT_CUSTOMER_NAME.toLowerCase()
+  )
+
+  const customerOptions = hasPelangganUmum
+    ? activeCustomers
+    : [
+        {
+          id: DEFAULT_CUSTOMER_ID,
+          tenantId: '',
+          name: DEFAULT_CUSTOMER_NAME,
+          phone: '081234567890',
+          city: 'Surabaya',
+          receivable: 0,
+          orders: 0,
+          status: 'Aktif',
+          syncStatus: 'synced' as const,
+          version: 1,
+          updatedAt: '',
+        },
+        ...activeCustomers,
+      ]
+
+  useEffect(() => {
+    if (!isFocused && (!customerName || customerName.trim() === '')) {
+      setCustomer(defaultCustomer.id, defaultCustomer.name)
+    } else if (
+      customerName === DEFAULT_CUSTOMER_NAME &&
+      customerId === DEFAULT_CUSTOMER_ID &&
+      defaultCustomer.id !== DEFAULT_CUSTOMER_ID
+    ) {
+      setCustomer(defaultCustomer.id, defaultCustomer.name)
+    }
+  }, [isFocused, customerName, customerId, defaultCustomer.id, defaultCustomer.name, setCustomer])
 
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerFormSchema),
@@ -35,13 +78,19 @@ export function PosCustomerSelect() {
   })
 
   function handleInputChange(name: string) {
-    const match = activeCustomers.find(c => c.name.toLowerCase() === name.toLowerCase())
+    const match = customerOptions.find(c => c.name.toLowerCase() === name.toLowerCase())
     if (match) {
       setCustomer(match.id, match.name)
     } else if (name === '') {
-      setCustomer(null, null)
+      setCustomer(null, '')
     } else {
       setCustomer(`custom-${Date.now()}`, name)
+    }
+  }
+
+  function handleBlur() {
+    if (!customerName || customerName.trim() === '') {
+      setCustomer(defaultCustomer.id, defaultCustomer.name)
     }
   }
 
@@ -63,15 +112,25 @@ export function PosCustomerSelect() {
   return (
     <div className="flex items-center gap-2 w-full">
       <div className="flex-1">
-        <Combobox items={activeCustomers} value={customerName || ''} onValueChange={handleInputChange}>
-          <ComboboxInput id="pos-customer-select" placeholder="Cari / Pilih Pelanggan" />
+        <Combobox items={customerOptions} value={customerName || ''} onValueChange={handleInputChange}>
+          <ComboboxInput
+            id="pos-customer-select"
+            placeholder="Cari / Pilih Pelanggan"
+            value={customerName || ''}
+            onFocus={() => setIsFocused(true)}
+            onChange={(e) => handleInputChange(e.target.value)}
+            onBlur={() => {
+              setIsFocused(false)
+              handleBlur()
+            }}
+          />
           <ComboboxContent>
-            {activeCustomers.length === 0 ? (
+            {customerOptions.length === 0 ? (
               <ComboboxEmpty>{t('customers.none')}</ComboboxEmpty>
             ) : (
               <ComboboxList>
                 {(item: unknown) => {
-                  const customer = item as (typeof activeCustomers)[number]
+                  const customer = item as (typeof customerOptions)[number]
 
                   return (
                     <ComboboxItem key={customer.id} value={customer.name} className="flex flex-col items-start gap-0.5">

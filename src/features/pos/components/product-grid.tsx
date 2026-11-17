@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { formatCurrency } from '@/lib/format-currency'
 import { usePosStore } from '@/features/pos/stores/pos-store'
 import { matchesProductSearch } from '@/features/pos/lib/product-search'
@@ -17,19 +19,34 @@ const iconMap: Record<string, React.ReactNode> = {
 function ProductMedia({ imageUrl, iconName, className }: { imageUrl?: string; iconName?: string; className?: string }) {
   if (imageUrl) {
     return (
-      <div className={`bg-muted overflow-hidden shrink-0 ${className}`}>
-        <img src={imageUrl} alt="Product" className="w-full h-full object-cover" loading="lazy" />
+      <div className={`shrink-0 overflow-hidden bg-muted ${className}`}>
+        <img src={imageUrl} alt="Product" className="h-full w-full object-cover" loading="lazy" />
       </div>
     )
   }
   return (
-    <div className={`bg-muted/30 flex items-center justify-center shrink-0 border-b ${className}`}>
+    <div className={`flex shrink-0 items-center justify-center border-b bg-muted/30 ${className}`}>
       {iconName && iconMap[iconName] ? iconMap[iconName] : <ImageIcon className="size-8 text-muted-foreground" />}
     </div>
   )
 }
 
+function StockBadge({ stock, type }: { stock: number; type: string }) {
+  if (type === 'Jasa') return null
+
+  if (stock <= 0) {
+    return <Badge variant="destructive" className="text-xs font-medium">Habis</Badge>
+  }
+
+  if (stock <= 5) {
+    return <Badge variant="outline" className="border-amber-300 bg-amber-50 text-xs font-medium text-amber-700">{stock}</Badge>
+  }
+
+  return <Badge variant="outline" className="bg-background/90 text-xs font-medium shadow-sm backdrop-blur-sm">{stock}</Badge>
+}
+
 export function ProductGrid() {
+  const { t } = useTranslation()
   const searchQuery = usePosStore((state) => state.searchQuery)
   const selectedCategory = usePosStore((state) => state.selectedCategory)
   const viewMode = usePosStore((state) => state.viewMode)
@@ -44,7 +61,7 @@ export function ProductGrid() {
   })
 
   if (products.length === 0) {
-    return <EmptyState title="Produk tidak ditemukan" description="Coba kata kunci lain atau pilih kategori berbeda." />
+    return <EmptyState title={t('pos.product_empty_title')} description={t('pos.product_empty_desc')} />
   }
 
   function handleAddItem(product: { id: string; sku?: string; barcode?: string; name: string; category: string; price: number; stock: number; type: string; wholesaleTiers?: { minQty: number; price: number }[] }) {
@@ -75,11 +92,13 @@ export function ProductGrid() {
             <ProductMedia imageUrl={product.imageUrl} iconName={product.icon} className="size-16 rounded-md border" />
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
               <p className="truncate font-medium leading-tight">{product.name}</p>
-              <Badge variant="secondary" className="w-fit font-normal text-[10px] px-1.5 py-0">{product.category}</Badge>
+              <Badge variant="secondary" className="w-fit px-1.5 py-0 text-xs font-normal">{product.category}</Badge>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
               <p className="font-semibold">{formatCurrency(product.price)}</p>
-              <p className="text-xs text-muted-foreground">Stok {product.type === 'Jasa' ? '-' : `${product.stock} pcs`}</p>
+              <p className="text-xs text-muted-foreground">
+                {product.type === 'Jasa' ? t('pos.stock_dash') : t('pos.stock_pcs', { stock: product.stock })}
+              </p>
             </div>
           </button>
         ))}
@@ -88,7 +107,7 @@ export function ProductGrid() {
   }
 
   return (
-    <div className="grid grid-cols-3 gap-3 md:grid-cols-4 xl:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
       {products.map((product) => (
         <button
           key={product.id}
@@ -98,11 +117,9 @@ export function ProductGrid() {
         >
           <div className="relative w-full overflow-hidden bg-muted">
             <ProductMedia imageUrl={product.imageUrl} iconName={product.icon} className="h-24 w-full border-b transition-transform duration-300 group-hover:scale-110" />
-            {product.type !== 'Jasa' && (
-              <span className="absolute right-1.5 top-1.5 rounded-md border bg-background/90 px-1.5 py-0.5 text-[10px] font-medium shadow-sm backdrop-blur-sm">
-                {product.stock}
-              </span>
-            )}
+            <div className="absolute right-1.5 top-1.5">
+              <StockBadge stock={product.stock} type={product.type} />
+            </div>
           </div>
           <div className="flex w-full flex-col gap-1 p-2.5">
             <p className="line-clamp-2 text-xs font-medium leading-tight">{product.name}</p>

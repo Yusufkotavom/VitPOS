@@ -45,7 +45,7 @@ function buildWhatsappUrl(value?: string | null) {
 
 export function SubscriptionExpiredDialog({ open, status, planName, planValidUntil, warningKind = 'expired', tenantId }: Props) {
   const navigate = useNavigate()
-  const isPastValidUntil = !planValidUntil || new Date(planValidUntil).getTime() < Date.now()
+  const [isPastValidUntil] = useState(() => !planValidUntil || new Date(planValidUntil).getTime() < Date.now())
   const isHardGated = warningKind === 'expired' || status === 'suspended' || (status === 'cancelled' && isPastValidUntil)
   const [dismissed, setDismissed] = useState(() => {
     try {

@@ -29,6 +29,7 @@ export const demoProducts: LocalProduct[] = [
 ]
 
 export const demoCustomers: LocalCustomer[] = [
+  { id: '11110000-0000-4000-8000-000000000001', tenantId: DEMO_TENANT_ID, name: 'Pelanggan Umum', phone: '081234567890', city: 'Surabaya', receivable: 0, orders: 0, status: 'Aktif', syncStatus: 'synced', version: 1, updatedAt: now() },
   { id: baimRuntime.customerId, tenantId: DEMO_TENANT_ID, name: 'Budi Santoso', phone: '0812-3456-7890', city: 'Surabaya', receivable: 450000, orders: 18, status: 'Aktif', syncStatus: 'synced', version: 1, updatedAt: now() },
   { id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', tenantId: DEMO_TENANT_ID, name: 'Sari Printing', phone: '0857-1111-2222', city: 'Sidoarjo', receivable: 1200000, orders: 9, status: 'Piutang', syncStatus: 'synced', version: 1, updatedAt: now() },
   { id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', tenantId: DEMO_TENANT_ID, name: 'Toko Maju Jaya', phone: '0821-3333-4444', city: 'Malang', receivable: 0, orders: 27, status: 'Aktif', syncStatus: 'synced', version: 1, updatedAt: now() },

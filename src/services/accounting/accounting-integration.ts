@@ -87,12 +87,33 @@ export async function recordPosSaleJournal(
   totalHpp: number,
   paymentMethodType: string,
   date: string,
+  splits?: { method: string; amount: number }[],
 ): Promise<void> {
   try {
-    const debitAccount = await resolvePaymentMethodAccountCode(
-      tenantId,
-      paymentMethodType,
-    )
+    const debitLines: { accountCode: string; debit: number; credit: number }[] = []
+
+    if (splits && splits.length > 0) {
+      let allocated = 0
+      for (const split of splits) {
+        const amount = Math.max(0, Math.min(split.amount, grandTotal - allocated))
+        if (amount <= 0) continue
+        const accountCode = await resolvePaymentMethodAccountCode(tenantId, split.method)
+        debitLines.push({ accountCode, debit: amount, credit: 0 })
+        allocated += amount
+      }
+
+      const remainder = grandTotal - allocated
+      if (remainder > 0.001) {
+        debitLines.push({
+          accountCode: await resolvePaymentMethodAccountCode(tenantId, 'piutang'),
+          debit: remainder,
+          credit: 0,
+        })
+      }
+    } else {
+      const debitAccount = await resolvePaymentMethodAccountCode(tenantId, paymentMethodType)
+      debitLines.push({ accountCode: debitAccount, debit: grandTotal, credit: 0 })
+    }
 
     await createJournalEntry(tenantId, {
       referenceType: 'pos_sale',
@@ -100,7 +121,7 @@ export async function recordPosSaleJournal(
       description: `Penjualan POS #${salesOrderId.slice(-8)}`,
       date: date.slice(0, 10),
       lines: [
-        { accountCode: debitAccount, debit: grandTotal, credit: 0 },
+        ...debitLines,
         { accountCode: '5-1000', debit: totalHpp, credit: 0 },
         { accountCode: '4-1000', debit: 0, credit: grandTotal },
         { accountCode: '1-2000', debit: 0, credit: totalHpp },

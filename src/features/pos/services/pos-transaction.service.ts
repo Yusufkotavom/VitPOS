@@ -3,8 +3,9 @@ import { productRepository } from '@/services/local-db/repository'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { syncCustomerSalesMetrics } from '@/features/sales-orders/services/sales-order-finance.service'
 import { recordPosSaleJournal } from '@/services/accounting/accounting-integration'
+import { DEFAULT_CUSTOMER_NAME } from '@/features/pos/lib/default-customer'
 import type { LocalPayment, LocalProduct, LocalSalesOrder, LocalSalesOrderItem, LocalStockMovement, OutboxItem, PosPaymentMethodCode, LocalInventory } from '@/services/local-db/schema'
-import type { PosPaymentMethod } from '@/features/pos/types/pos.types'
+import type { PosPaymentMethod, PosPaymentSplit } from '@/features/pos/types/pos.types'
 
 interface CartItem {
   productId: string
@@ -62,7 +63,7 @@ export const posTransactionService = {
       tenantId,
       code: `DRF-${Date.now()}`,
       customerId: customerId ?? undefined,
-      customerName: customerName || 'Umum',
+      customerName: customerName?.trim() || DEFAULT_CUSTOMER_NAME,
       date: nowIso,
       subtotal: totals.subtotal,
       discountTotal: discountTotal,
@@ -97,13 +98,14 @@ export const posTransactionService = {
     })
   },
 
-  async checkout(cartItems: CartItem[], totals: PosTotals, paymentMethod: PosPaymentMethod, paidAmount: number, discountTotal: number = 0, customerName?: string | null, customerId?: string | null, notes?: string) {
+  async checkout(cartItems: CartItem[], totals: PosTotals, paymentMethod: PosPaymentMethod, paidAmount: number, discountTotal: number = 0, customerName?: string | null, customerId?: string | null, notes?: string, paymentSplits?: PosPaymentSplit[]) {
     if (cartItems.length === 0) return
 
     const tenantId = requireActiveTenantId()
     const nowIso = new Date().toISOString()
     const salesOrderId = crypto.randomUUID()
-    const paymentId = crypto.randomUUID()
+
+    const validSplits = (paymentSplits ?? []).filter((split) => split.amount > 0)
 
     const items: LocalSalesOrderItem[] = cartItems.map((cartItem) => ({
       id: crypto.randomUUID(),
@@ -116,7 +118,9 @@ export const posTransactionService = {
       subtotal: cartItem.subtotal,
     }))
 
-    const rawPaid = Math.max(paidAmount, 0)
+    const rawPaid = validSplits.length > 0
+      ? validSplits.reduce((sum, split) => sum + split.amount, 0)
+      : Math.max(paidAmount, 0)
     const retainedAmount = Math.min(rawPaid, totals.total)
 
     const salesOrder: LocalSalesOrder = {
@@ -124,7 +128,7 @@ export const posTransactionService = {
       tenantId,
       code: await orderCode(),
       customerId: customerId ?? undefined,
-      customerName: customerName || 'Umum',
+      customerName: customerName?.trim() || DEFAULT_CUSTOMER_NAME,
       date: nowIso,
       subtotal: totals.subtotal,
       discountTotal: discountTotal,
@@ -139,20 +143,35 @@ export const posTransactionService = {
       updatedAt: nowIso,
     }
 
-    const payment: LocalPayment = {
-      id: paymentId,
-      tenantId,
-      ref: `PAY-${Date.now().toString().slice(-6)}`,
-      salesOrderId,
-      source: 'POS',
-      method: paymentMethod as PosPaymentMethodCode,
-      amount: retainedAmount,
-      date: nowIso,
-      status: paymentMethod === 'piutang' ? 'Pending' : 'Berhasil',
-      syncStatus: 'pending',
-      version: 1,
-      updatedAt: nowIso,
-    }
+    const payments: LocalPayment[] = validSplits.length > 0
+      ? validSplits.map((split, index) => ({
+          id: crypto.randomUUID(),
+          tenantId,
+          ref: `PAY-${Date.now().toString().slice(-6)}${index > 0 ? `-${index + 1}` : ''}`,
+          salesOrderId,
+          source: 'POS',
+          method: split.method as PosPaymentMethodCode,
+          amount: split.amount,
+          date: nowIso,
+          status: split.method === 'piutang' ? 'Pending' : 'Berhasil',
+          syncStatus: 'pending',
+          version: 1,
+          updatedAt: nowIso,
+        }))
+      : [{
+          id: crypto.randomUUID(),
+          tenantId,
+          ref: `PAY-${Date.now().toString().slice(-6)}`,
+          salesOrderId,
+          source: 'POS',
+          method: paymentMethod as PosPaymentMethodCode,
+          amount: retainedAmount,
+          date: nowIso,
+          status: paymentMethod === 'piutang' ? 'Pending' : 'Berhasil',
+          syncStatus: 'pending',
+          version: 1,
+          updatedAt: nowIso,
+        }]
 
     const warehouseName = 'Gudang Toko'
     const allCartProductIds = [...new Set(cartItems.map((i) => i.productId))]
@@ -231,18 +250,18 @@ export const posTransactionService = {
         createdAt: nowIso,
         updatedAt: nowIso,
       },
-      {
+      ...payments.map<OutboxItem>((payment) => ({
         id: newId('outbox'),
         tenantId,
         entityType: 'payment',
-        entityId: paymentId,
+        entityId: payment.id,
         mutationType: 'create',
         payload: payment,
         status: 'queued',
         attempts: 0,
         createdAt: nowIso,
         updatedAt: nowIso,
-      },
+      })),
       ...stockMovements.map<OutboxItem>((movement) => ({
         id: newId('outbox'),
         tenantId,
@@ -296,7 +315,7 @@ export const posTransactionService = {
       await localDb.transaction('rw', [localDb.salesOrders, localDb.salesOrderItems, localDb.payments, localDb.stockMovements, localDb.products, localDb.inventory, localDb.outbox], async () => {
         await localDb.salesOrders.put(salesOrder)
         if (items.length > 0) await localDb.salesOrderItems.bulkPut(items)
-        await localDb.payments.put(payment)
+        for (const payment of payments) await localDb.payments.put(payment)
         if (stockMovements.length > 0) await localDb.stockMovements.bulkPut(stockMovements)
         for (const product of productUpdates) {
           await productRepository.upsert(product)
@@ -326,13 +345,14 @@ export const posTransactionService = {
         salesOrderId,
         totals.total,
         totalHpp,
-        paymentMethod,
+        validSplits.length > 0 ? validSplits[0].method : paymentMethod,
         nowIso,
+        validSplits.length > 0 ? validSplits : undefined,
       )
     } catch (err) {
       console.warn('[POS] recordPosSaleJournal failed (non-critical):', err)
     }
 
-    return { salesOrderId, paymentId, code: salesOrder.code }
+    return { salesOrderId, paymentId: payments[0].id, code: salesOrder.code }
   }
 }

@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { CurrencyInput } from '@/shared/components/forms/currency-input'
+import { formatCurrency } from '@/lib/format-currency'
 import { type PosCartItem } from '@/features/pos/types/pos.types'
 
 export function CartItemEditDialog({
@@ -28,7 +29,7 @@ export function CartItemEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>{t('pos.edit_item_title', { name: item.name })}</DialogTitle>
         </DialogHeader>
@@ -36,12 +37,17 @@ export function CartItemEditDialog({
         <div className="grid gap-4 py-4">
           <div className="space-y-2">
             <label htmlFor="price" className="text-sm font-medium">{t('pos.unit_price')}</label>
-            <Input 
-              id="price" 
-              type="number" 
-              value={price || ''} 
-              onChange={(e) => setPrice(Number(e.target.value))} 
+            <CurrencyInput
+              id="price"
+              prefix="Rp"
+              value={price}
+              onValueChange={setPrice}
+              className="h-11 text-base font-semibold"
+              autoFocus
             />
+            <p className="text-xs text-muted-foreground">
+              {t('pos.subtotal')}: {formatCurrency(price * item.qty)}
+            </p>
           </div>
         </div>
 

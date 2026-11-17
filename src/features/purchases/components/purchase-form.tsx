@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useEffect } from 'react'
-import { Controller, useFieldArray, useForm } from 'react-hook-form'
+import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { Trash2Icon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -54,9 +54,9 @@ export function PurchaseForm({
   }, [defaultValues, form])
 
   const errors = form.formState.errors
-  const watchItems = form.watch('items')
-  const watchStatus = form.watch('status')
-  const watchIsPaid = form.watch('isPaid')
+  const watchItems = useWatch({ control: form.control, name: 'items' })
+  const watchStatus = useWatch({ control: form.control, name: 'status' })
+  const watchIsPaid = useWatch({ control: form.control, name: 'isPaid' })
   const totalAmount = (watchItems || []).reduce((sum, item) => {
     const qty = parseDigits(item?.qty || '0')
     const price = parseDigits(item?.unitPrice || '0')
