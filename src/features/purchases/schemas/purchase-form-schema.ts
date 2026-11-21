@@ -3,11 +3,12 @@ import { z } from 'zod'
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { parseDigits } from '@/features/catalog/lib/formatters'
 import { toDateInput } from '@/lib/date'
+import { normalizePurchaseItems, normalizePurchaseStatus, purchaseStatusOptions } from '@/features/purchases/lib/purchase-status'
 import type { LocalPurchase, LocalPurchaseItem } from '@/services/local-db/schema'
 
 import { localDb } from '@/services/local-db/client'
 
-export const purchaseStatusOptions = ['Draft', 'Dikirim', 'Diterima', 'Batal'] as const
+export { purchaseStatusOptions }
 
 export async function generatePurchaseCode(): Promise<string> {
   const today = new Date()
@@ -38,15 +39,15 @@ export async function generatePurchaseCode(): Promise<string> {
 export const purchaseItemSchema = z.object({
   productId: z.string().trim(),
   name: z.string().trim().min(1, 'Nama produk wajib diisi'),
-  qty: z.string().trim().min(1, 'Qty wajib diisi'),
-  unitPrice: z.string().trim().min(1, 'Harga wajib diisi'),
+  qty: z.string().trim().min(1, 'Qty wajib diisi').refine((value) => parseDigits(value) > 0, 'Qty harus lebih dari 0'),
+  unitPrice: z.string().trim().min(1, 'Harga wajib diisi').refine((value) => parseDigits(value) >= 0, 'Harga tidak valid'),
 })
 
 export const purchaseFormSchema = z.object({
   code: z.string(),
   supplierName: z.string().trim().min(1, 'Nama supplier wajib diisi'),
   date: z.string().trim().min(1, 'Tanggal wajib diisi'),
-  status: z.enum(purchaseStatusOptions),
+  status: z.string().trim().min(1, 'Status wajib diisi'),
   isPaid: z.boolean().optional(),
   payMethod: z.string().optional(),
   items: z.array(purchaseItemSchema).min(1, 'Minimal 1 item'),
@@ -92,7 +93,7 @@ export function mapPurchaseFormToRecord(values: PurchaseFormValues, id: string, 
     subtotal,
     grandTotal: subtotal,
     paidTotal: base?.paidTotal ?? 0,
-    status: values.status,
+    status: normalizePurchaseStatus(values.status),
     items,
     syncStatus: 'pending',
     version: (base?.version ?? 0) + 1,
@@ -101,15 +102,22 @@ export function mapPurchaseFormToRecord(values: PurchaseFormValues, id: string, 
 }
 
 export function mapPurchaseRecordToFormValues(purchase: LocalPurchase): PurchaseFormValues {
+  const items = normalizePurchaseItems(purchase.items, purchase.tenantId, purchase.id)
+
   return {
     code: purchase.code,
     supplierName: purchase.supplierName,
     date: toDateInput(purchase.date),
-    status: purchase.status,
+    status: normalizePurchaseStatus(purchase.status),
     isPaid: (purchase.paidTotal ?? 0) >= purchase.grandTotal && purchase.grandTotal > 0,
     payMethod: 'tunai',
-    items: purchase.items.length > 0
-      ? purchase.items.map((item) => ({ productId: item.productId ?? '', name: item.name, qty: String(item.qty), unitPrice: String(item.unitPrice) }))
+    items: items.length > 0
+      ? items.map((item) => ({
+          productId: item.productId ?? '',
+          name: item.name,
+          qty: String(item.qty),
+          unitPrice: String(item.unitPrice),
+        }))
       : [{ productId: '', name: '', qty: '1', unitPrice: '0' }],
   }
 }

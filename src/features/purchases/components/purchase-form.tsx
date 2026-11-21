@@ -19,6 +19,7 @@ import { FormSection } from '@/shared/components/forms/form-section'
 import { ProductLineItemSelect } from '@/shared/components/forms/product-line-item-select'
 import { SupplierSelect } from '@/features/purchases/components/supplier-select'
 import { parseDigits } from '@/features/catalog/lib/formatters'
+import { normalizePurchaseStatus } from '@/features/purchases/lib/purchase-status'
 import { formatCurrency } from '@/lib/format-currency'
 
 export function PurchaseForm({
@@ -68,7 +69,7 @@ export function PurchaseForm({
     if (!code) {
       code = await generatePurchaseCode()
     }
-    await onSubmit({ ...values, code })
+    await onSubmit({ ...values, code, status: normalizePurchaseStatus(values.status) })
   }
 
   return (
@@ -126,6 +127,10 @@ export function PurchaseForm({
           />
         </div>
       </div>
+
+      {errors.status ? (
+        <p className="text-xs font-medium text-destructive">{t('purchases.status_invalid')}</p>
+      ) : null}
 
       <FormSection title={t('purchases.items')} description={t('purchases.items_description')}>
         <div className="flex flex-col gap-3 md:col-span-2">
@@ -235,7 +240,7 @@ export function PurchaseForm({
         </div>
 
         {errors.items?.message ? (
-          <span className="text-xs text-destructive md:col-span-2">{errors.items.message}</span>
+          <span className="text-xs text-destructive md:col-span-2">{t('purchases.items_invalid')}</span>
         ) : null}
 
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3 border-t md:col-span-2">

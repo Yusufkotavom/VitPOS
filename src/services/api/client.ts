@@ -33,16 +33,47 @@ function getAuthHeaders(): Record<string, string> {
   return headers
 }
 
+export type ApiRequestOptions = {
+  timeoutMs?: number
+  signal?: AbortSignal
+}
+
+function createTimeoutSignal(timeoutMs = 10_000, externalSignal?: AbortSignal): AbortSignal {
+  if (externalSignal) {
+    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.any === 'function') {
+      const timeoutSignal = typeof AbortSignal.timeout === 'function'
+        ? AbortSignal.timeout(timeoutMs)
+        : createFallbackTimeoutSignal(timeoutMs)
+      return AbortSignal.any([externalSignal, timeoutSignal])
+    }
+    return externalSignal
+  }
+
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    return AbortSignal.timeout(timeoutMs)
+  }
+
+  return createFallbackTimeoutSignal(timeoutMs)
+}
+
+function createFallbackTimeoutSignal(timeoutMs: number): AbortSignal {
+  const controller = new AbortController()
+  setTimeout(() => controller.abort(), timeoutMs)
+  return controller.signal
+}
+
 async function readApiError(response: Response) {
   const payload = await response.json().catch(() => null) as { message?: string } | null
   return payload?.message ?? `API request failed: ${response.status}`
 }
 
-export async function apiGet<T>(path: string, query?: URLSearchParams) {
+export async function apiGet<T>(path: string, query?: URLSearchParams, options?: ApiRequestOptions) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3010'
   const url = buildApiUrl(baseUrl, path)
+  const signal = createTimeoutSignal(options?.timeoutMs ?? 10_000, options?.signal)
   const response = await fetch(query ? `${url}?${query.toString()}` : url, {
     headers: getAuthHeaders(),
+    signal,
   })
 
   if (!response.ok) {
@@ -52,13 +83,15 @@ export async function apiGet<T>(path: string, query?: URLSearchParams) {
   return response.json() as Promise<T>
 }
 
-export async function apiPost<T>(path: string, body: unknown) {
+export async function apiPost<T>(path: string, body: unknown, options?: ApiRequestOptions) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3010'
   const url = buildApiUrl(baseUrl, path)
+  const signal = createTimeoutSignal(options?.timeoutMs ?? 10_000, options?.signal)
   const response = await fetch(url, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(body),
+    signal,
   })
 
   if (!response.ok) {
@@ -68,13 +101,15 @@ export async function apiPost<T>(path: string, body: unknown) {
   return response.json() as Promise<T>
 }
 
-export async function apiPatch<T>(path: string, body: unknown) {
+export async function apiPatch<T>(path: string, body: unknown, options?: ApiRequestOptions) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3010'
   const url = buildApiUrl(baseUrl, path)
+  const signal = createTimeoutSignal(options?.timeoutMs ?? 10_000, options?.signal)
   const response = await fetch(url, {
     method: 'PATCH',
     headers: getAuthHeaders(),
     body: JSON.stringify(body),
+    signal,
   })
 
   if (!response.ok) {
@@ -84,12 +119,14 @@ export async function apiPatch<T>(path: string, body: unknown) {
   return response.json() as Promise<T>
 }
 
-export async function apiDelete<T = { ok: boolean }>(path: string) {
+export async function apiDelete<T = { ok: boolean }>(path: string, options?: ApiRequestOptions) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3010'
   const url = buildApiUrl(baseUrl, path)
+  const signal = createTimeoutSignal(options?.timeoutMs ?? 10_000, options?.signal)
   const response = await fetch(url, {
     method: 'DELETE',
     headers: getAuthHeaders(),
+    signal,
   })
 
   if (!response.ok) {

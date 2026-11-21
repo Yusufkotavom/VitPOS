@@ -4,6 +4,7 @@ import { DEMO_TENANT_ID } from '@/services/local-db/seeds'
 import { baimRuntime } from '@/lib/baim-runtime'
 import { apiGet, apiPost, buildTenantQuery } from '@/services/api/client'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
+import { normalizePurchaseItems, normalizePurchaseStatus } from '@/features/purchases/lib/purchase-status'
 import { listOutboxItems, updateOutboxStatus } from '@/services/sync/outbox-service'
 import { extractEntityId, indexPushResults, partitionSyncMutations, toLocalOutboxStatus } from '@/services/sync/sync-transport'
 import type {
@@ -378,18 +379,24 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
       updatedAt: item.updatedAt,
     })
   } else if (item.entityType === 'purchase') {
+    const existingPurchase = await localDb.purchases.get(item.entityId)
+    const rawStatus = typeof payload.status === 'string' ? payload.status : ''
     const purchase: LocalPurchase = {
       id: item.entityId,
       tenantId,
       code: typeof payload.code === 'string' ? payload.code : '',
-      supplierId: typeof payload.supplierId === 'string' ? payload.supplierId : undefined,
-      supplierName: typeof payload.supplierName === 'string' ? payload.supplierName : '',
-      date: typeof payload.date === 'string' ? toDateInput(payload.date) : '',
-      subtotal: Number(payload.subtotal ?? 0),
-      grandTotal: Number(payload.grandTotal ?? 0),
-      paidTotal: Number(payload.paidTotal ?? 0),
-      status: (typeof payload.status === 'string' ? payload.status : 'Draft') as LocalPurchase['status'],
-      items: Array.isArray(payload.items) ? payload.items : [],
+      supplierId: typeof payload.supplierId === 'string' ? payload.supplierId : existingPurchase?.supplierId,
+      supplierName: typeof payload.supplierName === 'string'
+        ? payload.supplierName
+        : existingPurchase?.supplierName ?? '',
+      date: typeof payload.date === 'string' ? toDateInput(payload.date) : existingPurchase?.date ?? '',
+      subtotal: Number(payload.subtotal ?? existingPurchase?.subtotal ?? 0),
+      grandTotal: Number(payload.grandTotal ?? existingPurchase?.grandTotal ?? 0),
+      paidTotal: Number(payload.paidTotal ?? existingPurchase?.paidTotal ?? 0),
+      status: normalizePurchaseStatus(rawStatus || existingPurchase?.status),
+      items: Array.isArray(payload.items)
+        ? normalizePurchaseItems(payload.items, tenantId, item.entityId)
+        : existingPurchase?.items ?? [],
       syncStatus: 'synced',
       version: typeof payload.version === 'number' ? payload.version : 1,
       updatedAt: item.updatedAt,
@@ -397,7 +404,7 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
     await localDb.purchases.put(purchase)
     if (Array.isArray(payload.items)) {
       await localDb.purchaseItems.where('purchaseId').equals(item.entityId).delete()
-      await localDb.purchaseItems.bulkPut(payload.items)
+      if (purchase.items.length > 0) await localDb.purchaseItems.bulkPut(purchase.items)
     }
   } else if (item.entityType === 'return') {
     const ret: LocalReturn = {
@@ -580,7 +587,21 @@ export async function applyPullItems(items: SyncPullItem[], tenantId: string) {
 }
 
 
-export async function runSync() {
+let activeSyncPromise: Promise<{ processed: number; failed: number; pulled: number }> | null = null
+
+export async function runSync(): Promise<{ processed: number; failed: number; pulled: number }> {
+  if (activeSyncPromise) {
+    return activeSyncPromise
+  }
+
+  activeSyncPromise = doRunSync().finally(() => {
+    activeSyncPromise = null
+  })
+
+  return activeSyncPromise
+}
+
+async function doRunSync(): Promise<{ processed: number; failed: number; pulled: number }> {
   const syncContext = await resolveSyncContext()
   const tenantId = syncContext.tenantId
   const runId = createId('run')

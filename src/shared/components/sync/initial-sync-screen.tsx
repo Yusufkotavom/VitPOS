@@ -7,8 +7,10 @@ import { cn } from '@/lib/utils'
 
 type SyncPhase = 'syncing' | 'done' | 'error'
 
-const DONE_DELAY_MS = 1_200
-const FADE_OUT_MS = 400
+const DONE_DELAY_MS = 600
+const FADE_OUT_MS = 250
+const MAX_INITIAL_SYNC_WAIT_MS = 4_000
+const HARD_SAFETY_TIMEOUT_MS = 5_000
 
 const SYNC_PHRASES = [
   'Menyinkronkan data\u2026',
@@ -22,33 +24,53 @@ export function InitialSyncScreen({ onDone }: { onDone: () => void }) {
   const [phase, setPhase] = useState<SyncPhase>('syncing')
   const [fadeOut, setFadeOut] = useState(false)
   const [phraseIndex, setPhraseIndex] = useState(0)
+
   const mountedRef = useRef(true)
+  const hasTriggeredRef = useRef(false)
+  const finishedRef = useRef(false)
+  const onDoneRef = useRef(onDone)
+
+  useEffect(() => {
+    onDoneRef.current = onDone
+  }, [onDone])
 
   useEffect(() => {
     if (phase !== 'syncing') return
     const timer = setInterval(() => {
       setPhraseIndex((i) => (i + 1) % SYNC_PHRASES.length)
-    }, 1500)
+    }, 1200)
     return () => clearInterval(timer)
   }, [phase])
 
-  const handleSkip = useCallback(() => {
+  const finishSync = useCallback(() => {
+    if (finishedRef.current) return
+    finishedRef.current = true
     localStorage.setItem('vitpos-initial-sync-done', 'true')
     setFadeOut(true)
-    setTimeout(() => onDone(), FADE_OUT_MS)
-  }, [onDone])
+    setTimeout(() => {
+      onDoneRef.current()
+    }, FADE_OUT_MS)
+  }, [])
+
+  const handleSkip = useCallback(() => {
+    finishSync()
+  }, [finishSync])
 
   const triggerSync = useCallback(async () => {
+    if (!mountedRef.current) return
     setPhase('syncing')
     try {
       const result = await Promise.race([
         runSync(),
-        new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 8_000)),
+        new Promise<'timeout'>((resolve) =>
+          setTimeout(() => resolve('timeout'), MAX_INITIAL_SYNC_WAIT_MS),
+        ),
       ])
+
       if (!mountedRef.current) return
 
       if (result === 'timeout') {
-        handleSkip()
+        finishSync()
         return
       }
 
@@ -56,30 +78,40 @@ export function InitialSyncScreen({ onDone }: { onDone: () => void }) {
       setPhase('done')
       setTimeout(() => {
         if (mountedRef.current) {
-          setFadeOut(true)
-          setTimeout(() => { if (mountedRef.current) onDone() }, FADE_OUT_MS)
+          finishSync()
         }
       }, DONE_DELAY_MS)
     } catch {
-      if (mountedRef.current) setPhase('error')
+      if (mountedRef.current) {
+        setPhase('error')
+      }
     }
-  }, [onDone, handleSkip])
+  }, [finishSync])
 
   useEffect(() => {
-    let active = true
-    if (active) {
-       // Start sync on next tick to prevent synchronous setState inside effect
-       setTimeout(() => {
-         if (mountedRef.current) void triggerSync()
-       }, 0)
+    mountedRef.current = true
+
+    if (!hasTriggeredRef.current) {
+      hasTriggeredRef.current = true
+      void triggerSync()
     }
-    return () => { active = false; mountedRef.current = false }
-  }, [triggerSync])
+
+    const safetyTimer = setTimeout(() => {
+      if (mountedRef.current) {
+        finishSync()
+      }
+    }, HARD_SAFETY_TIMEOUT_MS)
+
+    return () => {
+      mountedRef.current = false
+      clearTimeout(safetyTimer)
+    }
+  }, [triggerSync, finishSync])
 
   return (
     <div
       className={cn(
-        'fixed inset-0 z-50 flex items-center justify-center bg-background transition-opacity duration-[400ms]',
+        'fixed inset-0 z-50 flex items-center justify-center bg-background transition-opacity duration-[250ms]',
         fadeOut ? 'opacity-0' : 'opacity-100',
       )}
     >
@@ -121,7 +153,9 @@ export function InitialSyncScreen({ onDone }: { onDone: () => void }) {
 
         {phase === 'error' && (
           <div className="flex items-center gap-3 pt-2">
-            <Button size="sm" onClick={triggerSync}>Coba Lagi</Button>
+            <Button size="sm" onClick={() => void triggerSync()}>
+              Coba Lagi
+            </Button>
             <Button variant="ghost" size="sm" onClick={handleSkip}>
               Jalankan di Latar
             </Button>
@@ -132,7 +166,7 @@ export function InitialSyncScreen({ onDone }: { onDone: () => void }) {
           <button
             type="button"
             onClick={handleSkip}
-            className="pt-2 text-xs text-muted-foreground/70 underline-offset-2 transition-colors hover:text-foreground hover:underline"
+            className="pt-2 text-xs text-muted-foreground/70 underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Jalankan di Latar
           </button>

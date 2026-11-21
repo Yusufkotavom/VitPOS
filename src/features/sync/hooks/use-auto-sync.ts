@@ -6,7 +6,8 @@ import { apiGet } from '@/services/api/client'
 const SYNC_INTERVAL_MS = 30_000
 const PING_INTERVAL_MS = 15_000
 
-export function useAutoSync() {
+export function useAutoSync(options?: { enabled?: boolean }) {
+  const enabled = options?.enabled ?? true
   const setOnline = useSyncStore((s) => s.setOnline)
   const setApiConnected = useSyncStore((s) => s.setApiConnected)
   const setStatus = useSyncStore((s) => s.setStatus)
@@ -17,7 +18,7 @@ export function useAutoSync() {
 
   useEffect(() => {
     async function triggerSync() {
-      if (syncingRef.current) return
+      if (!enabled || syncingRef.current) return
       syncingRef.current = true
       setStatus('syncing')
 
@@ -51,7 +52,9 @@ export function useAutoSync() {
     function handleOnline() {
       setOnline(true)
       checkApiConnection()
-      triggerSync()
+      if (enabled) {
+        triggerSync()
+      }
     }
 
     function handleOffline() {
@@ -64,15 +67,17 @@ export function useAutoSync() {
 
     setOnline(navigator.onLine)
     checkApiConnection()
-    if (navigator.onLine) {
+    if (enabled && navigator.onLine) {
       triggerSync()
     }
 
-    intervalRef.current = setInterval(() => {
-      if (navigator.onLine) {
-        triggerSync()
-      }
-    }, SYNC_INTERVAL_MS)
+    if (enabled) {
+      intervalRef.current = setInterval(() => {
+        if (navigator.onLine) {
+          triggerSync()
+        }
+      }, SYNC_INTERVAL_MS)
+    }
 
     pingRef.current = setInterval(() => {
       checkApiConnection()
@@ -84,5 +89,5 @@ export function useAutoSync() {
       if (intervalRef.current) clearInterval(intervalRef.current)
       if (pingRef.current) clearInterval(pingRef.current)
     }
-  }, [setOnline, setApiConnected, setStatus, markSynced])
+  }, [enabled, setOnline, setApiConnected, setStatus, markSynced])
 }

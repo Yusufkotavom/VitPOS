@@ -1,5 +1,6 @@
 import { localDb } from '@/services/local-db/client'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
+import { normalizePurchaseItems, normalizePurchaseStatus } from '@/features/purchases/lib/purchase-status'
 import type {
   LocalAccount,
   LocalCash,
@@ -132,11 +133,32 @@ export const purchaseRepository = (() => {
   const repo = createRepository<LocalPurchase>({ table: localDb.purchases, outboxTable: localDb.outbox, entityType: 'purchase' })
   return {
     ...repo,
+    async list(tenantId?: string) {
+      const rows = await repo.list(tenantId)
+      return rows.map((row) => ({
+        ...row,
+        status: normalizePurchaseStatus(row.status),
+        items: normalizePurchaseItems(row.items, row.tenantId, row.id),
+      }))
+    },
+    async get(id: string, tenantId?: string) {
+      const row = await repo.get(id, tenantId)
+      if (!row) return row
+      return {
+        ...row,
+        status: normalizePurchaseStatus(row.status),
+        items: normalizePurchaseItems(row.items, row.tenantId, row.id),
+      }
+    },
     async upsert(row: LocalPurchase) {
-      await repo.upsert(row)
-      await localDb.purchaseItems.where('purchaseId').equals(row.id).delete()
-      if (row.items?.length) await localDb.purchaseItems.bulkPut(row.items)
-      return row
+      const normalized: LocalPurchase = {
+        ...row,
+        status: normalizePurchaseStatus(row.status),
+      }
+      await repo.upsert(normalized)
+      await localDb.purchaseItems.where('purchaseId').equals(normalized.id).delete()
+      if (normalized.items?.length) await localDb.purchaseItems.bulkPut(normalized.items)
+      return normalized
     },
     async remove(id: string, tenantId?: string) {
       await repo.remove(id, tenantId)

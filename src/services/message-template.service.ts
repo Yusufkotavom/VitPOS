@@ -10,6 +10,7 @@ export type MessageTemplateType =
   | 'product_info'
   | 'service_order_masuk'
   | 'service_order_selesai'
+  | 'service_order_status'
 
 export const TEMPLATE_LABELS: Record<MessageTemplateType, string> = {
   invoice: 'Nota / Invoice',
@@ -19,6 +20,7 @@ export const TEMPLATE_LABELS: Record<MessageTemplateType, string> = {
   product_info: 'Info Produk',
   service_order_masuk: 'Service Order (Baru Masuk)',
   service_order_selesai: 'Service Order (Selesai)',
+  service_order_status: 'Service Order (Update Status)',
 }
 
 export const TEMPLATE_VARIABLES: Record<MessageTemplateType, string[]> = {
@@ -29,6 +31,7 @@ export const TEMPLATE_VARIABLES: Record<MessageTemplateType, string[]> = {
   product_info: ['product_name', 'price', 'stock', 'category'],
   service_order_masuk: ['code', 'customer_name', 'device', 'problem', 'status', 'cost', 'estimated_completion', 'date', 'total', 'paid', 'remaining', 'items', 'change', 'payment_method', 'store_name'],
   service_order_selesai: ['code', 'customer_name', 'device', 'problem', 'status', 'cost', 'date', 'total', 'paid', 'remaining', 'items', 'change', 'payment_method', 'store_name'],
+  service_order_status: ['code', 'customer_name', 'device', 'problem', 'status', 'cost', 'estimated_completion', 'date', 'total', 'paid', 'remaining', 'items', 'change', 'payment_method', 'store_name', 'notes'],
 }
 
 export const DEFAULT_TEMPLATES: Record<MessageTemplateType, string> = {
@@ -110,6 +113,20 @@ Pekerjaan telah selesai dan perangkat siap diambil.
 *Sisa Tagihan:* {{remaining}}
 ─────────────────
 Silakan tunjukkan pesan ini atau nomor service saat pengambilan. Terima kasih.`,
+
+  service_order_status: `📋 *UPDATE STATUS SERVICE*
+─────────────────
+*No Service:* {{code}}
+*Pelanggan:* {{customer_name}}
+*Perangkat:* {{device}}
+*Status:* {{status}}
+─────────────────
+*Catatan:* {{notes}}
+*Estimasi Selesai:* {{estimated_completion}}
+*Estimasi Biaya:* {{cost}}
+*Sisa Tagihan:* {{remaining}}
+─────────────────
+Terima kasih telah mempercayakan perbaikan kepada kami.`,
 }
 
 function renderTemplate(template: string, variables: Record<string, string>): string {
@@ -120,12 +137,16 @@ function renderTemplate(template: string, variables: Record<string, string>): st
 
 export const messageTemplateService = {
   async getTemplate(type: MessageTemplateType): Promise<string> {
-    const tenantId = resolveTenantId()
-    const override = await localDb.settings.get(`msg_template_${type}`)
-    if (override && override.tenantId === tenantId && override.value.trim()) {
-      return override.value
+    try {
+      const tenantId = resolveTenantId()
+      const override = await localDb?.settings?.get(`msg_template_${type}`)
+      if (override && override.tenantId === tenantId && override.value?.trim()) {
+        return override.value
+      }
+    } catch {
+      // Fallback to default template
     }
-    return DEFAULT_TEMPLATES[type]
+    return DEFAULT_TEMPLATES[type] ?? ''
   },
 
   async render(type: MessageTemplateType, variables: Record<string, string>): Promise<string> {

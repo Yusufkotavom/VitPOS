@@ -30,13 +30,11 @@ import { PageShell } from '@/shared/components/layout/page-shell'
 import { CurrencyInput } from '@/shared/components/forms/currency-input'
 import { formatCurrency } from '@/lib/format-currency'
 import { formatDateTime } from '@/lib/date'
-import { buildWhatsAppLink } from '@/lib/whatsapp'
 import { cn } from '@/lib/utils'
 import { useLiveQuery } from '@/shared/hooks/use-live-query'
 import { usePdf } from '@/shared/components/pdf/use-pdf'
 import { localDb } from '@/services/local-db/client'
 import { serviceOrderRepository } from '@/services/local-db/repository'
-import { messageTemplateService } from '@/services/message-template.service'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { useServiceOrder } from '@/features/service-orders/hooks/use-service-order'
 import { useServiceVertical } from '@/features/service-orders/hooks/use-service-vertical'
@@ -45,10 +43,11 @@ import { usePaymentMethods } from '@/features/settings/hooks/use-payment-methods
 import { getPaymentMethodDisplay, buildQuickCashOptions } from '@/features/pos/lib/payment-method-display'
 import { JobLineEditor } from '@/features/service-orders/components/job-line-editor'
 import { JobCatalogPicker } from '@/features/service-orders/components/job-catalog-picker'
+import { ServiceOrderStatusDialog } from '@/features/service-orders/components/service-order-status-dialog'
 import { addWarrantyDuration, buildWarrantyTimelineNote, isJobOverdue, isWarrantyExpired } from '@/features/service-orders/lib/warranty'
 import { normalizeJobLines, sumJobLines, validateJobLines } from '@/features/service-orders/lib/job-lines'
 import { saveJobLineAsCatalogService } from '@/features/service-orders/lib/save-line-as-service'
-import type { LocalJobLine, LocalServiceOrder, ServiceOrderStatus } from '@/services/local-db/schema'
+import type { LocalJobLine, ServiceOrderStatus } from '@/services/local-db/schema'
 import type { PdfData } from '@/shared/components/pdf/types'
 
 function tone(status: string) {
@@ -112,6 +111,13 @@ export function ServiceOrderDetailPage() {
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [payAmount, setPayAmount] = useState(0)
   const [payMethod, setPayMethod] = useState('tunai')
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false)
+  const [statusDialogTarget, setStatusDialogTarget] = useState<ServiceOrderStatus | undefined>(undefined)
+
+  function openStatusDialog(target?: ServiceOrderStatus) {
+    setStatusDialogTarget(target)
+    setStatusDialogOpen(true)
+  }
 
   const serviceData: PdfData | null = order ? {
     type: 'service',
@@ -295,34 +301,6 @@ export function ServiceOrderDetailPage() {
     }
   }
 
-  async function advanceStatus(nextStatus: ServiceOrderStatus) {
-    if (!order) return
-    try {
-      const nowIso = new Date().toISOString()
-      const next: LocalServiceOrder = {
-        ...order,
-        status: nextStatus,
-        timeline: [
-          ...(order.timeline ?? []),
-          {
-            id: crypto.randomUUID(),
-            status: nextStatus,
-            date: nowIso,
-            note: `Status diubah menjadi ${nextStatus}`,
-            actor: order.technicianName || undefined,
-          },
-        ],
-        version: order.version + 1,
-        updatedAt: nowIso,
-      }
-      await serviceOrderRepository.upsert(next)
-      toast.success(t('service_orders.updated'))
-      refetch()
-    } catch (error) {
-      toast.error(t('common.save_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
-    }
-  }
-
   async function handleDelete() {
     if (!order) return
     try {
@@ -344,44 +322,6 @@ export function ServiceOrderDetailPage() {
     } catch (error) {
       toast.error(t('common.save_error', { message: error instanceof Error ? error.message : t('common.error_generic') }))
     }
-  }
-
-  async function handleWhatsApp() {
-    if (!order) return
-    const found = order.customerId
-      ? await localDb.customers.get(order.customerId)
-      : (await localDb.customers.where('tenantId').equals(tenantId).filter((row) => row.name === order.customerName).toArray())[0]
-    const phone = found?.tenantId === tenantId ? found.phone : ''
-    if (!phone) {
-      toast.error(t('service_orders.whatsapp_not_found'))
-      return
-    }
-
-    const templateType = order.status === 'Selesai' || order.status === 'Diambil'
-      ? 'service_order_selesai'
-      : 'service_order_masuk'
-
-    const text = await messageTemplateService.render(templateType, {
-      code: order.code,
-      customer_name: order.customerName,
-      device: [order.deviceBrand, order.deviceModel].filter(Boolean).join(' ') || order.jobCategory || order.description,
-      problem: order.complaint || order.description,
-      status: order.status,
-      cost: formatCurrency(order.cost),
-      estimated_completion: order.estimatedCompletion
-        ? new Date(order.estimatedCompletion).toLocaleDateString('id-ID', { dateStyle: 'long' })
-        : '-',
-      date: formatDateTime(order.date),
-      total: formatCurrency(order.cost),
-      paid: formatCurrency(totalPaid),
-      remaining: formatCurrency(remaining),
-      items: lines.map((line) => `- ${line.name} (${line.qty} ${line.unit})`).join('\n'),
-      change: '',
-      payment_method: '',
-      store_name: '',
-    })
-
-    window.open(buildWhatsAppLink(phone, text), '_blank')
   }
 
   if (!order) {
@@ -421,9 +361,14 @@ export function ServiceOrderDetailPage() {
             <Download className="mr-2 h-4 w-4" />
             {t('common.pdf')}
           </Button>
-          <Button variant="outline" size="sm" className="text-green-600 hover:text-green-700" onClick={handleWhatsApp}>
-            <MessageSquare className="mr-2 h-4 w-4" />
-            WA
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+            onClick={() => openStatusDialog(order.status)}
+          >
+            <MessageSquare className="mr-1.5 size-4" />
+            Kirim WA
           </Button>
           {editing ? (
             <>
@@ -461,7 +406,13 @@ export function ServiceOrderDetailPage() {
                 return (
                   <div key={status} className="flex items-center gap-1.5">
                     {index > 0 && <span className="h-px w-4 bg-border" />}
-                    <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => !editing && openStatusDialog(status as ServiceOrderStatus)}
+                      disabled={editing}
+                      className="flex items-center gap-1.5 rounded-full px-1.5 py-0.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-default disabled:hover:bg-transparent"
+                      title={editing ? undefined : `Ubah status ke ${status}`}
+                    >
                       <span
                         className={cn(
                           'flex size-5 items-center justify-center rounded-full text-[10px] font-semibold',
@@ -471,7 +422,7 @@ export function ServiceOrderDetailPage() {
                         {index + 1}
                       </span>
                       <span className={cn('text-xs', reached ? 'font-medium' : 'text-muted-foreground')}>{status}</span>
-                    </div>
+                    </button>
                   </div>
                 )
               })}
@@ -483,16 +434,27 @@ export function ServiceOrderDetailPage() {
               </p>
             )}
 
-            {!isFinal && !editing && (
+            {!editing && (
               <div className="flex flex-wrap gap-2">
-                {nextStatus && (
-                  <Button size="sm" onClick={() => advanceStatus(nextStatus)}>
+                {!isFinal && nextStatus && (
+                  <Button size="sm" onClick={() => openStatusDialog(nextStatus)}>
                     <ArrowRight data-icon="inline-start" />
                     {t('service_orders.advance_to', { status: nextStatus })}
                   </Button>
                 )}
-                <Button variant="outline" size="sm" onClick={() => advanceStatus('Selesai')} disabled={order.status === 'Selesai'}>
-                  {t('service_orders.mark_complete')}
+                {!isFinal && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openStatusDialog('Selesai')}
+                    disabled={order.status === 'Selesai'}
+                  >
+                    {t('service_orders.mark_complete')}
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={() => openStatusDialog()}>
+                  <Pencil className="mr-1.5 size-3.5" />
+                  Ubah Status
                 </Button>
                 {remaining > 0 && (
                   <Button variant="secondary" size="sm" onClick={() => { setPayAmount(remaining); setPaymentOpen(true) }}>
@@ -804,7 +766,20 @@ export function ServiceOrderDetailPage() {
               <div className="space-y-3 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">{t('service_orders.job_status')}</span>
-                  <StatusBadge label={order.status} tone={tone(order.status)} />
+                  <div className="flex items-center gap-1.5">
+                    <StatusBadge label={order.status} tone={tone(order.status)} />
+                    {!editing && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => openStatusDialog()}
+                        className="h-6 px-1.5 text-xs text-primary hover:underline"
+                      >
+                        Ubah
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 {order.discountTotal ? (
                   <div className="flex items-center justify-between">
@@ -1012,6 +987,17 @@ export function ServiceOrderDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ServiceOrderStatusDialog
+        open={statusDialogOpen}
+        onOpenChange={setStatusDialogOpen}
+        order={order}
+        initialTargetStatus={statusDialogTarget}
+        customerPhone={customer?.phone}
+        totalPaid={totalPaid}
+        remaining={remaining}
+        onSuccess={() => refetch()}
+      />
     </PageShell>
   )
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Building2, Store, ShoppingCart, Coffee, Monitor } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -32,14 +32,19 @@ export function AppLayout() {
     () => localStorage.getItem('vitpos-initial-sync-done') === 'true',
   )
 
-  useAutoSync()
+  const handleInitialSyncDone = useCallback(() => {
+    localStorage.setItem('vitpos-initial-sync-done', 'true')
+    setInitialSyncDone(true)
+  }, [])
+
+  useAutoSync({ enabled: initialSyncDone })
   const syncSummary = useSyncStore()
   const settings = useSettings()
   const location = useLocation()
   const { isRefreshing, lastError, clearError, refreshAll } = useRefresh()
 
   if (!initialSyncDone) {
-    return <InitialSyncScreen onDone={() => setInitialSyncDone(true)} />
+    return <InitialSyncScreen onDone={handleInitialSyncDone} />
   }
   const isPos = location.pathname === '/pos'
   const hideMobileNavigation = isPos || location.pathname === '/service-orders/create'
