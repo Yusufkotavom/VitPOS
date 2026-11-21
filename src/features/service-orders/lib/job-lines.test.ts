@@ -105,7 +105,7 @@ describe('service vertical config', () => {
     const config = resolveServiceVertical({ modeId: 'computer_printer_combo' })
     expect(config.id).toBe('service_computer')
     expect(config.intakeFields.some((field) => field.key === 'deviceSerial')).toBe(true)
-    expect(config.statusFlow).toContain('Diagnosa')
+    expect(config.statusFlow).toContain('Menunggu Persetujuan')
   })
 
   it('resolves printing vertical with area-friendly quick services', () => {

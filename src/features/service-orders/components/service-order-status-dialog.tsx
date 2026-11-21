@@ -53,19 +53,20 @@ import type {
 
 const ALL_STATUSES: ServiceOrderStatus[] = [
   'Diterima',
-  'Diagnosa',
   'Menunggu Persetujuan',
   'Dikerjakan',
   'Selesai',
-  'Diambil',
+  'Garansi',
   'Batal',
 ]
 
 function getStatusTone(status: string) {
   if (status === 'Selesai' || status === 'Diambil') return 'success' as const
+  if (status === 'Garansi') return 'info' as const
   if (status === 'Dikerjakan') return 'info' as const
+  if (status === 'Menunggu Persetujuan') return 'warning' as const
   if (status === 'Batal') return 'danger' as const
-  if (status === 'Diagnosa' || status === 'Menunggu Persetujuan') return 'info' as const
+  if (status === 'Diagnosa') return 'info' as const
   return 'warning' as const
 }
 
@@ -155,9 +156,15 @@ export function ServiceOrderStatusDialog({
   const [templateType, setTemplateType] = useState<MessageTemplateType>(
     initialTargetStatus === 'Selesai' || order.status === 'Selesai'
       ? 'service_order_selesai'
-      : initialTargetStatus === 'Diterima' || order.status === 'Diterima'
-        ? 'service_order_masuk'
-        : 'service_order_status',
+      : initialTargetStatus === 'Garansi' || order.status === 'Garansi'
+        ? 'service_order_garansi'
+        : initialTargetStatus === 'Menunggu Persetujuan' || order.status === 'Menunggu Persetujuan'
+          ? 'service_order_persetujuan'
+          : initialTargetStatus === 'Dikerjakan' || order.status === 'Dikerjakan'
+            ? 'service_order_dikerjakan'
+            : initialTargetStatus === 'Batal' || order.status === 'Batal'
+              ? 'service_order_batal'
+              : 'service_order_masuk',
   )
   const [waMessage, setWaMessage] = useState('')
   const [isRenderingTemplate, setIsRenderingTemplate] = useState(false)
@@ -180,9 +187,17 @@ export function ServiceOrderStatusDialog({
       const defaultTpl: MessageTemplateType =
         next === 'Selesai' || next === 'Diambil'
           ? 'service_order_selesai'
-          : next === 'Diterima'
-            ? 'service_order_masuk'
-            : 'service_order_status'
+          : next === 'Garansi'
+            ? 'service_order_garansi'
+            : next === 'Menunggu Persetujuan'
+              ? 'service_order_persetujuan'
+              : next === 'Dikerjakan'
+                ? 'service_order_dikerjakan'
+                : next === 'Batal'
+                  ? 'service_order_batal'
+                  : next === 'Diterima'
+                    ? 'service_order_masuk'
+                    : 'service_order_status'
       setTemplateType(defaultTpl)
     }
   }, [open, initialTargetStatus, order, customerPhone])
@@ -191,6 +206,18 @@ export function ServiceOrderStatusDialog({
   const suggestedTemplateType = useMemo<MessageTemplateType>(() => {
     if (targetStatus === 'Selesai' || targetStatus === 'Diambil') {
       return 'service_order_selesai'
+    }
+    if (targetStatus === 'Garansi') {
+      return 'service_order_garansi'
+    }
+    if (targetStatus === 'Menunggu Persetujuan') {
+      return 'service_order_persetujuan'
+    }
+    if (targetStatus === 'Dikerjakan') {
+      return 'service_order_dikerjakan'
+    }
+    if (targetStatus === 'Batal') {
+      return 'service_order_batal'
     }
     if (targetStatus === 'Diterima') {
       return 'service_order_masuk'
@@ -265,10 +292,13 @@ export function ServiceOrderStatusDialog({
         ]
       }
 
-      // Handle warranty if Selesai or Diambil
+      // Handle warranty if Selesai, Diambil, or Garansi
       let warrantyStartDate = order.warrantyStartDate
       let warrantyEndDate = order.warrantyEndDate
-      const isFinishing = targetStatus === 'Selesai' || targetStatus === 'Diambil'
+      const isFinishing =
+        targetStatus === 'Selesai' ||
+        targetStatus === 'Diambil' ||
+        targetStatus === 'Garansi'
 
       if (isFinishing && hasWarranty) {
         if (!warrantyStartDate) warrantyStartDate = nowIso
@@ -459,8 +489,10 @@ export function ServiceOrderStatusDialog({
             )}
           </div>
 
-          {/* Garansi (jika status Selesai atau Diambil) */}
-          {(targetStatus === 'Selesai' || targetStatus === 'Diambil') && (
+          {/* Garansi (jika status Selesai, Diambil, atau Garansi) */}
+          {(targetStatus === 'Selesai' ||
+            targetStatus === 'Diambil' ||
+            targetStatus === 'Garansi') && (
             <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <input
@@ -611,14 +643,26 @@ export function ServiceOrderStatusDialog({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="service_order_status">
-                        Update Status (Umum)
+                      <SelectItem value="service_order_persetujuan">
+                        Menunggu Persetujuan (Konfirmasi Biaya)
+                      </SelectItem>
+                      <SelectItem value="service_order_dikerjakan">
+                        Sedang Dikerjakan (Proses Servis)
                       </SelectItem>
                       <SelectItem value="service_order_selesai">
                         Service Selesai (Siap Diambil)
                       </SelectItem>
+                      <SelectItem value="service_order_garansi">
+                        Garansi Servis (Status & Klaim)
+                      </SelectItem>
+                      <SelectItem value="service_order_batal">
+                        Pembatalan Servis
+                      </SelectItem>
                       <SelectItem value="service_order_masuk">
                         Tanda Terima (Masuk)
+                      </SelectItem>
+                      <SelectItem value="service_order_status">
+                        Update Status (Umum)
                       </SelectItem>
                     </SelectContent>
                   </Select>

@@ -14,7 +14,11 @@ const TEMPLATE_TYPES: MessageTemplateType[] = [
   'status',
   'product_info',
   'service_order_masuk',
+  'service_order_persetujuan',
+  'service_order_dikerjakan',
   'service_order_selesai',
+  'service_order_garansi',
+  'service_order_batal',
   'service_order_status',
 ]
 

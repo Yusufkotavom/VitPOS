@@ -61,6 +61,7 @@ const SERVER_TO_LOCAL_SERVICE_STATUS: Record<string, LocalServiceOrder['status']
   in_progress: 'Dikerjakan',
   completed: 'Selesai',
   picked_up: 'Diambil',
+  garansi: 'Garansi',
   cancelled: 'Batal',
   Diterima: 'Diterima',
   Diagnosa: 'Diagnosa',
@@ -68,6 +69,7 @@ const SERVER_TO_LOCAL_SERVICE_STATUS: Record<string, LocalServiceOrder['status']
   Dikerjakan: 'Dikerjakan',
   Selesai: 'Selesai',
   Diambil: 'Diambil',
+  Garansi: 'Garansi',
   Batal: 'Batal',
 }
 

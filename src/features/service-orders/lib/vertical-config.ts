@@ -58,7 +58,7 @@ const computerConfig: ServiceVerticalConfig = {
     { label: 'Ganti LCD', complaint: 'LCD bergaris / pecah' },
     { label: 'Servis Printer', complaint: 'Printer head buntu / hasil bergaris' },
   ],
-  statusFlow: ['Diterima', 'Diagnosa', 'Menunggu Persetujuan', 'Dikerjakan', 'Selesai', 'Diambil'],
+  statusFlow: ['Diterima', 'Menunggu Persetujuan', 'Dikerjakan', 'Selesai', 'Garansi'],
   defaultWarrantyDays: 30,
 }
 
@@ -83,7 +83,7 @@ const printingConfig: ServiceVerticalConfig = {
     { label: 'Cetak Kartu Nama', complaint: 'Kartu nama 1 box isi 100' },
     { label: 'Jilid Buku', complaint: 'Jilid spiral / lem panas' },
   ],
-  statusFlow: ['Diterima', 'Diagnosa', 'Menunggu Persetujuan', 'Dikerjakan', 'Selesai', 'Diambil'],
+  statusFlow: ['Diterima', 'Menunggu Persetujuan', 'Dikerjakan', 'Selesai', 'Garansi'],
   defaultWarrantyDays: 0,
 }
 
@@ -103,7 +103,7 @@ const gadgetConfig: ServiceVerticalConfig = {
     { label: 'Flash Software', complaint: 'Bootloop / lupa pola' },
     { label: 'Ganti Konektor', complaint: 'Tidak bisa charge' },
   ],
-  statusFlow: ['Diterima', 'Diagnosa', 'Menunggu Persetujuan', 'Dikerjakan', 'Selesai', 'Diambil'],
+  statusFlow: ['Diterima', 'Menunggu Persetujuan', 'Dikerjakan', 'Selesai', 'Garansi'],
   defaultWarrantyDays: 14,
 }
 
@@ -121,7 +121,7 @@ const generalConfig: ServiceVerticalConfig = {
     { key: 'accessories', label: 'Kelengkapan', placeholder: 'Opsional' },
   ],
   quickServices: [],
-  statusFlow: ['Diterima', 'Dikerjakan', 'Selesai', 'Diambil'],
+  statusFlow: ['Diterima', 'Menunggu Persetujuan', 'Dikerjakan', 'Selesai', 'Garansi'],
   defaultWarrantyDays: 0,
 }
 

@@ -265,6 +265,19 @@ export function ServiceOrdersPage() {
                 </Button>
               )
             })}
+            {(() => {
+              const batalCount = filtered.filter((row) => row.status === 'Batal').length
+              if (batalCount === 0) return null
+              return (
+                <Button
+                  size="sm"
+                  variant={filterStatus === 'Batal' ? 'default' : 'outline'}
+                  onClick={() => setFilterStatus('Batal')}
+                >
+                  Batal ({batalCount})
+                </Button>
+              )
+            })()}
             {overdueCount > 0 && (
               <Button
                 size="sm"

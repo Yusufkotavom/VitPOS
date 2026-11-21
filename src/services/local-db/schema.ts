@@ -306,7 +306,7 @@ export type WholesaleTier = {
   price: number
 }
 
-export type ServiceOrderStatus = 'Diterima' | 'Diagnosa' | 'Menunggu Persetujuan' | 'Dikerjakan' | 'Selesai' | 'Diambil' | 'Batal'
+export type ServiceOrderStatus = 'Diterima' | 'Diagnosa' | 'Menunggu Persetujuan' | 'Dikerjakan' | 'Selesai' | 'Diambil' | 'Garansi' | 'Batal'
 
 export type JobLineSource = 'catalog' | 'custom'
 export type JobLineKind = 'product' | 'service'

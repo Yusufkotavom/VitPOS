@@ -5,8 +5,11 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  CheckCircle2,
+  Clock,
   CreditCard,
   Download,
+  Inbox,
   MessageSquare,
   Pencil,
   Plus,
@@ -14,7 +17,9 @@ import {
   ShieldCheck,
   ShieldX,
   Trash2,
+  Wrench,
   X,
+  XCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -52,11 +57,58 @@ import type { PdfData } from '@/shared/components/pdf/types'
 
 function tone(status: string) {
   if (status === 'Selesai' || status === 'Diambil') return 'success' as const
+  if (status === 'Garansi') return 'info' as const
   if (status === 'Dikerjakan') return 'info' as const
+  if (status === 'Menunggu Persetujuan') return 'warning' as const
   if (status === 'Batal') return 'danger' as const
-  if (status === 'Diagnosa' || status === 'Menunggu Persetujuan') return 'info' as const
+  if (status === 'Diagnosa') return 'info' as const
   return 'warning' as const
 }
+
+const CORE_STATUS_STEPS = [
+  {
+    status: 'Diterima' as const,
+    label: '1. Diterima',
+    sublabel: 'Tanda Terima Servis',
+    icon: Inbox,
+    index: 0,
+  },
+  {
+    status: 'Menunggu Persetujuan' as const,
+    label: '2. Persetujuan',
+    sublabel: 'Biaya & Estimasi',
+    icon: Clock,
+    index: 1,
+  },
+  {
+    status: 'Dikerjakan' as const,
+    label: '3. Dikerjakan',
+    sublabel: 'Proses Perbaikan',
+    icon: Wrench,
+    index: 2,
+  },
+  {
+    status: 'Selesai' as const,
+    label: '4. Selesai',
+    sublabel: 'Siap Ambil & Bayar',
+    icon: CheckCircle2,
+    index: 3,
+  },
+  {
+    status: 'Garansi' as const,
+    label: '5. Garansi',
+    sublabel: 'Masa Garansi / Klaim',
+    icon: ShieldCheck,
+    index: 4,
+  },
+  {
+    status: 'Batal' as const,
+    label: 'Batal',
+    sublabel: 'Servis Dibatalkan',
+    icon: XCircle,
+    index: -1,
+  },
+]
 
 export function ServiceOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -346,11 +398,12 @@ export function ServiceOrderDetailPage() {
     )
   }
 
-  const statusFlow = vertical.statusFlow
-  const currentIndex = statusFlow.indexOf(order.status)
-  const isFinal = order.status === 'Diambil' || order.status === 'Batal'
-  const nextStatus = currentIndex >= 0 && currentIndex < statusFlow.length - 1 ? statusFlow[currentIndex + 1] : null
+  const statusFlow = ['Diterima', 'Menunggu Persetujuan', 'Dikerjakan', 'Selesai', 'Garansi'] as const
+  const currentFlowIdx = statusFlow.indexOf(order.status as typeof statusFlow[number])
+  const isFinal = order.status === 'Batal'
+  const nextStatus = currentFlowIdx >= 0 && currentFlowIdx < statusFlow.length - 1 ? statusFlow[currentFlowIdx + 1] : null
   const isOverdue = isJobOverdue(order.estimatedCompletion, order.status)
+  const isWarrantyExpiredDate = resolvedWarranty.hasWarranty && resolvedWarranty.warrantyEndDate ? isWarrantyExpired(resolvedWarranty.warrantyEndDate) : false
 
   const editSubtotal = sumJobLines(editLines)
   const editTotal = Math.max(editSubtotal - editDiscount, 0)
@@ -405,78 +458,160 @@ export function ServiceOrderDetailPage() {
         </>
       }
     >
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
-          {/* Stepper + aksi status */}
-          <Card className="gap-4 p-4">
-            <div className="flex flex-wrap items-center gap-1.5">
-              {statusFlow.map((status, index) => {
-                const reached = currentIndex >= index && currentIndex !== -1
-                return (
-                  <div key={status} className="flex items-center gap-1.5">
-                    {index > 0 && <span className="h-px w-4 bg-border" />}
-                    <button
-                      type="button"
-                      onClick={() => !editing && openStatusDialog(status as ServiceOrderStatus)}
-                      disabled={editing}
-                      className="flex items-center gap-1.5 rounded-full px-1.5 py-0.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-default disabled:hover:bg-transparent"
-                      title={editing ? undefined : `Ubah status ke ${status}`}
-                    >
-                      <span
-                        className={cn(
-                          'flex size-5 items-center justify-center rounded-full text-[10px] font-semibold',
-                          reached ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
-                        )}
-                      >
-                        {index + 1}
-                      </span>
-                      <span className={cn('text-xs', reached ? 'font-medium' : 'text-muted-foreground')}>{status}</span>
-                    </button>
-                  </div>
-                )
-              })}
+      <div className="space-y-6">
+        {/* Panel Alur Status Servis (Di atas menu / konten detail servis) */}
+        <Card className="gap-4 p-4 border-border/80 shadow-xs">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b pb-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Status Servis:
+              </span>
+              <StatusBadge label={order.status} tone={tone(order.status)} />
+              {order.technicianName && (
+                <span className="text-xs text-muted-foreground">
+                  Teknisi: <span className="font-medium text-foreground">{order.technicianName}</span>
+                </span>
+              )}
+              {isOverdue && (
+                <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold text-destructive">
+                  {t('service_orders.overdue_hint')}
+                </span>
+              )}
+              {resolvedWarranty.hasWarranty && (
+                <span
+                  className={cn(
+                    'flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                    isWarrantyExpiredDate
+                      ? 'bg-destructive/10 text-destructive'
+                      : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+                  )}
+                >
+                  <ShieldCheck className="size-3" />
+                  {isWarrantyExpiredDate
+                    ? 'Garansi Habis'
+                    : `Garansi Aktif (${resolvedWarranty.warrantyValue} ${resolvedWarranty.warrantyUnit})`}
+                </span>
+              )}
             </div>
 
-            {isOverdue && (
-              <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
-                {t('service_orders.overdue_hint')}
-              </p>
-            )}
-
             {!editing && (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {!isFinal && nextStatus && (
-                  <Button size="sm" onClick={() => openStatusDialog(nextStatus)}>
-                    <ArrowRight data-icon="inline-start" />
-                    {t('service_orders.advance_to', { status: nextStatus })}
-                  </Button>
-                )}
-                {!isFinal && (
                   <Button
-                    variant="outline"
                     size="sm"
-                    onClick={() => openStatusDialog('Selesai')}
-                    disabled={order.status === 'Selesai'}
+                    className="h-8 text-xs font-medium"
+                    onClick={() => openStatusDialog(nextStatus)}
                   >
-                    {t('service_orders.mark_complete')}
+                    <ArrowRight className="mr-1.5 size-3.5" />
+                    Lanjut: {nextStatus}
                   </Button>
                 )}
-                <Button variant="outline" size="sm" onClick={() => openStatusDialog()}>
-                  <Pencil className="mr-1.5 size-3.5" />
-                  Ubah Status
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs font-medium text-emerald-700 dark:text-emerald-400 border-emerald-600/30 hover:bg-emerald-500/10"
+                  onClick={() => openStatusDialog(order.status)}
+                >
+                  <MessageSquare className="mr-1.5 size-3.5" />
+                  Ubah Status & Kirim WA
                 </Button>
                 {remaining > 0 && (
-                  <Button variant="secondary" size="sm" onClick={() => { setPayAmount(remaining); setPaymentOpen(true) }}>
-                    <CreditCard data-icon="inline-start" />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 text-xs font-medium"
+                    onClick={() => {
+                      setPayAmount(remaining)
+                      setPaymentOpen(true)
+                    }}
+                  >
+                    <CreditCard className="mr-1.5 size-3.5" />
                     {t('service_orders.accept_payment')}
                   </Button>
                 )}
               </div>
             )}
-          </Card>
+          </div>
 
-          {/* Info pekerjaan */}
-          <Card className="gap-4 p-4">
+          {/* Tombol Alur Proses Servis */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            {CORE_STATUS_STEPS.map((step) => {
+              const StepIcon = step.icon
+              const isCurrent = order.status === step.status
+              const isPast =
+                currentFlowIdx !== -1 &&
+                step.index !== -1 &&
+                currentFlowIdx > step.index
+
+              return (
+                <button
+                  key={step.status}
+                  type="button"
+                  onClick={() => !editing && openStatusDialog(step.status)}
+                  disabled={editing}
+                  className={cn(
+                    'group relative flex flex-col items-start gap-1 rounded-xl border p-2.5 text-left transition-all',
+                    isCurrent
+                      ? step.status === 'Batal'
+                        ? 'border-destructive bg-destructive/10 ring-1 ring-destructive/30'
+                        : 'border-primary bg-primary/10 shadow-xs ring-1 ring-primary/30'
+                      : isPast
+                        ? 'border-border/80 bg-muted/30 hover:bg-muted/60'
+                        : 'border-border/60 bg-background hover:bg-muted/20',
+                    editing && 'cursor-not-allowed opacity-60',
+                  )}
+                  title={
+                    editing
+                      ? undefined
+                      : `Klik untuk ubah status ke ${step.status} & kirim WhatsApp`
+                  }
+                >
+                  <div className="flex w-full items-center justify-between">
+                    <span
+                      className={cn(
+                        'flex size-5 items-center justify-center rounded-full text-[10px]',
+                        isCurrent
+                          ? step.status === 'Batal'
+                            ? 'bg-destructive text-white'
+                            : 'bg-primary text-primary-foreground'
+                          : isPast
+                            ? 'bg-muted-foreground/20 text-foreground'
+                            : 'bg-muted text-muted-foreground',
+                      )}
+                    >
+                      <StepIcon className="size-3" />
+                    </span>
+                    {isCurrent && (
+                      <span className="flex size-2 rounded-full bg-primary animate-pulse" />
+                    )}
+                  </div>
+                  <div className="mt-0.5">
+                    <div
+                      className={cn(
+                        'text-xs font-semibold leading-tight',
+                        isCurrent
+                          ? step.status === 'Batal'
+                            ? 'text-destructive'
+                            : 'text-primary'
+                          : 'text-foreground',
+                      )}
+                    >
+                      {step.label}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                      {step.sublabel}
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </Card>
+
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="space-y-4 lg:col-span-2">
+            {/* Info pekerjaan */}
+            <Card className="gap-4 p-4">
             <h3 className="text-sm font-semibold">{t('service_orders.job_detail')}</h3>
 
             {editing ? (
@@ -715,10 +850,9 @@ export function ServiceOrderDetailPage() {
                       <SelectValue placeholder={t('common.select_placeholder')} />
                     </SelectTrigger>
                     <SelectContent>
-                      {vertical.statusFlow.map((status) => (
-                        <SelectItem key={status} value={status}>{status}</SelectItem>
+                      {CORE_STATUS_STEPS.map((s) => (
+                        <SelectItem key={s.status} value={s.status}>{s.status}</SelectItem>
                       ))}
-                      <SelectItem value="Batal">Batal</SelectItem>
                     </SelectContent>
                   </Select>
                 </label>
@@ -871,6 +1005,7 @@ export function ServiceOrderDetailPage() {
             </Card>
           )}
         </div>
+      </div>
       </div>
 
       <Dialog open={isCatalogOpen} onOpenChange={setIsCatalogOpen}>

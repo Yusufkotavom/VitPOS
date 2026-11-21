@@ -2224,10 +2224,10 @@ function mapClientReturnStatus(value) {
   return "draft";
 }
 function mapClientServiceOrderStatus(value) {
-  if (value === "Diterima" || value === "received") return "received";
-  if (value === "Dikerjakan" || value === "in_progress") return "in_progress";
+  if (value === "Diterima" || value === "Diagnosa" || value === "received") return "received";
+  if (value === "Menunggu Persetujuan" || value === "waiting_approval" || value === "Dikerjakan" || value === "in_progress") return "in_progress";
   if (value === "Selesai" || value === "completed") return "completed";
-  if (value === "Diambil" || value === "picked_up") return "picked_up";
+  if (value === "Diambil" || value === "Garansi" || value === "picked_up") return "picked_up";
   if (value === "Batal" || value === "cancelled") return "cancelled";
   return "received";
 }
