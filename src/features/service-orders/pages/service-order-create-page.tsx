@@ -358,64 +358,25 @@ export function ServiceOrderCreatePage() {
               />
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">{t('service_orders.estimated_completion')}</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn('h-10 w-full justify-start gap-2 font-normal', !store.estimatedCompletion && 'text-muted-foreground')}>
-                      <CalendarIcon className="h-4 w-4" />
-                      {store.estimatedCompletion
-                        ? format(new Date(store.estimatedCompletion), 'd MMM yyyy', { locale: localeId })
-                        : t('common.select_date')}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={store.estimatedCompletion ? new Date(store.estimatedCompletion) : undefined}
-                      onSelect={(date) => store.setEstimatedCompletion(date ? date.toISOString() : undefined)}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">{t('service_orders.service_warranty')}</Label>
-                <div className="flex h-10 items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="soc-warranty"
-                    className="h-4 w-4 rounded border-gray-300"
-                    checked={store.hasWarranty}
-                    onChange={(event) => store.setHasWarranty(event.target.checked)}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">{t('service_orders.estimated_completion')}</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn('h-10 w-full justify-start gap-2 font-normal', !store.estimatedCompletion && 'text-muted-foreground')}>
+                    <CalendarIcon className="h-4 w-4" />
+                    {store.estimatedCompletion
+                      ? format(new Date(store.estimatedCompletion), 'd MMM yyyy', { locale: localeId })
+                      : t('common.select_date')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={store.estimatedCompletion ? new Date(store.estimatedCompletion) : undefined}
+                    onSelect={(date) => store.setEstimatedCompletion(date ? date.toISOString() : undefined)}
                   />
-                  {store.hasWarranty ? (
-                    <>
-                      <Input
-                        inputMode="numeric"
-                        className="h-10 w-16"
-                        value={store.warrantyValue}
-                        onChange={(event) => store.setWarrantyValue(event.target.value.replace(/\D/g, ''))}
-                        placeholder="30"
-                        aria-label={t('service_orders.warranty_value')}
-                      />
-                      <Select value={store.warrantyUnit} onValueChange={(value) => store.setWarrantyUnit(value as 'hari' | 'bulan' | 'tahun')}>
-                        <SelectTrigger className="h-10 flex-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="hari">{t('common.days')}</SelectItem>
-                          <SelectItem value="bulan">{t('common.months')}</SelectItem>
-                          <SelectItem value="tahun">{t('common.years')}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">{t('common.none')}</span>
-                  )}
-                </div>
-              </div>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="space-y-1">

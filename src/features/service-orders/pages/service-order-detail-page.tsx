@@ -11,6 +11,7 @@ import {
   Download,
   Inbox,
   MessageSquare,
+  PackageCheck,
   Pencil,
   Plus,
   Printer,
@@ -90,16 +91,23 @@ const CORE_STATUS_STEPS = [
   {
     status: 'Selesai' as const,
     label: '4. Selesai',
-    sublabel: 'Siap Ambil & Bayar',
+    sublabel: 'Siap Diambil di Toko',
     icon: CheckCircle2,
     index: 3,
   },
   {
+    status: 'Diambil' as const,
+    label: '5. Sudah Diambil',
+    sublabel: 'Diserahkan ke Pelanggan',
+    icon: PackageCheck,
+    index: 4,
+  },
+  {
     status: 'Garansi' as const,
-    label: '5. Garansi',
+    label: '6. Garansi',
     sublabel: 'Masa Garansi / Klaim',
     icon: ShieldCheck,
-    index: 4,
+    index: 5,
   },
   {
     status: 'Batal' as const,
@@ -398,7 +406,7 @@ export function ServiceOrderDetailPage() {
     )
   }
 
-  const statusFlow = ['Diterima', 'Menunggu Persetujuan', 'Dikerjakan', 'Selesai', 'Garansi'] as const
+  const statusFlow = ['Diterima', 'Menunggu Persetujuan', 'Dikerjakan', 'Selesai', 'Diambil', 'Garansi'] as const
   const currentFlowIdx = statusFlow.indexOf(order.status as typeof statusFlow[number])
   const isFinal = order.status === 'Batal'
   const nextStatus = currentFlowIdx >= 0 && currentFlowIdx < statusFlow.length - 1 ? statusFlow[currentFlowIdx + 1] : null
@@ -472,6 +480,18 @@ export function ServiceOrderDetailPage() {
                   Teknisi: <span className="font-medium text-foreground">{order.technicianName}</span>
                 </span>
               )}
+              {order.status === 'Selesai' && (
+                <span className="flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-amber-900 dark:text-amber-200">
+                  <CheckCircle2 className="size-3" />
+                  Siap Diambil (Unit Masih di Toko)
+                </span>
+              )}
+              {order.status === 'Diambil' && (
+                <span className="flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-900 dark:text-emerald-200">
+                  <PackageCheck className="size-3" />
+                  Sudah Diserahkan ke Pelanggan
+                </span>
+              )}
               {isOverdue && (
                 <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold text-destructive">
                   {t('service_orders.overdue_hint')}
@@ -534,7 +554,7 @@ export function ServiceOrderDetailPage() {
           </div>
 
           {/* Tombol Alur Proses Servis */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
             {CORE_STATUS_STEPS.map((step) => {
               const StepIcon = step.icon
               const isCurrent = order.status === step.status
@@ -871,39 +891,41 @@ export function ServiceOrderDetailPage() {
                   <span className="text-lg font-bold">{formatCurrency(editTotal)}</span>
                 </div>
 
-                <div className="space-y-2 border-t pt-3">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="edit-warranty"
-                      className="h-4 w-4 rounded border-gray-300"
-                      checked={editHasWarranty}
-                      onChange={(event) => setEditHasWarranty(event.target.checked)}
-                    />
-                    <label htmlFor="edit-warranty" className="text-xs font-medium">{t('service_orders.service_warranty')}</label>
-                  </div>
-                  {editHasWarranty && (
-                    <div className="flex gap-2">
-                      <Input
-                        inputMode="numeric"
-                        className="h-9 w-20"
-                        value={editWarrantyValue}
-                        onChange={(event) => setEditWarrantyValue(event.target.value.replace(/\D/g, ''))}
-                        aria-label={t('service_orders.warranty_value')}
+                {(editStatus === 'Selesai' || editStatus === 'Diambil' || editStatus === 'Garansi') && (
+                  <div className="space-y-2 border-t pt-3">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="edit-warranty"
+                        className="h-4 w-4 rounded border-gray-300"
+                        checked={editHasWarranty}
+                        onChange={(event) => setEditHasWarranty(event.target.checked)}
                       />
-                      <Select value={editWarrantyUnit} onValueChange={(value) => setEditWarrantyUnit(value as 'hari' | 'bulan' | 'tahun')}>
-                        <SelectTrigger className="h-9 flex-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="hari">{t('common.days')}</SelectItem>
-                          <SelectItem value="bulan">{t('common.months')}</SelectItem>
-                          <SelectItem value="tahun">{t('common.years')}</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <label htmlFor="edit-warranty" className="text-xs font-medium">{t('service_orders.service_warranty')}</label>
                     </div>
-                  )}
-                </div>
+                    {editHasWarranty && (
+                      <div className="flex gap-2">
+                        <Input
+                          inputMode="numeric"
+                          className="h-9 w-20"
+                          value={editWarrantyValue}
+                          onChange={(event) => setEditWarrantyValue(event.target.value.replace(/\D/g, ''))}
+                          aria-label={t('service_orders.warranty_value')}
+                        />
+                        <Select value={editWarrantyUnit} onValueChange={(value) => setEditWarrantyUnit(value as 'hari' | 'bulan' | 'tahun')}>
+                          <SelectTrigger className="h-9 flex-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="hari">{t('common.days')}</SelectItem>
+                            <SelectItem value="bulan">{t('common.months')}</SelectItem>
+                            <SelectItem value="tahun">{t('common.years')}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-3 text-sm">

@@ -56,6 +56,7 @@ const ALL_STATUSES: ServiceOrderStatus[] = [
   'Menunggu Persetujuan',
   'Dikerjakan',
   'Selesai',
+  'Diambil',
   'Garansi',
   'Batal',
 ]
@@ -77,6 +78,7 @@ async function renderOrderWaMessage(
   statusNote: string,
   totalPaid: number,
   remaining: number,
+  warrantyText?: string,
 ): Promise<string> {
   const lines = normalizeJobLines(order)
   return messageTemplateService.render(templateType, {
@@ -93,6 +95,7 @@ async function renderOrderWaMessage(
     total: formatCurrency(order.cost),
     paid: formatCurrency(totalPaid),
     remaining: formatCurrency(remaining),
+    warranty: warrantyText || 'Tanpa Garansi',
     estimated_completion: order.estimatedCompletion
       ? new Date(order.estimatedCompletion).toLocaleDateString('id-ID', {
           dateStyle: 'long',
@@ -156,15 +159,17 @@ export function ServiceOrderStatusDialog({
   const [templateType, setTemplateType] = useState<MessageTemplateType>(
     initialTargetStatus === 'Selesai' || order.status === 'Selesai'
       ? 'service_order_selesai'
-      : initialTargetStatus === 'Garansi' || order.status === 'Garansi'
-        ? 'service_order_garansi'
-        : initialTargetStatus === 'Menunggu Persetujuan' || order.status === 'Menunggu Persetujuan'
-          ? 'service_order_persetujuan'
-          : initialTargetStatus === 'Dikerjakan' || order.status === 'Dikerjakan'
-            ? 'service_order_dikerjakan'
-            : initialTargetStatus === 'Batal' || order.status === 'Batal'
-              ? 'service_order_batal'
-              : 'service_order_masuk',
+      : initialTargetStatus === 'Diambil' || order.status === 'Diambil'
+        ? 'service_order_diambil'
+        : initialTargetStatus === 'Garansi' || order.status === 'Garansi'
+          ? 'service_order_garansi'
+          : initialTargetStatus === 'Menunggu Persetujuan' || order.status === 'Menunggu Persetujuan'
+            ? 'service_order_persetujuan'
+            : initialTargetStatus === 'Dikerjakan' || order.status === 'Dikerjakan'
+              ? 'service_order_dikerjakan'
+              : initialTargetStatus === 'Batal' || order.status === 'Batal'
+                ? 'service_order_batal'
+                : 'service_order_masuk',
   )
   const [waMessage, setWaMessage] = useState('')
   const [isRenderingTemplate, setIsRenderingTemplate] = useState(false)
@@ -185,27 +190,32 @@ export function ServiceOrderStatusDialog({
       setSendWa(Boolean(customerPhone.trim()))
 
       const defaultTpl: MessageTemplateType =
-        next === 'Selesai' || next === 'Diambil'
+        next === 'Selesai'
           ? 'service_order_selesai'
-          : next === 'Garansi'
-            ? 'service_order_garansi'
-            : next === 'Menunggu Persetujuan'
-              ? 'service_order_persetujuan'
-              : next === 'Dikerjakan'
-                ? 'service_order_dikerjakan'
-                : next === 'Batal'
-                  ? 'service_order_batal'
-                  : next === 'Diterima'
-                    ? 'service_order_masuk'
-                    : 'service_order_status'
+          : next === 'Diambil'
+            ? 'service_order_diambil'
+            : next === 'Garansi'
+              ? 'service_order_garansi'
+              : next === 'Menunggu Persetujuan'
+                ? 'service_order_persetujuan'
+                : next === 'Dikerjakan'
+                  ? 'service_order_dikerjakan'
+                  : next === 'Batal'
+                    ? 'service_order_batal'
+                    : next === 'Diterima'
+                      ? 'service_order_masuk'
+                      : 'service_order_status'
       setTemplateType(defaultTpl)
     }
   }, [open, initialTargetStatus, order, customerPhone])
 
   // Automatically update template type when targetStatus changes
   const suggestedTemplateType = useMemo<MessageTemplateType>(() => {
-    if (targetStatus === 'Selesai' || targetStatus === 'Diambil') {
+    if (targetStatus === 'Selesai') {
       return 'service_order_selesai'
+    }
+    if (targetStatus === 'Diambil') {
+      return 'service_order_diambil'
     }
     if (targetStatus === 'Garansi') {
       return 'service_order_garansi'
@@ -237,6 +247,9 @@ export function ServiceOrderStatusDialog({
     async function generateMessage() {
       setIsRenderingTemplate(true)
       try {
+        const warrantyText = hasWarranty
+          ? `${warrantyValue} ${warrantyUnit}`
+          : 'Tanpa Garansi'
         const rendered = await renderOrderWaMessage(
           templateType,
           order,
@@ -244,6 +257,7 @@ export function ServiceOrderStatusDialog({
           statusNote,
           totalPaid,
           remaining,
+          warrantyText,
         )
         if (active) {
           setWaMessage(rendered)
@@ -266,7 +280,18 @@ export function ServiceOrderStatusDialog({
     return () => {
       active = false
     }
-  }, [open, templateType, targetStatus, statusNote, order, totalPaid, remaining])
+  }, [
+    open,
+    templateType,
+    targetStatus,
+    statusNote,
+    order,
+    totalPaid,
+    remaining,
+    hasWarranty,
+    warrantyValue,
+    warrantyUnit,
+  ])
 
   async function handleSave() {
     setIsSubmitting(true)
@@ -401,6 +426,9 @@ export function ServiceOrderStatusDialog({
         } else {
           let textToSend = waMessage.trim()
           if (!textToSend) {
+            const warrantyText = hasWarranty
+              ? `${warrantyValue} ${warrantyUnit}`
+              : 'Tanpa Garansi'
             textToSend = await renderOrderWaMessage(
               templateType,
               order,
@@ -408,6 +436,7 @@ export function ServiceOrderStatusDialog({
               statusNote,
               totalPaid,
               remaining,
+              warrantyText,
             )
           }
           window.open(buildWhatsAppLink(cleanPhone, textToSend), '_blank')
@@ -509,27 +538,34 @@ export function ServiceOrderStatusDialog({
               </div>
 
               {hasWarranty && (
-                <div className="flex items-center gap-2 pt-1">
-                  <Input
-                    inputMode="numeric"
-                    value={warrantyValue}
-                    onChange={(e) => setWarrantyValue(e.target.value.replace(/\D/g, ''))}
-                    className="h-8 w-24 text-xs"
-                    placeholder="Nilai"
-                  />
-                  <Select
-                    value={warrantyUnit}
-                    onValueChange={(val) => setWarrantyUnit(val as WarrantyUnit)}
-                  >
-                    <SelectTrigger className="h-8 w-28 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="hari">Hari</SelectItem>
-                      <SelectItem value="bulan">Bulan</SelectItem>
-                      <SelectItem value="tahun">Tahun</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      inputMode="numeric"
+                      value={warrantyValue}
+                      onChange={(e) => setWarrantyValue(e.target.value.replace(/\D/g, ''))}
+                      className="h-8 w-24 text-xs"
+                      placeholder="Nilai"
+                    />
+                    <Select
+                      value={warrantyUnit}
+                      onValueChange={(val) => setWarrantyUnit(val as WarrantyUnit)}
+                    >
+                      <SelectTrigger className="h-8 w-28 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="hari">Hari</SelectItem>
+                        <SelectItem value="bulan">Bulan</SelectItem>
+                        <SelectItem value="tahun">Tahun</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {targetStatus === 'Selesai'
+                      ? 'Garansi disiapkan untuk pelanggan dan mulai aktif saat barang diambil.'
+                      : 'Garansi resmi aktif mulai tanggal penyerahan unit ini.'}
+                  </p>
                 </div>
               )}
             </div>
@@ -650,7 +686,10 @@ export function ServiceOrderStatusDialog({
                         Sedang Dikerjakan (Proses Servis)
                       </SelectItem>
                       <SelectItem value="service_order_selesai">
-                        Service Selesai (Siap Diambil)
+                        Service Selesai (Siap Diambil di Toko)
+                      </SelectItem>
+                      <SelectItem value="service_order_diambil">
+                        Sudah Diambil (Penyerahan ke Pelanggan)
                       </SelectItem>
                       <SelectItem value="service_order_garansi">
                         Garansi Servis (Status & Klaim)

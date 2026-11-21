@@ -12,6 +12,7 @@ export type MessageTemplateType =
   | 'service_order_persetujuan'
   | 'service_order_dikerjakan'
   | 'service_order_selesai'
+  | 'service_order_diambil'
   | 'service_order_garansi'
   | 'service_order_batal'
   | 'service_order_status'
@@ -25,7 +26,8 @@ export const TEMPLATE_LABELS: Record<MessageTemplateType, string> = {
   service_order_masuk: 'Service Order (Baru Masuk)',
   service_order_persetujuan: 'Service Order (Menunggu Persetujuan)',
   service_order_dikerjakan: 'Service Order (Sedang Dikerjakan)',
-  service_order_selesai: 'Service Order (Selesai)',
+  service_order_selesai: 'Service Order (Selesai / Siap Diambil)',
+  service_order_diambil: 'Service Order (Sudah Diambil)',
   service_order_garansi: 'Service Order (Garansi Servis)',
   service_order_batal: 'Service Order (Dibatalkan)',
   service_order_status: 'Service Order (Update Status)',
@@ -41,6 +43,7 @@ export const TEMPLATE_VARIABLES: Record<MessageTemplateType, string[]> = {
   service_order_persetujuan: ['code', 'customer_name', 'device', 'problem', 'status', 'cost', 'estimated_completion', 'date', 'total', 'paid', 'remaining', 'items', 'notes', 'store_name'],
   service_order_dikerjakan: ['code', 'customer_name', 'device', 'problem', 'status', 'cost', 'estimated_completion', 'date', 'notes', 'store_name'],
   service_order_selesai: ['code', 'customer_name', 'device', 'problem', 'status', 'cost', 'date', 'total', 'paid', 'remaining', 'items', 'change', 'payment_method', 'store_name', 'warranty'],
+  service_order_diambil: ['code', 'customer_name', 'device', 'problem', 'status', 'cost', 'date', 'total', 'paid', 'remaining', 'items', 'change', 'payment_method', 'store_name', 'warranty'],
   service_order_garansi: ['code', 'customer_name', 'device', 'problem', 'status', 'cost', 'date', 'warranty', 'notes', 'store_name'],
   service_order_batal: ['code', 'customer_name', 'device', 'problem', 'status', 'notes', 'date', 'store_name'],
   service_order_status: ['code', 'customer_name', 'device', 'problem', 'status', 'cost', 'estimated_completion', 'date', 'total', 'paid', 'remaining', 'items', 'change', 'payment_method', 'store_name', 'notes'],
@@ -138,19 +141,33 @@ Mohon balas *SETUJU* jika biaya di atas disetujui agar teknisi kami dapat segera
 ─────────────────
 Perangkat Anda saat ini sedang dikerjakan oleh teknisi kami. Kami akan mengabari Anda segera setelah selesai. Terima kasih.`,
 
-  service_order_selesai: `✅ *SERVICE SELESAI*
+  service_order_selesai: `✅ *SERVICE SELESAI & SIAP DIAMBIL*
 ─────────────────
 *No Service:* {{code}}
 *Pelanggan:* {{customer_name}}
 *Perangkat:* {{device}}
 ─────────────────
-Pekerjaan telah selesai dan perangkat siap diambil.
+Pekerjaan telah selesai dan perangkat siap diambil di toko.
 *Total Biaya:* {{total}}
 *Sudah Dibayar:* {{paid}}
 *Sisa Tagihan:* {{remaining}}
 *Garansi:* {{warranty}}
 ─────────────────
 Silakan tunjukkan pesan ini atau nomor service saat pengambilan. Terima kasih.`,
+
+  service_order_diambil: `🤝 *PENYERAHAN UNIT SERVICE*
+─────────────────
+*No Service:* {{code}}
+*Pelanggan:* {{customer_name}}
+*Perangkat:* {{device}}
+─────────────────
+Unit servis telah diserahkan kepada pelanggan.
+*Total Biaya:* {{total}}
+*Sudah Dibayar:* {{paid}}
+*Sisa Tagihan:* {{remaining}}
+*Garansi Servis:* {{warranty}}
+─────────────────
+Terima kasih telah mempercayakan perbaikan kepada kami. Simpan pesan ini sebagai bukti garansi servis Anda.`,
 
   service_order_garansi: `🛡️ *STATUS GARANSI SERVICE*
 ─────────────────
