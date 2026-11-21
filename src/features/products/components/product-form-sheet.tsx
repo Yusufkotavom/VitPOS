@@ -25,6 +25,8 @@ export function ProductFormSheet() {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [category, setCategory] = useState('Umum')
+  const [sku, setSku] = useState('')
+  const [barcode, setBarcode] = useState('')
   const [costPrice, setCostPrice] = useState('0')
   const [price, setPrice] = useState('0')
   const [stock, setStock] = useState('0')
@@ -42,6 +44,8 @@ export function ProductFormSheet() {
         costPrice: parseDigits(costPrice),
         price: parseDigits(price),
         stock: parseDigits(stock),
+        sku: sku.trim() || undefined,
+        barcode: barcode.trim() || undefined,
         status: 'Aktif',
         syncStatus: 'pending',
         version: 1,
@@ -50,6 +54,8 @@ export function ProductFormSheet() {
 
       setName('')
       setCategory('Umum')
+      setSku('')
+      setBarcode('')
       setCostPrice('0')
       setPrice('0')
       setStock('0')
@@ -72,6 +78,10 @@ export function ProductFormSheet() {
         <div className="grid gap-4 p-4">
           <FormSection title={t('products.basic_info')} description={t('products.basic_info_description')}>
             <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={t('products.name_placeholder')} />
+            <div className="grid grid-cols-2 gap-2">
+              <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="SKU / Kode Barang" className="font-mono text-xs uppercase" />
+              <Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="Barcode / EAN" className="font-mono text-xs" />
+            </div>
             <select className="h-10 rounded-md border border-input bg-transparent px-3 text-sm" value={category} onChange={(event) => setCategory(event.target.value)}>
               {Array.from(new Set(categoryOptions)).map((option) => <option key={option} value={option}>{option}</option>)}
             </select>

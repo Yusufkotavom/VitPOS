@@ -184,7 +184,21 @@ export function ProductsPage() {
           <DataTable
             columns={[
               { key: 'image', header: '', render: (row) => <ProductMedia imageUrl={row.imageUrl} iconName={row.icon} className="size-10 rounded-md" /> },
-              { key: 'name', header: t('common.name') },
+              {
+                key: 'name',
+                header: t('common.name'),
+                render: (row) => (
+                  <div className="flex flex-col">
+                    <span className="font-medium text-foreground">{row.name}</span>
+                    {(row.sku || row.barcode) && (
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground font-mono mt-0.5">
+                        {row.sku && <span className="rounded bg-muted px-1.5 py-0.5">SKU: {row.sku}</span>}
+                        {row.barcode && <span className="rounded bg-primary/10 text-primary px-1.5 py-0.5">Barcode: {row.barcode}</span>}
+                      </div>
+                    )}
+                  </div>
+                ),
+              },
               { key: 'category', header: t('common.category') },
               { key: 'type', header: t('common.type') },
               { key: 'costPrice', header: t('common.cost_price') || 'HPP', render: (row) => formatCurrency(row.costPrice ?? 0) },
@@ -223,7 +237,14 @@ export function ProductsPage() {
                       <span className="text-xs font-medium px-2 py-1 bg-muted rounded-md text-muted-foreground">{row.type}</span>
                     </div>
                     <h3 className="font-semibold text-lg line-clamp-1">{row.name}</h3>
-                    <p className="text-sm text-muted-foreground mt-1 mb-4">{row.category}</p>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground mt-1 mb-4">
+                      <span>{row.category}</span>
+                      {(row.sku || row.barcode) && (
+                        <span className="font-mono text-xs text-primary/80">
+                          {row.barcode ? `Barcode: ${row.barcode}` : `SKU: ${row.sku}`}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-4">

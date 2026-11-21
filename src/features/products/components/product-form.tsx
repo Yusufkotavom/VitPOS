@@ -12,7 +12,7 @@ import { useCategories } from '@/features/products/hooks/use-categories'
 import { productFormSchema, productInitialValues, productStatusOptions, productTypeOptions, type ProductFormValues } from '@/features/products/schemas/product-form-schema'
 import { fileToDataUrl, uploadImage } from '@/services/upload.service'
 
-import { Image, Upload, Package, Coffee, Shirt, MonitorSmartphone, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Image, Upload, Package, Coffee, Shirt, MonitorSmartphone, Plus, Trash2, ChevronDown, ChevronUp, Barcode } from 'lucide-react'
 
 const iconOptions = [
   { id: 'Package', icon: <Package className="size-6" /> },
@@ -163,6 +163,34 @@ export function ProductForm({ defaultValues, submitLabel, onCancel, onSubmit }: 
         <label className="text-sm font-medium">{t('products.name_label')}</label>
         <Input aria-invalid={Boolean(errors.name)} {...form.register('name')} placeholder={t('products.name_placeholder')} />
         {errors.name ? <span className="text-xs text-destructive">{errors.name.message}</span> : null}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium" htmlFor="product-sku">
+            SKU (Kode Barang)
+          </label>
+          <Input
+            id="product-sku"
+            {...form.register('sku')}
+            placeholder="Contoh: KOP-001"
+            className="h-9 font-mono text-xs uppercase"
+          />
+          <p className="text-[11px] text-muted-foreground">Kode internal unik produk</p>
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium flex items-center gap-1.5" htmlFor="product-barcode">
+            <Barcode className="size-4 text-muted-foreground" />
+            Barcode / EAN / UPC
+          </label>
+          <Input
+            id="product-barcode"
+            {...form.register('barcode')}
+            placeholder="Scan barcode / ketik angka..."
+            className="h-9 font-mono text-xs"
+          />
+          <p className="text-[11px] text-muted-foreground">Untuk scan langsung di POS / kasir</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">

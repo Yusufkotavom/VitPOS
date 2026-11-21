@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { mapProductFormToRecord, productFormSchema, productInitialValues } from '@/features/products/schemas/product-form-schema'
+import {
+  mapProductFormToRecord,
+  mapProductRecordToFormValues,
+  productFormSchema,
+  productInitialValues,
+} from '@/features/products/schemas/product-form-schema'
 
 describe('productFormSchema', () => {
   it('rejects blank product name', () => {
@@ -87,5 +92,26 @@ describe('productFormSchema', () => {
 
     expect(result.version).toBe(4)
     expect(result.syncStatus).toBe('pending')
+  })
+
+  it('maps sku and barcode from form values to product record and vice-versa', () => {
+    const record = mapProductFormToRecord(
+      {
+        ...productInitialValues,
+        name: 'Scanner Barcode USB',
+        category: 'Hardware',
+        price: '350000',
+        sku: 'SCN-001',
+        barcode: '8991234567890',
+      },
+      'prod-sku-1',
+    )
+
+    expect(record.sku).toBe('SCN-001')
+    expect(record.barcode).toBe('8991234567890')
+
+    const formValues = mapProductRecordToFormValues(record)
+    expect(formValues.sku).toBe('SCN-001')
+    expect(formValues.barcode).toBe('8991234567890')
   })
 })
