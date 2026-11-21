@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { ExternalLink, PlusIcon, Trash2Icon } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
@@ -35,15 +35,15 @@ export function ServiceOrderCrudActions({ order }: { order?: LocalServiceOrder }
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap items-center gap-1.5">
       <Button variant="outline" size="sm" asChild>
         <Link to={`/service-orders/${order.id}`}>
-          <PencilIcon data-icon="inline-start" className="mr-2 h-4 w-4" />
-          {t('common.edit')}
+          <ExternalLink data-icon="inline-start" className="mr-1.5 h-3.5 w-3.5" />
+          {t('service_orders.open_order')}
         </Link>
       </Button>
-      <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
-        <Trash2Icon data-icon="inline-start" className="mr-2 h-4 w-4" />
+      <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeleteOpen(true)}>
+        <Trash2Icon data-icon="inline-start" className="mr-1.5 h-3.5 w-3.5" />
         {t('common.delete')}
       </Button>
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>

@@ -78,5 +78,10 @@ describe('ServiceOrdersPage', () => {
     // Expect SRV-0008 (which has no warranty) to show "Tanpa Garansi"
     expect(screen.getByText('SRV-0008')).toBeInTheDocument()
     expect(screen.getByText('Tanpa Garansi')).toBeInTheDocument()
+
+    // Expect action button to be "Buka Order" (linking to detail page) rather than duplicate "Edit"
+    const openButtons = screen.getAllByRole('link', { name: /Buka Order/i })
+    expect(openButtons).toHaveLength(2)
+    expect(openButtons[0]).toHaveAttribute('href', '/service-orders/so-1')
   })
 })
