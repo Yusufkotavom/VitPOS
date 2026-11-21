@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/format-currency'
+import { usePdfSettings } from '@/shared/components/pdf/use-pdf-settings'
 import type { LocalProduct } from '@/services/local-db/schema'
 
 export type ProductBarcodeLabelDialogProps = {
@@ -37,8 +38,10 @@ export function ProductBarcodeLabelDialog({
   open,
   onOpenChange,
   product,
-  storeName = 'KOTACOM POS',
+  storeName,
 }: ProductBarcodeLabelDialogProps) {
+  const pdfSettings = usePdfSettings()
+  const effectiveStoreName = storeName || pdfSettings.companyName || 'KOTACOM POS'
   const [size, setSize] = useState<ProductLabelSize>('40x30')
   const [copies, setCopies] = useState(1)
   const [showPrice, setShowPrice] = useState(true)
@@ -97,7 +100,7 @@ export function ProductBarcodeLabelDialog({
 
     const singleLabelHtml = `
       <div class="label-wrapper">
-        ${showStore ? `<div class="store-name">${storeName}</div>` : ''}
+        ${showStore ? `<div class="store-name">${effectiveStoreName}</div>` : ''}
         <div class="product-name">${product.name}</div>
         <div class="barcode-box">${svgHtml}</div>
         <div class="barcode-text">${barcodeValue}</div>
@@ -250,7 +253,7 @@ export function ProductBarcodeLabelDialog({
             >
               {showStore && (
                 <div className="text-center font-bold uppercase tracking-wider text-[10px] text-muted-foreground">
-                  {storeName}
+                  {effectiveStoreName}
                 </div>
               )}
               <div className="text-center font-bold line-clamp-2 leading-tight">

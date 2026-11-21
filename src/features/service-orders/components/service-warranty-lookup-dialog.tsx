@@ -10,6 +10,7 @@ import {
   ShieldX,
   Smartphone,
   User,
+  X,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -25,6 +26,7 @@ import { StatusBadge } from '@/shared/components/display/status-badge'
 import { formatCurrency } from '@/lib/format-currency'
 import { formatDateTime } from '@/lib/date'
 import { buildWhatsAppLink } from '@/lib/whatsapp'
+import { localDb } from '@/services/local-db/client'
 import { useServiceOrders } from '@/features/service-orders/hooks/use-service-orders'
 import {
   isWarrantyExpired,
@@ -71,7 +73,9 @@ export function ServiceWarrantyLookupDialog({
       .slice(0, 10)
   }, [serviceOrders, trimmed])
 
-  function handleShareWa(order: LocalServiceOrder) {
+  async function handleShareWa(order: LocalServiceOrder) {
+    const customer = order.customerId ? await localDb.customers.get(order.customerId) : undefined
+    const phone = customer?.phone || ''
     const resolved = resolveServiceWarranty(order)
     let statusText = 'Tanpa Garansi'
     if (resolved.hasWarranty && resolved.warrantyEndDate) {
@@ -87,7 +91,7 @@ export function ServiceWarrantyLookupDialog({
       order.jobCategory ||
       order.description
     const text = `🛡️ *INFO GARANSI SERVIS*\n─────────────────\n*No Servis:* ${order.code}\n*Pelanggan:* ${order.customerName}\n*Perangkat:* ${device}\n*Status Garansi:* ${statusText}\n─────────────────\nTerima kasih.`
-    window.open(buildWhatsAppLink('', text), '_blank')
+    window.open(buildWhatsAppLink(phone, text), '_blank')
   }
 
   return (
@@ -110,16 +114,26 @@ export function ServiceWarrantyLookupDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          <div className="relative">
+          <form onSubmit={(e) => e.preventDefault()} className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input
               autoFocus
               placeholder="Scan barcode nota / ketik SRV-0001 / nama pelanggan..."
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              className="pl-9 pr-4 text-sm"
+              className="pl-9 pr-8 text-sm"
             />
-          </div>
+            {keyword && (
+              <button
+                type="button"
+                onClick={() => setKeyword('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Bersihkan pencarian"
+              >
+                <X className="size-4" />
+              </button>
+            )}
+          </form>
 
           {!trimmed ? (
             <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center text-muted-foreground">

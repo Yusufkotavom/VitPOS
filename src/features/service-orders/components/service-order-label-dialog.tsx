@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatDateTime } from '@/lib/date'
+import { usePdfSettings } from '@/shared/components/pdf/use-pdf-settings'
 import type { LocalServiceOrder } from '@/services/local-db/schema'
 
 export type ServiceOrderLabelDialogProps = {
@@ -37,9 +38,11 @@ export function ServiceOrderLabelDialog({
   open,
   onOpenChange,
   order,
-  storeName = 'KOTACOM POS',
+  storeName,
   customerPhone = '',
 }: ServiceOrderLabelDialogProps) {
+  const pdfSettings = usePdfSettings()
+  const effectiveStoreName = storeName || pdfSettings.companyName || 'KOTACOM POS'
   const [size, setSize] = useState<LabelSize>('50x30')
   const svgRef = useRef<SVGSVGElement>(null)
 
@@ -167,7 +170,7 @@ export function ServiceOrderLabelDialog({
       <body>
         <div class="label-box">
           <div class="store-header">
-            <span>${storeName}</span>
+            <span>${effectiveStoreName}</span>
             <span>${dateFormatted.split(',')[0] || dateFormatted}</span>
           </div>
 
@@ -259,7 +262,7 @@ export function ServiceOrderLabelDialog({
             >
               {/* Header Toko */}
               <div className="flex items-center justify-between border-b border-black pb-1 text-[9px] font-bold">
-                <span className="truncate max-w-[120px]">{storeName}</span>
+                <span className="truncate max-w-[120px]">{effectiveStoreName}</span>
                 <span className="text-[8px] font-normal text-gray-700">
                   {dateFormatted.split(',')[0]}
                 </span>
