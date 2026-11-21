@@ -491,34 +491,50 @@ syncRoutes.get('/pull', async (c) => {
       serverSyncStatus: row.syncStatus,
       updatedAt: row.updatedAt.toISOString(),
     })),
-    ...serviceOrderRows.map<SyncPullItem>((row) => ({
-      id: row.id,
-      entityId: row.id,
-      entityType: 'service_order',
-      mutationType: 'update',
-      payload: {
+    ...serviceOrderRows.map<SyncPullItem>((row) => {
+      const rawTimeline = Array.isArray(row.timeline) ? row.timeline : []
+      const warrantyEvts = rawTimeline.filter(
+        (item) => item && typeof item === 'object' && ((item as { type?: unknown }).type === 'warranty' || (typeof (item as { note?: unknown }).note === 'string' && String((item as { note: string }).note).toLowerCase().includes('garansi'))),
+      )
+      const lastWarranty = warrantyEvts[warrantyEvts.length - 1] as Record<string, unknown> | undefined
+      const hasWarranty = lastWarranty
+        ? (lastWarranty.hasWarranty !== false && !String(lastWarranty.note ?? '').toLowerCase().includes('dihapus'))
+        : undefined
+
+      return {
         id: row.id,
-        code: row.code,
-        customerId: row.customerId,
-        customerName: row.customerName,
-        description: row.description,
-        date: row.date.toISOString(),
-        cost: Number(row.cost),
-        paidTotal: Number(row.paidTotal),
-        items: Array.isArray(row.items) ? row.items.map((item) => ({
-          ...(typeof item === 'object' && item !== null ? item : {}),
-          qty: Number((item as { qty?: unknown }).qty ?? 0),
-          price: Number((item as { price?: unknown; unitPrice?: unknown }).price ?? (item as { unitPrice?: unknown }).unitPrice ?? 0),
-          subtotal: Number((item as { subtotal?: unknown }).subtotal ?? 0),
-        })) : [],
-        timeline: Array.isArray(row.timeline) ? row.timeline : [],
-        status: row.status,
-        version: row.version,
-      },
-      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
-      serverSyncStatus: row.syncStatus,
-      updatedAt: row.updatedAt.toISOString(),
-    })),
+        entityId: row.id,
+        entityType: 'service_order',
+        mutationType: 'update',
+        payload: {
+          id: row.id,
+          code: row.code,
+          customerId: row.customerId,
+          customerName: row.customerName,
+          description: row.description,
+          date: row.date.toISOString(),
+          cost: Number(row.cost),
+          paidTotal: Number(row.paidTotal),
+          items: Array.isArray(row.items) ? row.items.map((item) => ({
+            ...(typeof item === 'object' && item !== null ? item : {}),
+            qty: Number((item as { qty?: unknown }).qty ?? 0),
+            price: Number((item as { price?: unknown; unitPrice?: unknown }).price ?? (item as { unitPrice?: unknown }).unitPrice ?? 0),
+            subtotal: Number((item as { subtotal?: unknown }).subtotal ?? 0),
+          })) : [],
+          timeline: rawTimeline,
+          status: row.status,
+          hasWarranty,
+          warrantyValue: lastWarranty?.warrantyValue ? Number(lastWarranty.warrantyValue) : undefined,
+          warrantyUnit: lastWarranty?.warrantyUnit ? String(lastWarranty.warrantyUnit) : undefined,
+          warrantyStartDate: lastWarranty?.warrantyStartDate ? String(lastWarranty.warrantyStartDate) : undefined,
+          warrantyEndDate: lastWarranty?.warrantyEndDate ? String(lastWarranty.warrantyEndDate) : undefined,
+          version: row.version,
+        },
+        transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
+        serverSyncStatus: row.syncStatus,
+        updatedAt: row.updatedAt.toISOString(),
+      }
+    }),
 
     ...paymentMethodsRows.map<SyncPullItem>((row) => ({
       id: row.id,

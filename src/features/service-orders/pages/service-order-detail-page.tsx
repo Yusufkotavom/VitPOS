@@ -44,7 +44,7 @@ import { getPaymentMethodDisplay, buildQuickCashOptions } from '@/features/pos/l
 import { JobLineEditor } from '@/features/service-orders/components/job-line-editor'
 import { JobCatalogPicker } from '@/features/service-orders/components/job-catalog-picker'
 import { ServiceOrderStatusDialog } from '@/features/service-orders/components/service-order-status-dialog'
-import { addWarrantyDuration, buildWarrantyTimelineNote, isJobOverdue, isWarrantyExpired } from '@/features/service-orders/lib/warranty'
+import { addWarrantyDuration, buildWarrantyTimelineNote, isJobOverdue, isWarrantyExpired, resolveServiceWarranty } from '@/features/service-orders/lib/warranty'
 import { normalizeJobLines, sumJobLines, validateJobLines } from '@/features/service-orders/lib/job-lines'
 import { saveJobLineAsCatalogService } from '@/features/service-orders/lib/save-line-as-service'
 import type { LocalJobLine, ServiceOrderStatus } from '@/services/local-db/schema'
@@ -119,6 +119,8 @@ export function ServiceOrderDetailPage() {
     setStatusDialogOpen(true)
   }
 
+  const resolvedWarranty = order ? resolveServiceWarranty(order) : { hasWarranty: false }
+
   const serviceData: PdfData | null = order ? {
     type: 'service',
     code: order.code,
@@ -139,11 +141,11 @@ export function ServiceOrderDetailPage() {
       status: remaining <= 0 ? 'Lunas' : 'Sebagian',
     },
     items: lines.map((line) => ({ name: line.name, qty: line.qty, price: line.unitPrice, subtotal: line.subtotal })),
-    warranty: order.hasWarranty && order.warrantyEndDate ? {
-      value: order.warrantyValue ?? 0,
-      unit: order.warrantyUnit ?? 'hari',
-      isExpired: isWarrantyExpired(order.warrantyEndDate),
-      endDate: order.warrantyEndDate,
+    warranty: resolvedWarranty.hasWarranty && resolvedWarranty.warrantyEndDate ? {
+      value: resolvedWarranty.warrantyValue ?? 0,
+      unit: resolvedWarranty.warrantyUnit ?? 'hari',
+      isExpired: isWarrantyExpired(resolvedWarranty.warrantyEndDate),
+      endDate: resolvedWarranty.warrantyEndDate,
     } : undefined,
     payments: payments?.map((payment) => ({
       method: payment.method,
@@ -166,6 +168,7 @@ export function ServiceOrderDetailPage() {
 
   function startEditing() {
     if (!order) return
+    const resolved = resolveServiceWarranty(order)
     setEditCustomer(order.customerName)
     setEditComplaint(order.complaint ?? order.description)
     setEditDiagnosis(order.diagnosis ?? '')
@@ -177,9 +180,9 @@ export function ServiceOrderDetailPage() {
     setEditDetails(order.details ?? {})
     setEditDiscount(order.discountTotal ?? 0)
     setEditLines(normalizeJobLines(order))
-    setEditHasWarranty(order.hasWarranty ?? false)
-    setEditWarrantyValue(String(order.warrantyValue ?? ''))
-    setEditWarrantyUnit(order.warrantyUnit ?? 'hari')
+    setEditHasWarranty(resolved.hasWarranty)
+    setEditWarrantyValue(String(resolved.warrantyValue ?? 30))
+    setEditWarrantyUnit(resolved.warrantyUnit ?? 'hari')
     setEditing(true)
   }
 
@@ -217,9 +220,9 @@ export function ServiceOrderDetailPage() {
       let warrantyStartDate = order.warrantyStartDate
       let warrantyEndDate = order.warrantyEndDate
 
-      if (editStatus === 'Selesai' && editHasWarranty) {
+      if (editHasWarranty) {
         if (!warrantyStartDate) warrantyStartDate = nowIso
-        const value = Number(editWarrantyValue) || 0
+        const value = Number(editWarrantyValue) || order.warrantyValue || 30
         if (!order.hasWarranty || value !== order.warrantyValue || editWarrantyUnit !== order.warrantyUnit || !warrantyEndDate) {
           warrantyEndDate = addWarrantyDuration(warrantyStartDate ?? nowIso, value, editWarrantyUnit)
           timeline = [
@@ -236,6 +239,11 @@ export function ServiceOrderDetailPage() {
               }),
               type: 'warranty',
               actor: editTechnician || undefined,
+              hasWarranty: true,
+              warrantyValue: value,
+              warrantyUnit: editWarrantyUnit,
+              warrantyStartDate,
+              warrantyEndDate,
             },
           ]
         }
@@ -251,6 +259,7 @@ export function ServiceOrderDetailPage() {
             note: buildWarrantyTimelineNote({ value: 0, unit: 'hari', mode: 'removed' }),
             type: 'warranty',
             actor: editTechnician || undefined,
+            hasWarranty: false,
           },
         ]
       }
@@ -284,10 +293,10 @@ export function ServiceOrderDetailPage() {
         details: editDetails,
         estimatedCompletion: editEstimated ? new Date(editEstimated).toISOString() : undefined,
         hasWarranty: editHasWarranty,
-        warrantyValue: editHasWarranty ? Number(editWarrantyValue) || undefined : undefined,
+        warrantyValue: editHasWarranty ? Number(editWarrantyValue) || order.warrantyValue || 30 : undefined,
         warrantyUnit: editHasWarranty ? editWarrantyUnit : undefined,
-        warrantyStartDate,
-        warrantyEndDate,
+        warrantyStartDate: editHasWarranty ? (warrantyStartDate || nowIso) : undefined,
+        warrantyEndDate: editHasWarranty ? warrantyEndDate : undefined,
         timeline,
         version: order.version + 1,
         updatedAt: nowIso,
@@ -817,8 +826,8 @@ export function ServiceOrderDetailPage() {
                 <div className="space-y-1 border-t border-dashed pt-3">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">{t('service_orders.service_warranty')}</span>
-                    {order.hasWarranty ? (
-                      order.warrantyEndDate && isWarrantyExpired(order.warrantyEndDate) ? (
+                    {resolvedWarranty.hasWarranty ? (
+                      resolvedWarranty.warrantyEndDate && isWarrantyExpired(resolvedWarranty.warrantyEndDate) ? (
                         <span className="flex items-center gap-1 text-xs font-medium text-destructive">
                           <ShieldX className="h-4 w-4" />
                           {t('service_orders.warranty_expired')}
@@ -826,17 +835,17 @@ export function ServiceOrderDetailPage() {
                       ) : (
                         <span className="flex items-center gap-1 text-xs font-medium text-amber-600">
                           <ShieldCheck className="h-4 w-4" />
-                          {order.warrantyValue} {order.warrantyUnit}
+                          {resolvedWarranty.warrantyValue} {resolvedWarranty.warrantyUnit}
                         </span>
                       )
                     ) : (
                       <span className="text-xs text-muted-foreground">{t('common.none')}</span>
                     )}
                   </div>
-                  {order.hasWarranty && order.warrantyEndDate && (
+                  {resolvedWarranty.hasWarranty && resolvedWarranty.warrantyEndDate && (
                     <p className="text-xs text-muted-foreground">
                       {t('service_orders.valid_until', {
-                        date: new Date(order.warrantyEndDate).toLocaleDateString('id-ID', { dateStyle: 'long' }),
+                        date: new Date(resolvedWarranty.warrantyEndDate).toLocaleDateString('id-ID', { dateStyle: 'long' }),
                       })}
                     </p>
                   )}

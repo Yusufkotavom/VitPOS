@@ -83,8 +83,10 @@ export const socTransactionService = {
 
     const paymentStatus = paymentMethod === 'piutang' ? 'Pending' : 'Berhasil'
 
-    const warrantyEndDate = serviceData.hasWarranty && serviceData.warrantyValue && serviceData.warrantyUnit
-      ? addWarrantyDuration(nowIso, serviceData.warrantyValue, serviceData.warrantyUnit)
+    const warrantyVal = serviceData.hasWarranty ? (serviceData.warrantyValue || 30) : undefined
+    const warrantyUnit = serviceData.warrantyUnit || 'hari'
+    const warrantyEndDate = serviceData.hasWarranty && warrantyVal
+      ? addWarrantyDuration(nowIso, warrantyVal, warrantyUnit)
       : undefined
 
     const timelineEvents: LocalServiceOrder['timeline'] = [{
@@ -95,14 +97,19 @@ export const socTransactionService = {
       actor: serviceData.technicianName || undefined,
     }]
 
-    if (serviceData.hasWarranty && serviceData.warrantyValue && serviceData.warrantyUnit) {
+    if (serviceData.hasWarranty && warrantyVal) {
       timelineEvents.push({
         id: crypto.randomUUID(),
         status: 'Diterima',
         date: nowIso,
-        note: buildWarrantyTimelineNote({ value: serviceData.warrantyValue, unit: serviceData.warrantyUnit, mode: 'created', endDate: warrantyEndDate }),
+        note: buildWarrantyTimelineNote({ value: warrantyVal, unit: warrantyUnit, mode: 'created', endDate: warrantyEndDate }),
         type: 'warranty',
         actor: serviceData.technicianName || undefined,
+        hasWarranty: true,
+        warrantyValue: warrantyVal,
+        warrantyUnit,
+        warrantyStartDate: nowIso,
+        warrantyEndDate,
       })
     }
 
@@ -151,8 +158,8 @@ export const socTransactionService = {
       technicianName: serviceData.technicianName || undefined,
       details: serviceData.details,
       hasWarranty: serviceData.hasWarranty,
-      warrantyValue: serviceData.warrantyValue,
-      warrantyUnit: serviceData.warrantyUnit,
+      warrantyValue: serviceData.hasWarranty ? warrantyVal : undefined,
+      warrantyUnit: serviceData.hasWarranty ? warrantyUnit : undefined,
       warrantyStartDate: serviceData.hasWarranty ? nowIso : undefined,
       warrantyEndDate,
       timeline: timelineEvents,

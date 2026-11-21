@@ -83,7 +83,7 @@ const initialState = {
   estimatedCompletion: undefined as string | undefined,
   discount: 0,
   hasWarranty: false,
-  warrantyValue: '',
+  warrantyValue: '30',
   warrantyUnit: 'hari' as const,
   lines: [] as LocalJobLine[],
 }
@@ -119,7 +119,11 @@ export const useServiceOrderCreateStore = create<ServiceIntakeState>((set, get) 
   setStatus: (status) => set({ status }),
   setEstimatedCompletion: (estimatedCompletion) => set({ estimatedCompletion }),
   setDiscount: (discount) => set({ discount: Math.max(0, discount) }),
-  setHasWarranty: (hasWarranty) => set({ hasWarranty }),
+  setHasWarranty: (hasWarranty) =>
+    set((state) => ({
+      hasWarranty,
+      warrantyValue: hasWarranty && !state.warrantyValue ? '30' : state.warrantyValue,
+    })),
   setWarrantyValue: (warrantyValue) => set({ warrantyValue }),
   setWarrantyUnit: (warrantyUnit) => set({ warrantyUnit }),
 

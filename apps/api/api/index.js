@@ -2577,6 +2577,7 @@ async function applyServiceOrder(db2, ctx, entityId, mutationType, payload) {
       subtotal: toNumeric(item.subtotal)
     })),
     timeline: (payload.timeline ?? []).map((item) => ({
+      ...item,
       id: item.id ?? crypto.randomUUID(),
       status: item.status ?? "",
       date: item.date ?? now.toISOString(),
@@ -2604,6 +2605,7 @@ async function applyServiceOrder(db2, ctx, entityId, mutationType, payload) {
         subtotal: toNumeric(item.subtotal)
       })),
       timeline: (payload.timeline ?? []).map((item) => ({
+        ...item,
         id: item.id ?? crypto.randomUUID(),
         status: item.status ?? "",
         date: item.date ?? now.toISOString(),
@@ -3204,34 +3206,47 @@ syncRoutes.get("/pull", async (c) => {
       serverSyncStatus: row.syncStatus,
       updatedAt: row.updatedAt.toISOString()
     })),
-    ...serviceOrderRows.map((row) => ({
-      id: row.id,
-      entityId: row.id,
-      entityType: "service_order",
-      mutationType: "update",
-      payload: {
+    ...serviceOrderRows.map((row) => {
+      const rawTimeline = Array.isArray(row.timeline) ? row.timeline : [];
+      const warrantyEvts = rawTimeline.filter(
+        (item) => item && typeof item === "object" && (item.type === "warranty" || typeof item.note === "string" && String(item.note).toLowerCase().includes("garansi"))
+      );
+      const lastWarranty = warrantyEvts[warrantyEvts.length - 1];
+      const hasWarranty = lastWarranty ? lastWarranty.hasWarranty !== false && !String(lastWarranty.note ?? "").toLowerCase().includes("dihapus") : void 0;
+      return {
         id: row.id,
-        code: row.code,
-        customerId: row.customerId,
-        customerName: row.customerName,
-        description: row.description,
-        date: row.date.toISOString(),
-        cost: Number(row.cost),
-        paidTotal: Number(row.paidTotal),
-        items: Array.isArray(row.items) ? row.items.map((item) => ({
-          ...typeof item === "object" && item !== null ? item : {},
-          qty: Number(item.qty ?? 0),
-          price: Number(item.price ?? item.unitPrice ?? 0),
-          subtotal: Number(item.subtotal ?? 0)
-        })) : [],
-        timeline: Array.isArray(row.timeline) ? row.timeline : [],
-        status: row.status,
-        version: row.version
-      },
-      transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
-      serverSyncStatus: row.syncStatus,
-      updatedAt: row.updatedAt.toISOString()
-    })),
+        entityId: row.id,
+        entityType: "service_order",
+        mutationType: "update",
+        payload: {
+          id: row.id,
+          code: row.code,
+          customerId: row.customerId,
+          customerName: row.customerName,
+          description: row.description,
+          date: row.date.toISOString(),
+          cost: Number(row.cost),
+          paidTotal: Number(row.paidTotal),
+          items: Array.isArray(row.items) ? row.items.map((item) => ({
+            ...typeof item === "object" && item !== null ? item : {},
+            qty: Number(item.qty ?? 0),
+            price: Number(item.price ?? item.unitPrice ?? 0),
+            subtotal: Number(item.subtotal ?? 0)
+          })) : [],
+          timeline: rawTimeline,
+          status: row.status,
+          hasWarranty,
+          warrantyValue: lastWarranty?.warrantyValue ? Number(lastWarranty.warrantyValue) : void 0,
+          warrantyUnit: lastWarranty?.warrantyUnit ? String(lastWarranty.warrantyUnit) : void 0,
+          warrantyStartDate: lastWarranty?.warrantyStartDate ? String(lastWarranty.warrantyStartDate) : void 0,
+          warrantyEndDate: lastWarranty?.warrantyEndDate ? String(lastWarranty.warrantyEndDate) : void 0,
+          version: row.version
+        },
+        transportStatus: serverSyncStatusToApiItemStatus(row.syncStatus),
+        serverSyncStatus: row.syncStatus,
+        updatedAt: row.updatedAt.toISOString()
+      };
+    }),
     ...paymentMethodsRows.map((row) => ({
       id: row.id,
       entityId: row.id,

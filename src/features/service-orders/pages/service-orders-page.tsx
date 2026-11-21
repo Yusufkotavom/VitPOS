@@ -16,7 +16,7 @@ import { DataTable } from '@/shared/components/data-table/data-table'
 import { ContentCard } from '@/shared/components/display/content-card'
 import { StatusBadge } from '@/shared/components/display/status-badge'
 import { EmptyState } from '@/shared/components/feedback/empty-state'
-import { isWarrantyExpired } from '@/features/service-orders/lib/warranty'
+import { isWarrantyExpired, resolveServiceWarranty } from '@/features/service-orders/lib/warranty'
 import { PageShell } from '@/shared/components/layout/page-shell'
 
 type Tone = 'success' | 'warning' | 'danger' | 'info' | 'neutral'
@@ -30,12 +30,13 @@ function tone(status: string): Tone {
 }
 
 function warrantyBadge(
-  row: { hasWarranty?: boolean; status: string; warrantyStartDate?: string; warrantyEndDate?: string },
+  row: Parameters<typeof resolveServiceWarranty>[0] & { status: string },
   t: (key: string) => string,
 ) {
-  if (!row.hasWarranty) return { label: t('service_orders.no_warranty'), tone: 'neutral' as const, icon: ShieldX, filterValue: 'tanpa' }
+  const resolved = resolveServiceWarranty(row)
+  if (!resolved.hasWarranty) return { label: t('service_orders.no_warranty'), tone: 'neutral' as const, icon: ShieldX, filterValue: 'tanpa' }
   if (row.status !== 'Selesai' && row.status !== 'Diambil') return { label: t('service_orders.warranty_pending'), tone: 'warning' as const, icon: Clock, filterValue: 'menunggu' }
-  return isWarrantyExpired(row.warrantyEndDate)
+  return isWarrantyExpired(resolved.warrantyEndDate)
     ? { label: t('service_orders.warranty_expired'), tone: 'danger' as const, icon: ShieldX, filterValue: 'berakhir' }
     : { label: t('common.active'), tone: 'success' as const, icon: ShieldCheck, filterValue: 'aktif' }
 }

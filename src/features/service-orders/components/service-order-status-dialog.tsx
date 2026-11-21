@@ -42,6 +42,7 @@ import { StatusBadge } from '@/shared/components/display/status-badge'
 import {
   addWarrantyDuration,
   buildWarrantyTimelineNote,
+  resolveServiceWarranty,
 } from '@/features/service-orders/lib/warranty'
 import { normalizeJobLines } from '@/features/service-orders/lib/job-lines'
 import type {
@@ -137,13 +138,14 @@ export function ServiceOrderStatusDialog({
   const [statusNote, setStatusNote] = useState('')
   const [technician, setTechnician] = useState(order.technicianName ?? '')
 
-  // Warranty states (for when status is Selesai)
-  const [hasWarranty, setHasWarranty] = useState(order.hasWarranty ?? false)
+  // Warranty states (for when status is Selesai or Diambil)
+  const initialWarranty = useMemo(() => resolveServiceWarranty(order), [order])
+  const [hasWarranty, setHasWarranty] = useState(initialWarranty.hasWarranty)
   const [warrantyValue, setWarrantyValue] = useState(
-    order.warrantyValue ? String(order.warrantyValue) : '30',
+    initialWarranty.warrantyValue ? String(initialWarranty.warrantyValue) : '30',
   )
   const [warrantyUnit, setWarrantyUnit] = useState<WarrantyUnit>(
-    order.warrantyUnit ?? 'hari',
+    initialWarranty.warrantyUnit ?? 'hari',
   )
 
   // WhatsApp states
@@ -165,12 +167,13 @@ export function ServiceOrderStatusDialog({
   useEffect(() => {
     if (open) {
       const next = initialTargetStatus ?? order.status
+      const resolved = resolveServiceWarranty(order)
       setTargetStatus(next)
       setStatusNote('')
       setTechnician(order.technicianName ?? '')
-      setHasWarranty(order.hasWarranty ?? false)
-      setWarrantyValue(order.warrantyValue ? String(order.warrantyValue) : '30')
-      setWarrantyUnit(order.warrantyUnit ?? 'hari')
+      setHasWarranty(resolved.hasWarranty)
+      setWarrantyValue(resolved.warrantyValue ? String(resolved.warrantyValue) : '30')
+      setWarrantyUnit(resolved.warrantyUnit ?? 'hari')
       setPhone(customerPhone)
       setSendWa(Boolean(customerPhone.trim()))
 
@@ -262,41 +265,40 @@ export function ServiceOrderStatusDialog({
         ]
       }
 
-      // Handle warranty if Selesai
+      // Handle warranty if Selesai or Diambil
       let warrantyStartDate = order.warrantyStartDate
       let warrantyEndDate = order.warrantyEndDate
+      const isFinishing = targetStatus === 'Selesai' || targetStatus === 'Diambil'
 
-      if (targetStatus === 'Selesai' && hasWarranty) {
+      if (isFinishing && hasWarranty) {
         if (!warrantyStartDate) warrantyStartDate = nowIso
-        const val = Number(warrantyValue) || 0
-        if (
-          !order.hasWarranty ||
-          val !== order.warrantyValue ||
-          warrantyUnit !== order.warrantyUnit ||
-          !warrantyEndDate
-        ) {
-          warrantyEndDate = addWarrantyDuration(
-            warrantyStartDate ?? nowIso,
-            val,
+        const val = Number(warrantyValue) || order.warrantyValue || 30
+        warrantyEndDate = addWarrantyDuration(
+          warrantyStartDate ?? nowIso,
+          val,
+          warrantyUnit,
+        )
+        timeline = [
+          ...timeline,
+          {
+            id: crypto.randomUUID(),
+            status: targetStatus,
+            date: nowIso,
+            note: buildWarrantyTimelineNote({
+              value: val,
+              unit: warrantyUnit,
+              mode: order.hasWarranty ? 'updated' : 'created',
+              endDate: warrantyEndDate,
+            }),
+            type: 'warranty',
+            actor: technician.trim() || undefined,
+            hasWarranty: true,
+            warrantyValue: val,
             warrantyUnit,
-          )
-          timeline = [
-            ...timeline,
-            {
-              id: crypto.randomUUID(),
-              status: targetStatus,
-              date: nowIso,
-              note: buildWarrantyTimelineNote({
-                value: val,
-                unit: warrantyUnit,
-                mode: order.hasWarranty ? 'updated' : 'created',
-                endDate: warrantyEndDate,
-              }),
-              type: 'warranty',
-              actor: technician.trim() || undefined,
-            },
-          ]
-        }
+            warrantyStartDate,
+            warrantyEndDate,
+          },
+        ]
       } else if (!hasWarranty && order.hasWarranty) {
         warrantyStartDate = undefined
         warrantyEndDate = undefined
@@ -313,6 +315,7 @@ export function ServiceOrderStatusDialog({
             }),
             type: 'warranty',
             actor: technician.trim() || undefined,
+            hasWarranty: false,
           },
         ]
       }
@@ -321,17 +324,23 @@ export function ServiceOrderStatusDialog({
         ...order,
         status: targetStatus,
         technicianName: technician.trim() || order.technicianName,
-        hasWarranty: targetStatus === 'Selesai' ? hasWarranty : order.hasWarranty,
+        hasWarranty: isFinishing ? hasWarranty : (hasWarranty || Boolean(order.hasWarranty)),
         warrantyValue:
-          targetStatus === 'Selesai' && hasWarranty
-            ? Number(warrantyValue) || undefined
-            : order.warrantyValue,
+          (isFinishing ? hasWarranty : (hasWarranty || Boolean(order.hasWarranty)))
+            ? Number(warrantyValue) || order.warrantyValue || 30
+            : undefined,
         warrantyUnit:
-          targetStatus === 'Selesai' && hasWarranty
+          (isFinishing ? hasWarranty : (hasWarranty || Boolean(order.hasWarranty)))
             ? warrantyUnit
             : order.warrantyUnit,
-        warrantyStartDate,
-        warrantyEndDate,
+        warrantyStartDate:
+          (isFinishing ? hasWarranty : (hasWarranty || Boolean(order.hasWarranty)))
+            ? (warrantyStartDate || nowIso)
+            : undefined,
+        warrantyEndDate:
+          (isFinishing ? hasWarranty : (hasWarranty || Boolean(order.hasWarranty)))
+            ? warrantyEndDate
+            : undefined,
         timeline,
         version: order.version + 1,
         updatedAt: nowIso,
@@ -450,8 +459,8 @@ export function ServiceOrderStatusDialog({
             )}
           </div>
 
-          {/* Garansi (jika status Selesai) */}
-          {targetStatus === 'Selesai' && (
+          {/* Garansi (jika status Selesai atau Diambil) */}
+          {(targetStatus === 'Selesai' || targetStatus === 'Diambil') && (
             <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <input

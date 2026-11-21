@@ -5,6 +5,7 @@ import { baimRuntime } from '@/lib/baim-runtime'
 import { apiGet, apiPost, buildTenantQuery } from '@/services/api/client'
 import { requireActiveTenantId } from '@/features/auth/stores/auth-store'
 import { normalizePurchaseItems, normalizePurchaseStatus } from '@/features/purchases/lib/purchase-status'
+import { resolveServiceWarranty } from '@/features/service-orders/lib/warranty'
 import { listOutboxItems, updateOutboxStatus } from '@/services/sync/outbox-service'
 import { extractEntityId, indexPushResults, partitionSyncMutations, toLocalOutboxStatus } from '@/services/sync/sync-transport'
 import type {
@@ -451,21 +452,43 @@ async function applyPullItem(item: SyncPullItem, tenantId: string) {
           }
         }) : existingSo?.items,
         notes: typeof payload.notes === 'string' ? payload.notes : existingSo?.notes,
-        timeline: Array.isArray(payload.timeline) ? payload.timeline.map((rawItem) => {
-          const itemPayload = isRecord(rawItem) ? rawItem : {}
+        ...(() => {
+          const rawTimeline = Array.isArray(payload.timeline) ? payload.timeline.map((rawItem) => {
+            const itemPayload = isRecord(rawItem) ? rawItem : {}
+            return {
+              id: typeof itemPayload.id === 'string' ? itemPayload.id : crypto.randomUUID(),
+              status: typeof itemPayload.status === 'string' ? itemPayload.status : '',
+              date: typeof itemPayload.date === 'string' ? itemPayload.date : item.updatedAt,
+              note: typeof itemPayload.note === 'string' ? itemPayload.note : '',
+              type: (typeof itemPayload.type === 'string' ? itemPayload.type : undefined) as 'status' | 'warranty' | undefined,
+              hasWarranty: typeof itemPayload.hasWarranty === 'boolean' ? itemPayload.hasWarranty : undefined,
+              warrantyValue: typeof itemPayload.warrantyValue === 'number' ? itemPayload.warrantyValue : undefined,
+              warrantyUnit: typeof itemPayload.warrantyUnit === 'string' ? (itemPayload.warrantyUnit as 'hari' | 'bulan' | 'tahun') : undefined,
+              warrantyStartDate: typeof itemPayload.warrantyStartDate === 'string' ? itemPayload.warrantyStartDate : undefined,
+              warrantyEndDate: typeof itemPayload.warrantyEndDate === 'string' ? itemPayload.warrantyEndDate : undefined,
+            }
+          }) : existingSo?.timeline
+
+          const resolvedWarranty = resolveServiceWarranty({
+            hasWarranty: typeof payload.hasWarranty === 'boolean' ? payload.hasWarranty : existingSo?.hasWarranty,
+            warrantyValue: typeof payload.warrantyValue === 'number' ? payload.warrantyValue : existingSo?.warrantyValue,
+            warrantyUnit: (typeof payload.warrantyUnit === 'string' ? payload.warrantyUnit : existingSo?.warrantyUnit) as 'hari' | 'bulan' | 'tahun' | undefined,
+            warrantyStartDate: typeof payload.warrantyStartDate === 'string' ? payload.warrantyStartDate : existingSo?.warrantyStartDate,
+            warrantyEndDate: typeof payload.warrantyEndDate === 'string' ? payload.warrantyEndDate : existingSo?.warrantyEndDate,
+            status: SERVER_TO_LOCAL_SERVICE_STATUS[rawStatus] ?? existingSo?.status ?? 'Diterima',
+            date: typeof payload.date === 'string' ? toDateInput(payload.date) : existingSo?.date,
+            timeline: rawTimeline,
+          })
+
           return {
-            id: typeof itemPayload.id === 'string' ? itemPayload.id : crypto.randomUUID(),
-            status: typeof itemPayload.status === 'string' ? itemPayload.status : '',
-            date: typeof itemPayload.date === 'string' ? itemPayload.date : item.updatedAt,
-            note: typeof itemPayload.note === 'string' ? itemPayload.note : '',
-            type: (typeof itemPayload.type === 'string' ? itemPayload.type : undefined) as 'status' | 'warranty' | undefined,
+            timeline: rawTimeline,
+            hasWarranty: resolvedWarranty.hasWarranty,
+            warrantyValue: resolvedWarranty.warrantyValue,
+            warrantyUnit: resolvedWarranty.warrantyUnit,
+            warrantyStartDate: resolvedWarranty.warrantyStartDate,
+            warrantyEndDate: resolvedWarranty.warrantyEndDate,
           }
-        }) : existingSo?.timeline,
-        hasWarranty: existingSo?.hasWarranty,
-        warrantyValue: existingSo?.warrantyValue,
-        warrantyUnit: existingSo?.warrantyUnit,
-        warrantyStartDate: existingSo?.warrantyStartDate,
-        warrantyEndDate: existingSo?.warrantyEndDate,
+        })(),
         estimatedCompletion: typeof payload.estimatedCompletion === 'string' ? payload.estimatedCompletion : existingSo?.estimatedCompletion,
         discountTotal: typeof payload.discountTotal === 'number' ? payload.discountTotal : existingSo?.discountTotal,
         complaint: typeof payload.complaint === 'string' ? payload.complaint : existingSo?.complaint,

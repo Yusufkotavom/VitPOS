@@ -340,6 +340,11 @@ export type ServiceOrderTimelineItem = {
   note: string
   type?: 'status' | 'warranty'
   actor?: string
+  hasWarranty?: boolean
+  warrantyValue?: number
+  warrantyUnit?: WarrantyUnit
+  warrantyStartDate?: string
+  warrantyEndDate?: string
 }
 
 export type LocalServiceOrder = {
