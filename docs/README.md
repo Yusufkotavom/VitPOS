@@ -5,6 +5,8 @@ Dokumentasi ini jadi peta utama untuk arsitektur, sinkronisasi, rencana fitur, d
 ## Entry Points
 
 - [Root README](../README.md) — overview project, stack, dan workflow utama.
+- [Changelog](../CHANGELOG.md) — riwayat rilis dan catatan pembaruan versi.
+- [Panduan Fitur & Operasional](PANDUAN_FITUR.md) — panduan penggunaan fitur Service Orders, Barcode Label Thermal, WhatsApp flow, dan Cetak PDF.
 - [Roadmap Phases](../PHASES.md) — roadmap makro dan urutan fase produk.
 - [Sync Engine](SYNC_ENGINE.md) — desain sync engine offline-first.
 - [Agent Changelog](agent-changelog.md) — catatan perubahan oleh agent.

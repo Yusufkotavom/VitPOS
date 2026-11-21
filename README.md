@@ -2,11 +2,21 @@
 
 Offline-first POS, CRM & Accounting untuk UKM Indonesia. Satu kode React untuk Web (PWA), Android (Capacitor), dan Desktop (Tauri).
 
-## Arsitektur
+## Fitur Unggulan
+
+- **Point of Sale (POS) Modern:** Alur transaksi cepat 3–5 tap, multi-metode pembayaran (Tunai, QRIS, Transfer, Kartu, Split/Partial DP), dan layout kasir tablet/desktop yang responsif.
+- **Service Order & Manajemen Reparasi:** Manajemen antrean servis, status bertahap (*Diterima ➔ Menunggu Persetujuan ➔ Dikerjakan ➔ Selesai ➔ Diambil ➔ Garansi*), form garansi kontekstual saat selesai, dan follow-up pengingat ambil barang.
+- **Cetak Stiker Label Barcode Thermal:** Stiker barcode untuk bodi unit servis (laptop/printer/HP) dan label rak pajangan produk dengan barcode vector `CODE128` (kompatibel Xprinter, Blueprint, Panda, TSC, Zebra).
+- **Cek Garansi Cepat (Quick Warranty):** Pemindaian instan barcode nota untuk melihat sisa hari garansi aktif, status klaim, dan kirim kartu garansi WhatsApp ke pelanggan.
+- **Notifikasi WhatsApp Kontekstual:** Otomatisasi pengiriman pesan status servis, konfirmasi biaya, dan nota pembelian ke nomor WhatsApp pelanggan.
+- **Dokumen Cetak PDF Fleksibel:** Pengaturan bahasa cetak opsional (Bahasa Indonesia 1 Halaman hemat kertas standar, English Only, atau Bilingual).
+- **Outbox Sync Engine Offline-First:** Seluruh operasional toko berjalan tanpa internet lewat Dexie / SQLite, lalu otomatis tersinkron ke PostgreSQL cloud saat online.
 
 ## Documentation
 
 - [Documentation Index](docs/README.md)
+- [Panduan Fitur & Operasional](docs/PANDUAN_FITUR.md)
+- [Changelog Rilis](CHANGELOG.md)
 - [Architecture Docs](docs/architecture/README.md)
 - [Sync Engine](docs/SYNC_ENGINE.md)
 - [Superpowers Plans and Specs](docs/superpowers/README.md)

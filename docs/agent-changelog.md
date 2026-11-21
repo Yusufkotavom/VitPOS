@@ -134,6 +134,45 @@ Track agent work, verification evidence, and remaining gaps after each delegated
 - Remaining:
   - None for this wave. Lanjut rilis feature wave 1.
 
+## 2026-11-21 — Service Orders, Thermal Barcode Labels, Quick Warranty & Bilingual PDF Customization
+
+### Service Orders & Barcode Labeling Agent
+- Status: done
+- Files:
+  - `src/features/service-orders/components/service-order-label-dialog.tsx`
+  - `src/features/service-orders/components/service-order-label-dialog.test.tsx`
+  - `src/features/service-orders/components/service-warranty-lookup-dialog.tsx`
+  - `src/features/service-orders/components/service-warranty-lookup-dialog.test.tsx`
+  - `src/features/service-orders/pages/service-order-detail-page.tsx`
+  - `src/features/service-orders/pages/service-orders-page.tsx`
+  - `src/features/service-orders/components/service-order-status-dialog.tsx`
+  - `src/features/service-orders/components/service-success-flow.tsx`
+  - `src/features/products/components/product-barcode-label-dialog.tsx`
+  - `src/features/products/components/product-barcode-label-dialog.test.tsx`
+  - `src/features/products/components/product-crud-actions.tsx`
+  - `src/features/products/pages/products-page.tsx`
+  - `src/services/message-template.service.ts`
+  - `src/services/message-template.service.test.ts`
+  - `src/features/settings/pages/message-templates-page.tsx`
+  - `src/features/settings/components/invoice-settings-form.tsx`
+  - `src/shared/components/pdf/*`
+  - `CHANGELOG.md`
+  - `docs/PANDUAN_FITUR.md`
+- Done:
+  - Added thermal barcode label sticker printing for physical service devices (50x30 mm, 40x30 mm, 58 mm).
+  - Added shelf barcode label dialog for products with dynamic copies adjustment to inventory stock.
+  - Implemented quick warranty lookup dialog with barcode scanner support, live remaining days calculation, and 1-tap WhatsApp sharing.
+  - Integrated contextual WhatsApp notifications for all service order status transitions, including dedicated pickup reminder template (`service_order_pengingat`).
+  - Implemented user-configurable PDF language settings (1 Page ID, 1 Page EN, Bilingual 2 Pages) across all 6 PDF document renderers.
+  - Added unit tests for new components and verified 100% test pass rate (312 tests across 99 test files).
+- Verification:
+  - `npm run lint` passed (0 errors).
+  - `npm run typecheck` passed (0 errors).
+  - `npx vitest run` passed (312 passed, 99 test files).
+  - `npm run build` passed.
+- Remaining:
+  - None. Everything verified and documented.
+
 ## New agent reporting rule
 
 After every agent completion, update this file before commit:
