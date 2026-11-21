@@ -1,7 +1,7 @@
 import { useLiveQuery } from '@/shared/hooks/use-live-query'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { localDb } from '@/services/local-db/client'
-import type { PdfCompanySettings, InvoiceThemeName } from './types'
+import type { PdfCompanySettings, InvoiceThemeName, PdfPrintLanguage } from './types'
 
 export function usePdfSettings(): PdfCompanySettings {
   const activeTenantId = useAuthStore((state) => state.activeTenant?.id)
@@ -11,6 +11,8 @@ export function usePdfSettings(): PdfCompanySettings {
   ) ?? []
 
   const themeRaw = settings.find(s => s.id === 'invoice-theme')?.value
+  const langRaw = settings.find(s => s.id === 'pdf-language')?.value
+  const pdfLanguage = (langRaw && ['id', 'en', 'both'].includes(langRaw) ? langRaw : 'id') as PdfPrintLanguage
 
   return {
     companyName: settings.find(s => s.id === 'company-name')?.value || 'KOTACOM POS',
@@ -22,5 +24,6 @@ export function usePdfSettings(): PdfCompanySettings {
     invoiceTerm: settings.find(s => s.id === 'invoice-term')?.value || 'Syarat & Ketentuan berlaku.',
     invoiceTheme: (themeRaw && ['klasik', 'korporat', 'modern', 'eksekutif'].includes(themeRaw) ? themeRaw : 'klasik') as InvoiceThemeName,
     invoiceLogo: settings.find(s => s.id === 'invoice-logo')?.value || undefined,
+    pdfLanguage,
   }
 }

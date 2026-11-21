@@ -80,10 +80,14 @@ function PaymentPage({ data, settings, lang }: { data: PdfPaymentData; settings:
 }
 
 export function PaymentPDF({ data, settings }: { data: PdfPaymentData; settings: PdfCompanySettings }) {
+  const lang = settings.pdfLanguage ?? 'id'
+  const showId = lang === 'id' || lang === 'both'
+  const showEn = lang === 'en' || lang === 'both'
+
   return (
     <Document>
-      <PaymentPage data={data} settings={settings} lang="id" />
-      <PaymentPage data={data} settings={settings} lang="en" />
+      {showId && <PaymentPage data={data} settings={settings} lang="id" />}
+      {showEn && <PaymentPage data={data} settings={settings} lang="en" />}
     </Document>
   )
 }

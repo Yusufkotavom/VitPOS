@@ -15,6 +15,7 @@ export type MessageTemplateType =
   | 'service_order_diambil'
   | 'service_order_garansi'
   | 'service_order_batal'
+  | 'service_order_pengingat'
   | 'service_order_status'
 
 export const TEMPLATE_LABELS: Record<MessageTemplateType, string> = {
@@ -30,6 +31,7 @@ export const TEMPLATE_LABELS: Record<MessageTemplateType, string> = {
   service_order_diambil: 'Service Order (Sudah Diambil)',
   service_order_garansi: 'Service Order (Garansi Servis)',
   service_order_batal: 'Service Order (Dibatalkan)',
+  service_order_pengingat: 'Service Order (Pengingat Pengambilan)',
   service_order_status: 'Service Order (Update Status)',
 }
 
@@ -44,6 +46,7 @@ export const TEMPLATE_VARIABLES: Record<MessageTemplateType, string[]> = {
   service_order_dikerjakan: ['code', 'customer_name', 'device', 'problem', 'status', 'cost', 'estimated_completion', 'date', 'notes', 'store_name'],
   service_order_selesai: ['code', 'customer_name', 'device', 'problem', 'status', 'cost', 'date', 'total', 'paid', 'remaining', 'items', 'change', 'payment_method', 'store_name', 'warranty'],
   service_order_diambil: ['code', 'customer_name', 'device', 'problem', 'status', 'cost', 'date', 'total', 'paid', 'remaining', 'items', 'change', 'payment_method', 'store_name', 'warranty'],
+  service_order_pengingat: ['code', 'customer_name', 'device', 'problem', 'status', 'cost', 'date', 'total', 'paid', 'remaining', 'items', 'change', 'payment_method', 'store_name', 'warranty'],
   service_order_garansi: ['code', 'customer_name', 'device', 'problem', 'status', 'cost', 'date', 'warranty', 'notes', 'store_name'],
   service_order_batal: ['code', 'customer_name', 'device', 'problem', 'status', 'notes', 'date', 'store_name'],
   service_order_status: ['code', 'customer_name', 'device', 'problem', 'status', 'cost', 'estimated_completion', 'date', 'total', 'paid', 'remaining', 'items', 'change', 'payment_method', 'store_name', 'notes'],
@@ -168,6 +171,21 @@ Unit servis telah diserahkan kepada pelanggan.
 *Garansi Servis:* {{warranty}}
 ─────────────────
 Terima kasih telah mempercayakan perbaikan kepada kami. Simpan pesan ini sebagai bukti garansi servis Anda.`,
+
+  service_order_pengingat: `🔔 *PENGINGAT PENGAMBILAN UNIT SERVICE*
+─────────────────
+*No Service:* {{code}}
+*Pelanggan:* {{customer_name}}
+*Perangkat:* {{device}}
+─────────────────
+Halo Kak {{customer_name}}, kami menginformasikan bahwa perbaikan perangkat Anda telah *SELESAI* dan siap diambil di toko.
+
+*Total Biaya:* {{total}}
+*Sudah Dibayar:* {{paid}}
+*Sisa Tagihan:* {{remaining}}
+*Garansi:* {{warranty}}
+─────────────────
+Silakan datang ke toko kami dengan menunjukkan nomor servis ini saat pengambilan. Terima kasih!`,
 
   service_order_garansi: `🛡️ *STATUS GARANSI SERVICE*
 ─────────────────

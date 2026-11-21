@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { PosSuccessDialog } from '@/features/pos/components/pos-success-dialog'
 import { ReceiptPrintLayout } from '@/features/pos/components/receipt-print-layout'
+import { ServiceOrderLabelDialog } from '@/features/service-orders/components/service-order-label-dialog'
 import { printPage } from '@/lib/print'
 import { formatDateTime } from '@/lib/date'
 import { formatCurrency } from '@/lib/format-currency'
@@ -11,6 +13,7 @@ import { localDb } from '@/services/local-db/client'
 import { messageTemplateService } from '@/services/message-template.service'
 import { usePdf } from '@/shared/components/pdf/use-pdf'
 import type { PosOrderSummary } from '@/features/pos/types/pos-order.types'
+import type { LocalServiceOrder } from '@/services/local-db/schema'
 
 export type ServiceSuccessMeta = {
   device: string
@@ -29,6 +32,35 @@ export function ServiceSuccessFlow({
 }) {
   const { t } = useTranslation()
   const { downloadPdf } = usePdf()
+  const [labelDialogOpen, setLabelDialogOpen] = useState(false)
+  const [serviceOrderRecord, setServiceOrderRecord] = useState<LocalServiceOrder | null>(null)
+
+  async function handleOpenLabel() {
+    if (!order) return
+    const dbOrder = await localDb.serviceOrders.get(order.id)
+    if (dbOrder) {
+      setServiceOrderRecord(dbOrder)
+    } else {
+      setServiceOrderRecord({
+        id: order.id,
+        tenantId: '',
+        code: order.code,
+        customerName: order.customerName || 'Umum',
+        customerId: order.customerId ?? undefined,
+        date: order.date.toISOString(),
+        status: 'Diterima',
+        deviceBrand: meta?.device,
+        complaint: meta?.complaint,
+        description: meta?.complaint || meta?.device || '',
+        cost: order.total,
+        paidTotal: order.amountPaid,
+        version: 1,
+        syncStatus: 'pending',
+        updatedAt: new Date().toISOString(),
+      })
+    }
+    setLabelDialogOpen(true)
+  }
 
   async function handleWhatsApp() {
     if (!order) return
@@ -103,10 +135,18 @@ export function ServiceSuccessFlow({
         detailRoute="/service-orders"
         onPrint={() => printPage()}
         onPrintSalesOrder={handleDownloadPdf}
+        onPrintLabel={handleOpenLabel}
         onWhatsApp={handleWhatsApp}
         onNewSale={onClose}
       />
       {order && <ReceiptPrintLayout order={order} />}
+      {serviceOrderRecord && (
+        <ServiceOrderLabelDialog
+          open={labelDialogOpen}
+          onOpenChange={setLabelDialogOpen}
+          order={serviceOrderRecord}
+        />
+      )}
     </>
   )
 }

@@ -134,11 +134,14 @@ function SalesOrderPage({ data, settings, theme, lang }: { data: PdfSalesOrderDa
 
 export function SalesOrderPDF({ data, settings }: { data: PdfSalesOrderData; settings: PdfCompanySettings }) {
   const theme = invoiceThemes[settings.invoiceTheme] ?? invoiceThemes.klasik
+  const lang = settings.pdfLanguage ?? 'id'
+  const showId = lang === 'id' || lang === 'both'
+  const showEn = lang === 'en' || lang === 'both'
 
   return (
     <Document>
-      <SalesOrderPage data={data} settings={settings} theme={theme} lang="id" />
-      <SalesOrderPage data={data} settings={settings} theme={theme} lang="en" />
+      {showId && <SalesOrderPage data={data} settings={settings} theme={theme} lang="id" />}
+      {showEn && <SalesOrderPage data={data} settings={settings} theme={theme} lang="en" />}
     </Document>
   )
 }

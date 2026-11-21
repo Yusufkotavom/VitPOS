@@ -9,6 +9,8 @@ export const invoiceThemeOptions: { value: InvoiceThemeName; label: string; desc
   { value: 'eksekutif', label: 'Eksekutif', description: 'Burgundy luxe dengan kontras hangat dan bold' },
 ]
 
+export type PdfPrintLanguage = 'id' | 'en' | 'both'
+
 export type PdfCompanySettings = {
   companyName: string
   companyPhone: string
@@ -19,6 +21,7 @@ export type PdfCompanySettings = {
   invoiceTerm: string
   invoiceTheme: InvoiceThemeName
   invoiceLogo?: string
+  pdfLanguage?: PdfPrintLanguage
 }
 
 export type PdfLineItem = {

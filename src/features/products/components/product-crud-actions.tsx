@@ -1,4 +1,4 @@
-import { PencilIcon, PlusIcon, Trash2Icon, Settings2, BookOpen } from 'lucide-react'
+import { PencilIcon, PlusIcon, Trash2Icon, Settings2, BookOpen, Barcode } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { createProductId } from '@/features/catalog/lib/entity-id'
 import { resolveTenantId } from '@/features/auth/stores/auth-store'
 import { ProductForm } from '@/features/products/components/product-form'
+import { ProductBarcodeLabelDialog } from '@/features/products/components/product-barcode-label-dialog'
 import { mapProductFormToRecord, mapProductRecordToFormValues, type ProductFormValues } from '@/features/products/schemas/product-form-schema'
 import { canDeleteProduct } from '@/shared/lib/delete-guard'
 import { productRepository } from '@/services/local-db/repository'
@@ -21,6 +22,7 @@ export function ProductCrudActions({ product }: { product?: LocalProduct }) {
   const { t } = useTranslation()
   const [formOpen, setFormOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [barcodeOpen, setBarcodeOpen] = useState(false)
   const [editProduct, setEditProduct] = useState<LocalProduct | undefined>()
   const [hasReferences, setHasReferences] = useState(false)
   const [referenceReason, setReferenceReason] = useState<string>()
@@ -181,6 +183,10 @@ export function ProductCrudActions({ product }: { product?: LocalProduct }) {
       </Dialog>
       {product ? (
         <>
+          <Button variant="outline" size="sm" onClick={() => setBarcodeOpen(true)}>
+            <Barcode data-icon="inline-start" className="size-4" />
+            Label
+          </Button>
           <Tooltip>
             <TooltipTrigger asChild>
               <span tabIndex={0}>
@@ -205,6 +211,12 @@ export function ProductCrudActions({ product }: { product?: LocalProduct }) {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          <ProductBarcodeLabelDialog
+            open={barcodeOpen}
+            onOpenChange={setBarcodeOpen}
+            product={product}
+          />
         </>
       ) : null}
     </div>

@@ -247,11 +247,14 @@ function InvoicePage({ data, settings, theme, lang }: { data: PdfInvoiceData; se
 
 export function InvoicePDF({ data, settings }: { data: PdfInvoiceData; settings: PdfCompanySettings }) {
   const theme = invoiceThemes[settings.invoiceTheme] ?? invoiceThemes.klasik
+  const lang = settings.pdfLanguage ?? 'id'
+  const showId = lang === 'id' || lang === 'both'
+  const showEn = lang === 'en' || lang === 'both'
 
   return (
     <Document>
-      <InvoicePage data={data} settings={settings} theme={theme} lang="id" />
-      <InvoicePage data={data} settings={settings} theme={theme} lang="en" />
+      {showId && <InvoicePage data={data} settings={settings} theme={theme} lang="id" />}
+      {showEn && <InvoicePage data={data} settings={settings} theme={theme} lang="en" />}
     </Document>
   )
 }

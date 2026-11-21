@@ -1,4 +1,4 @@
-import { Printer, MessageCircle, Plus, FileText } from 'lucide-react'
+import { Printer, MessageCircle, Plus, FileText, Barcode } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer'
 import { Button } from '@/components/ui/button'
@@ -16,6 +16,7 @@ export type PosSuccessDialogProps = {
   detailRoute?: string
   onPrint: () => void
   onPrintSalesOrder?: () => void
+  onPrintLabel?: () => void
   onWhatsApp: () => void
   onNewSale: () => void
 }
@@ -27,6 +28,7 @@ export function PosSuccessDialog({
   detailRoute,
   onPrint,
   onPrintSalesOrder,
+  onPrintLabel,
   onWhatsApp,
   onNewSale,
 }: PosSuccessDialogProps) {
@@ -75,6 +77,12 @@ export function PosSuccessDialog({
                 <DropdownMenuItem onClick={onPrintSalesOrder}>
                   <FileText className="mr-2 h-4 w-4" />
                   {t('pos.sales_order_a4')}
+                </DropdownMenuItem>
+              )}
+              {onPrintLabel && (
+                <DropdownMenuItem onClick={onPrintLabel}>
+                  <Barcode className="mr-2 h-4 w-4" />
+                  Stiker Label Unit (Thermal)
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>

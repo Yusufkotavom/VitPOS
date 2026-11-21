@@ -103,10 +103,14 @@ function ReceiptPage({ data, settings, lang }: { data: PdfReceiptData; settings:
 }
 
 export function ReceiptPDF({ data, settings }: { data: PdfReceiptData; settings: PdfCompanySettings }) {
+  const lang = settings.pdfLanguage ?? 'id'
+  const showId = lang === 'id' || lang === 'both'
+  const showEn = lang === 'en' || lang === 'both'
+
   return (
     <Document>
-      <ReceiptPage data={data} settings={settings} lang="id" />
-      <ReceiptPage data={data} settings={settings} lang="en" />
+      {showId && <ReceiptPage data={data} settings={settings} lang="id" />}
+      {showEn && <ReceiptPage data={data} settings={settings} lang="en" />}
     </Document>
   )
 }

@@ -133,11 +133,14 @@ function DeliveryNotePage({ data, settings, theme, lang }: { data: PdfDeliveryNo
 
 export function DeliveryNotePDF({ data, settings }: { data: PdfDeliveryNoteData; settings: PdfCompanySettings }) {
   const theme = invoiceThemes[settings.invoiceTheme] ?? invoiceThemes.klasik
+  const lang = settings.pdfLanguage ?? 'id'
+  const showId = lang === 'id' || lang === 'both'
+  const showEn = lang === 'en' || lang === 'both'
 
   return (
     <Document>
-      <DeliveryNotePage data={data} settings={settings} theme={theme} lang="id" />
-      <DeliveryNotePage data={data} settings={settings} theme={theme} lang="en" />
+      {showId && <DeliveryNotePage data={data} settings={settings} theme={theme} lang="id" />}
+      {showEn && <DeliveryNotePage data={data} settings={settings} theme={theme} lang="en" />}
     </Document>
   )
 }

@@ -335,11 +335,14 @@ function ServicePage({
 
 export function ServicePDF({ data, settings }: { data: PdfServiceData; settings: PdfCompanySettings }) {
   const theme = invoiceThemes[settings.invoiceTheme] ?? invoiceThemes.klasik
+  const lang = settings.pdfLanguage ?? 'id'
+  const showId = lang === 'id' || lang === 'both'
+  const showEn = lang === 'en' || lang === 'both'
 
   return (
     <Document>
-      <ServicePage data={data} settings={settings} theme={theme} lang="id" />
-      <ServicePage data={data} settings={settings} theme={theme} lang="en" />
+      {showId && <ServicePage data={data} settings={settings} theme={theme} lang="id" />}
+      {showEn && <ServicePage data={data} settings={settings} theme={theme} lang="en" />}
     </Document>
   )
 }

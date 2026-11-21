@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { formatCurrency } from '@/lib/format-currency'
 import { cn } from '@/lib/utils'
 import { ServiceOrderCrudActions } from '@/features/service-orders/components/service-order-crud-actions'
+import { ServiceWarrantyLookupDialog } from '@/features/service-orders/components/service-warranty-lookup-dialog'
 import { useServiceOrders } from '@/features/service-orders/hooks/use-service-orders'
 import { useServiceVertical } from '@/features/service-orders/hooks/use-service-vertical'
 import { DataTable } from '@/shared/components/data-table/data-table'
@@ -73,6 +74,7 @@ export function ServiceOrdersPage() {
   const [sortBy, setSortBy] = useState('newest')
   const [pageSize, setPageSize] = useState('20')
   const [filterOpen, setFilterOpen] = useState(false)
+  const [warrantyLookupOpen, setWarrantyLookupOpen] = useState(false)
 
   const customers = useMemo(
     () => Array.from(new Set(serviceRows.map((row) => row.customerName).filter(Boolean))).toSorted((a, b) => a.localeCompare(b)),
@@ -147,6 +149,15 @@ export function ServiceOrdersPage() {
               className="w-full lg:w-64"
             />
             <div className="flex items-center gap-2 lg:ml-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 text-emerald-700 dark:text-emerald-400 border-emerald-600/30 hover:bg-emerald-500/10"
+                onClick={() => setWarrantyLookupOpen(true)}
+              >
+                <ShieldCheck className="h-4 w-4" />
+                Cek Garansi
+              </Button>
               <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm" className="relative gap-2">
@@ -367,6 +378,11 @@ export function ServiceOrdersPage() {
           {t('service_orders.showing_count', { count: paginated.length, total: filtered.length })}
         </p>
       </ContentCard>
+
+      <ServiceWarrantyLookupDialog
+        open={warrantyLookupOpen}
+        onOpenChange={setWarrantyLookupOpen}
+      />
     </PageShell>
   )
 }

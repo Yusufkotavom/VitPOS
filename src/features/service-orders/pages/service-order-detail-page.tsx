@@ -4,6 +4,8 @@ import { Link, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
   ArrowRight,
+  Barcode,
+  BellRing,
   Check,
   CheckCircle2,
   Clock,
@@ -50,9 +52,11 @@ import { getPaymentMethodDisplay, buildQuickCashOptions } from '@/features/pos/l
 import { JobLineEditor } from '@/features/service-orders/components/job-line-editor'
 import { JobCatalogPicker } from '@/features/service-orders/components/job-catalog-picker'
 import { ServiceOrderStatusDialog } from '@/features/service-orders/components/service-order-status-dialog'
+import { ServiceOrderLabelDialog } from '@/features/service-orders/components/service-order-label-dialog'
 import { addWarrantyDuration, buildWarrantyTimelineNote, isJobOverdue, isWarrantyExpired, resolveServiceWarranty } from '@/features/service-orders/lib/warranty'
 import { normalizeJobLines, sumJobLines, validateJobLines } from '@/features/service-orders/lib/job-lines'
 import { saveJobLineAsCatalogService } from '@/features/service-orders/lib/save-line-as-service'
+import type { MessageTemplateType } from '@/services/message-template.service'
 import type { LocalJobLine, ServiceOrderStatus } from '@/services/local-db/schema'
 import type { PdfData } from '@/shared/components/pdf/types'
 
@@ -173,9 +177,12 @@ export function ServiceOrderDetailPage() {
   const [payMethod, setPayMethod] = useState('tunai')
   const [statusDialogOpen, setStatusDialogOpen] = useState(false)
   const [statusDialogTarget, setStatusDialogTarget] = useState<ServiceOrderStatus | undefined>(undefined)
+  const [statusDialogTemplate, setStatusDialogTemplate] = useState<MessageTemplateType | undefined>(undefined)
+  const [labelDialogOpen, setLabelDialogOpen] = useState(false)
 
-  function openStatusDialog(target?: ServiceOrderStatus) {
+  function openStatusDialog(target?: ServiceOrderStatus, initialTemplate?: MessageTemplateType) {
     setStatusDialogTarget(target)
+    setStatusDialogTemplate(initialTemplate)
     setStatusDialogOpen(true)
   }
 
@@ -431,6 +438,10 @@ export function ServiceOrderDetailPage() {
             <Download className="mr-2 h-4 w-4" />
             {t('common.pdf')}
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setLabelDialogOpen(true)}>
+            <Barcode className="mr-2 h-4 w-4" />
+            Cetak Label
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -524,6 +535,17 @@ export function ServiceOrderDetailPage() {
                   >
                     <ArrowRight className="mr-1.5 size-3.5" />
                     Lanjut: {nextStatus}
+                  </Button>
+                )}
+                {order.status === 'Selesai' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs font-medium text-amber-700 dark:text-amber-400 border-amber-600/30 hover:bg-amber-500/10"
+                    onClick={() => openStatusDialog('Selesai', 'service_order_pengingat')}
+                  >
+                    <BellRing className="mr-1.5 size-3.5" />
+                    Pengingat Ambil (WA)
                   </Button>
                 )}
                 <Button
@@ -1159,10 +1181,18 @@ export function ServiceOrderDetailPage() {
         onOpenChange={setStatusDialogOpen}
         order={order}
         initialTargetStatus={statusDialogTarget}
+        initialTemplateType={statusDialogTemplate}
         customerPhone={customer?.phone}
         totalPaid={totalPaid}
         remaining={remaining}
         onSuccess={() => refetch()}
+      />
+
+      <ServiceOrderLabelDialog
+        open={labelDialogOpen}
+        onOpenChange={setLabelDialogOpen}
+        order={order}
+        customerPhone={customer?.phone}
       />
     </PageShell>
   )

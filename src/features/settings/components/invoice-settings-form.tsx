@@ -38,6 +38,7 @@ export function InvoiceSettingsForm() {
   const hydrated = useRef(false)
 
   const [theme, setTheme] = useState<InvoiceThemeName>('klasik')
+  const [pdfLanguage, setPdfLanguage] = useState<'id' | 'en' | 'both'>('id')
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null)
   const logoInputRef = useRef<HTMLInputElement>(null)
@@ -53,6 +54,10 @@ export function InvoiceSettingsForm() {
     const themeRaw = settings.find((s) => s.id === 'invoice-theme')?.value
     if (themeRaw && ['klasik', 'korporat', 'modern', 'eksekutif'].includes(themeRaw)) {
       setTheme(themeRaw as InvoiceThemeName)
+    }
+    const langRaw = settings.find((s) => s.id === 'pdf-language')?.value
+    if (langRaw && ['id', 'en', 'both'].includes(langRaw)) {
+      setPdfLanguage(langRaw as 'id' | 'en' | 'both')
     }
     const savedLogo = settings.find((s) => s.id === 'invoice-logo')?.value
     if (savedLogo) setLogoUrl(savedLogo)
@@ -103,6 +108,16 @@ export function InvoiceSettingsForm() {
         area: 'Invoice & Struk',
         setting: 'Tema Invoice',
         value: theme,
+        status: 'Lengkap',
+        updatedAt: now,
+      })
+
+      await settingRepository.upsert({
+        id: 'pdf-language',
+        tenantId: resolveTenantId(settings.find((s) => s.id === 'pdf-language')?.tenantId),
+        area: 'Invoice & Struk',
+        setting: 'Bahasa Dokumen Cetak',
+        value: pdfLanguage,
         status: 'Lengkap',
         updatedAt: now,
       })
@@ -176,6 +191,51 @@ export function InvoiceSettingsForm() {
                   </div>
                   <span className="text-xs font-medium">{opt.label}</span>
                   <span className="text-[10px] text-muted-foreground leading-tight">{opt.description}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-6 space-y-4 rounded-xl border p-4">
+        <div>
+          <Label className="text-sm font-medium">Bahasa Dokumen Cetak (PDF / Nota / Invoice)</Label>
+          <p className="text-xs text-muted-foreground mb-3">
+            Pilih bahasa saat mencetak dokumen PDF. Secara default dokumen dicetak 1 halaman dalam Bahasa Indonesia.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              {
+                value: 'id' as const,
+                title: 'Bahasa Indonesia Saja',
+                desc: '1 Halaman (Standar - Ringkas & Hemat Kertas)',
+              },
+              {
+                value: 'en' as const,
+                title: 'English Only',
+                desc: '1 Page (International English Format)',
+              },
+              {
+                value: 'both' as const,
+                title: 'Bilingual (Keduanya)',
+                desc: '2 Halaman (Hal. 1 Indonesia, Hal. 2 English)',
+              },
+            ].map((opt) => {
+              const isActive = pdfLanguage === opt.value
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setPdfLanguage(opt.value)}
+                  className={`flex flex-col items-start gap-1 rounded-xl border-2 p-3 text-left transition-all hover:shadow-xs ${
+                    isActive ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-border/60 bg-muted/20'
+                  }`}
+                >
+                  <span className={`text-xs font-semibold ${isActive ? 'text-primary' : 'text-foreground'}`}>
+                    {opt.title}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground leading-tight">{opt.desc}</span>
                 </button>
               )
             })}

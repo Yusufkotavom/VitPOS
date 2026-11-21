@@ -119,6 +119,7 @@ export type ServiceOrderStatusDialogProps = {
   onOpenChange: (open: boolean) => void
   order: LocalServiceOrder
   initialTargetStatus?: ServiceOrderStatus
+  initialTemplateType?: MessageTemplateType
   customerPhone?: string
   totalPaid: number
   remaining: number
@@ -130,6 +131,7 @@ export function ServiceOrderStatusDialog({
   onOpenChange,
   order,
   initialTargetStatus,
+  initialTemplateType,
   customerPhone = '',
   totalPaid,
   remaining,
@@ -190,7 +192,8 @@ export function ServiceOrderStatusDialog({
       setSendWa(Boolean(customerPhone.trim()))
 
       const defaultTpl: MessageTemplateType =
-        next === 'Selesai'
+        initialTemplateType ??
+        (next === 'Selesai'
           ? 'service_order_selesai'
           : next === 'Diambil'
             ? 'service_order_diambil'
@@ -204,10 +207,10 @@ export function ServiceOrderStatusDialog({
                     ? 'service_order_batal'
                     : next === 'Diterima'
                       ? 'service_order_masuk'
-                      : 'service_order_status'
+                      : 'service_order_status')
       setTemplateType(defaultTpl)
     }
-  }, [open, initialTargetStatus, order, customerPhone])
+  }, [open, initialTargetStatus, initialTemplateType, order, customerPhone])
 
   // Automatically update template type when targetStatus changes
   const suggestedTemplateType = useMemo<MessageTemplateType>(() => {
@@ -687,6 +690,9 @@ export function ServiceOrderStatusDialog({
                       </SelectItem>
                       <SelectItem value="service_order_selesai">
                         Service Selesai (Siap Diambil di Toko)
+                      </SelectItem>
+                      <SelectItem value="service_order_pengingat">
+                        Pengingat Pengambilan (Follow-up Unit Selesai)
                       </SelectItem>
                       <SelectItem value="service_order_diambil">
                         Sudah Diambil (Penyerahan ke Pelanggan)
