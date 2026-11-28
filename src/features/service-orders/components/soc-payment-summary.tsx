@@ -121,6 +121,7 @@ export function SocPaymentSummary({
           price: line.unitPrice,
           qty: line.qty,
           subtotal: line.subtotal,
+          note: line.note,
         })),
         customerId: store.customerId,
         customerName: store.customerName ?? 'Umum',

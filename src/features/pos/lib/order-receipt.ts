@@ -23,6 +23,7 @@ export async function buildInvoicePdfData(order: PosOrderSummary, notes: string)
       qty: item.qty,
       price: item.price,
       subtotal: item.subtotal,
+      note: item.note,
     })),
     summary: {
       subtotal: order.subtotal,

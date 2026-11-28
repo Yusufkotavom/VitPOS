@@ -13,6 +13,7 @@ interface CartItem {
   qty: number
   price: number
   subtotal: number
+  note?: string
 }
 
 interface PosTotals {
@@ -56,6 +57,7 @@ export const posTransactionService = {
       qty: cartItem.qty,
       unitPrice: cartItem.price,
       subtotal: cartItem.subtotal,
+      note: cartItem.note,
     }))
 
     const draftOrder: LocalSalesOrder = {
@@ -116,6 +118,7 @@ export const posTransactionService = {
       qty: cartItem.qty,
       unitPrice: cartItem.price,
       subtotal: cartItem.subtotal,
+      note: cartItem.note,
     }))
 
     const rawPaid = validSplits.length > 0

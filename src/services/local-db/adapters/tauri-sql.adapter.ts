@@ -217,7 +217,7 @@ class TauriSqlAdapterImpl implements LocalDbAdapter {
       productCategories: `id TEXT PRIMARY KEY, tenantId TEXT, name TEXT, description TEXT, status TEXT, syncStatus TEXT, version INTEGER, updatedAt TEXT`,
       customers: `id TEXT PRIMARY KEY, tenantId TEXT, name TEXT, phone TEXT, city TEXT, receivable REAL, orders INTEGER, status TEXT, syncStatus TEXT, version INTEGER, updatedAt TEXT`,
       salesOrders: `id TEXT PRIMARY KEY, tenantId TEXT, code TEXT, customerId TEXT, customerName TEXT, shiftId TEXT, date TEXT, subtotal REAL, discountTotal REAL, taxTotal REAL, grandTotal REAL, paidTotal REAL, notes TEXT, status TEXT, items TEXT, syncStatus TEXT, version INTEGER, updatedAt TEXT`,
-      salesOrderItems: `id TEXT PRIMARY KEY, tenantId TEXT, salesOrderId TEXT, productId TEXT, name TEXT, qty REAL, unitPrice REAL, subtotal REAL`,
+      salesOrderItems: `id TEXT PRIMARY KEY, tenantId TEXT, salesOrderId TEXT, productId TEXT, name TEXT, qty REAL, unitPrice REAL, subtotal REAL, note TEXT`,
       payments: `id TEXT PRIMARY KEY, tenantId TEXT, ref TEXT, salesOrderId TEXT, serviceOrderId TEXT, purchaseId TEXT, shiftId TEXT, source TEXT, method TEXT, amount REAL, date TEXT, status TEXT, syncStatus TEXT, version INTEGER, updatedAt TEXT`,
       stockMovements: `id TEXT PRIMARY KEY, tenantId TEXT, productId TEXT, productName TEXT, warehouseId TEXT, warehouseName TEXT, type TEXT, qty REAL, referenceType TEXT, referenceId TEXT, notes TEXT, syncStatus TEXT, updatedAt TEXT`,
       inventory: `id TEXT PRIMARY KEY, tenantId TEXT, product TEXT, warehouse TEXT, stockSystem REAL, stockSafe REAL, movement TEXT, status TEXT`,
@@ -245,6 +245,16 @@ class TauriSqlAdapterImpl implements LocalDbAdapter {
     })
 
     await this.db.execute(statements.join('\n'))
+
+    // Column migrations for existing databases (idempotent)
+    const migrations = [`ALTER TABLE salesOrderItems ADD COLUMN note TEXT`]
+    for (const migration of migrations) {
+      try {
+        await this.db.execute(migration)
+      } catch {
+        // Column already exists — expected on fresh install or already migrated
+      }
+    }
   }
 
   async teardown(): Promise<void> {

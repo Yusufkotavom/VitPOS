@@ -183,6 +183,7 @@ function ServicePage({
             >
               <View style={baseStyles.colItem}>
                 <Text>{item.name}</Text>
+                {item.note ? <Text style={{ fontSize: 8, color: theme.mutedText }}>• {item.note}</Text> : null}
               </View>
               <View style={baseStyles.colQty}>
                 <Text>{item.qty}</Text>

@@ -112,6 +112,7 @@ export type LocalSalesOrderItem = {
   qty: number
   unitPrice: number
   subtotal: number
+  note?: string
 }
 
 export type LocalSalesOrder = {

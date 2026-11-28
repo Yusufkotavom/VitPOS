@@ -70,6 +70,32 @@ function tone(status: string) {
   return 'warning' as const
 }
 
+function CustomFieldAdder({ onAdd }: { onAdd: (key: string) => void }) {
+  const { t } = useTranslation()
+  const [key, setKey] = useState('')
+  function add() {
+    const trimmed = key.trim()
+    if (!trimmed) return
+    onAdd(trimmed)
+    setKey('')
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <Input
+        value={key}
+        onChange={(event) => setKey(event.target.value)}
+        onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); add() } }}
+        placeholder={t('service_orders.add_custom_field', { defaultValue: 'Tambah field, mis. No. Rangka' })}
+        className="h-10 flex-1"
+        aria-label={t('service_orders.add_custom_field', { defaultValue: 'Tambah field' })}
+      />
+      <Button type="button" variant="outline" size="sm" onClick={add}>
+        <Plus className="h-4 w-4" />
+      </Button>
+    </div>
+  )
+}
+
 const CORE_STATUS_STEPS = [
   {
     status: 'Diterima' as const,
@@ -207,7 +233,7 @@ export function ServiceOrderDetailPage() {
       paidTotal: totalPaid,
       status: remaining <= 0 ? 'Lunas' : 'Sebagian',
     },
-    items: lines.map((line) => ({ name: line.name, qty: line.qty, price: line.unitPrice, subtotal: line.subtotal })),
+    items: lines.map((line) => ({ name: line.name, qty: line.qty, price: line.unitPrice, subtotal: line.subtotal, note: line.note })),
     warranty: resolvedWarranty.hasWarranty && resolvedWarranty.warrantyEndDate ? {
       value: resolvedWarranty.warrantyValue ?? 0,
       unit: resolvedWarranty.warrantyUnit ?? 'hari',
@@ -354,6 +380,7 @@ export function ServiceOrderDetailPage() {
           price: line.unitPrice,
           costPrice: line.costPrice,
           subtotal: line.subtotal,
+          note: line.note,
         })),
         status: editStatus,
         technicianName: editTechnician.trim() || undefined,
@@ -699,6 +726,39 @@ export function ServiceOrderDetailPage() {
                       />
                     </label>
                   ))}
+                {(() => {
+                  const known = new Set<string>(vertical.intakeFields.map((f) => f.key))
+                  const extra = Object.keys(editDetails).filter((k) => !known.has(k))
+                  return (
+                    <div className="flex flex-col gap-2 sm:col-span-2">
+                      <p className="text-xs font-medium text-muted-foreground">{t('service_orders.custom_fields', { defaultValue: 'Field tambahan' })}</p>
+                      {extra.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">{t('service_orders.no_custom_fields', { defaultValue: 'Belum ada. Tambah jika perlu (mis. serial, warna, catatan teknisi).' })}</p>
+                      ) : null}
+                      {extra.map((k) => (
+                        <div key={k} className="flex items-center gap-2">
+                          <Input value={k} readOnly className="h-10 w-32 shrink-0 bg-muted/50 font-medium" aria-label={t('service_orders.custom_field_key', { defaultValue: 'Nama field' })} />
+                          <Input
+                            value={editDetails[k] ?? ''}
+                            onChange={(event) => setEditDetails((prev) => ({ ...prev, [k]: event.target.value }))}
+                            placeholder={t('service_orders.custom_field_value', { defaultValue: 'Nilai' })}
+                            className="h-10 flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            aria-label={t('service_orders.remove_custom_field', { defaultValue: 'Hapus' })}
+                            onClick={() => setEditDetails((prev) => { const next = { ...prev }; delete next[k]; return next })}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <CustomFieldAdder onAdd={(key) => setEditDetails((prev) => ({ ...prev, [key]: prev[key] ?? '' }))} />
+                    </div>
+                  )
+                })()}
               </div>
             ) : (
               <div className="space-y-3 text-sm">
@@ -745,6 +805,16 @@ export function ServiceOrderDetailPage() {
                         </div>
                       )
                     })}
+                  {(() => {
+                    const known = new Set<string>(vertical.intakeFields.map((f) => f.key))
+                    const extra = Object.entries(order.details ?? {}).filter(([k, v]) => !known.has(k) && v)
+                    return extra.map(([k, v]) => (
+                      <div key={k}>
+                        <p className="text-xs text-muted-foreground">{k}</p>
+                        <p className="font-medium">{v}</p>
+                      </div>
+                    ))
+                  })()}
                 </div>
 
                 <div>

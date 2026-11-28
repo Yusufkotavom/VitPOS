@@ -5,6 +5,17 @@ Format penulisan mengacu pada [Keep a Changelog](https://keepachangelog.com/id/1
 
 ---
 
+## [2.2.0] - 2026-11-27
+
+### Ditambahkan (Added)
+- **Catatan per item pada nota (Nota/Struk/Invoice):**
+  - Kolom `note` pada item penjualan (`sales_order_items`) — server schema, Drizzle migration `0011`, Dexie `LocalSalesOrderItem`, serta adapter SQLite & Tauri-SQL (auto `ALTER TABLE`).
+  - Input **catatan per item** di form Sales Order dan di dialog edit keranjang **POS** (catatan ikut tersimpan pada checkout maupun draft).
+  - `PdfLineItem.note` dicetak di **Invoice**, **Surat Pesanan (sales-order)**, **Service Order**, dan **struk** (format `• catatan`).
+  - Service Order: catatan baris pekerjaan (`LocalJobLine.note`) kini tercetak di PDF nota servis.
+- **Field tambahan bebas pada Service Order (bisa edit/tambah):**
+  - Di halaman detail servis (mode edit) tersedia blok **"Field tambahan"** — tambah field (nama + nilai), hapus, dan tampil otomatis di mode lihat; tersimpan pada `details` (JSONB).
+
 ## [2.1.0] - 2026-11-21
 
 ### Ditambahkan (Added)

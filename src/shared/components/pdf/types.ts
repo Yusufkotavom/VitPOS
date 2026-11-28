@@ -29,6 +29,7 @@ export type PdfLineItem = {
   qty: number
   price: number
   subtotal: number
+  note?: string
 }
 
 export type PdfCustomer = {

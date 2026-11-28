@@ -347,6 +347,7 @@ var salesOrderItems = pgTable("sales_order_items", {
   unitPrice: numeric("unit_price", { precision: 14, scale: 2 }).notNull(),
   discountTotal: numeric("discount_total", { precision: 14, scale: 2 }).default("0").notNull(),
   subtotal: numeric("subtotal", { precision: 14, scale: 2 }).notNull(),
+  note: text("note"),
   ...timestamps
 }, (table) => [index("sales_order_items_tenant_id_idx").on(table.tenantId), index("sales_order_items_order_id_idx").on(table.salesOrderId), index("sales_order_items_product_id_idx").on(table.productId)]);
 var payments = pgTable("payments", {

@@ -190,7 +190,7 @@ function InvoicePage({ data, settings, theme, lang }: { data: PdfInvoiceData; se
         </View>
         {data.items.map((item, i) => (
           <View key={i} style={[baseStyles.tableRow, { borderTopColor: theme.tableBorderColor, backgroundColor: i % 2 === 0 ? theme.cardBg : theme.cardSoftBg }]}>
-            <View style={baseStyles.colItem}><Text>{item.name}</Text></View>
+            <View style={baseStyles.colItem}><Text>{item.name}</Text>{item.note ? <Text style={{ fontSize: 8, color: theme.mutedText }}>• {item.note}</Text> : null}</View>
             <View style={baseStyles.colQty}><Text>{item.qty}</Text></View>
             <View style={baseStyles.colPrice}><Text>{fmt(item.price)}</Text></View>
             <View style={baseStyles.colTotal}><Text style={{ fontWeight: 'bold' }}>{fmt(item.subtotal)}</Text></View>

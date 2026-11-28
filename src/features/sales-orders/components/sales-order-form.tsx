@@ -95,11 +95,15 @@ export function SalesOrderForm({ defaultValues, submitLabel, onCancel, onSubmit 
               {fields.length > 1 ? (
                 <Button aria-label={t('sales_orders.remove_item', { index: index + 1 })} type="button" variant="ghost" size="sm" onClick={() => remove(index)}><Trash2Icon aria-hidden="true" /></Button>
               ) : null}
+              <label className="flex flex-col gap-1 text-sm font-medium sm:col-span-full" htmlFor={`sales-order-item-note-${index}`}>
+                <span className="sm:sr-only">{t('sales_orders.item_note', { defaultValue: 'Catatan item' })}</span>
+                <Input id={`sales-order-item-note-${index}`} aria-label={t('sales_orders.item_note', { defaultValue: 'Catatan item' })} placeholder={t('sales_orders.item_note_placeholder', { defaultValue: 'Catatan (opsional) — mis. custom, warna, ukuran…' })} {...form.register(`items.${index}.note`)} />
+              </label>
             </div>
           ))}
         </div>
         {errors.items?.message ? <span className="text-xs text-destructive">{errors.items.message}</span> : null}
-        <Button type="button" variant="outline" size="sm" onClick={() => append({ productId: '', name: '', qty: '1', unitPrice: '0' })}>{t('sales_orders.add_item')}</Button>
+        <Button type="button" variant="outline" size="sm" onClick={() => append({ productId: '', name: '', qty: '1', unitPrice: '0', note: '' })}>{t('sales_orders.add_item')}</Button>
       </FormSection>
 
       <FormSection title={t('sales_orders.discount_tax_section_title')} description={t('sales_orders.discount_tax_section_description')}>

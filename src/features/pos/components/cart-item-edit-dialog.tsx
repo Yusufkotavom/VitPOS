@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { CurrencyInput } from '@/shared/components/forms/currency-input'
+import { Textarea } from '@/components/ui/textarea'
 import { formatCurrency } from '@/lib/format-currency'
 import { type PosCartItem } from '@/features/pos/types/pos.types'
 
@@ -18,12 +19,13 @@ export function CartItemEditDialog({
   onSave: (updates: Partial<PosCartItem>) => void
 }) {
   const [price, setPrice] = useState(item?.price ?? 0)
+  const [note, setNote] = useState(item?.note ?? '')
 
   const { t } = useTranslation()
   if (!item) return null
 
   function handleSave() {
-    onSave({ price })
+    onSave({ price, note: note.trim() || undefined })
     onOpenChange(false)
   }
 
@@ -48,6 +50,16 @@ export function CartItemEditDialog({
             <p className="text-xs text-muted-foreground">
               {t('pos.subtotal')}: {formatCurrency(price * item.qty)}
             </p>
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="note" className="text-sm font-medium">{t('pos.note_optional', { defaultValue: 'Catatan (opsional)' })}</label>
+            <Textarea
+              id="note"
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder={t('pos.note_item_placeholder', { defaultValue: 'Mis. custom, warna, ukuran, permintaan khusus…' })}
+              rows={2}
+            />
           </div>
         </div>
 

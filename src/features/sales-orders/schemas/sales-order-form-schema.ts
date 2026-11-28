@@ -12,6 +12,7 @@ export const salesOrderItemSchema = z.object({
   name: z.string().trim().min(1, 'Nama produk wajib diisi'),
   qty: z.string().trim().min(1, 'Qty wajib diisi'),
   unitPrice: z.string().trim().min(1, 'Harga wajib diisi'),
+  note: z.string().trim().optional(),
 })
 
 export const salesOrderFormSchema = z.object({
@@ -33,7 +34,7 @@ export const salesOrderInitialValues: SalesOrderFormValues = {
   discountTotal: '0',
   taxTotal: '0',
   status: 'Draft',
-  items: [{ productId: '', name: '', qty: '1', unitPrice: '0' }],
+  items: [{ productId: '', name: '', qty: '1', unitPrice: '0', note: '' }],
 }
 
 export function mapSalesOrderFormToRecord(values: SalesOrderFormValues, id: string, base?: LocalSalesOrder): LocalSalesOrder {
@@ -50,6 +51,7 @@ export function mapSalesOrderFormToRecord(values: SalesOrderFormValues, id: stri
       qty,
       unitPrice,
       subtotal: qty * unitPrice,
+      note: item.note?.trim() || undefined,
     }
   })
 
@@ -96,7 +98,7 @@ export function mapSalesOrderRecordToFormValues(order: LocalSalesOrder): SalesOr
     taxTotal: String(order.taxTotal),
     status: order.status,
     items: (order.items?.length ?? 0) > 0
-      ? order.items.map((item) => ({ productId: item.productId ?? '', name: item.name, qty: String(item.qty), unitPrice: String(item.unitPrice) }))
-      : [{ productId: '', name: '', qty: '1', unitPrice: '0' }],
+      ? order.items.map((item) => ({ productId: item.productId ?? '', name: item.name, qty: String(item.qty), unitPrice: String(item.unitPrice), note: item.note ?? '' }))
+      : [{ productId: '', name: '', qty: '1', unitPrice: '0', note: '' }],
   }
 }
